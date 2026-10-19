@@ -88,6 +88,7 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'scripts/verify-list-inspection.mjs',
     'scripts/verify-stats-focus.mjs',
     'scripts/verify-account-deletion.mjs',
+    'scripts/verify-presentation.mjs',
     'scripts/quality/browser-support.mjs',
     'scripts/quality/browser-fixtures.mjs',
     'ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json',

@@ -88,7 +88,7 @@ jobs:
       - name: Generate and compile the Swift client
         run: bash scripts/verify-swift-client.sh
 
-  # Builds the real app and runs six bounded test suites on an owned simulator. The
+  # Builds the real app and runs bounded test suites on an owned simulator. The
   # api-dtos:check step in `quality` only compares generated text, and
   # `swift-client` above compiles a separate OpenAPI-generated package, so
   # this job additionally catches runtime failures and requires nonzero tests.

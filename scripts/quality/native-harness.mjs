@@ -7,6 +7,9 @@ import { fileURLToPath } from 'node:url';
 import { runCommand } from './process.mjs';
 
 export const nativeSuites = [
+  'ActivityMapTests/PresentationTests',
+  'ActivityMapTests/DisplayPreferencesTests',
+  'ActivityMapTests/StravaConnectTests',
   'ActivityMapTests/ActivityFilterTests',
   'ActivityMapTests/ActivityStoreSelectionTests',
   'ActivityMapTests/SelectionFixtureTests',

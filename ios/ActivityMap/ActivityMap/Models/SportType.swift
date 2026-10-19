@@ -9,17 +9,10 @@ nonisolated enum ActivityCategory: String, CaseIterable, Identifiable, Sendable 
 
     var id: String { rawValue }
 
-    var name: String {
-        switch self {
-        case .bcXcSki: return "BC & XC Ski"
-        case .trailHike: return "Trail / Hike"
-        case .run: return "Run"
-        case .ride: return "Ride"
-        case .misc: return "Miscellaneous"
-        }
-    }
+    var localizedName: LocalizedStringResource { SportPresentation.name(rawValue) }
+    var name: String { String(localized: localizedName) }
 
-    // Generated from the web category catalogue by scripts/sync-ios-sport-assets.ts.
+    // Generated from shared/presentation by scripts/generate-presentation.mjs.
     var assetName: String { "Sport-\(rawValue)" }
     @MainActor var color: Color { Color(assetName) }
 
@@ -87,18 +80,6 @@ nonisolated enum SportType: String, CaseIterable, Identifiable, Sendable {
     var id: String { rawValue }
 
     var category: ActivityCategory {
-        switch self {
-        case .backcountrySki, .nordicSki, .rollerSki:
-            return .bcXcSki
-        case .hike, .trailRun, .rockClimbing, .snowshoe:
-            return .trailHike
-        case .run, .virtualRun:
-            return .run
-        case .ride, .virtualRide, .gravelRide, .mountainBikeRide, .eBikeRide,
-             .eMountainBikeRide, .handcycle, .velomobile:
-            return .ride
-        default:
-            return .misc
-        }
+        ActivityCategory(rawValue: SportPresentation.categoryIDs[rawValue] ?? "misc") ?? .misc
     }
 }
