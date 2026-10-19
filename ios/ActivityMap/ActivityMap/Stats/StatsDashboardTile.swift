@@ -32,7 +32,6 @@ struct StatsDashboardTile: View {
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
-    @Environment(\.statsAvailableWidth) private var availableWidth
     @Environment(\.statsInspectedActivityID) private var inspectedActivityID
     @State private var contentWidth: CGFloat = 0
     @State var volumeRange = StatsHistoryRange.weeks
@@ -87,7 +86,7 @@ struct StatsDashboardTile: View {
 
     var body: some View {
         StatsTileSurface(title: tile.title, titleResource: tile.id.titleResource(locale: locale), period: period,
-                         expand: StatsDashboard.expandable(tile.id) && !(tile.id == .sportMix && availableWidth >= 760 && !expanded) ? toggleExpansion : nil,
+                         expand: StatsDashboard.expandable(tile.id) ? toggleExpansion : nil,
                          expanded: expanded, compactHeader: pilot, detailScreen: detailScreen,
                          controlsInContent: tile.id == .activityCalendar && !expanded) {
             if !headlineControls || displayed == nil { controls }
@@ -113,6 +112,7 @@ struct StatsDashboardTile: View {
         }
         .environment(\.statsTileInspection, inspection)
         .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { contentWidth = $0 }
+        .accessibilityElement(children: .contain)
         .accessibilityIdentifier("stats-tile-\(tile.id.rawValue)")
         .zIndex(expanded ? 1 : 0)
     }
@@ -186,12 +186,9 @@ struct StatsDashboardTile: View {
             if let top = shares.first {
                 Text("\(Text("\(StatsDisplay.number(top.share * 100, locale: locale))%").font(AppTheme.Typography.metric)) \(Text(top.sport.name).font(.caption).foregroundColor(.secondary))").monospacedDigit().fixedSize(horizontal: false, vertical: true)
                 note(shares.count == 1 ? "One sport represented; no mix to compare" : "of \(StatsDisplay.measurement(hours, metric: .time, units: units, locale: locale)) moving time")
-                if availableWidth >= 760 {
-                    StatsSportMixVisual(shares: shares, breakdown: breakdown, expanded: true)
-                        .environment(\.statsExpansionProgress, 1)
-                } else {
-                    StatsSportMixVisual(shares: shares, breakdown: breakdown, expanded: expanded)
-                }
+                // Window width chooses the detail's layout, never its amount
+                // of information. Compact cards keep the same summary on iPad.
+                StatsSportMixVisual(shares: shares, breakdown: breakdown, expanded: expanded)
             } else { note("No moving time yet") }
         case .hilliness(let climb, let activities):
             headline(units.hilliness(climb.current / 100), unit: units.hillinessUnit, decimals: 1)

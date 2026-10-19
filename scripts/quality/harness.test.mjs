@@ -43,7 +43,7 @@ async function temporary(t) {
   return directory;
 }
 
-test('native runtime eligibility reports iOS 27 native-sheet coverage without skipping iOS 26 cases', () => {
+test('native runtime eligibility reports iOS 27 sheet and content Back coverage while retaining iOS 26 calendar regressions', () => {
   const older = nativeSuiteEligibility('26.2');
   assert.deepEqual(older.ineligibleSuites, [
     {
@@ -58,8 +58,26 @@ test('native runtime eligibility reports iOS 27 native-sheet coverage without sk
       actual: '26.2',
       reason: 'Retained native-sheet continuation fixture',
     },
+    {
+      suite: 'ActivityMapTests/DetailBackGestureTests',
+      requires: 'iOS 27+',
+      actual: '26.2',
+      reason: 'Native content-pop recognizer delegate contract',
+    },
+    {
+      suite: 'ActivityMapUITests/StatsUITests',
+      requires: 'iOS 27+',
+      actual: '26.2',
+      reason: 'Stats calendar pan and native content Back contract',
+    },
   ]);
-  assert.equal(older.suites.length, nativeSuites.length - 2);
+  assert.equal(older.suites.length, nativeSuites.length - 4);
+  assert(older.suites.includes('ActivityMapTests/StatsCalendarLayoutTests'));
+  assert(
+    older.suites.includes('ActivityMapTests/StatsCalendarScrollRenderingTests'),
+  );
+  assert(!older.suites.includes('ActivityMapTests/DetailBackGestureTests'));
+  assert(!older.suites.includes('ActivityMapUITests/StatsUITests'));
   assert(older.suites.includes('ActivityMapUITests/MapPhotoUITests'));
   assert(!older.suites.includes('ActivityMapUITests/MapRotationUITests'));
   assert(

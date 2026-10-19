@@ -183,11 +183,10 @@ private struct StatsDetailDestination<Content: View>: View {
     @AppToolbarEnvironment private var toolbarLayout
 
     var body: some View {
-        content()
-        .background(AppTheme.contentBackground)
-        .navigationTitle(title)
-        .navigationBarBackButtonHidden()
-        .appNavigationBar(AppToolbar(
+        // The regular workspace already owns stationary chrome. A single
+        // modifier chain preserves the destination identity during resizing;
+        // visible=false suppresses both native and safe-area detail bars.
+        page.appNavigationBar(AppToolbar(
             leading: AnyView(AppToolbarBackButton(label: backLabel, identifier: "stats-detail-back", action: goBack)),
             principal: AnyView(Text(title).font(.headline).foregroundStyle(.white)
                 .lineLimit(toolbarLayout.isCompact ? 1 : nil)
@@ -195,9 +194,16 @@ private struct StatsDetailDestination<Content: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("stats-detail-title")),
-            trailing: toolbarTrailing), embedded: usesShellHeader)
-        .background(DetailBackGesture())
-        .accessibilityAction(.escape) { goBack() }
+            trailing: toolbarTrailing), visible: !usesShellHeader)
+    }
+    private var page: some View {
+        content()
+            .background(AppTheme.contentBackground)
+            .navigationTitle(title)
+            .navigationBarBackButtonHidden()
+            .environment(\.statsDetailBackAction, goBack)
+            .background(DetailBackGesture())
+            .accessibilityAction(.escape) { goBack() }
     }
     private func goBack() {
         if closeInspection?() != true { dismiss() }
@@ -214,15 +220,19 @@ struct StatsDetailScreen: View {
     var usesShellHeader = false
     var toolbarTrailing = AnyView(EmptyView())
 
+    private var backLabel: String {
+        dashboard.inspectedActivityID != nil ? "Back to \(tile.title)" : "Back to Stats dashboard"
+    }
     var body: some View {
         StatsDetailDestination(title: tile.title,
-                               backLabel: dashboard.inspectedActivityID != nil ? "Back to \(tile.title)" : "Back to Stats dashboard",
+                               backLabel: backLabel,
                                usesShellHeader: usesShellHeader, toolbarTrailing: toolbarTrailing, closeInspection: {
             guard dashboard.inspectedActivityID != nil else { return false }
             dashboard.inspectedActivityID = nil
             return true
         }) {
-            StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
+            StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync,
+                               showsContentHeading: usesShellHeader, backLabel: backLabel)
         }
     }
 }
@@ -233,6 +243,10 @@ private struct StatsDetailContent: View {
     let dashboard: StatsDashboardState
     let tile: StatsTileDefinition
     var sync: SyncController? = nil
+    var showsContentHeading = false
+    var backLabel = "Back to Stats dashboard"
+    @Environment(\.statsDetailBackAction) private var goBack
+    @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
 
     private var presentation: StatsPresentation {
@@ -265,9 +279,11 @@ private struct StatsDetailContent: View {
         StatsActivityInspection(store: store, dashboard: dashboard, backLabel: "Back to \(tile.title)") {
         GeometryReader { geometry in
             ScrollView {
-                if let emptyTitle {
-                    ContentUnavailableView(emptyTitle, systemImage: "chart.bar")
-                } else {
+                VStack(alignment: .leading, spacing: 0) {
+                    if showsContentHeading { contentHeading }
+                    if let emptyTitle {
+                        ContentUnavailableView(emptyTitle, systemImage: "chart.bar")
+                    } else {
                     StatsDashboardTile(tile: tile, store: store, dashboard: dashboard,
                                        expanded: true, detailScreen: true,
                                        toggleExpansion: {}, openActivity: { dashboard.inspectedActivityID = $0 })
@@ -277,6 +293,7 @@ private struct StatsDetailContent: View {
                                      ? Double(geometry.size.height) - 170 : nil)
                         .environment(\.statsFocusChartHeight, focusChartHeight(geometry.size))
                         .transaction { $0.animation = nil }
+                    }
                 }
             }
             .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
@@ -287,6 +304,35 @@ private struct StatsDetailContent: View {
         .task(id: request) { await dashboard.load(store: store, request: request) }
 
     }
+
+    private var contentHeading: some View {
+        HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
+            Button { goBack?() } label: {
+                BrowseActionIcon(.back)
+                    .font(.system(size: 20, weight: .medium))
+                    .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.accent)
+            .accessibilityLabel(backLabel)
+            .accessibilityIdentifier("stats-detail-back")
+            Text(tile.id.titleResource(locale: locale))
+                .font(.title2.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("stats-detail-title")
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, AppTheme.Spacing.small)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("stats-detail-content-heading")
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var statsDetailBackAction: (() -> Void)? = nil
 }
 
 /// Share the dashboard reference, not a second selection. UIKit's destination

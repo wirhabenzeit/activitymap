@@ -316,6 +316,7 @@ struct StatsSportMixVisual: View {
     let shares: [StatsShare]
     let breakdown: [ActivityCategory: StatsTotals]
     let expanded: Bool
+    @Environment(\.statsExpansionProgress) private var sharedExpansionProgress
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var contentWidth: CGFloat = 0
     var body: some View {
@@ -328,9 +329,13 @@ struct StatsSportMixVisual: View {
                     }
                 }
             }.frame(height: 10).clipShape(RoundedRectangle(cornerRadius: 2)).accessibilityHidden(true)
-            StatsExpansionReveal(expanded: expanded) {
-                if typeSize.isAccessibilitySize || contentWidth < 600 { detailRows }
-                else { ViewThatFits(in: .horizontal) { detailTable.fixedSize(horizontal: true, vertical: false); detailRows } }
+            // Fully compact cards must not retain detail-only accessibility
+            // descendants. Keep the reveal while an inline transition runs.
+            if expanded || (sharedExpansionProgress ?? 0) > 0 {
+                StatsExpansionReveal(expanded: expanded) {
+                    if typeSize.isAccessibilitySize || contentWidth < 600 { detailRows }
+                    else { ViewThatFits(in: .horizontal) { detailTable.fixedSize(horizontal: true, vertical: false); detailRows } }
+                }
             }
             StatsExpansionReveal(expanded: !expanded, inverted: true) {
                 LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible(), alignment: .leading)] : [GridItem(.adaptive(minimum: 140), alignment: .leading)], alignment: .leading, spacing: 6) {
