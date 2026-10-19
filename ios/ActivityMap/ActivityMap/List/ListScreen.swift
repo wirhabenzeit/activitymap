@@ -9,6 +9,7 @@ struct ListScreen: View {
     @Environment(\.browsePaneWidth) private var paneWidth
     @Environment(\.listShellNavigation) private var shellNavigation
     @Environment(\.listRootToolbar) private var shellToolbar
+    @Environment(\.listRootHeader) private var shellHeader
     @State private var localPushedDetail = false
     private var hasPushedDetail: Bool {
         get { shellNavigation?.detailPresented ?? localPushedDetail }
@@ -44,7 +45,7 @@ struct ListScreen: View {
                         .frame(maxHeight: .infinity)
                 }
             }
-            .modifier(ListRootChrome(toolbar: shellToolbar,
+            .modifier(ListRootChrome(toolbar: shellToolbar, header: shellHeader,
                                      visible: store.selectedTab == .list && (!sideBySide || hasPushedDetail)))
             // Inspecting is ordinary navigation. Back only clears inspection;
             // the retained list and selection/camera owners remain unchanged.
@@ -141,9 +142,14 @@ struct ListScreen: View {
 
 private struct ListRootChrome: ViewModifier {
     let toolbar: BrowseRootToolbar?
+    let header: AnyView?
     let visible: Bool
     @ViewBuilder func body(content: Content) -> some View {
-        if let toolbar {
+        if let header {
+            content
+                .toolbar(.hidden, for: .navigationBar)
+                .safeAreaInset(edge: .top, spacing: 0) { header }
+        } else if let toolbar {
             content
                 .toolbar(visible ? .visible : .hidden, for: .navigationBar)
                 .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)

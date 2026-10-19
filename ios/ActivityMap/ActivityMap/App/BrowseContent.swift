@@ -10,6 +10,7 @@ struct BrowseContent: View {
     @Environment(\.browseStatsDestination) private var statsDestination
     @Environment(\.stravaConnect) private var stravaConnect
     @Environment(\.browsePaneWidth) private var paneWidth
+    @Environment(\.listRootHeader) private var listRootHeader
     @State private var landscapeInsets = PhoneLandscapeInsets()
 
     var body: some View {
@@ -25,6 +26,9 @@ struct BrowseContent: View {
                             // Establish inline metrics before the first detail push.
                             .navigationBarTitleDisplayMode(.inline)
                     }
+                    // Compact List owns its header inside this stack. Reclaim
+                    // the shell's placeholder consistently, including offscreen.
+                    .ignoresSafeArea(.container, edges: listRootHeader == nil ? [] : .top)
                     if !footerHostedByShell { BrowseListFooter(store: store) }
                 }
                     .id(store.mapContext.scopeRevision)
@@ -148,6 +152,9 @@ extension EnvironmentValues {
     @Entry var listFooterHostedByShell = false
     @Entry var listShellNavigation: ListShellNavigation? = nil
     @Entry var listRootToolbar: BrowseRootToolbar? = nil
+    /// Compact landscape chrome belongs to the List's root page, so pushing
+    /// native detail does not resize the navigation controller itself.
+    @Entry var listRootHeader: AnyView? = nil
 
     /// The shell's target column width, independent of a retained native
     /// navigation root's temporarily stale frame during destination switches.

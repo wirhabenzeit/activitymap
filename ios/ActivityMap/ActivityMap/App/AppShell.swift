@@ -226,6 +226,7 @@ struct AppShell: View {
                         navigableContent(nativeListHeader: nativeListHeader, sidebarAvailable: sidebarAvailable)
                             .environment(\.browsePaneWidth, contentWidth)
                             .environment(\.listRootToolbar, usesStatsNavigation ? nil : browseRootToolbar(sidebarAvailable: sidebarAvailable))
+                            .environment(\.listRootHeader, compactBar ? AnyView(shellHeader(sidebarAvailable: sidebarAvailable)) : nil)
                             .environment(\.filtersCollapseForDetail, panelTight && sheets.showsFilters && !panelFloats)
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
@@ -259,17 +260,30 @@ struct AppShell: View {
             VStack(spacing: 0) {
                 NavigationStack {
                     content
+                        // Root-only chrome travels away with a pushed page;
+                        // its native Back bar keeps the same navigation frame.
+                        .safeAreaInset(edge: .top, spacing: 0) {
+                            if compactBar {
+                                if store.selectedTab == .list {
+                                    // The inner List stack owns its root header.
+                                    // Keep the outer inset stable for retained tabs.
+                                    Color.clear.frame(height: 44).allowsHitTesting(false)
+                                } else {
+                                    shellHeader(sidebarAvailable: sidebarAvailable)
+                                }
+                            }
+                        }
                         .navigationBarTitleDisplayMode(.inline)
-                        .toolbar((store.selectedTab == .list && nativeListHeader)
+                        .toolbar(!compactBar && ((store.selectedTab == .list && nativeListHeader)
                                  || (store.selectedTab == .stats && nativeStatsHeader)
-                                 || (store.selectedTab == .map && nativeMapHeader) ? .visible : .hidden, for: .navigationBar)
+                                 || (store.selectedTab == .map && nativeMapHeader)) ? .visible : .hidden, for: .navigationBar)
                         .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
                         .toolbarBackgroundVisibility(.visible, for: .navigationBar)
                         .toolbarColorScheme(.dark, for: .navigationBar)
                         .toolbar {
-                            if (store.selectedTab == .list && nativeListHeader)
+                            if !compactBar && ((store.selectedTab == .list && nativeListHeader)
                                 || (store.selectedTab == .stats && nativeStatsHeader)
-                                || (store.selectedTab == .map && nativeMapHeader) {
+                                || (store.selectedTab == .map && nativeMapHeader)) {
                                 browseRootToolbar(sidebarAvailable: sidebarAvailable)
                             }
                         }
@@ -405,6 +419,11 @@ struct AppShell: View {
 
     /// iPhone landscape: a slimmer bar that also carries the List's status row (#315).
     private var compactBar: Bool { verticalSizeClass == .compact && !typeSize.isAccessibilitySize }
+    // iPad keeps regular size classes when rotated; its landscape root header
+    // can use the same 44pt targets without the portrait bar's extra padding.
+    private var compactHeader: Bool {
+        !typeSize.isAccessibilitySize && (verticalSizeClass == .compact || shellSize.width > shellSize.height)
+    }
     private var syncing: Bool { sync?.status.showsLoadingIndicator == true }
 
     private func browseRootToolbar(sidebarAvailable: Bool) -> BrowseRootToolbar {
@@ -441,7 +460,7 @@ struct AppShell: View {
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 16)
-        .frame(height: compactBar ? 44 : 54)
+        .frame(height: compactHeader ? 44 : 54)
         // Controls stay inside the safe area; only the colour reaches the edges.
         .background(AppTheme.navigationBlue.ignoresSafeArea(edges: [.top, .horizontal]))
         .accessibilityElement(children: .contain)
@@ -557,18 +576,21 @@ struct AppShell: View {
                         .foregroundStyle(Color.white)
                         .frame(minWidth: 54)
                         .padding(.horizontal, 8)
-                        .frame(minHeight: compactBar ? 36 : 44)
+                        .frame(minHeight: compactHeader ? 36 : 44)
                         .background(
                             store.selectedTab == tab ? Color.white.opacity(0.22) : .clear,
                             in: Capsule()
                         )
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(store.selectedTab == tab ? .isSelected : [])
                 .accessibilityIdentifier("browse-destination-\(tab.title.lowercased())")
             }
         }
-        .padding(compactBar ? 2 : 3)
+        .padding(.horizontal, compactHeader ? 2 : 3)
+        .padding(.vertical, compactHeader ? 0 : 3)
         .background(Color.white.opacity(0.08), in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")

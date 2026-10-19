@@ -44,7 +44,7 @@ struct RoutePickerSheet: View {
                         .accessibilityHidden(detail != nil || expansion < 0.8)
                     if detail != nil {
                         MapActivityPager(store: store, picker: picker, expansion: expansion, compactProfile: !isSidePanel,
-                                         scrollsHeading: isSidePanel, bottomContentInset: bottomInset)
+                                         bottomContentInset: bottomInset)
                             .accessibilityHint(candidates.count > 1 ? "Swipe left or right to browse selected activities" : "")
                             .transition(.identity)
                     }

@@ -103,7 +103,6 @@ struct ActivityDetailPanel: View {
     var showsHeading = true
     var mapExpansion: MapActivityExpansion? = nil
     var compactMapProfile = false
-    var scrollsMapHeading = false
     var mapBottomContentInset: CGFloat = 0
     /// Only the visible tab's panel loads its elevation profile.
     var hostTab = AppTab.list
@@ -116,7 +115,7 @@ struct ActivityDetailPanel: View {
             if let activity {
                 if let mapExpansion {
                     MapActivityDetailReveal(store: store, activity: activity, expansion: mapExpansion, compactProfile: compactMapProfile,
-                                            scrollsHeading: scrollsMapHeading, bottomContentInset: mapBottomContentInset,
+                                            bottomContentInset: mapBottomContentInset,
                                             trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID)) { id in
                         if let showOnMap { showOnMap(id) }
                         else if overMap { store.mapContext.request(.fitActivity(id)) }
@@ -155,41 +154,37 @@ private struct MapActivityDetailReveal: View {
     let activity: Activity
     let expansion: MapActivityExpansion
     let compactProfile: Bool
-    let scrollsHeading: Bool
     let bottomContentInset: CGFloat
-    private var progress: CGFloat { scrollsHeading ? 1 : expansion.progress }
+    @Environment(\.dynamicTypeSize) private var typeSize
+    // Side panels reveal a fixed-height viewport when expanded. Keep their
+    // content layout stable while the outer host collapses or expands.
+    private var progress: CGFloat { compactProfile ? expansion.progress : 1 }
     let trailingInset: CGFloat
     let hasRoute: Bool
     let showOnMap: (Int) -> Void
     private var reveal: CGFloat { min(1, max(0, (progress - 0.25) / 0.75)) }
 
     var body: some View {
-        if scrollsHeading {
-            // Keep the entire landscape/iPad detail in the stable scroll viewport.
-            ScrollView {
-                VStack(spacing: 0) {
-                    heading
-                    fullDetail
-                }
-                .padding(.bottom, bottomContentInset)
-            }
-            .accessibilityIdentifier("activity-detail-scroll")
-            .clipped()
-        } else {
-            VStack(spacing: 0) {
-                heading
-                ScrollView { fullDetail.padding(.bottom, bottomContentInset) }
-                    .accessibilityIdentifier("activity-detail-scroll")
-                    .clipped()
-                    .allowsHitTesting(progress > 0.8)
-            }
+        VStack(spacing: 0) {
+            heading
+            ScrollView { fullDetail.padding(.bottom, bottomContentInset) }
+                .accessibilityIdentifier("activity-detail-scroll")
+                .clipped()
+                .allowsHitTesting(progress > 0.8)
         }
+    }
+
+    // A short side panel must retain space to scroll at accessibility sizes.
+    // The title remains complete in VoiceOver and the activity editor.
+    private var titleLineLimit: Int {
+        if !compactProfile && typeSize.isAccessibilitySize { return 1 }
+        return progress > 0.8 ? 2 : 1
     }
 
     // The Map title row has no duplicate Fit action; the group header owns it.
     private var heading: some View {
         ActivityDetailHeading(activity: activity, trailingInset: trailingInset,
-                              titleLineLimit: compactProfile ? (expansion.progress > 0.8 ? 2 : 1) : nil,
+                              titleLineLimit: titleLineLimit,
                               hasRoute: hasRoute, showOnMap: showOnMap, editing: store.activityEditing)
             .padding(.horizontal, AppTheme.Spacing.large)
             .padding(.vertical, AppTheme.Spacing.small)

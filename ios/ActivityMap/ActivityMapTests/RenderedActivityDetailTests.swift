@@ -36,6 +36,16 @@ extension RenderedRoutePickingTests {
         let viewport = scroll.convert(scroll.bounds, to: host.host.view)
         #expect(viewport.height >= 100, "Short landscapes must have a usable detail viewport: \(viewport)")
         #expect(abs(viewport.maxY - size.height) < 1, "Content must scroll through the bottom safe area, without a fixed blank strip: \(viewport)")
+        let initialImage = host.snapshot()
+        func titleFrame(in image: UIImage) throws -> CGRect {
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+            return try #require(request.results?.first {
+                $0.topCandidates(1).first?.string.contains("A long") == true
+            }).boundingBox
+        }
+        let initialTitleFrame = try titleFrame(in: initialImage)
         scroll.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
         try await Task.sleep(for: .milliseconds(150))
         let offset = scroll.contentOffset
@@ -55,6 +65,9 @@ extension RenderedRoutePickingTests {
         request.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        let scrolledTitleFrame = try titleFrame(in: image)
+        #expect(abs(scrolledTitleFrame.minY - initialTitleFrame.minY) * size.height < 2,
+                "The activity name must stay pinned while the details scroll")
         #expect(text.contains("Route only"), "The final export row must be visible at the end of scrolling: \(text)")
         let lowestText = (request.results ?? []).map(\.boundingBox.minY).min() ?? 0
         #expect(lowestText * size.height >= bottom - 1, "Final text must still stop above the home indicator")
@@ -772,7 +785,7 @@ extension RenderedRoutePickingTests {
 
 
 extension RenderedRoutePickingTests {
-    @Test func landscapePanelShowsLoadedProfileWithScrollingHeading() async throws {
+    @Test func landscapePanelShowsLoadedProfileWithPinnedHeading() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity(["id": "1", "name": "Landscape ride"])
         try await storage.apply([.upsertActivity(dto)], scope: Fixtures.scope)
@@ -800,7 +813,7 @@ extension RenderedRoutePickingTests {
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
         #expect(text.contains("Landscape ride") && text.contains("Elevation (m)") && text.contains("Distance (km)"),
-                "The scrolling heading and complete chart axes must fit in the opening landscape panel: \(text)")
+                "The pinned heading and complete chart axes must fit in the opening landscape panel: \(text)")
         #expect(!text.contains("Fit route"), "Detail content must not add another Fit action")
     }
 }

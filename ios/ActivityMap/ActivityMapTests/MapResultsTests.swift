@@ -78,6 +78,7 @@ struct MapResultsTests {
                 }
                 #expect(layouts[0].contentHeight < layouts[1].contentHeight)
                 #expect(layouts[1].frame == layouts[2].frame)
+                #expect(layouts[2].frame.minY == 48, "Expanded side panels leave a 4pt gap below the toolbar")
                 #expect(layouts.allSatisfy { abs($0.frame.maxX - (size.width - 16)) < 0.01 })
                 #expect(layouts.allSatisfy { $0.bottomOcclusion == 0 && $0.trailingOcclusion == layouts[0].trailingOcclusion })
                 #expect(layouts.allSatisfy { $0.frame.maxY == size.height + 21 }, "Both states meet the physical bottom edge through the safe area")
@@ -115,7 +116,7 @@ struct MapResultsTests {
     func detentsLeaveNavigationAvailable(size: CGSize) {
         for detent in MapResultsDetent.allCases {
             let layout = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
-            #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + 34)
+            #expect(layout.frame.minY >= (layout.isSidePanel ? 110 : 118) && layout.frame.maxY <= size.height + 34)
             #expect(layout.frame.minX >= (layout.isSidePanel ? 12 : 4) && layout.frame.maxX <= size.width)
             if layout.isSidePanel {
                 #expect(size.width - layout.trailingOcclusion - 16 >= 160)

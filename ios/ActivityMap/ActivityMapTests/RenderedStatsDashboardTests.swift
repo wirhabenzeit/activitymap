@@ -165,7 +165,8 @@ import Testing
         try await Task.sleep(for: .milliseconds(400))
         let navigation = try #require(host.contentNavigation())
         #expect(host.shellAccountButton() != nil)
-        #expect(!navigation.isNavigationBarHidden, "The phone dashboard and detail share a native header")
+        #expect(navigation.isNavigationBarHidden == (variant == "landscape"),
+                "The compact landscape dashboard uses its custom root header; native focus navigation remains available")
         let root = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[0].view)
             .first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)

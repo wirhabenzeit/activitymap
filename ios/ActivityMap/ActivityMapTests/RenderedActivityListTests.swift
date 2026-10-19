@@ -3,6 +3,7 @@ import Observation
 import SwiftUI
 import Testing
 import UIKit
+import Vision
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
@@ -655,8 +656,17 @@ extension RenderedRoutePickingTests {
         list.setContentOffset(CGPoint(x: 0, y: 200), animated: false)
         try await Task.sleep(for: .milliseconds(200))
         let offset = list.contentOffset
-        #expect(!navigation.isNavigationBarHidden)
-        let headerBottom = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view).maxY
+        let customRootHeader = scenario == "landscape"
+        #expect(navigation.isNavigationBarHidden == customRootHeader,
+                "Compact landscape uses the custom browsing header; other roots keep their native bar")
+        let headerBottom: CGFloat
+        if customRootHeader {
+            headerBottom = try compactBrowseHeaderBottom(in: host.snapshot())
+            #expect(abs(headerBottom - (host.window.safeAreaInsets.top + 44)) < 1,
+                    "The compact browsing header ends 44pt below the top safe area")
+        } else {
+            headerBottom = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view).maxY
+        }
         let listTop = list.convert(list.bounds, to: host.host.view).minY
         #expect(listTop + list.adjustedContentInset.top >= headerBottom,
                 "The retained List starts below the visible shell bar")
@@ -700,6 +710,7 @@ extension RenderedRoutePickingTests {
         let detailGestureDelegate = popGesture.delegate
         store.selectedTab = .map
         try await Task.sleep(for: .milliseconds(200))
+        try host.save("list-detail-map-return-\(scenario)")
         #expect(host.accessibilityElement(label: "Settings") != nil,
                 "The browsing header returns on Map while List retains its detail")
         store.selectedTab = .list
@@ -710,8 +721,13 @@ extension RenderedRoutePickingTests {
         #expect(list.contentOffset == offset)
         #expect(store.selectedActivityIDs.isEmpty)
         #expect(popGesture.delegate !== detailGestureDelegate, "Restore UIKit's gesture delegate after leaving detail")
-        #expect(!navigation.isNavigationBarHidden && navigation.viewControllers.count == 1,
-                "Back restores the browsing toolbar in the same native header")
+        #expect(navigation.isNavigationBarHidden == customRootHeader && navigation.viewControllers.count == 1,
+                "Back restores the root's compact or native browsing header")
+        if customRootHeader {
+            let restoredBottom = try compactBrowseHeaderBottom(in: host.snapshot())
+            #expect(abs(restoredBottom - headerBottom) < 1,
+                    "Back restores the compact browsing header inside the List root")
+        }
         try host.save("list-single-header-back-\(scenario)")
     }
 
@@ -860,11 +876,14 @@ private final class ListHarness<Content: View> {
         host.view.frame = window.bounds
         host.view.layoutIfNeeded()
     }
-    func save(_ name: String) throws {
+    func snapshot() -> UIImage {
         host.view.layoutIfNeeded()
-        let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
+        return UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
             host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
         }
+    }
+    func save(_ name: String) throws {
+        let image = snapshot()
         let directory = URL(fileURLWithPath: "/private/tmp/activitymap-ios-211-screenshots")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         try image.pngData()?.write(to: directory.appendingPathComponent("\(name).png"))
@@ -1238,4 +1257,90 @@ extension RenderedRoutePickingTests {
             try saveSheet("translucent-detail")
         }
     }
+}
+
+
+extension RenderedRoutePickingTests {
+    @Test func phoneLandscapeBrowseHeaderKeepsCompactGeometry() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer {
+            MapboxOptions.accessToken = token
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+        try await listWait { scene.effectiveGeometry.interfaceOrientation == .landscapeRight }
+        let store = ActivityStore(activities: (1...3).map { ActivityStoreSelectionTests.activity($0) },
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        let host = try ListHarness(root: AppShell(store: store)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.verticalSizeClass, .compact)
+            .environment(\.dynamicTypeSize, .large)
+            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
+            size: scene.effectiveGeometry.coordinateSpace.bounds.size)
+        defer { host.host.dismiss(animated: false); host.close() }
+        for orientation in [UIInterfaceOrientation.landscapeRight, .landscapeLeft] {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: orientation == .landscapeRight ? .landscapeRight : .landscapeLeft))
+            try await listWait { scene.effectiveGeometry.interfaceOrientation == orientation }
+            host.window.frame = scene.effectiveGeometry.coordinateSpace.bounds
+            host.host.view.frame = host.window.bounds
+            host.host.view.layoutIfNeeded()
+            for tab in [AppTab.map, .list, .stats] {
+                store.selectedTab = tab
+                try await Task.sleep(for: .milliseconds(500))
+                let image = host.snapshot()
+                let headerBottom = try compactBrowseHeaderBottom(in: image)
+                let expectedBottom = host.window.safeAreaInsets.top + 44
+                #expect(abs(headerBottom - expectedBottom) < 1,
+                        "Landscape browsing keeps a 44pt blue header below the top safe area: \(tab), \(headerBottom), \(expectedBottom)")
+                #expect(host.controllers(of: UINavigationController.self).allSatisfy {
+                    $0.isNavigationBarHidden || $0.navigationBar.window == nil
+                }, "The compact root header must not be stacked with another native navigation bar")
+                let pixels = try #require(image.cgImage)
+                let scale = CGFloat(pixels.width) / image.size.width
+                let header = try #require(pixels.cropping(to: CGRect(x: 0, y: 0, width: pixels.width,
+                    height: Int((expectedBottom * scale).rounded()))))
+                let request = VNRecognizeTextRequest()
+                request.recognitionLevel = .accurate
+                request.recognitionLanguages = ["en-US"]
+                request.usesLanguageCorrection = false
+                try VNImageRequestHandler(cgImage: header).perform([request])
+                let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+                #expect(["Map", "List", "Stats"].allSatisfy { text.contains($0) },
+                        "All browsing destinations remain visibly labelled in the compact header: \(text)")
+                try host.save("compact-header-\(tab.title.lowercased())-\(orientation.rawValue)")
+            }
+        }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        try await listWait { scene.effectiveGeometry.interfaceOrientation == .portrait }
+    }
+}
+
+/// Read the solid navigation-blue strip at the blank physical left margin.
+/// Decode to explicit RGBA instead of assuming the renderer's provider format.
+@MainActor
+private func compactBrowseHeaderBottom(in image: UIImage) throws -> CGFloat {
+    let pixels = try #require(image.cgImage)
+    let width = pixels.width, height = pixels.height
+    var rgba = [UInt8](repeating: 0, count: width * height * 4)
+    try rgba.withUnsafeMutableBytes { buffer in
+        let context = try #require(CGContext(data: buffer.baseAddress, width: width, height: height,
+            bitsPerComponent: 8, bytesPerRow: width * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue | CGBitmapInfo.byteOrder32Big.rawValue))
+        context.draw(pixels, in: CGRect(x: 0, y: 0, width: width, height: height))
+    }
+    let scale = CGFloat(width) / image.size.width
+    let x = min(width - 1, max(0, Int((2 * scale).rounded())))
+    func isNavigationBlue(_ row: Int) -> Bool {
+        let offset = (row * width + x) * 4
+        let red = Double(rgba[offset]) / 255, green = Double(rgba[offset + 1]) / 255
+        let blue = Double(rgba[offset + 2]) / 255
+        return red < 0.22 && green > 0.30 && green < 0.62 && blue > 0.65
+            && blue - red > 0.35 && blue - green > 0.15
+    }
+    var bottom = 0
+    while bottom < height && isNavigationBlue(bottom) { bottom += 1 }
+    #expect(bottom > 0 && bottom < height, "The rendered header has a solid blue top edge and a visible lower boundary")
+    return CGFloat(bottom) / scale
 }
