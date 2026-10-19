@@ -95,6 +95,36 @@ try {
       before,
       'Edit actions stay fixed while fields scroll',
     );
+    // Opening is insufficient: an option can be visible but covered by the dialog.
+    const sport = dialog.getByRole('combobox', { name: 'Sport type' });
+    await sport.click();
+    const run = page.getByRole('option', { name: 'Run', exact: true });
+    await run.scrollIntoViewIfNeeded();
+    await run.evaluate((element) =>
+      Promise.all(
+        element
+          .getAnimations()
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+    );
+    assert(
+      await run.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return element.contains(
+          document.elementFromPoint(
+            rect.x + rect.width / 2,
+            rect.y + rect.height / 2,
+          ),
+        );
+      }),
+      'Sport choice must be on top of the dialog',
+    );
+    await run.click();
+    assert.equal(await sport.textContent(), 'Run');
+    assert(
+      await save.isEnabled(),
+      'Selecting a new sport changes the actual form',
+    );
     await dialog.getByRole('button', { name: 'Close Edit activity' }).click();
     await page
       .getByRole('button', { name: 'Open Settings', exact: true })
@@ -121,6 +151,31 @@ try {
       create && create.y + create.height <= viewport.height - 15,
       'Share action stays reachable',
     );
+    const expiry = dialog.getByRole('combobox', { name: 'Expires after' });
+    await expiry.click();
+    const oneDay = page.getByRole('option', { name: '1 day', exact: true });
+    await oneDay.scrollIntoViewIfNeeded();
+    await oneDay.evaluate((element) =>
+      Promise.all(
+        element
+          .getAnimations()
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+    );
+    assert(
+      await oneDay.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return element.contains(
+          document.elementFromPoint(
+            rect.x + rect.width / 2,
+            rect.y + rect.height / 2,
+          ),
+        );
+      }),
+      'Share expiry choice must be on top of the dialog',
+    );
+    await oneDay.click();
+    assert.equal(await expiry.textContent(), '1 day');
     await page.screenshot({
       path: join(output, `share-${viewport.width}x${viewport.height}.png`),
     });
@@ -200,6 +255,58 @@ try {
     .filter({ hasText: '212×92:true' })
     .waitFor();
 
+  await page
+    .getByRole('button', { name: 'Open nested popups', exact: true })
+    .click();
+  const nestedDialog = page.getByRole('dialog', {
+    name: 'Nested popups',
+    exact: true,
+  });
+  await nestedDialog
+    .getByRole('button', { name: 'Open dialog popover', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Change from popover', exact: true })
+    .click();
+  assert.equal(await page.locator('[data-popup-changes]').textContent(), '1');
+  await page.keyboard.press('Escape');
+  await page
+    .getByRole('button', { name: 'Change from popover', exact: true })
+    .waitFor({ state: 'hidden' });
+  assert(
+    await nestedDialog.isVisible(),
+    'Dismissing a popover leaves its owning dialog open',
+  );
+  await nestedDialog
+    .getByRole('button', { name: 'Open dialog menu', exact: true })
+    .click();
+  const nestedChoice = page.getByRole('menuitemcheckbox', {
+    name: 'Dialog preference',
+    exact: true,
+  });
+  await nestedChoice.click();
+  assert.equal(await nestedChoice.getAttribute('aria-checked'), 'true');
+  await page
+    .getByRole('menuitem', { name: 'More choices', exact: true })
+    .hover();
+  const subChoice = page.getByRole('menuitemcheckbox', {
+    name: 'Nested preference',
+    exact: true,
+  });
+  await subChoice.click();
+  assert.equal(await subChoice.getAttribute('aria-checked'), 'false');
+  await page.keyboard.press('ArrowLeft');
+  await subChoice.waitFor({ state: 'hidden' });
+  assert(await nestedChoice.isVisible(), 'ArrowLeft closes only the submenu');
+  await page.keyboard.press('Escape');
+  await nestedChoice.waitFor({ state: 'hidden' });
+  assert(
+    await nestedDialog.isVisible(),
+    'Dismissing nested menus leaves its owning dialog open',
+  );
+  await nestedDialog
+    .getByRole('button', { name: 'Close nested popups', exact: true })
+    .click();
   await page.getByRole('button', { name: 'Open Feature', exact: true }).click();
   const dismiss = page.getByRole('button', {
     name: 'Close map feature details',
@@ -229,6 +336,8 @@ try {
         viewports: 3,
         checks: [
           'dialog bounds/fixed footer/focus',
+          'actual Edit sport and Share expiry option hit testing/selection',
+          'nested dialog popover/menu/submenu interaction and dismissal',
           'persistent pointer+keyboard checkboxes',
           'available-height menu',
           'map availability+dispatch',

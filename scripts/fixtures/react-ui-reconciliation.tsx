@@ -5,6 +5,11 @@ import { useTable } from '@tanstack/react-table';
 import { Activity, Suspense, createElement, useEffect, useState } from 'react';
 
 import {
+  AppDialogBody,
+  AppDialogContent,
+  AppDialogHeader,
+} from '~/components/app-dialog';
+import {
   SignedOutConnectPanel,
   StravaConnectProvider,
 } from '~/components/auth/strava-connect';
@@ -15,8 +20,26 @@ import { PhotoLightbox } from '~/components/list/photo';
 import { features } from '~/components/list/table-extensions';
 import { FeatureInfoCard } from '~/components/map/feature-info-card';
 import { LayerSwitcher } from '~/components/map/layer-switcher';
+import {
+  PreferenceMenuCheckboxItem,
+  PreferenceMenuContent,
+  PreferenceMenuSubContent,
+} from '~/components/preference-menu';
 import { SettingsDialog } from '~/components/settings/settings-dialog';
 import { ShareButton } from '~/components/share-button';
+import { Dialog, DialogDescription, DialogTitle } from '~/components/ui/dialog';
+import {
+  DropdownMenu,
+  DropdownMenuPortal,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '~/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from '~/components/ui/popover';
 import { activityDTOSchema } from '~/contracts/v1/activity';
 import { useElementSize } from '~/hooks/use-element-size';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
@@ -84,6 +107,9 @@ function Content() {
   const [settings, setSettings] = useState(false);
   const [edit, setEdit] = useState(false);
   const [connect, setConnect] = useState(false);
+  const [nested, setNested] = useState(false);
+  const [popupChanges, setPopupChanges] = useState(0);
+  const [popupChecked, setPopupChecked] = useState(false);
   const [feature, setFeature] = useState(false);
   const [tag, setTag] = useState<'div' | 'section'>('div');
   const [width, setWidth] = useState(240);
@@ -115,6 +141,58 @@ function Content() {
         <button onClick={() => setFeature(true)}>Open Feature</button>
         <PhotoLightbox photos={[photo]} title="Fixture" />
       </div>
+      <button onClick={() => setNested(true)}>Open nested popups</button>
+      <Dialog open={nested} onOpenChange={setNested}>
+        <AppDialogContent closeLabel="Close nested popups" layout="sections">
+          <AppDialogHeader>
+            <DialogTitle>Nested popups</DialogTitle>
+            <DialogDescription>
+              Test nested portal interaction.
+            </DialogDescription>
+          </AppDialogHeader>
+          <AppDialogBody>
+            <Popover>
+              <PopoverTrigger asChild>
+                <button>Open dialog popover</button>
+              </PopoverTrigger>
+              <PopoverContent>
+                <button onClick={() => setPopupChanges((value) => value + 1)}>
+                  Change from popover
+                </button>
+              </PopoverContent>
+            </Popover>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button>Open dialog menu</button>
+              </DropdownMenuTrigger>
+              <PreferenceMenuContent>
+                <PreferenceMenuCheckboxItem
+                  checked={popupChecked}
+                  onCheckedChange={(value) => setPopupChecked(value === true)}
+                >
+                  Dialog preference
+                </PreferenceMenuCheckboxItem>
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger>More choices</DropdownMenuSubTrigger>
+                  <DropdownMenuPortal>
+                    <PreferenceMenuSubContent>
+                      <PreferenceMenuCheckboxItem
+                        checked={popupChecked}
+                        onCheckedChange={(value) =>
+                          setPopupChecked(value === true)
+                        }
+                      >
+                        Nested preference
+                      </PreferenceMenuCheckboxItem>
+                    </PreferenceMenuSubContent>
+                  </DropdownMenuPortal>
+                </DropdownMenuSub>
+              </PreferenceMenuContent>
+            </DropdownMenu>
+            <output data-popup-changes="">{popupChanges}</output>
+          </AppDialogBody>
+        </AppDialogContent>
+      </Dialog>
       <SettingsDialog open={settings} onOpenChange={setSettings} />
       <EditActivity
         row={table.getCoreRowModel().rows[0]!}
