@@ -25,8 +25,10 @@ struct ActivityContinuationTests {
         pull.updateGeometry(geometry(direction, 40))
         #expect(pull.direction == direction && pull.progress > 0 && !pull.isArmed)
         pull.updateGeometry(geometry(direction, 70))
+        #expect(!pull.isArmed && pull.hapticGeneration == 0, "A pull that armed at the old sensitivity must now cancel")
+        pull.updateGeometry(geometry(direction, 90))
         #expect(pull.isArmed && pull.hapticGeneration == 1)
-        let released = pull.changePhase(to: .decelerating, geometry: geometry(direction, 70))
+        let released = pull.changePhase(to: .decelerating, geometry: geometry(direction, 90))
         #expect(released == direction)
         pull.updateGeometry(geometry(direction, 100))
         let settled = pull.changePhase(to: .idle, geometry: geometry(direction, 0))
@@ -163,7 +165,7 @@ struct ActivityContinuationTests {
             contentHeight: 1408 + 2.0 / 3, height: 724, topInset: 116, bottomInset: 34)
         _ = pull.changePhase(to: .tracking, geometry: resting)
         _ = pull.changePhase(to: .interacting, geometry: resting)
-        let released = ActivityContinuationPull.Geometry(offset: restingOffset + (direction == .previous ? -80 : 80),
+        let released = ActivityContinuationPull.Geometry(offset: restingOffset + (direction == .previous ? -90 : 90),
             contentHeight: 1408 + 2.0 / 3, height: 724, topInset: 116, bottomInset: 34)
         pull.updateGeometry(released)
         #expect(pull.isArmed && pull.hapticGeneration == 1)

@@ -24,6 +24,18 @@ struct ActivityDetailContinuation {
     }
 }
 
+private struct ActivityContinuationIndicatorState: Equatable {
+    var distance: CGFloat = 0
+    var isArmed = false
+    var progress: CGFloat { min(1, max(0, distance / ActivityContinuationPull.threshold)) }
+
+    init() {}
+    init(_ pull: ActivityContinuationPull) {
+        distance = pull.distance
+        isArmed = pull.isArmed
+    }
+}
+
 extension EnvironmentValues {
     @Entry var activityDetailContinuation: ActivityDetailContinuation? = nil
 }
@@ -37,6 +49,7 @@ struct ActivityContinuationScrollView<Content: View>: View {
     @Environment(\.activityDetailContinuation) private var continuation
     @State private var pull = ActivityContinuationPull()
     @State private var position = ScrollPosition(edge: .top)
+    @State private var previousIndicator = ActivityContinuationIndicatorState()
 
     private var navigation: ActivityDetailContinuation? {
         guard let continuation, continuation.currentID == activityID else { return nil }
@@ -53,16 +66,19 @@ struct ActivityContinuationScrollView<Content: View>: View {
         ScrollView {
             VStack(spacing: 0) { content() }
                 .padding(.bottom, bottomContentInset)
-                .background(ActivityPreviousRefresh(currentID: activityID, destination: navigation?.isEnabled == true ? navigation?.destination(for: .previous) : nil) {
+                .background(ActivityPreviousRefresh(currentID: activityID, destination: navigation?.isEnabled == true ? navigation?.destination(for: .previous) : nil,
+                    updateIndicator: { previousIndicator = $0 }) {
                     guard let navigation, navigation.isEnabled, navigation.destination(for: .previous) != nil else { return }
                     navigation.navigate(.previous)
                 })
-
         }
         .scrollPosition($position)
         .scrollBounceBehavior(navigation?.isEnabled == true ? .always : .basedOnSize, axes: .vertical)
+        .overlay(alignment: .top) {
+            indicator(for: .previous, state: previousIndicator)
+        }
         .overlay(alignment: .bottom) {
-            indicator.padding(.bottom, bottomContentInset)
+            indicator(for: .next, state: .init(pull)).padding(.bottom, bottomContentInset)
         }
         .onScrollGeometryChange(for: ActivityContinuationPull.Geometry.self) {
             .init($0)
@@ -84,47 +100,56 @@ struct ActivityContinuationScrollView<Content: View>: View {
             }
         }
         .onChange(of: identity) { _, identity in pull.configure(identity) }
+        .onChange(of: navigation?.destination(for: .previous)?.id) { _, _ in previousIndicator = .init() }
+        .onChange(of: navigation?.isEnabled) { _, enabled in
+            if enabled != true { previousIndicator = .init() }
+        }
         .onChange(of: activityID) { _, _ in
+            previousIndicator = .init()
             pull.configure(identity)
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) { position.scrollTo(edge: .top) }
         }
-        .onDisappear { pull.cancel() }
+        .onDisappear { pull.cancel(); previousIndicator = .init() }
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pull.hapticGeneration)
     }
 
-    @ViewBuilder private var indicator: some View {
-        if identity != nil, pull.direction == .next, pull.distance > 0,
-           let destination = navigation?.destination(for: .next) {
-            cue(destination: destination)
+    @ViewBuilder private func indicator(for direction: ActivityContinuationDirection,
+                                        state: ActivityContinuationIndicatorState) -> some View {
+        if navigation?.isEnabled == true, state.distance > 0,
+           let destination = navigation?.destination(for: direction) {
+            cue(direction: direction, destination: destination, state: state)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(height: pull.distance, alignment: .top)
+                .frame(height: state.distance, alignment: direction == .previous ? .bottom : .top)
                 .clipped()
-                .opacity(min(1, pull.distance / 24))
+                .opacity(min(1, state.distance / 24))
                 .allowsHitTesting(false)
         }
     }
 
-    private func cue(destination: ActivityDetailContinuation.Destination) -> some View {
+    private func cue(direction: ActivityContinuationDirection,
+                     destination: ActivityDetailContinuation.Destination,
+                     state: ActivityContinuationIndicatorState) -> some View {
+        let previous = direction == .previous
         return HStack(spacing: 12) {
             ZStack {
                 Circle().stroke(.secondary.opacity(0.2), lineWidth: 2)
-                Circle().trim(from: 0, to: pull.progress)
+                Circle().trim(from: 0, to: state.progress)
                     .stroke(AppTheme.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                Image(systemName: pull.isArmed ? "checkmark" : "arrow.up")
+                Image(systemName: state.isArmed ? "checkmark" : previous ? "arrow.down" : "arrow.up")
                     .font(.system(size: 12, weight: .semibold))
             }
             .frame(width: 28, height: 28)
-            .foregroundStyle(pull.isArmed ? AppTheme.accent : .secondary)
+            .foregroundStyle(state.isArmed ? AppTheme.accent : .secondary)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
                 ZStack(alignment: .leading) {
-                    Text("Pull up for next activity")
-                        .opacity(pull.isArmed ? 0 : 1)
-                    Text("Release for next activity")
-                        .opacity(pull.isArmed ? 1 : 0)
+                    (previous ? Text("Pull down for previous activity") : Text("Pull up for next activity"))
+                        .opacity(state.isArmed ? 0 : 1)
+                    (previous ? Text("Release for previous activity") : Text("Release for next activity"))
+                        .opacity(state.isArmed ? 1 : 0)
                 }
                 .font(.caption.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
@@ -135,18 +160,19 @@ struct ActivityContinuationScrollView<Content: View>: View {
         .padding(.horizontal, AppTheme.Spacing.large)
         .padding(.vertical, 12)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Next activity: \(destination.name)"))
-        .accessibilityValue(pull.isArmed ? Text("Release to open") : Text("Keep pulling"))
-        .accessibilityIdentifier("activity-continuation-cue")
+        .accessibilityLabel(previous ? Text("Previous activity: \(destination.name)") : Text("Next activity: \(destination.name)"))
+        .accessibilityValue(state.isArmed ? Text("Release to open") : Text("Keep pulling"))
+        .accessibilityIdentifier(previous ? "activity-continuation-previous-cue" : "activity-continuation-cue")
     }
 }
 
 /// A real refresh control reserves top pulls for scrolling inside native sheets.
-/// Its progress appears only in the bounce; the same 64pt threshold as the
-/// bottom action applies before a completed native pan can navigate.
+/// Its system spinner is hidden; both edges render the shared SwiftUI cue.
+/// The shared pull policy applies before a completed native pan can navigate.
 private struct ActivityPreviousRefresh: UIViewRepresentable {
     let currentID: Int
     let destination: ActivityDetailContinuation.Destination?
+    let updateIndicator: (ActivityContinuationIndicatorState) -> Void
     let action: () -> Void
 
     func makeUIView(context: Context) -> Attachment { Attachment() }
@@ -154,6 +180,7 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
         view.currentID = currentID
         view.destination = destination
         view.action = action
+        view.updateIndicator = updateIndicator
         view.attach()
     }
     static func dismantleUIView(_ view: Attachment, coordinator: ()) { view.detach() }
@@ -162,6 +189,8 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
         var currentID = 0
         var destination: ActivityDetailContinuation.Destination?
         var action: (() -> Void)?
+        var updateIndicator: ((ActivityContinuationIndicatorState) -> Void)?
+        private var lastIndicator = ActivityContinuationIndicatorState()
         private let control = UIRefreshControl()
         private weak var scroll: UIScrollView?
         private var startingInset: CGFloat = 0
@@ -173,6 +202,8 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
         init() {
             super.init(frame: .zero)
             isUserInteractionEnabled = false
+            control.tintColor = .clear
+            control.accessibilityElementsHidden = true
         }
         @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
         override func didMoveToWindow() { super.didMoveToWindow(); attach() }
@@ -188,8 +219,7 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
                 scroll = parent
                 parent.panGestureRecognizer.addTarget(self, action: #selector(panChanged))
             }
-            if let destination {
-                control.accessibilityLabel = String(localized: "Previous activity: \(destination.name)")
+            if destination != nil {
                 if parent.refreshControl !== control { parent.refreshControl = control }
             } else if parent.refreshControl === control {
                 if control.isRefreshing { control.endRefreshing() }
@@ -202,6 +232,13 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
             scroll?.panGestureRecognizer.removeTarget(self, action: #selector(panChanged))
             if scroll?.refreshControl === control { scroll?.refreshControl = nil }
             scroll = nil
+        }
+        private func publishIndicator(_ state: ActivityContinuationIndicatorState) {
+            // Normal scrolling publishes no updates and never touches refresh
+            // presentation, preserving native momentum after finger lift.
+            guard state != lastIndicator else { return }
+            lastIndicator = state
+            updateIndicator?(state)
         }
         @objc private func panChanged(_ pan: UIPanGestureRecognizer) {
             guard let scroll else { return }
@@ -221,10 +258,7 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
                 if pull.hapticGeneration != feedback {
                     UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.6)
                 }
-                let title = pull.isArmed ? String(localized: "Release for previous activity") : nil
-                if control.attributedTitle?.string != title {
-                    control.attributedTitle = title.map { NSAttributedString(string: $0) }
-                }
+                publishIndicator(.init(pull))
             case .ended, .cancelled, .failed:
                 let expected = identity
                 let navigate = pan.state == .ended
@@ -237,7 +271,7 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
                     // Ending an idle refresh resets native scroll motion too.
                     // Ordinary flicks must leave the scroll view untouched.
                     if self.control.isRefreshing { self.control.endRefreshing() }
-                    if self.control.attributedTitle != nil { self.control.attributedTitle = nil }
+                    self.publishIndicator(.init())
                     if navigate, self.identity == expected { self.action?() }
                 }
             default: break
@@ -302,7 +336,7 @@ struct ActivityContinuationPull {
         }
     }
 
-    static let threshold: CGFloat = 64
+    static let threshold: CGFloat = 80
     private(set) var hapticGeneration = 0
     private(set) var distance: CGFloat = 0
     private(set) var phase = ScrollPhase.idle

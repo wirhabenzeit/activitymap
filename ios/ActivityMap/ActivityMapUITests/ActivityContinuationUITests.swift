@@ -170,7 +170,7 @@ final class ActivityContinuationUITests: XCTestCase {
         let bottom = try await scrollToBottom(app, expectedID: 1, list: false)
         XCTAssertFalse(app.descendants(matching: .any).matching(identifier: "activity-continuation-cue").firstMatch.exists,
                        "The last activity must not advertise another activity")
-        pull(app, frame: rect(bottom.detailContentFrame), distance: 230)
+        pull(app, frame: rect(bottom.detailContentFrame), distance: 280)
         let returned = try await state(in: app) { $0.ready }
         XCTAssertEqual(returned.detailID, 1, "Overscroll at the final activity must not wrap to the first")
         XCTAssertEqual(returned.selection, [1, 2, 3])
@@ -200,7 +200,7 @@ final class ActivityContinuationUITests: XCTestCase {
         let short = try await state(in: app) { $0.ready }
         XCTAssertEqual(short.currentID(list: list), first, "A small rubber-band bounce must cancel")
         assertNoIdleCues(in: app)
-        pull(app, frame: rect(short.detailContentFrame), distance: 230)
+        pull(app, frame: rect(short.detailContentFrame), distance: 280)
         let advanced = try await state(in: app) { $0.ready && $0.currentID(list: list) == next }
         XCTAssertEqual(advanced.selection, initial.selection)
         XCTAssertEqual(advanced.detailOffset, advanced.detailTopOffset, accuracy: 2,
@@ -274,7 +274,7 @@ final class ActivityContinuationUITests: XCTestCase {
         // Native XCTest's held drag is visible in the runner's recording. The
         // hold gives reviewable evidence of the transient ring before release.
         let longStart = profile ? try await elevationChart(in: app).frame.upperPlotPoint : nil
-        pullDown(app, frame: rect(short.detailContentFrame), distance: 230, startingAt: longStart)
+        pullDown(app, frame: rect(short.detailContentFrame), distance: 280, startingAt: longStart)
         let advanced = try await state(in: app) { $0.ready && $0.currentID(list: list) == previous }
         XCTAssertEqual(advanced.detailOffset, advanced.detailTopOffset, accuracy: 2,
                        "The previous activity must begin at its top")
@@ -316,7 +316,7 @@ final class ActivityContinuationUITests: XCTestCase {
         }
 
         let boundaryStart = profile ? try await elevationChart(in: app).frame.upperPlotPoint : nil
-        pullDown(app, frame: rect(settled.detailContentFrame), distance: 230, startingAt: boundaryStart)
+        pullDown(app, frame: rect(settled.detailContentFrame), distance: 280, startingAt: boundaryStart)
         let boundary = try await state(in: app) { $0.ready }
         XCTAssertEqual(boundary.currentID(list: list), previous, "Top overscroll at the first activity must not wrap")
         XCTAssertEqual(boundary.selection, initial.selection)
@@ -362,7 +362,7 @@ final class ActivityContinuationUITests: XCTestCase {
             let frame = rect(current.detailContentFrame)
             // A tiny final drag is swallowed by the native pan recognizer's
             // touch slop. A 40pt nudge reaches the boundary without arming the
-            // continuation's 64pt *rubber-banded* overscroll threshold.
+            // continuation's 80pt *rubber-banded* overscroll threshold.
             pull(app, frame: frame, distance: min(max(40, CGFloat(remaining) + 12), frame.height * 0.5))
             current = try await state(in: app) { $0.ready }
         }
@@ -389,7 +389,7 @@ final class ActivityContinuationUITests: XCTestCase {
         let viewport = frame.intersection(app.frame)
         // Start in scrolling content rather than the pinned title or grabber.
         // Preserve native pan ownership if the finger leaves a short pane.
-        let start = startingAt ?? CGPoint(x: viewport.midX, y: viewport.minY + viewport.height * 0.25)
+        let start = startingAt ?? CGPoint(x: viewport.midX, y: viewport.minY + viewport.height * 0.1)
         let endY = min(app.frame.maxY - 40, start.y + distance)
         coordinate(app, x: start.x, y: start.y).press(forDuration: 0.05,
                     thenDragTo: coordinate(app, x: start.x, y: endY),
@@ -509,7 +509,7 @@ final class ActivityContinuationUITests: XCTestCase {
 }
 
 private extension CGRect {
-    // Leave enough screen below the touch for a deliberate 230pt downward
+    // Leave enough screen below the touch for a deliberate downward
     // pull while still hitting the actual plot, not its readout or padding.
     var upperPlotPoint: CGPoint { CGPoint(x: midX, y: minY + min(20, height * 0.15)) }
 }
