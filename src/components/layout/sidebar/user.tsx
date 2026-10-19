@@ -3,6 +3,7 @@
 import { ChevronsUpDown, LogOut, Loader2, Info, Settings2 } from 'lucide-react';
 
 import { signOut } from '~/lib/auth-client';
+import { clearLocalAccountData } from '~/lib/account-deletion';
 import { displayEmail, safeReturnPath } from '~/lib/auth-return';
 
 import { useShallowStore } from '~/store';
@@ -132,18 +133,21 @@ export function UserSettings() {
   // brings every store and query back in the signed-out state; it keeps the
   // current view rather than jumping elsewhere.
   const handleSignOut = async () => {
-    const { error } = await signOut();
-    if (error) {
+    const departingUserId = user?.id;
+    try {
+      const { error } = await signOut();
+      if (error) throw new Error('Sign-out failed');
+      if (departingUserId) await clearLocalAccountData(departingUserId);
+      window.location.assign(
+        safeReturnPath(`${window.location.pathname}${window.location.search}`),
+      );
+    } catch {
       toast({
         title: 'Couldn’t sign out',
         description: 'Please try again.',
         variant: 'destructive',
       });
-      return;
     }
-    window.location.assign(
-      safeReturnPath(`${window.location.pathname}${window.location.search}`),
-    );
   };
 
   // Signed out, the connect dialog over the app is the account entry point.

@@ -82,7 +82,7 @@ export default function StatsTiles() {
           <button
             type="button"
             className="underline"
-            onClick={() => void query.refetch()}
+            onClick={() => void query.refetch().catch(() => undefined)}
           >
             Retry
           </button>

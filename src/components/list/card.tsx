@@ -1,5 +1,8 @@
 'use client';
 
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
+
 import {
   Map,
   Minus,
@@ -174,10 +177,16 @@ export function ActivityCardContent({
 
   const date = row.original.start_date_local;
   const handleRefresh = async () => {
+    const isCurrent = () => {
+      const state = useShallowStore.getState();
+      return !!userId && state.user?.id === userId && !state.isGuest;
+    };
+    if (!isCurrent()) return;
     if (!stravaConnected) return;
     setLoading(true);
     try {
       await refreshActivity(row.original.id);
+      if (!userId || !isCurrent()) return;
 
       if (userId) {
         await reloadStreamSummaryActivity(
@@ -187,14 +196,19 @@ export function ActivityCardContent({
         );
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['activities'] });
-      await queryClient.invalidateQueries({ queryKey: ['photos'] });
+      if (userId)
+        await requestLibrarySync(
+          queryClient,
+          authenticatedLibraryScope(userId),
+        );
+      if (!isCurrent()) return;
 
       toast({
         title: 'Activity Refreshed',
         description: 'Successfully refreshed activity data from Strava.',
       });
     } catch (error) {
+      if (!isCurrent()) return;
       console.error(error);
       toast({
         title: 'Error',

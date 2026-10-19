@@ -13,6 +13,7 @@ import { Button } from '~/components/ui/button';
 import { signOut } from '~/lib/auth-client';
 import {
   clearDeletedAccountData,
+  clearLocalAccountData,
   deleteAccount,
   notifyAccountDeleted,
 } from '~/lib/account-deletion';
@@ -146,11 +147,13 @@ export function SettingsDialog({
   const email = userId ? displayEmail(user?.email) : null;
 
   const handleSignOut = async () => {
+    const departingUserId = userId;
     setSigningOut(true);
     setSignOutFailed(false);
     try {
       const result = await signOut();
       if (result.error) throw new Error('Sign-out failed');
+      if (departingUserId) await clearLocalAccountData(departingUserId);
       window.location.assign(
         safeReturnPath(`${window.location.pathname}${window.location.search}`),
       );

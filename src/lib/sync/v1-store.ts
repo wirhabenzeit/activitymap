@@ -68,6 +68,155 @@ export type V1SyncState = {
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
 
+export type V1LibrarySnapshot = {
+  activities: ActivityDTO[];
+  photos: PhotoDTO[];
+  syncState: V1SyncState | null;
+};
+
+export type V1LibraryCommit = {
+  scope: string;
+  revision: number;
+  kind: 'write' | 'clear';
+};
+
+const libraryListeners = new Set<(commit: V1LibraryCommit) => void>();
+const libraryRevisions = new Map<string, number>();
+let libraryChannel: BroadcastChannel | null = null;
+const LIBRARY_CHANNEL_NAME = 'activitymap:library-commits-v1';
+
+function publishLibraryCommit(
+  scope: string,
+  kind: V1LibraryCommit['kind'],
+  remote = false,
+) {
+  const revision = (libraryRevisions.get(scope) ?? 0) + 1;
+  libraryRevisions.set(scope, revision);
+  for (const listener of libraryListeners) {
+    try {
+      listener({ scope, revision, kind });
+    } catch (error) {
+      console.error('Library commit subscriber failed', error);
+    }
+  }
+  if (!remote) {
+    let channel = libraryChannel;
+    try {
+      // A sign-out clear can commit after the final local owner was released.
+      // Other tabs still need the invalidation even without a local listener.
+      if (
+        !channel &&
+        typeof window !== 'undefined' &&
+        typeof window.BroadcastChannel === 'function'
+      ) {
+        channel = new window.BroadcastChannel(LIBRARY_CHANNEL_NAME);
+      }
+      channel?.postMessage({ version: 1, scope, kind });
+    } catch {
+      /* A closed/unavailable channel never undoes a committed transaction. */
+    } finally {
+      if (channel && channel !== libraryChannel) channel.close();
+    }
+  }
+}
+
+/** Invalidation only: DTOs never leave IndexedDB over the cross-tab channel. */
+export function subscribeV1LibraryCommits(
+  listener: (commit: V1LibraryCommit) => void,
+) {
+  libraryListeners.add(listener);
+  if (
+    !libraryChannel &&
+    typeof window !== 'undefined' &&
+    typeof window.BroadcastChannel === 'function'
+  ) {
+    try {
+      libraryChannel = new window.BroadcastChannel(LIBRARY_CHANNEL_NAME);
+      libraryChannel.onmessage = ({ data }: MessageEvent<unknown>) => {
+        if (typeof data !== 'object' || !data) return;
+        const value = data as {
+          version?: unknown;
+          scope?: unknown;
+          kind?: unknown;
+        };
+        if (
+          value.version === 1 &&
+          typeof value.scope === 'string' &&
+          (value.kind === 'write' || value.kind === 'clear')
+        ) {
+          publishLibraryCommit(value.scope, value.kind, true);
+        }
+      };
+    } catch {
+      /* Storage reads still work when BroadcastChannel is unavailable. */
+    }
+  }
+  return () => {
+    libraryListeners.delete(listener);
+    if (libraryListeners.size === 0) {
+      libraryChannel?.close();
+      libraryChannel = null;
+    }
+  };
+}
+
+/** Read the entire visible library/checkpoint at a single transaction boundary. */
+export async function readV1LibrarySnapshot(
+  scope: string,
+  signal?: AbortSignal,
+): Promise<V1LibrarySnapshot> {
+  signal?.throwIfAborted();
+  const db = await openDatabase();
+  if (!db) throw new Error('IndexedDB is unavailable');
+  signal?.throwIfAborted();
+  const tx = db.transaction(
+    [ACTIVITIES_STORE, PHOTOS_STORE, SYNC_STATE_STORE],
+    'readonly',
+  );
+  const completed = txToPromise(tx);
+  const abort = () => {
+    try {
+      tx.abort();
+    } catch {
+      /* Already finished. */
+    }
+  };
+  signal?.addEventListener('abort', abort, { once: true });
+  try {
+    const activities = requestToPromise(
+      tx
+        .objectStore(ACTIVITIES_STORE)
+        .index('by_scope')
+        .getAll(scope) as IDBRequest<ActivityRecord[]>,
+    );
+    const photos = requestToPromise(
+      tx
+        .objectStore(PHOTOS_STORE)
+        .index('by_scope')
+        .getAll(scope) as IDBRequest<PhotoRecord[]>,
+    );
+    const state = requestToPromise(
+      tx.objectStore(SYNC_STATE_STORE).get(scope) as IDBRequest<
+        V1SyncState | undefined
+      >,
+    );
+    const [activityRows, photoRows, syncState] = await Promise.all([
+      activities,
+      photos,
+      state,
+      completed,
+    ]);
+    signal?.throwIfAborted();
+    return {
+      activities: activityRows.map((row) => row.data),
+      photos: photoRows.map((row) => row.data),
+      syncState: syncState ?? null,
+    };
+  } finally {
+    signal?.removeEventListener('abort', abort);
+  }
+}
+
 export class OfflineCacheUpgradeBlockedError extends Error {
   constructor() {
     super(
@@ -357,6 +506,7 @@ export const applyV1SyncPage = async (
   } finally {
     options.signal?.removeEventListener('abort', abort);
   }
+  publishLibraryCommit(scope, 'write');
 };
 
 export const getCachedActivityDTOs = async (
@@ -408,6 +558,7 @@ export const upsertActivityDTOs = async (
     } satisfies ActivityRecord);
   }
   await txToPromise(tx);
+  publishLibraryCommit(scope, 'write');
 };
 
 export const deleteActivityDTOsByIds = async (
@@ -428,6 +579,7 @@ export const deleteActivityDTOsByIds = async (
     tx.objectStore(STREAM_SUMMARIES_STORE).delete(buildPk(scope, id));
   }
   await txToPromise(tx);
+  publishLibraryCommit(scope, 'write');
 };
 
 export const getCachedPhotoDTOs = async (
@@ -463,6 +615,7 @@ export const upsertPhotoDTOs = async (
     } satisfies PhotoRecord);
   }
   await txToPromise(tx);
+  publishLibraryCommit(scope, 'write');
 };
 
 export const deletePhotoDTOsByIds = async (
@@ -479,6 +632,7 @@ export const deletePhotoDTOsByIds = async (
     store.delete(buildPk(scope, id));
   }
   await txToPromise(tx);
+  publishLibraryCommit(scope, 'write');
 };
 
 export const deletePhotoDTOsByActivityIds = async (
@@ -501,6 +655,7 @@ export const deletePhotoDTOsByActivityIds = async (
     }
   }
   await txToPromise(tx);
+  publishLibraryCommit(scope, 'write');
 };
 
 export const getV1SyncState = async (
@@ -524,6 +679,7 @@ export const setV1SyncState = async (state: V1SyncState): Promise<void> => {
   const tx = db.transaction(SYNC_STATE_STORE, 'readwrite');
   tx.objectStore(SYNC_STATE_STORE).put(state);
   await txToPromise(tx);
+  publishLibraryCommit(state.scope, 'write');
 };
 
 export const clearV1Scope = async (scope: string): Promise<void> => {
@@ -551,6 +707,7 @@ export const clearV1Scope = async (scope: string): Promise<void> => {
   tx.objectStore(SYNC_STATE_STORE).delete(scope);
 
   await txToPromise(tx);
+  publishLibraryCommit(scope, 'clear');
 };
 
 export const getCachedStreamSummaries = async (

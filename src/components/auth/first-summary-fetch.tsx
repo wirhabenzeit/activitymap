@@ -12,9 +12,13 @@ import {
 } from '~/components/ui/dialog';
 import { useActivities } from '~/hooks/use-activities';
 import { useShallowStore } from '~/store';
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
+import { useBrowserSyncStatus } from '~/lib/sync/browser-status';
 import {
   FirstSummaryFetchError,
   firstSummaryFetchOptions,
+  shouldFetchFirstSummaries,
 } from '~/lib/first-summary-fetch';
 
 export function FirstSummaryFetch() {
@@ -27,7 +31,10 @@ export function FirstSummaryFetch() {
   }));
   const activities = useActivities();
   const [dismissed, setDismissed] = useState<string | null>(null);
-  const empty = activities.isSuccess && activities.data?.length === 0;
+  const syncPhase = useBrowserSyncStatus((state) =>
+    userId ? state.byUser[userId]?.phase : undefined,
+  );
+  const empty = shouldFetchFirstSummaries(activities, syncPhase);
   const fetch = useQuery(
     firstSummaryFetchOptions(client, userId, Boolean(connected && empty)),
   );
@@ -39,16 +46,11 @@ export function FirstSummaryFetch() {
       window.setTimeout(() => {
         if (useShallowStore.getState().user?.id !== userId || !navigator.onLine)
           return;
-        window.dispatchEvent(new Event('activitymap:retry-browser-sync'));
-        void client
-          .invalidateQueries({
-            predicate: ({ queryKey }) =>
-              (queryKey[0] === 'activities' &&
-                queryKey[1] === 'auth' &&
-                queryKey[2] === userId) ||
-              (queryKey[0] === 'photos' && queryKey[1] === userId),
-          })
-          .catch(() => undefined);
+        if (useShallowStore.getState().isGuest) return;
+        void requestLibrarySync(
+          client,
+          authenticatedLibraryScope(userId),
+        ).catch(() => undefined);
       }, delay),
     );
     return () => timers.forEach((timer) => window.clearTimeout(timer));

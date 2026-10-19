@@ -1,5 +1,8 @@
 'use client';
 
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
+
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -85,6 +88,11 @@ export function ProfileForm({
   });
 
   async function onSubmit(values: FormValues) {
+    const isCurrent = () => {
+      const state = useShallowStore.getState();
+      return !!userId && state.user?.id === userId && !state.isGuest;
+    };
+    if (!isCurrent()) return;
     setLoading(true);
     try {
       const activityUpdate: UpdateActivityInput = {
@@ -95,6 +103,7 @@ export function ProfileForm({
       };
 
       await updateActivity(activityUpdate);
+      if (!userId || !isCurrent()) return;
 
       if (userId) {
         await reloadStreamSummaryActivity(
@@ -104,7 +113,12 @@ export function ProfileForm({
         );
       }
 
-      await queryClient.invalidateQueries({ queryKey: ['activities'] });
+      if (userId)
+        await requestLibrarySync(
+          queryClient,
+          authenticatedLibraryScope(userId),
+        );
+      if (!isCurrent()) return;
 
       toast({
         title: 'Activity Updated',
@@ -113,6 +127,7 @@ export function ProfileForm({
 
       setOpen?.(false);
     } catch (error) {
+      if (!isCurrent()) return;
       console.error(error);
       toast({
         title: 'Error',
