@@ -1,12 +1,13 @@
 // Exercise the production photo UI against synthetic image responses, without a backend.
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
 import { execFileSync } from 'node:child_process';
-import { dirname, join, resolve } from 'node:path';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+
+import { chromium } from 'playwright-core';
 
 const require = createRequire(import.meta.url);
 const { build } = require(
@@ -137,7 +138,7 @@ function App(){
  <PhotoLightbox photos={photos} title="Afternoon on the ridge" className="h-20" /></div>
  <Dialog><DialogTrigger>Open activity detail</DialogTrigger><DialogContent><DialogTitle>Activity detail</DialogTitle><PhotoLightbox photos={photos} title="Detail photos"/></DialogContent></Dialog>
  <div style={{height:260,marginTop:32}}><Map ref={ref=>window.photoMap=ref} onIdle={()=>window.mapReady=true} initialViewState={{latitude:0,longitude:0,zoom:10}} mapboxAccessToken="pk.offline-test"
- mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e6e9e3'}}]}}><PhotoLayer/></Map></div>
+ mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e6e9e3'}}]}}><PhotoLayer photos={window.photoFixtures} visibleIDs={[1]}/></Map></div>
  <button onClick={()=>window.underlyingClicks=(window.underlyingClicks||0)+1}>Underlying action</button>
  </div>;
 }

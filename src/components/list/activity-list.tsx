@@ -1,15 +1,16 @@
 'use client';
 
 import React from 'react';
-import { columns } from '~/components/list/columns';
-import { DataTable } from '~/components/list/data-table';
-import { ActivityCardContent } from '~/components/list/card';
-import { groupBy } from '~/lib/utils';
-import { useShallowStore } from '~/store';
 
-import { type Activity, type Photo } from '~/server/db/schema';
+import { ActivityCardContent } from '~/components/list/card';
+import { activityColumns } from '~/components/list/columns';
+import { DataTable } from '~/components/list/data-table';
 import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useListInspection } from '~/hooks/use-list-inspection';
+import { useShowOnMap } from '~/hooks/use-show-on-map';
+import { groupBy } from '~/lib/utils';
+import { type Activity, type Photo } from '~/server/db/schema';
+import { useShallowStore } from '~/store';
 
 export function ActivityListView({
   activities,
@@ -25,6 +26,16 @@ export function ActivityListView({
   isFetching?: boolean;
 }) {
   const filterIDs = useBrowsingIDs(ordinaryFilterIDs);
+  const filterIDSet = React.useMemo(() => new Set(filterIDs), [filterIDs]);
+  const eligibleIDSet = React.useMemo(
+    () => new Set(ordinaryFilterIDs),
+    [ordinaryFilterIDs],
+  );
+  const showOnMap = useShowOnMap(activities);
+  const columns = React.useMemo(
+    () => activityColumns(showOnMap, eligibleIDSet),
+    [showOnMap, eligibleIDSet],
+  );
   const { selected, setSelected, tableState } = useShallowStore((state) => ({
     selected: state.selected,
     setSelected: state.setSelected,
@@ -37,7 +48,7 @@ export function ActivityListView({
     useListInspection();
 
   React.useEffect(() => {
-    if (!activeId || activities === undefined || filterIDs.includes(activeId))
+    if (!activeId || activities === undefined || filterIDSet.has(activeId))
       return;
     // A deep link may point into a later streamed page. Only reject a missing
     // identity once loading finishes; filters can dismiss an already loaded row.
@@ -46,11 +57,11 @@ export function ActivityListView({
       (!hasNextPage && !isFetching)
     )
       close();
-  }, [activeId, activities, filterIDs, hasNextPage, isFetching, close]);
+  }, [activeId, activities, filterIDSet, hasNextPage, isFetching, close]);
 
   const columnFilters = React.useMemo(
-    () => [{ id: 'id', value: filterIDs }],
-    [filterIDs],
+    () => [{ id: 'id', value: filterIDSet }],
+    [filterIDSet],
   );
   const photoDict = React.useMemo(
     () => groupBy(photos ?? [], (photo) => photo.activity_id),
@@ -90,7 +101,17 @@ export function ActivityListView({
         detailPresentation={presentation}
         detailStepping
         renderDetails={(row) => (
-          <ActivityCardContent key={row.id} row={row} stickyHeader />
+          <ActivityCardContent
+            key={row.id}
+            row={row}
+            stickyHeader
+            onShowOnMap={showOnMap}
+            mapActionVariant={
+              eligibleIDSet.has(row.original.id)
+                ? 'show'
+                : 'clear-filters-and-show'
+            }
+          />
         )}
         {...tableState}
       />

@@ -16,6 +16,7 @@ import { AppSidebar } from '~/components/layout/app-sidebar';
 import { AppHeader } from '~/components/layout/app-header';
 import { SidebarProvider } from '~/components/ui/sidebar';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import { useSelectionReconciliation } from '~/hooks/use-selection-reconciliation';
 import { activityDTOSchema } from '~/contracts/v1/activity';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
@@ -27,6 +28,7 @@ function FixtureList() {
     return raw.map(item => dtoToActivity(activityDTOSchema.parse({...defaults, ...item})));
   }, [dense]);
   const { filterIDs } = useFilteredActivities(activities);
+  useSelectionReconciliation(activities, true, filterIDs);
   return <ActivityListView activities={activities} filterIDs={filterIDs} />;
 }
 export default function Review() {

@@ -1,22 +1,24 @@
-import { AuthProvider } from '~/components/providers/auth';
-import { auth } from '~/lib/auth';
 import { headers } from 'next/headers';
-import { SidebarProvider } from '~/components/ui/sidebar';
-import { AppSidebar } from '~/components/layout/app-sidebar';
-import { AppHeader } from '~/components/layout/app-header';
-import { getUserInternal, getAccountInternal } from '~/server/db/internal';
-import { toCurrentUserDTO } from '~/server/db/dto';
-import type { InitialAuth } from '~/store/auth';
-import { Toaster } from '~/components/ui/toaster';
-import { ToastManager } from '~/components/providers/toast';
-import { QueryProvider } from '~/providers/query-provider';
-import { ServiceWorkerProvider } from '~/components/providers/service-worker';
-import { OfflineSyncProvider } from '~/components/providers/offline-sync';
+
 import { FirstSummaryFetch } from '~/components/auth/first-summary-fetch';
 import {
   SignedOutConnectPanel,
   StravaConnectProvider,
 } from '~/components/auth/strava-connect';
+import { AppHeader } from '~/components/layout/app-header';
+import { AppSidebar } from '~/components/layout/app-sidebar';
+import { AuthProvider } from '~/components/providers/auth';
+import { OfflineSyncProvider } from '~/components/providers/offline-sync';
+import { ServiceWorkerProvider } from '~/components/providers/service-worker';
+import { ToastManager } from '~/components/providers/toast';
+import { SidebarProvider } from '~/components/ui/sidebar';
+import { Toaster } from '~/components/ui/toaster';
+import { BrowsingProvider } from '~/hooks/use-browsing-library';
+import { auth } from '~/lib/auth';
+import { QueryProvider } from '~/providers/query-provider';
+import { toCurrentUserDTO } from '~/server/db/dto';
+import { getAccountInternal, getUserInternal } from '~/server/db/internal';
+import type { InitialAuth } from '~/store/auth';
 
 /**
  * The authenticated web app's shell (sidebar, header, its own Share button,
@@ -56,25 +58,27 @@ export default async function AppShellLayout({
         {/* Reads the React Query client, so it must sit inside QueryProvider. */}
         <OfflineSyncProvider />
         <AuthProvider initialAuth={initialAuth}>
-          <StravaConnectProvider>
-            <SidebarProvider
-              className="flex h-dvh flex-col"
-              style={{ height: '100dvh' }}
-            >
-              <AppHeader />
-              <div className="flex min-h-0 flex-1 overflow-hidden">
-                <AppSidebar />
-                <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                  <div className="h-14 w-full" />
-                  <div className="min-h-0 w-full flex-1 overflow-hidden">
-                    {children}
-                    <SignedOutConnectPanel />
-                    <FirstSummaryFetch />
-                  </div>
-                </main>
-              </div>
-            </SidebarProvider>
-          </StravaConnectProvider>
+          <BrowsingProvider>
+            <StravaConnectProvider>
+              <SidebarProvider
+                className="flex h-dvh flex-col"
+                style={{ height: '100dvh' }}
+              >
+                <AppHeader />
+                <div className="flex min-h-0 flex-1 overflow-hidden">
+                  <AppSidebar />
+                  <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                    <div className="h-14 w-full" />
+                    <div className="min-h-0 w-full flex-1 overflow-hidden">
+                      {children}
+                      <SignedOutConnectPanel />
+                      <FirstSummaryFetch />
+                    </div>
+                  </main>
+                </div>
+              </SidebarProvider>
+            </StravaConnectProvider>
+          </BrowsingProvider>
           <Toaster />
           <ToastManager />
         </AuthProvider>

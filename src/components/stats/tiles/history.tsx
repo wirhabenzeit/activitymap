@@ -1,42 +1,44 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
-import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { type ReactNode, useMemo, useState } from 'react';
+
 import { Button } from '~/components/ui/button';
 import {
   Select,
-  SelectTrigger,
-  SelectValue,
   SelectContent,
   SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from '~/components/ui/select';
-import { categorySettings } from '~/settings/category';
-import { type StatsMetric } from '~/settings/stats-tiles.generated';
+import { useBrowsingState } from '~/hooks/use-browsing-context';
+import { formatPreferredDate } from '~/lib/date-preferences';
 import {
-  sameDateLastYear,
-  metricValue,
-  sportOrder,
-} from '~/lib/stats/tile-data';
-import {
+  type HistoryRange,
   calendarDays,
   firstActivityDay,
   volumeHistory,
   volumeHistoryAverage,
-  type HistoryRange,
 } from '~/lib/stats/history';
 import {
-  dailyTotals,
+  metricValue,
+  sameDateLastYear,
+  sportOrder,
+} from '~/lib/stats/tile-data';
+import {
   calendarSummaryWindow,
+  dailyTotals,
   dateOfDay,
   monthStart,
   yearStart,
 } from '~/lib/stats/tile-series';
+import { categorySettings } from '~/settings/category';
+import { type StatsMetric } from '~/settings/stats-tiles.generated';
+
 import { ActivityRow } from './activity-row';
 import { WeekdayRows } from './calendar';
 import { Measure, SportArea } from './charts';
-import { formatPreferredDate } from '~/lib/date-preferences';
-import { statsFormat, monthName, shortDate } from './format';
+import { monthName, shortDate, statsFormat } from './format';
 import { type TileContext } from './tiles';
 
 function PeriodNavigation({
@@ -103,10 +105,7 @@ export function VolumeHistory({
       year: 'numeric',
     });
 
-  const [range, setRange] = useBrowsingState<HistoryRange>(
-    'stats:volumeGrouping',
-    'weeks',
-  );
+  const [range, setRange] = useBrowsingState('stats:volumeGrouping', 'weeks');
   const buckets = useMemo(
     () => volumeHistory(context.activities, context.today, metric, range),
     [context.activities, context.today, metric, range],
@@ -380,7 +379,7 @@ function CalendarHistoryContent({
             className="flex min-h-8 items-center justify-between gap-2"
           >
             <p className="flex items-baseline gap-1 whitespace-nowrap">
-              <strong className="font-mono text-xl font-medium leading-none">
+              <strong className="font-mono text-xl leading-none font-medium">
                 {days.size}
               </strong>
               <span className="text-xs text-muted-foreground">active days</span>
