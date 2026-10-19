@@ -1,20 +1,21 @@
-import { withApiV1Observability } from '~/server/api/observability';
-import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
-import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
-import { createShareLinksHandler } from './handler';
-import { shareLinkDependencies } from './dependencies';
+import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 
-export const GET = withApiV1Observability(
-  withApiV1RateLimit(createShareLinksHandler(shareLinkDependencies, 'list'), {
-    route: 'GET /api/v1/share-links',
-    resolveUserId: resolveRateLimitUserId,
-  }),
-  { route: 'GET /api/v1/share-links' },
+import { shareLinkDependencies } from './dependencies';
+import { createShareLinksHandler } from './handler';
+
+export const GET = withAuthenticatedApiV1(
+  (request, context) =>
+    createShareLinksHandler(
+      { ...shareLinkDependencies, resolveActor: context.actor },
+      'list',
+    )(request),
+  { route: 'GET /api/v1/share-links', cache: 'private-no-store' },
 );
-export const POST = withApiV1Observability(
-  withApiV1RateLimit(createShareLinksHandler(shareLinkDependencies, 'create'), {
-    route: 'POST /api/v1/share-links',
-    resolveUserId: resolveRateLimitUserId,
-  }),
-  { route: 'POST /api/v1/share-links' },
+export const POST = withAuthenticatedApiV1(
+  (request, context) =>
+    createShareLinksHandler(
+      { ...shareLinkDependencies, resolveActor: context.actor },
+      'create',
+    )(request),
+  { route: 'POST /api/v1/share-links', cache: 'private-no-store' },
 );

@@ -1,20 +1,18 @@
 import { after } from 'next/server';
-import { withApiV1Observability } from '~/server/api/observability';
-import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
-import { resolveActor } from '~/server/auth/actor';
-import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
+
+import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import {
   runStravaImport,
   startStravaImport,
 } from '~/server/application/strava-import';
 import { stravaAccessEnabled } from '~/server/config/external-effects';
-import { stravaImportRepository } from '~/server/repositories/strava-import';
 import { logger } from '~/server/logging/logger';
+import { stravaImportRepository } from '~/server/repositories/strava-import';
+
 import { createStravaImportHandler } from './handler';
 
 export const maxDuration = 60;
 const dependencies = {
-  resolveActor: (request: Request) => resolveActor(request.headers),
   read: (actor: Parameters<typeof startStravaImport>[0]) =>
     stravaImportRepository.read(actor, stravaAccessEnabled()),
   start: startStravaImport,
@@ -24,17 +22,19 @@ const dependencies = {
   onError: (error: unknown, requestId: string) =>
     logger.error('Strava import failed', { error, requestId }),
 };
-export const GET = withApiV1Observability(
-  withApiV1RateLimit(createStravaImportHandler(dependencies, 'GET'), {
-    route: 'GET /api/v1/strava-import',
-    resolveUserId: resolveRateLimitUserId,
-  }),
-  { route: 'GET /api/v1/strava-import' },
+export const GET = withAuthenticatedApiV1(
+  (request, context) =>
+    createStravaImportHandler(
+      { ...dependencies, resolveActor: context.actor },
+      'GET',
+    )(request),
+  { route: 'GET /api/v1/strava-import', cache: 'private-no-store' },
 );
-export const POST = withApiV1Observability(
-  withApiV1RateLimit(createStravaImportHandler(dependencies, 'POST'), {
-    route: 'POST /api/v1/strava-import',
-    resolveUserId: resolveRateLimitUserId,
-  }),
-  { route: 'POST /api/v1/strava-import' },
+export const POST = withAuthenticatedApiV1(
+  (request, context) =>
+    createStravaImportHandler(
+      { ...dependencies, resolveActor: context.actor },
+      'POST',
+    )(request),
+  { route: 'POST /api/v1/strava-import', cache: 'private-no-store' },
 );

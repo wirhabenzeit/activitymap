@@ -1,23 +1,19 @@
 import { getSessionCookie } from 'better-auth/cookies';
 
-import { auth } from '~/lib/auth';
+import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
+import { STRICT_IP_RATE_LIMIT } from '~/server/api/rate-limit-boundary';
 import { issueMobileLoginCode } from '~/server/auth/mobile';
-import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
 import { logger } from '~/server/logging/logger';
-import { withApiV1Observability } from '~/server/api/observability';
-import {
-  STRICT_IP_RATE_LIMIT,
-  withApiV1RateLimit,
-} from '~/server/api/rate-limit-boundary';
+
 import { createMobileAuthCallbackHandler } from './handler';
 
 const ROUTE = 'GET /api/v1/auth/mobile/callback';
 
-export const GET = withApiV1Observability(
-  withApiV1RateLimit(
+export const GET = withAuthenticatedApiV1(
+  (request, context) =>
     createMobileAuthCallbackHandler({
-      resolveSessionUserId: async (headers) => {
-        const session = await auth.api.getSession({ headers });
+      resolveSessionUserId: async () => {
+        const session = await context.session();
         return session?.user?.id ?? null;
       },
       // The signed session cookie value Better Auth just set for the browser
@@ -34,12 +30,11 @@ export const GET = withApiV1Observability(
           requestId,
         });
       },
-    }),
-    {
-      route: ROUTE,
+    })(request),
+  { route: ROUTE, cache: 'passthrough' },
+  {
+    rateLimit: {
       ipGroup: { name: 'mobile-oauth', rule: STRICT_IP_RATE_LIMIT },
-      resolveUserId: resolveRateLimitUserId,
     },
-  ),
-  { route: ROUTE },
+  },
 );

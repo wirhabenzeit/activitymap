@@ -1,18 +1,19 @@
-import type { Actor } from '~/server/auth/actor';
-import { errorEnvelope } from '~/contracts/v1/error';
-import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import {
   activityCompactStreamSummariesDTOSchema,
-  toCompactStreamSummaryDTO,
   activityStreamSummariesDTOSchema,
   toActivityStreamSummaryDTO,
+  toCompactStreamSummaryDTO,
 } from '~/contracts/v1/activity-streams';
-import { streamActivityIdSchema } from '~/server/strava/streams';
-import {
-  ActivityStreamsUnavailableError,
-  type ActivityStreamsRepository,
-} from '~/server/repositories/activity-streams';
+import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
+import { errorEnvelope } from '~/contracts/v1/error';
+import { PRIVATE_API_HEADERS } from '~/server/api/transport';
+import type { Actor } from '~/server/auth/actor';
 import { requestIdFor } from '~/server/http/request-id';
+import {
+  type ActivityStreamsRepository,
+  ActivityStreamsUnavailableError,
+} from '~/server/repositories/activity-streams';
+import { streamActivityIdSchema } from '~/server/strava/streams';
 
 export const STREAM_SUMMARIES_MAX_IDS = 100;
 
@@ -31,8 +32,7 @@ export function createStreamSummariesHandler(deps: {
   return async (request: Request): Promise<Response> => {
     const requestId = requestIdFor(request);
     const headers = {
-      'Cache-Control': 'private, no-store',
-      Vary: 'Cookie, Authorization',
+      ...PRIVATE_API_HEADERS,
     };
     const fail = (status: number, code: string, message: string) =>
       Response.json(errorEnvelope(code, message, { requestId }), {

@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+
 import { deleteAccountRequestSchema } from '~/contracts/v1/account-deletion';
 import { makeEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
+import { mutationOriginAllowed } from '~/server/api/transport';
 import { requestIdFor } from '~/server/http/request-id';
 
 type DeletionSession = { userId: string; token: string };
@@ -36,12 +38,7 @@ export function createAccountDeletionHandler({
     try {
       // Cookie-authenticated mutations require a same-origin browser request.
       // Native clients use a signed bearer credential and do not send Origin.
-      const origin = request.headers.get('origin');
-      if (
-        (origin && origin !== new URL(request.url).origin) ||
-        (!origin &&
-          !request.headers.get('authorization')?.startsWith('Bearer '))
-      ) {
+      if (!mutationOriginAllowed(request, 'required-unless-bearer')) {
         return failure('forbidden', 'A same-origin request is required.', 403);
       }
       const session = await resolveSession(request.headers);
