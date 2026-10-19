@@ -159,7 +159,6 @@ private struct MapActivityDetailDestination: View {
     @Bindable var state: MapActivityDetailState
     let compactProfile: Bool
     let bottomContentInset: CGFloat
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var sequence: ActivityDetailSequence {
         ActivityDetailSequence(ids: picker.candidateIDs, currentID: state.activityID)
@@ -192,13 +191,6 @@ private struct MapActivityDetailDestination: View {
                 picker.showDetail(target.id, store: store, motion: direction == .previous ? .backward : .forward)
             }
     }
-    private var activityTransition: AnyTransition {
-        guard !reduceMotion else { return .opacity }
-        let forward = state.motion != .backward
-        return .asymmetric(insertion: .move(edge: forward ? .bottom : .top).combined(with: .opacity),
-                           removal: .move(edge: forward ? .top : .bottom).combined(with: .opacity))
-    }
-
     var body: some View {
         ZStack {
             ActivityDetailPanel(store: store, activityID: state.activityID,
@@ -209,10 +201,9 @@ private struct MapActivityDetailDestination: View {
                 .environment(\.activityDetailOverMap, true)
                 .environment(\.activityDetailPaging, paging)
                 .environment(\.activityDetailContinuation, continuation)
-                .id(state.activityID)
-                .transition(activityTransition)
+                .environment(\.activityDetailTransitionDirection,
+                             state.motion == .none ? nil : (state.motion == .backward ? .previous : .next))
         }
-        .animation(reduceMotion ? nil : .easeInOut(duration: 0.25), value: state.activityID)
         .clipped()
         .background(DetailBackGesture())
     }

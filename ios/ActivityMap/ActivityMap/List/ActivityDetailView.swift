@@ -79,6 +79,13 @@ struct ActivityDetailPanel: View {
     private var activity: Activity? { store.activity(id: activityID) }
 
     var body: some View {
+        ActivityDetailPageTransition(activityID: activityID) {
+            detail
+        }
+        .background { if !overMap { AppTheme.surface } }
+    }
+
+    private var detail: some View {
         Group {
             if let activity {
                 if let mapExpansion {
@@ -108,7 +115,6 @@ struct ActivityDetailPanel: View {
                                        description: Text("This activity is no longer in your library."))
             }
         }
-        .background { if !overMap { AppTheme.surface } }
     }
 }
 

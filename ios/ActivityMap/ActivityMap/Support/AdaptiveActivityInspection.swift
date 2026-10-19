@@ -143,7 +143,9 @@ struct AdaptiveActivityInspection<Content: View, Panel: View, Destination: View>
 
 /// Only the active Stats navigation level registers this destination type.
 /// It remains distinct from tile IDs and other app navigation values.
-private struct InspectedActivityDestination: Hashable { let id: Int }
+// Navigation identity represents the inspection level, not the activity. A
+// neighbour replaces its content without popping/pushing another destination.
+private struct InspectedActivityDestination: Hashable {}
 private struct ActivityInspectionNavigation<Destination: View>: ViewModifier {
     let enabled: Bool
     @Binding var selection: Int?
@@ -151,9 +153,11 @@ private struct ActivityInspectionNavigation<Destination: View>: ViewModifier {
     @ViewBuilder func body(content: Content) -> some View {
         if enabled {
             content.navigationDestination(item: Binding(
-                get: { selection.map { InspectedActivityDestination(id: $0) } },
-                set: { selection = $0?.id }
-            )) { item in destination(item.id) }
+                get: { selection.map { _ in InspectedActivityDestination() } },
+                set: { if $0 == nil { selection = nil } }
+            )) { _ in
+                if let id = selection { destination(id) }
+            }
         } else { content }
     }
 }

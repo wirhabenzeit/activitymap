@@ -185,6 +185,7 @@ struct ActivitySelectionSymbol: View {
 private struct ListActivityContinuation: ViewModifier {
     let store: ActivityStore
     let activityID: Int
+    @State private var transitionTarget: (id: Int, direction: ActivityContinuationDirection)?
     private var sequence: ActivityDetailSequence {
         ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: activityID)
     }
@@ -193,11 +194,13 @@ private struct ListActivityContinuation: ViewModifier {
         content
             .environment(\.activityDetailPaging, ActivityDetailPaging(position: { id in
                 ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).position
-            }, previous: { if let id = sequence.previousID { inspect(id) } },
-               next: { if let id = sequence.nextID { inspect(id) } },
+            }, previous: { if let id = sequence.previousID { inspect(id, direction: .previous) } },
+               next: { if let id = sequence.nextID { inspect(id, direction: .next) } },
                canGoPrevious: { id in ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).previousID != nil },
                canGoNext: { id in ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).nextID != nil }))
             .environment(\.activityDetailContinuation, continuation)
+            .environment(\.activityDetailTransitionDirection,
+                         transitionTarget?.id == activityID ? transitionTarget?.direction : nil)
     }
 
     private var continuation: ActivityDetailContinuation? {
@@ -213,14 +216,13 @@ private struct ListActivityContinuation: ViewModifier {
                 let target = direction == .previous ? previous : next
                 let liveID = direction == .previous ? sequence.previousID : sequence.nextID
                 guard let target, liveID == target.id else { return }
-                inspect(target.id)
+                inspect(target.id, direction: direction)
             }
     }
 
-    private func inspect(_ id: Int) {
+    private func inspect(_ id: Int, direction: ActivityContinuationDirection) {
         guard store.selectedTab == .list, store.inspectedActivityID == activityID else { return }
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) { store.inspect(id) }
+        transitionTarget = (id, direction)
+        store.inspect(id)
     }
 }
