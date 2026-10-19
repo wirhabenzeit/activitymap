@@ -65,7 +65,7 @@ final class ActivityContinuationUITests: XCTestCase {
         XCTAssertEqual(cancelled.selection, initial.selection)
         start.press(forDuration: 0.05,
             thenDragTo: coordinate(app, x: viewport.maxX - 15, y: frame.minY + min(10, frame.height / 2)),
-            withVelocity: 1200, thenHoldForDuration: 0)
+            withVelocity: .slow, thenHoldForDuration: 0.2)
         let returned = try await state(in: app) { $0.ready && (list ? $0.inspectedID == -1 : $0.detailID == -1) }
         XCTAssertEqual(returned.selection, initial.selection)
         if !list {
