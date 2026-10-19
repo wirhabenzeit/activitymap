@@ -7,6 +7,23 @@ import XCTest
 /// touches reach the shared interaction in Map and List.
 @MainActor
 final class ActivityContinuationUITests: XCTestCase {
+    func testListStatusBarStaysLightWhileScrollingAndSwitching() async throws {
+        let app = launch(list: true, profile: true)
+        defer { app.terminate() }
+        _ = try await state(in: app) { $0.ready }
+        try await open(2, app: app, list: true)
+        _ = try await state(in: app) { $0.ready && $0.inspectedID == 2 }
+        detailScroll(in: app).swipeUp(velocity: 1200)
+        _ = try await state(in: app) { $0.ready }
+        try visibleButton("activity-next", in: app).tap()
+        _ = try await state(in: app) { $0.ready && $0.inspectedID == 1 }
+        try visibleButton("activity-previous", in: app).tap()
+        let settled = try await state(in: app) { $0.ready && $0.inspectedID == 2 }
+        XCTAssertEqual(settled.detailStatusStyles, [UIStatusBarStyle.lightContent.rawValue],
+                       "The clock and system icons must remain light over the blue header during scrolling and activity switches")
+        capture(app, name: "Stable blue-header status style through scrolling and activity switching")
+    }
+
     func testListFlickRetainsNativeInertia() async throws {
         try await inertiaJourney(list: true)
     }
@@ -501,6 +518,7 @@ final class ActivityContinuationUITests: XCTestCase {
         let nativeDetent: String
         let profileReady: Bool?
         let profileSetupError: String?
+        let detailStatusStyles: [Int]?
         let profileScrubbing: Bool?
         let profileSelectedSampleID: Int?
         let selection: [Int]

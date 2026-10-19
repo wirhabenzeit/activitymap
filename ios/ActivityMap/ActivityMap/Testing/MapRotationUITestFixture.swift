@@ -163,26 +163,27 @@ struct MapRotationUITestFixture: View {
 }
 
 /// Diagnostics sit outside the undimmed results sheet in a noninteractive
-/// shell overlay. Settings can hide the root AX tree; tests inspect its own UI
+/// shell overlay. A plain UIView avoids changing the status-bar appearance
+/// owner while measuring it. Settings can hide the root AX tree; tests inspect its own UI
 /// while open, then read this probe again after dismissal. No extra window or
 /// presentation controller participates in rotation. The probe uses only public
 /// containment/presentation relationships, UIView subviews, UIScrollView geometry
 /// and app-owned accessibility IDs.
-private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
+private struct MapRotationPresentationProbe: UIViewRepresentable {
     let store: ActivityStore
     let picker: RoutePicker
     let includesProfiles: Bool
     let profileSetupError: String?
-    func makeUIViewController(context: Context) -> Controller {
-        Controller(store: store, picker: picker, includesProfiles: includesProfiles)
+    func makeUIView(context: Context) -> ProbeView {
+        ProbeView(store: store, picker: picker, includesProfiles: includesProfiles)
     }
-    func updateUIViewController(_ controller: Controller, context: Context) {
+    func updateUIView(_ controller: ProbeView, context: Context) {
         controller.profileSetupError = profileSetupError
         controller.start()
     }
-    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) { controller.stop() }
+    static func dismantleUIView(_ controller: ProbeView, coordinator: ()) { controller.stop() }
 
-    final class Controller: UIViewController {
+    final class ProbeView: UIView {
         let store: ActivityStore
         let picker: RoutePicker
         let includesProfiles: Bool
@@ -193,13 +194,16 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
         private var presentations: Set<ObjectIdentifier> = []
         private var priorGeometry = ""
         private var stableSamples = 0
+        private var detailStatusStyles: [Int] = []
+        private var observesDetailStatus = false
 
 
         init(store: ActivityStore, picker: RoutePicker, includesProfiles: Bool) {
             self.store = store
             self.picker = picker
             self.includesProfiles = includesProfiles
-            super.init(nibName: nil, bundle: nil)
+            super.init(frame: .zero)
+            configureLabel()
         }
         @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
 
@@ -208,7 +212,7 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
             sampling = Task { [weak self] in
                 while !Task.isCancelled {
                     guard let self else { return }
-                    if let window = view.window, let root = window.rootViewController {
+                    if let window, let root = window.rootViewController {
                         sample(root: root, window: window)
                     }
                     do { try await Task.sleep(for: .milliseconds(50)) } catch { return }
@@ -221,10 +225,9 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
             sampling = nil
         }
 
-        override func loadView() {
-            view = UIView()
-            view.backgroundColor = .clear
-            view.isUserInteractionEnabled = false
+        private func configureLabel() {
+            backgroundColor = .clear
+            isUserInteractionEnabled = false
             label.text = "Rotation fixture"
             label.font = .systemFont(ofSize: 8)
             label.textColor = .label
@@ -232,9 +235,9 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
             label.isAccessibilityElement = true
             label.accessibilityIdentifier = "map-rotation-fixture-state"
             label.accessibilityLabel = "Map rotation fixture"
-            label.frame = view.bounds
+            label.frame = bounds
             label.autoresizingMask = [.flexibleWidth, .flexibleHeight]
-            view.addSubview(label)
+            addSubview(label)
         }
 
         private func sample(root: UIViewController, window: UIWindow) {
@@ -284,6 +287,14 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
                 && detailScroll?.isDragging != true && detailScroll?.isDecelerating != true
                 ? stableSamples + 1 : 0
             priorGeometry = geometry
+            if visibleDetailID == nil {
+                observesDetailStatus = false
+                detailStatusStyles = []
+            } else if stableSamples >= 10 { observesDetailStatus = true }
+            if observesDetailStatus, let style = window.windowScene?.statusBarManager?.statusBarStyle.rawValue,
+               detailStatusStyles.last != style {
+                detailStatusStyles.append(style)
+            }
             let profilesReady = !includesProfiles || store.activities.allSatisfy {
                 store.streamSummaries?.currentSummary(for: String($0.id)) != nil
             }
@@ -291,6 +302,7 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
                 "ready": profilesReady && (store.selectedTab == .list || (panel != nil && (scroll != nil || detailScroll != nil))) && stableSamples >= 10,
                 "profileReady": profilesReady,
                 "profileSetupError": profileSetupError ?? "",
+                "detailStatusStyles": detailStatusStyles,
                 "profileScrubbing": store.elevationScrubOwner != nil,
                 "profileSelectedSampleID": store.elevationCursor?.point.id ?? -1,
                 "orientation": orientation,

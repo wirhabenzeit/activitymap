@@ -51,6 +51,12 @@ struct AppShell: View {
     private var nativeMapHeader: Bool { usesStatsNavigation && sizeClass == .compact }
 
     var body: some View {
+        browsingContent.overlay {
+            BrowseStatusBarStyle().allowsHitTesting(false)
+        }
+    }
+
+    private var browsingContent: some View {
         Group {
             if usesStatsNavigation {
                 shellContent
