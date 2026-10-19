@@ -70,7 +70,7 @@ struct RoutePickerSheet: View {
         }
         // One continuous detail surface; only the outer host owns corners.
         .frame(maxHeight: .infinity, alignment: .top)
-        .background { if !nativePresentation { Rectangle().fill(.regularMaterial) } }
+        .background { if !nativePresentation { Rectangle().fill(.ultraThinMaterial) } }
         .clipShape(UnevenRoundedRectangle(topLeadingRadius: isSidePanel ? 20 : 28,
             bottomLeadingRadius: 0, bottomTrailingRadius: 0,
             topTrailingRadius: isSidePanel ? 20 : 28))
@@ -109,13 +109,21 @@ struct RoutePickerSheet: View {
     private var groupHeader: some View {
         HStack(spacing: 0) {
             SelectionBar(store: store, showsClear: false, expandsCount: true)
+            if detail != nil {
+                Button { picker.showResults() } label: {
+                    Image(systemName: "chevron.backward").frame(width: 44, height: 44).contentShape(Rectangle())
+                }
+                .accessibilityLabel("Back to selected activities")
+                .accessibilityIdentifier("map-results-back")
+            }
             Button { store.mapContext.request(fitActivityID.map { .fitActivity($0) } ?? .fitSelection) } label: {
                 Image(systemName: "viewfinder").frame(width: 44, height: 44).contentShape(Rectangle())
             }.accessibilityLabel(fitActivityID == nil ? "Fit selection" : "Fit route")
                 .accessibilityIdentifier("map-results-fit")
                 .disabled(fitActivityID.map { !store.routableActivityIDs.contains($0) }
                     ?? !candidates.contains { store.routableActivityIDs.contains($0.id) })
-            MapActivityShareButton(picker: picker, store: store)
+            // Detail owns its single-activity share action in the footer.
+            if detail == nil { MapActivityShareButton(picker: picker, store: store) }
             Button { store.clearSelection() } label: {
                 Image(systemName: "xmark").frame(width: 44, height: 44).contentShape(Rectangle())
             }.accessibilityLabel("Clear selection")
@@ -125,7 +133,7 @@ struct RoutePickerSheet: View {
     private var sidePanelHeader: some View {
         VStack(spacing: 0) {
             HStack(spacing: 0) { groupHeader; panelHandle }
-            if let detail, !collapsed { resultNavigation(detail) }
+            if let detail, !collapsed, candidates.count > 1 { detailNavigation(detail) }
         }.padding(.horizontal, 12)
     }
 
@@ -133,22 +141,13 @@ struct RoutePickerSheet: View {
         VStack(spacing: 0) {
             Color.clear.frame(height: 13).allowsHitTesting(false)
             groupHeader
-            if let detail, !collapsed { resultNavigation(detail) }
+            if let detail, !collapsed, candidates.count > 1 { detailNavigation(detail) }
         }.padding(.horizontal, 12)
-    }
-
-    private func resultNavigation(_ activity: Activity) -> some View {
-        HStack(spacing: 4) {
-            Button { picker.showResults() } label: {
-                Label("Results", systemImage: "chevron.left").font(.subheadline.weight(.medium)).frame(minHeight: 44)
-            }.accessibilityLabel("Back to selected activities").accessibilityIdentifier("map-results-back")
-            Spacer(minLength: 0)
-            if candidates.count > 1 { detailNavigation(activity) }
-        }
     }
 
     private func detailNavigation(_ activity: Activity) -> some View {
         HStack(spacing: 4) {
+            Spacer(minLength: 0)
             Button { if !picker.isPaging { picker.step(-1, store: store) } } label: {
                 Image(systemName: "chevron.left").frame(width: 44, height: 44)
             }.accessibilityLabel("Previous activity")
