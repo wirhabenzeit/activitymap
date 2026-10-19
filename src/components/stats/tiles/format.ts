@@ -1,4 +1,5 @@
 import { dateFormatter, numberFormatter } from '~/lib/presentation/formatters';
+import { comparisonPresentation } from '~/lib/stats/presentation-policy';
 import { METRES_PER_FOOT, METRES_PER_MILE, type UnitSystem } from '~/lib/units';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
 
@@ -59,7 +60,10 @@ export function formatShort(value: number, step = 1, locale = 'en'): string {
     Number.isFinite(interval) && interval > 0
       ? Math.min(12, Math.max(0, Math.ceil(-Math.log10(interval))))
       : 0;
-  const rounded = Number((value / scale).toFixed(decimals));
+  const factor = 10 ** decimals;
+  const rounded =
+    (Math.sign(value) * Math.floor(Math.abs(value / scale) * factor + 0.5)) /
+    factor;
   return (
     numberFormatter(locale, {
       maximumFractionDigits: decimals,
@@ -80,8 +84,13 @@ export function axisTicks(
 }
 
 export function percentChange(current: number, previous: number) {
-  if (previous === 0) return null;
-  return Math.round((current / previous - 1) * 100);
+  const facts = comparisonPresentation(current, previous);
+  if (facts.magnitude === null) return null;
+  return facts.magnitude === 0
+    ? 0
+    : facts.direction === 'lower'
+      ? -facts.magnitude
+      : facts.magnitude;
 }
 
 /** Activity-local calendar coordinates stay in UTC; locale changes ordering only. */

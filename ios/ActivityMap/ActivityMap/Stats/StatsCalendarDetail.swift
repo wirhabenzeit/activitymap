@@ -10,6 +10,8 @@ struct StatsCalendarDetail: View {
     var expand: () -> Void = {}
     var summaryControls: AnyView? = nil
     var background: Color = AppTheme.surface
+    @FocusState private var keyboardDay: Int?
+    @Environment(\.layoutDirection) private var layoutDirection
     @State var selectedDay: Int?
     @State private var localWeek: Int?
     @State private var width: CGFloat = 0
@@ -174,6 +176,9 @@ struct StatsCalendarDetail: View {
                                     .frame(width: side, height: side)
                             }
                             .buttonStyle(.plain)
+                            .focused($keyboardDay, equals: day)
+                            .statsDayKeys(day: day, first: layout.first, last: layout.last,
+                                          layout: .weekColumns, rtl: layoutDirection == .rightToLeft) { keyboardDay = $0 }
                             .accessibilityLabel(dayDescription(day, data: days[day]))
                             .accessibilityAddTraits(day == focusedDay ? .isSelected : [])
                             .accessibilityIdentifier("stats-calendar-day-\(day)")

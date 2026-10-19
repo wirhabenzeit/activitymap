@@ -62,23 +62,24 @@ struct StatsDashboardTile: View {
         }
     }
 
+    private var comparisonPeriods: StatsComparisonPeriods {
+        if let displayed, case .comparison(let values, _, _, _, _, _) = displayed.result, let periods = values.periods { return periods }
+        return .make(today: today, monthly: tile.id != .yearToDate)
+    }
     private var comparisonLabels: (current: String, previous: String) {
-        if tile.id == .yearToDate { return (String(year), String(year - 1)) }
-        let month = StatsDates.parts(today).month!
-        func name(_ month: Int) -> String {
-            StatsDates.date(StatsDates.start(year: year, month: month))
-                .formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated))
+        let periods = comparisonPeriods
+        if tile.id == .yearToDate {
+            return (String(StatsDates.parts(periods.current.first).year!), String(StatsDates.parts(periods.previous.first).year!))
         }
-        return (name(month), name(month - 1))
+        func name(_ day: Int) -> String {
+            StatsDates.date(day).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated))
+        }
+        return (name(periods.current.first), name(periods.previous.first))
     }
     private var comparisonContext: String {
-        if tile.id == .yearToDate {
-            return "vs \(year - 1) by \(StatsDisplay.shortDate(today))"
-        }
-        let date = StatsDates.parts(today)
-        let previousLast = StatsDates.start(year: year, month: date.month!) - 1
-        let elapsed = min(date.day!, StatsDates.parts(previousLast).day!)
-        return "vs \(comparisonLabels.previous) 1–\(elapsed)"
+        let previous = comparisonPeriods.previous
+        if tile.id == .yearToDate { return "vs \(comparisonLabels.previous) by \(StatsDisplay.shortDate(previous.last))" }
+        return "vs \(comparisonLabels.previous) 1–\(StatsDates.parts(previous.last).day!)"
     }
 
     var body: some View {
@@ -216,13 +217,13 @@ struct StatsDashboardTile: View {
     }
 
     private func comparisonChart(current: [StatsPoint], previous: [StatsPoint], band: StatsComparisonBand?) -> some View {
-        StatsSeriesChart(points: current.map { .init(x: $0.x, value: $0.y, series: comparisonLabels.current, partial: false) }
-                + previous.map { .init(x: $0.x, value: $0.y, series: comparisonLabels.previous, partial: false) },
+        StatsSeriesChart(points: current.map { .init(x: $0.x, value: $0.y, series: comparisonLabels.current, partial: false, role: .current) }
+                + previous.map { .init(x: $0.x, value: $0.y, series: comparisonLabels.previous, partial: false, role: .comparison) },
                 metric: metric, expanded: expanded, axis: tile.id == .yearToDate ? .year : .day, style: .lines, compact: true, band: band)
     }
 
     private func hillinessChart(_ climb: StatsClimbing) -> some View {
-        StatsPeriodBars(points: climb.months.enumerated().map { .init(x: $0.element.monthStart, value: $0.element.rate / 100, series: DisplayPreferences.shared.units.hillinessUnit, partial: $0.offset == climb.months.count - 1) }, expanded: expanded,
+        StatsPeriodBars(points: climb.months.enumerated().map { .init(x: $0.element.monthStart, value: $0.element.rate / 100, series: DisplayPreferences.shared.units.hillinessUnit, partial: $0.offset == climb.months.count - 1, role: .hilliness) }, expanded: expanded,
                             label: { StatsDates.date($0.x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)) },
                             detailLabel: { StatsDisplay.month($0.x) },
                             valueLabel: { "\(StatsDisplay.number(DisplayPreferences.shared.units.hilliness($0), decimals: 1)) \(DisplayPreferences.shared.units.hillinessUnit)" },
@@ -292,19 +293,13 @@ struct StatsDashboardTile: View {
         .accessibilityElement(children: .combine)
     }
     @ViewBuilder private func comparison(_ values: StatsPeriodComparison, context: String, unitless: Bool = false) -> some View {
-        if let change = values.percentageChange {
+        let presentation = StatsComparisonPresentation(current: values.current, previous: values.previous)
+        if let percent = presentation.percentage() {
             let delta = values.current - values.previous
-            let percent = abs(change) < 0.5 && change != 0 ? "<1" : StatsDisplay.number(abs(change))
-            let prefix = change >= 0 ? "+" : "−"
-            let absolute = unitless ? "" : "\(delta >= 0 ? "+" : "−")\(StatsDisplay.measurement(abs(delta), metric: metric)) · "
-            if pilot {
-                // Increases are green; a decrease is not a failure, so it keeps the primary text colour.
-                Text("\(Text("\(absolute)\(prefix)\(percent)%").foregroundColor(change > 0 && !unitless ? (colorScheme == .dark ? Color.green : Color(red: 0.08, green: 0.43, blue: 0.2)) : Color.primary)) \(Text(context).foregroundColor(.secondary))")
-                    .font(.caption).fixedSize(horizontal: false, vertical: true)
-            } else {
-                StatsComparison(value: "\(absolute)\(prefix)\(percent)%", context: context,
-                                direction: change == 0 ? .unchanged : change > 0 ? .higher : .lower)
-            }
+            let absolute = unitless ? "" : "\(delta == 0 ? "" : delta > 0 ? "+" : "−")\(StatsDisplay.measurement(abs(delta), metric: metric)) · "
+            StatsComparison(value: "\(absolute)\(percent)", context: context,
+                            direction: presentation.direction == .unchanged ? .unchanged : presentation.direction == .higher ? .higher : .lower,
+                            emphasisesIncrease: !unitless)
         } else { note(context) }
     }
     private func note(_ text: String) -> some View {

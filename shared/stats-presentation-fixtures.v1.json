@@ -1,0 +1,199 @@
+{
+  "version": 1,
+  "percentages": [
+    {
+      "current": 100,
+      "previous": 100,
+      "direction": "unchanged",
+      "magnitude": 0,
+      "lessThanOne": false,
+      "text": "0%"
+    },
+    {
+      "current": 100.49,
+      "previous": 100,
+      "direction": "higher",
+      "magnitude": 0,
+      "lessThanOne": true,
+      "text": "+<1%"
+    },
+    {
+      "current": 99.51,
+      "previous": 100,
+      "direction": "lower",
+      "magnitude": 0,
+      "lessThanOne": true,
+      "text": "−<1%"
+    },
+    {
+      "current": 100.5,
+      "previous": 100,
+      "direction": "higher",
+      "magnitude": 1,
+      "lessThanOne": false,
+      "text": "+1%"
+    },
+    {
+      "current": 99.5,
+      "previous": 100,
+      "direction": "lower",
+      "magnitude": 1,
+      "lessThanOne": false,
+      "text": "−1%"
+    },
+    {
+      "current": 9,
+      "previous": 8,
+      "direction": "higher",
+      "magnitude": 13,
+      "lessThanOne": false,
+      "text": "+13%"
+    },
+    {
+      "current": 7,
+      "previous": 8,
+      "direction": "lower",
+      "magnitude": 13,
+      "lessThanOne": false,
+      "text": "−13%"
+    },
+    {
+      "current": 2,
+      "previous": 0,
+      "direction": "higher",
+      "magnitude": null,
+      "lessThanOne": false,
+      "text": null
+    }
+  ],
+  "periods": [
+    {
+      "today": "2024-02-29",
+      "kind": "year",
+      "first": "2024-01-01",
+      "previousFirst": "2023-01-01",
+      "previousLast": "2023-02-28",
+      "previousComplete": false
+    },
+    {
+      "today": "2026-03-31",
+      "kind": "month",
+      "first": "2026-03-01",
+      "previousFirst": "2026-02-01",
+      "previousLast": "2026-02-28",
+      "previousComplete": true
+    },
+    {
+      "today": "2024-03-31",
+      "kind": "month",
+      "first": "2024-03-01",
+      "previousFirst": "2024-02-01",
+      "previousLast": "2024-02-29",
+      "previousComplete": true
+    },
+    {
+      "today": "2026-01-31",
+      "kind": "month",
+      "first": "2026-01-01",
+      "previousFirst": "2025-12-01",
+      "previousLast": "2025-12-31",
+      "previousComplete": true
+    },
+    {
+      "today": "2026-12-31",
+      "kind": "year",
+      "first": "2026-01-01",
+      "previousFirst": "2025-01-01",
+      "previousLast": "2025-12-31",
+      "previousComplete": true
+    }
+  ],
+  "axes": [
+    {
+      "value": 0,
+      "step": 0.2,
+      "text": "0"
+    },
+    {
+      "value": 0.2,
+      "step": 0.2,
+      "text": "0.2"
+    },
+    {
+      "value": 0.4,
+      "step": 0.2,
+      "text": "0.4"
+    },
+    {
+      "value": 1250,
+      "step": 250,
+      "text": "1.3k"
+    },
+    {
+      "value": -1250,
+      "step": 250,
+      "text": "-1.3k"
+    },
+    {
+      "value": -1e-5,
+      "step": 0.2,
+      "text": "0"
+    }
+  ],
+  "navigation": [
+    {
+      "day": 10,
+      "key": "ArrowRight",
+      "first": 1,
+      "last": 30,
+      "layout": "week-columns",
+      "rtl": false,
+      "expected": 17
+    },
+    {
+      "day": 10,
+      "key": "ArrowRight",
+      "first": 1,
+      "last": 30,
+      "layout": "week-columns",
+      "rtl": true,
+      "expected": 3
+    },
+    {
+      "day": 10,
+      "key": "ArrowDown",
+      "first": 1,
+      "last": 30,
+      "layout": "month-rows",
+      "rtl": false,
+      "expected": 17
+    },
+    {
+      "day": 1,
+      "key": "ArrowLeft",
+      "first": 1,
+      "last": 30,
+      "layout": "month-rows",
+      "rtl": false,
+      "expected": 1
+    },
+    {
+      "day": 10,
+      "key": "End",
+      "first": 1,
+      "last": 30,
+      "layout": "month-rows",
+      "rtl": false,
+      "expected": 30
+    },
+    {
+      "day": 10,
+      "key": "Enter",
+      "first": 1,
+      "last": 30,
+      "layout": "month-rows",
+      "rtl": false,
+      "expected": null
+    }
+  ]
+}

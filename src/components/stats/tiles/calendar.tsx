@@ -1,29 +1,27 @@
 'use client';
 
+import { interpolateRgb } from 'd3';
 // Seven weekday rows with chronological week columns.
 
 import {
-  useState,
-  useRef,
-  useLayoutEffect,
-  useEffectEvent,
   type ReactNode,
+  useEffectEvent,
+  useLayoutEffect,
+  useState,
 } from 'react';
 
-import { interpolateRgb } from 'd3';
+import { useRetainedScrollRef } from '~/hooks/use-browsing-context';
+import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
+import { type Sport } from '~/lib/stats/tile-data';
+import { sameDateLastYear } from '~/lib/stats/tile-data';
+import { calendarWeeks, dateOfDay } from '~/lib/stats/tile-series';
 import { type UnitSystem } from '~/lib/units';
-import { formatPreferredDate, type DateFormat } from '~/lib/date-preferences';
-
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
-import { type Sport } from '~/lib/stats/tile-data';
-import { dateOfDay, calendarWeeks } from '~/lib/stats/tile-series';
-
-import { sameDateLastYear } from '~/lib/stats/tile-data';
-import { useRetainedScrollRef } from '~/hooks/use-browsing-context';
 import { browsing } from '~/store/browsing';
 
-import { statsFormat, monthName, type TilePalette } from './format';
+import { type TilePalette, monthName, statsFormat } from './format';
+import { useDayGrid } from './use-day-grid';
 
 export function WeekdayRows({
   today,
@@ -91,8 +89,12 @@ export function WeekdayRows({
   useLayoutEffect(() => {
     positionOnOpen();
   }, [expanded, first, today]);
-  const [focusedDay, setFocusedDay] = useState(today);
-  const cells = useRef(new Map<number, HTMLButtonElement>());
+  const dayGrid = useDayGrid(
+    first,
+    today,
+    selectedDay ?? today,
+    'week-columns',
+  );
   const max =
     colorBy === 'sport'
       ? 0
@@ -185,7 +187,7 @@ export function WeekdayRows({
                   >
                     {labelMonth &&
                       (expanded || weekIndex < weeks.length - 2) && (
-                        <span className="absolute left-0 whitespace-nowrap text-[10px] leading-3 text-muted-foreground">
+                        <span className="absolute left-0 text-[10px] leading-3 whitespace-nowrap text-muted-foreground">
                           {monthName(labelDate)}
                           {(expanded || labelDate.getUTCMonth() === 0) && (
                             <span className="block">
@@ -208,7 +210,7 @@ export function WeekdayRows({
                         {monthStartIndex > 0 && (
                           <>
                             <span
-                              className="absolute -right-px top-0 w-[6px] translate-x-1/2 bg-card"
+                              className="absolute top-0 -right-px w-[6px] translate-x-1/2 bg-card"
                               style={{ height: boundaryTop }}
                             />
                             <span
@@ -235,15 +237,7 @@ export function WeekdayRows({
                           data-calendar-day={day}
                           type="button"
                           key={index}
-                          ref={(element) => {
-                            if (element) cells.current.set(day, element);
-                            else {
-                              // This is a DOM-ref Map, not a database operation.
-                              // eslint-disable-next-line drizzle/enforce-delete-with-where
-                              cells.current.delete(day);
-                            }
-                          }}
-                          tabIndex={day === focusedDay ? 0 : -1}
+                          {...dayGrid(day)}
                           aria-label={label}
                           aria-pressed={day === selectedDay}
                           title={label}
@@ -275,33 +269,13 @@ export function WeekdayRows({
                           }}
                           onPointerEnter={() => setHover(label)}
                           onFocus={() => {
-                            setFocusedDay(day);
+                            dayGrid(day).onFocus();
                             setHover(label);
                           }}
                           onClick={(event) => {
                             event.stopPropagation();
                             setHover(label);
                             onSelectDay?.(day);
-                          }}
-                          onKeyDown={(event) => {
-                            const offsets: Record<string, number> = {
-                              ArrowLeft: -7,
-                              ArrowRight: 7,
-                              ArrowUp: -1,
-                              ArrowDown: 1,
-                            };
-                            const offset = offsets[event.key];
-                            if (offset !== undefined) {
-                              event.preventDefault();
-                              cells.current
-                                .get(
-                                  Math.max(
-                                    first,
-                                    Math.min(today, day + offset),
-                                  ),
-                                )
-                                ?.focus();
-                            }
                           }}
                         />
                       );

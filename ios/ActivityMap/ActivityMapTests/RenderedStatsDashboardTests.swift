@@ -746,7 +746,7 @@ import Testing
         let start = StatsDates.day("2026-08-31")
         let values = [10_000.0, 5_000, 5_000, 6_000, 7_000]
         let points = values.enumerated().map { index, value in
-            StatsChartPoint(x: start + index * 7, value: value, series: "Weekly total", partial: index == values.count - 1)
+            StatsChartPoint(x: start + index * 7, value: value, series: "Weekly total", partial: index == values.count - 1, role: .weeklyTotal)
         }
         let host = try StatsDashboardHarness(root: StatsSeriesChart(points: points, metric: .elevation,
             expanded: false, axis: .date, style: .volume, compact: true)

@@ -39,6 +39,8 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     private var sports: [ActivityCategory] {
         ActivityCategory.allCases.filter { sport in buckets.contains { ($0.bySport[sport] ?? 0) > 0 } }
     }
+    private var axisTicks: [Double] { StatsDisplay.axisTicks(maximum: maximum) }
+    private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0]) : 1 }
     private var maximum: Double { max(1, max(buckets.map(\.total).max() ?? 1, trend.map(\.y).max() ?? 0)) * 1.08 }
     private func lower(_ bucket: StatsHistoryBucket, _ sport: ActivityCategory) -> Double {
         sports.prefix(while: { $0 != sport }).reduce(0) { $0 + (bucket.bySport[$1] ?? 0) }
@@ -169,10 +171,10 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
             }
         }
         .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { tick in
+            AxisMarks(position: .leading, values: axisTicks) { tick in
                 AxisGridLine()
                 AxisValueLabel {
-                    if let value = tick.as(Double.self) { Text(StatsDisplay.value(value, metric: metric)) }
+                    if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value), step: axisStep)) }
                 }
             }
         }

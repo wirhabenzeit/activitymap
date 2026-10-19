@@ -10,6 +10,7 @@ import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
 import { comparisonBand } from '~/lib/stats/comparison-band';
 import { periodComparisons, volumeHistoryAverage } from '~/lib/stats/history';
+import { comparisonPercentage } from '~/lib/stats/presentation-policy';
 import {
   type ActivityRecord,
   type StatsActivity,
@@ -18,7 +19,7 @@ import {
   dayOf,
   fourWeekVolume,
   mondayOf,
-  monthVsLastMonth,
+  periodComparison,
   recordRankings,
   records,
   sameDateLastYear,
@@ -27,8 +28,8 @@ import {
   typicalWeek,
   weeklyVolume,
   yearPace,
-  yearToDate,
 } from '~/lib/stats/tile-data';
+import type { StatsTileModels } from '~/lib/stats/tile-models';
 import {
   comparisonYear,
   cumulativeByDay,
@@ -54,11 +55,11 @@ import {
   PlainBars,
   VolumeArea,
 } from './charts';
+import { StatsChoices } from './choices';
 import {
   type TilePalette,
   metricLabel,
   monthName,
-  percentChange,
   shortDate,
   statsFormat,
 } from './format';
@@ -67,6 +68,7 @@ import { MonthRhythm, YearRhythm } from './period-rhythm';
 
 export type TileContext = {
   units?: UnitSystem;
+  models?: StatsTileModels;
   dateFormat?: DateFormat;
   activities: StatsActivity[];
   today: number;
@@ -171,8 +173,8 @@ function Delta({
 }) {
   const { formatWithUnit } = statsFormat(units);
 
-  const change = percentChange(current, previous);
-  if (change === null) return <>{text}</>;
+  const percentage = comparisonPercentage(current, previous);
+  if (percentage === null) return <>{text}</>;
   return (
     <>
       <span
@@ -184,10 +186,7 @@ function Delta({
       >
         {metric &&
           `${signed(current - previous, (value) => formatWithUnit(value, metric))} · `}
-        {change === 0 && current !== previous
-          ? `${current > previous ? '+' : '−'}<1`
-          : signed(change, String)}
-        %
+        {percentage}
       </span>{' '}
       {text}
     </>
@@ -297,7 +296,7 @@ function yearSeries(
     key: String(year),
     label: String(year),
     points,
-    current: year === currentYear,
+    role: year === currentYear ? 'current' : 'comparison',
   };
 }
 
@@ -409,7 +408,12 @@ const yearToDateView: TileView = {
     const { formatMetric, metricUnit } = statsFormat(units);
 
     const metric = asMetric(option, 'distance');
-    const { current, previous } = yearToDate(activities, today, metric);
+    const { current, previous, periods } = periodComparison(
+      activities,
+      today,
+      metric,
+      'year',
+    );
     return {
       value: formatMetric(current, metric),
       unit: `${metric === 'count' ? 'activities' : metricUnit[metric]} so far`,
@@ -420,7 +424,7 @@ const yearToDateView: TileView = {
           current={current}
           previous={previous}
           metric={metric}
-          text={`vs ${dateOfDay(today).getUTCFullYear() - 1} by ${shortDate(dateOfDay(today))}`}
+          text={`vs ${dateOfDay(periods.previous.first).getUTCFullYear()} by ${shortDate(dateOfDay(periods.previous.last))}`}
         />
       ),
     };
@@ -590,7 +594,7 @@ function monthPair(context: TileContext, metric: StatsMetric): LineSeries[] {
           thisStart - 1,
         ),
       ),
-      current: false,
+      role: 'comparison',
     },
     {
       key: 'current',
@@ -598,21 +602,9 @@ function monthPair(context: TileContext, metric: StatsMetric): LineSeries[] {
       points: toPoints(
         cumulativeByDay(context.activities, metric, thisStart, context.today),
       ),
-      current: true,
+      role: 'current',
     },
   ];
-}
-
-// "Aug 1–26": last month up to today's day number, capped at its last day.
-function samePeriodLastMonth(today: number) {
-  const date = dateOfDay(today);
-  const previous = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1),
-  );
-  const lastDay = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 0),
-  ).getUTCDate();
-  return `${monthName(previous)} 1–${Math.min(date.getUTCDate(), lastDay)}`;
 }
 
 const monthVsLastMonthView: TileView = {
@@ -642,7 +634,12 @@ const monthVsLastMonthView: TileView = {
     const { formatMetric, metricUnit } = statsFormat(units);
 
     const metric = asMetric(option, 'distance');
-    const { current, previous } = monthVsLastMonth(activities, today, metric);
+    const { current, previous, periods } = periodComparison(
+      activities,
+      today,
+      metric,
+      'month',
+    );
     return {
       value: formatMetric(current, metric),
       unit: `${metric === 'count' ? 'activities' : metricUnit[metric]} so far`,
@@ -653,7 +650,7 @@ const monthVsLastMonthView: TileView = {
           current={current}
           previous={previous}
           metric={metric}
-          text={`vs ${samePeriodLastMonth(today)}`}
+          text={`vs ${monthName(dateOfDay(periods.previous.first))} 1–${dateOfDay(periods.previous.last).getUTCDate()}`}
         />
       ),
     };
@@ -1200,11 +1197,12 @@ const yearPaceView: TileView = {
   expandable: false,
   headlineControls: true,
   period: ({ today }) => `${dateOfDay(today).getUTCFullYear()} projection`,
-  summary: ({ activities, today, units = 'metric' }, option) => {
+  summary: ({ activities, today, units = 'metric', models }, option) => {
     const { formatMetric, metricUnit } = statsFormat(units);
 
     const metric = asMetric(option, 'distance');
-    const pace = yearPace(activities, today, metric);
+    const pace =
+      models?.yearPace(metric) ?? yearPace(activities, today, metric);
     return {
       value: formatMetric(pace.projected, metric),
       unit: `${metricUnit[metric]} projected`,
@@ -1212,12 +1210,13 @@ const yearPaceView: TileView = {
       sub: "At this year's daily average",
     };
   },
-  face: ({ activities, today, units = 'metric' }, option) => {
+  face: ({ activities, today, units = 'metric', models }, option) => {
     const { formatMetric, formatWithUnit, formatDailyRate, metricUnit } =
       statsFormat(units);
 
     const metric = asMetric(option, 'distance');
-    const pace = yearPace(activities, today, metric);
+    const pace =
+      models?.yearPace(metric) ?? yearPace(activities, today, metric);
     const year = dateOfDay(today).getUTCFullYear();
     const unit = metricUnit[metric];
     const scale = Math.max(pace.projected, pace.lastYear, 1);
@@ -1518,26 +1517,14 @@ function RecordsDetail({ context }: { context: TileContext }) {
         {' · Use Filters to adjust these rankings.'}
       </p>
       <Activity mode={showBothPeriods ? 'hidden' : 'visible'}>
-        <div
-          role="group"
-          aria-label="Records period"
-          className="inline-flex rounded-md bg-muted p-0.5"
-        >
-          {(['currentYear', 'allTime'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={range === value}
-              onClick={() => setRange(value)}
-              className={cn(
-                'min-h-11 rounded-[5px] px-3 text-xs font-medium text-muted-foreground',
-                range === value && 'bg-background text-foreground shadow-xs',
-              )}
-            >
-              {optionLabels[value]}
-            </button>
-          ))}
-        </div>
+        <StatsChoices
+          label="Records period"
+          options={['currentYear', 'allTime'] as const}
+          value={range}
+          onChange={setRange}
+          accessibleLabel={(value) => optionLabels[value]!}
+          visibleLabel={(value) => optionLabels[value]}
+        />
         <p className="text-xs text-muted-foreground">
           {range === 'allTime'
             ? 'All-time records'

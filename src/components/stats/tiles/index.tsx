@@ -34,6 +34,7 @@ import { useStatsFocus } from '~/hooks/use-stats-focus';
 import { bentoRowMinimums, placeBento } from '~/lib/stats/bento';
 import { isStatsHistoryLoading } from '~/lib/stats/loading';
 import { type StatsActivity } from '~/lib/stats/tile-data';
+import { createStatsTileModels } from '~/lib/stats/tile-models';
 import { localToday } from '~/lib/stats/tile-series';
 import { cn } from '~/lib/utils';
 import {
@@ -46,6 +47,7 @@ import {
 
 import { StatsActivityInspector } from './activity-inspector';
 import { Measure } from './charts';
+import { StatsChoices } from './choices';
 import { statsFormat } from './format';
 import { tilePalette } from './format';
 import { FilterScope, useStatsActivities } from './scope';
@@ -161,6 +163,10 @@ export function StatsTileGrid({
   }, []);
   const units = useDisplayUnits();
   const dateFormat = useDateFormat();
+  const models = useMemo(
+    () => createStatsTileModels(activities, reportingDay ?? today),
+    [activities, reportingDay, today],
+  );
   const context: TileContext = useMemo(
     () => ({
       activities,
@@ -173,9 +179,11 @@ export function StatsTileGrid({
       availableWidth,
       selectedActivityId,
       palette: tilePalette(resolvedTheme === 'dark'),
+      models,
     }),
     [
       activities,
+      models,
       today,
       reportingDay,
       units,
@@ -653,36 +661,20 @@ function FaceSwitch({
 }) {
   const { metricUnit } = statsFormat(useDisplayUnits());
   return (
-    <div
-      role="group"
-      aria-label={label}
-      className="-my-1 inline-flex shrink-0 self-center rounded-md bg-muted p-0.5"
-      // Switching the face must not expand the tile.
-      onClick={(event) => event.stopPropagation()}
-      onKeyDown={(event) => {
-        if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
-      }}
-    >
-      {options.map((option) => (
-        <button
-          key={option}
-          type="button"
-          aria-pressed={option === value}
-          aria-label={optionLabels[option] ?? option}
-          title={optionLabels[option] ?? option}
-          onClick={() => onChange(option)}
-          className={cn(
-            'min-h-7 min-w-7 rounded-[5px] px-1.5 py-1 text-[11px] leading-none font-medium text-muted-foreground hover:text-foreground',
-            option === value && 'bg-background text-foreground shadow-xs',
-          )}
-        >
-          {option === 'distance'
-            ? metricUnit.distance
-            : option === 'elevation'
-              ? metricUnit.elevation
-              : (faceOptionLabels[option] ?? option)}
-        </button>
-      ))}
-    </div>
+    <StatsChoices
+      label={label}
+      options={options}
+      value={value}
+      onChange={onChange}
+      compact
+      accessibleLabel={(option) => optionLabels[option] ?? option}
+      visibleLabel={(option) =>
+        option === 'distance'
+          ? metricUnit.distance
+          : option === 'elevation'
+            ? metricUnit.elevation
+            : (faceOptionLabels[option] ?? option)
+      }
+    />
   );
 }
