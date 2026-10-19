@@ -96,6 +96,7 @@ export class StravaApiError extends Error {
     message: string,
     public status: number,
     public errors?: Array<{ resource: string; field: string; code: string }>,
+    public readonly retryAfterSeconds?: number,
   ) {
     super(message);
     this.name = 'StravaApiError';
@@ -308,7 +309,17 @@ export class StravaClient {
       const usage = parseStravaRateLimitUsage(response.headers);
       if (usage) this.rateLimitCallback?.(usage);
       if (!response.ok) {
-        throw new StravaApiError('Failed to refresh access token', response.status);
+        const retryAfter = response.headers.get('retry-after');
+        const numericDelay = retryAfter?.trim() ? Number(retryAfter) : NaN;
+        const deadline = retryAfter ? Date.parse(retryAfter) : NaN;
+        const retryAfterSeconds = Number.isFinite(numericDelay)
+          ? numericDelay >= 0 ? Math.ceil(numericDelay) : undefined
+          : Number.isFinite(deadline)
+            ? Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
+            : undefined;
+        throw new StravaApiError(
+          'Failed to refresh access token', response.status, undefined, retryAfterSeconds,
+        );
       }
       const tokens = stravaTokensSchema.parse(await response.json());
 

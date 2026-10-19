@@ -1,6 +1,6 @@
 'use server';
 
-import { getAuthenticatedAccountInternal } from '~/server/db/internal';
+import { getAuthenticatedAccountInternal } from '~/server/auth/request-account';
 import { logger } from '~/server/logging/logger';
 import { fetchStravaActivities } from './service';
 

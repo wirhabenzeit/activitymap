@@ -1,6 +1,10 @@
 import 'server-only';
 
 import { getAccountInternal } from '~/server/db/internal';
+import {
+  AccountCredentialsUnavailableError,
+  AccountPersistenceError,
+} from './account-credentials';
 import type { Activity, Photo } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
 import {
@@ -126,18 +130,7 @@ export async function fetchInitialActivitySummariesForActor(
 ): Promise<number> {
   const { resolveAccount, fetchActivities } = resolveDeps(deps);
   try {
-    const account = await resolveAccount({ userId: actor.userId });
-    if (
-      !account?.access_token ||
-      account.revokedAt ||
-      account.accountId !== String(actor.athleteId)
-    ) {
-      throw new ActivityMutationError(
-        'strava_not_connected',
-        'The connected Strava account is unavailable.',
-        409,
-      );
-    }
+    const account = await resolveConnectedAccount(actor, resolveAccount);
     const result = await fetchActivities({
       accessToken: account.access_token,
       athleteId: actor.athleteId,
@@ -197,7 +190,22 @@ async function requireOwnedActivity(
 
 function mutationFailure(error: unknown): ActivityMutationError {
   if (error instanceof ActivityMutationError) return error;
-  if (error instanceof StravaPersistenceError)
+  if (error instanceof AccountCredentialsUnavailableError)
+    return new ActivityMutationError(
+      error.reason === 'changed'
+        ? 'local_state_conflict'
+        : 'strava_not_connected',
+      error.message,
+      409,
+      error.reason === 'changed',
+      undefined,
+      undefined,
+      { cause: error },
+    );
+  if (
+    error instanceof StravaPersistenceError ||
+    error instanceof AccountPersistenceError
+  )
     return new ActivityMutationError(
       'local_persistence_failed',
       error.upstreamSucceeded
@@ -239,7 +247,7 @@ function mutationFailure(error: unknown): ActivityMutationError {
         'Strava rate-limited the request.',
         429,
         true,
-        60,
+        error.retryAfterSeconds ?? 60,
         undefined,
         { cause: error },
       );
@@ -259,7 +267,7 @@ function mutationFailure(error: unknown): ActivityMutationError {
         'Strava could not complete the request.',
         503,
         true,
-        60,
+        error.retryAfterSeconds ?? 60,
         undefined,
         { cause: error },
       );
@@ -297,6 +305,26 @@ function mutationFailure(error: unknown): ActivityMutationError {
   );
 }
 
+async function resolveConnectedAccount(
+  actor: Actor,
+  resolveAccount: AccountResolver,
+) {
+  try {
+    const account = await resolveAccount({ userId: actor.userId });
+    if (
+      !account?.access_token ||
+      account.revokedAt ||
+      account.scheduledErasureAt ||
+      account.accountId !== String(actor.athleteId)
+    ) {
+      throw new AccountCredentialsUnavailableError('missing_credentials');
+    }
+    return { ...account, access_token: account.access_token };
+  } catch (error) {
+    throw mutationFailure(error);
+  }
+}
+
 /**
  * Update an activity in Strava and mirror the result locally. Always
  * resolves the Strava credential and athlete id from the authenticated
@@ -314,14 +342,7 @@ export async function updateActivityForActor(
 
   const existing = await requireOwnedActivity(activitiesRepo, actor, act.id);
 
-  const account = await resolveAccount({ userId: actor.userId });
-  if (!account?.access_token) {
-    throw new ActivityMutationError(
-      'strava_not_connected',
-      'The connected Strava account is unavailable.',
-      409,
-    );
-  }
+  const account = await resolveConnectedAccount(actor, resolveAccount);
 
   let stravaActivity;
   try {
@@ -410,14 +431,7 @@ export async function refreshActivityForActor(
 
   await requireOwnedActivity(activitiesRepo, actor, activityId);
 
-  const account = await resolveAccount({ userId: actor.userId });
-  if (!account?.access_token) {
-    throw new ActivityMutationError(
-      'strava_not_connected',
-      'The connected Strava account is unavailable.',
-      409,
-    );
-  }
+  const account = await resolveConnectedAccount(actor, resolveAccount);
 
   let result: FetchStravaActivitiesResult;
   try {
