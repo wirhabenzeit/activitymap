@@ -2,15 +2,15 @@
 
 import { useCallback, useSyncExternalStore } from 'react';
 import { flushSync } from 'react-dom';
-import { focusedTile, tileFocusURL } from '~/components/stats/tiles/focus';
-import { type StatsTileID } from '~/settings/stats-tiles.generated';
-import { activityURL, inspectedActivity } from '~/components/list/inspection';
 
-type FocusHistory = {
-  statsTileFocus?: { dashboardURL: string };
-  statsActivityDetail?: { returnTo: string };
-};
-const changed = 'activitymap:stats-focus';
+import {
+  closeTileFocus,
+  currentFocusedTile,
+  focusCloseTarget,
+  openTileFocus,
+  subscribeBrowsingHistory,
+} from '~/lib/browsing-history';
+import { type StatsTileID } from '~/settings/stats-tiles.generated';
 
 let transition: ViewTransition | undefined;
 
@@ -70,80 +70,28 @@ function changeView(id: StatsTileID | null, update: () => void) {
   void current.finished.then(cleanup, cleanup);
 }
 
-const snapshot = () => focusedTile(window.location.search);
+const snapshot = currentFocusedTile;
 const serverSnapshot = () => null;
 function subscribe(notify: () => void) {
   let previous = snapshot();
-  const pop = () => {
+  return subscribeBrowsingHistory((reason) => {
     const next = snapshot();
-    if (next === previous) notify();
-    else changeView(next ?? previous, notify);
+    if (reason === 'pop' && next !== previous)
+      changeView(next ?? previous, notify);
+    else notify();
     previous = next;
-  };
-  const update = () => {
-    previous = snapshot();
-    notify();
-  };
-  window.addEventListener('popstate', pop);
-  window.addEventListener(changed, update);
-  return () => {
-    window.removeEventListener('popstate', pop);
-    window.removeEventListener(changed, update);
-  };
+  });
 }
 
 export function useStatsFocus() {
-  // Next's native history integration updates the URL without navigating or
-  // remounting this dashboard. This subscription also covers browser Forward.
   const activeID = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
   const open = useCallback((id: StatsTileID) => {
-    if (snapshot() === id) return;
-    changeView(id, () => {
-      window.history.pushState(
-        {
-          statsTileFocus: {
-            dashboardURL: tileFocusURL(window.location.href, null),
-          },
-        },
-        '',
-        tileFocusURL(window.location.href, id),
-      );
-      window.dispatchEvent(new Event(changed));
-    });
+    if (snapshot() !== id) changeView(id, () => openTileFocus(id));
   }, []);
   const close = useCallback(() => {
-    const state = window.history.state as FocusHistory | null;
-    if (
-      inspectedActivity(window.location.search) &&
-      !state?.statsActivityDetail?.returnTo
-    ) {
-      window.history.replaceState(
-        { statsTileFocus: state?.statsTileFocus },
-        '',
-        activityURL(window.location.href, 0),
-      );
-      window.dispatchEvent(new Event('activitymap:stats-inspection'));
-      return;
-    }
-    // A pushed activity inspection closes first, whether or not the focus
-    // itself was opened from the dashboard.
-    if (
-      state?.statsActivityDetail?.returnTo ||
-      state?.statsTileFocus?.dashboardURL
-    ) {
-      window.history.back();
-    } else {
-      // A direct/reloaded focus URL has no originating dashboard entry.
-      // Return locally instead of sending the user out of the app.
-      changeView(snapshot(), () => {
-        window.history.replaceState(
-          null,
-          '',
-          tileFocusURL(window.location.href, null),
-        );
-        window.dispatchEvent(new Event(changed));
-      });
-    }
+    if (focusCloseTarget() === 'dashboard')
+      changeView(snapshot(), closeTileFocus);
+    else closeTileFocus();
   }, []);
   return { activeID, open, close };
 }

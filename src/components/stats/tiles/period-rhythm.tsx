@@ -1,24 +1,26 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import { useBrowsingState } from '~/hooks/use-browsing-context';
-import { type StatsMetric } from '~/settings/stats-tiles.generated';
-import { categorySettings } from '~/settings/category';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import {
+  type PeriodSportValues,
+  monthActivityRhythm,
+  periodTotal,
+  yearMonthlyRhythm,
+} from '~/lib/stats/period-rhythm';
+import {
+  type Sport,
   metricValue,
   sameDateLastYear,
   sportOrder,
-  type Sport,
 } from '~/lib/stats/tile-data';
 import { dateOfDay } from '~/lib/stats/tile-series';
-import {
-  monthActivityRhythm,
-  yearMonthlyRhythm,
-  periodTotal,
-  type PeriodSportValues,
-} from '~/lib/stats/period-rhythm';
 import { cn } from '~/lib/utils';
+import { categorySettings } from '~/settings/category';
+import { type StatsMetric } from '~/settings/stats-tiles.generated';
+
 import { ActivityRow } from './activity-row';
 import { formatDailyRate, metricLabel, monthName, statsFormat } from './format';
 import { type TileContext } from './tiles';
@@ -50,7 +52,7 @@ export function MonthRhythm({
     () => monthActivityRhythm(context.activities, context.today, metric),
     [context.activities, context.today, metric],
   );
-  const [selectedDay, setSelectedDay] = useBrowsingState<number | null>(
+  const [selectedDay, setSelectedDay] = useBrowsingState(
     'stats:monthDay',
     null,
   );

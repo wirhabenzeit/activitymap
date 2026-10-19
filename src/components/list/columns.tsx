@@ -1,37 +1,37 @@
 'use client';
 
-import {
-  useDisplayUnits,
-  useDateFormat,
-} from '~/hooks/use-display-preferences';
-import { useContext } from 'react';
-import { SpeedDisplayContext } from './speed-display-context';
-import {
-  formatSpeed,
-  formatPaceSeconds,
-  paceSeconds,
-  speedLabel,
-  speedDisplayForSports,
-} from '~/lib/speed-display';
-import { aggregateMetric } from '~/lib/activity-presentation';
 import { type ColumnDef, type Table } from '@tanstack/react-table';
-import { store, useShallowStore } from '~/store';
-import { Checkbox } from '~/components/ui/checkbox';
+import { useContext } from 'react';
 
-import { isMissing } from '~/lib/activity-presentation';
-import { type Activity, type Photo } from '~/server/db/schema';
 import { Button } from '~/components/ui/button';
-
-import { DataTableColumnHeader } from './data-table-column-header';
+import { Checkbox } from '~/components/ui/checkbox';
 import {
-  activityFields,
+  useDateFormat,
+  useDisplayUnits,
+} from '~/hooks/use-display-preferences';
+import type { ActivityMapCommand } from '~/hooks/use-show-on-map';
+import { aggregateMetric } from '~/lib/activity-presentation';
+import { isMissing } from '~/lib/activity-presentation';
+import {
+  formatPaceSeconds,
+  formatSpeed,
+  paceSeconds,
+  speedDisplayForSports,
+  speedLabel,
+} from '~/lib/speed-display';
+import { type Activity, type Photo } from '~/server/db/schema';
+import {
   type ActivityField,
   type ActivityValueType,
+  activityFields,
 } from '~/settings/activity';
+import { store, useShallowStore } from '~/store';
 
 import { ActivityCard, DescriptionCard } from './card';
+import { DataTableColumnHeader } from './data-table-column-header';
 import { EditActivity } from './edit';
 import { PhotoLightbox } from './photo';
+import { SpeedDisplayContext } from './speed-display-context';
 import { type Features } from './table-extensions';
 import { getWidthMode, setWidthMode, widthModes } from './width-mode';
 
@@ -124,7 +124,7 @@ function columnFromField<K extends ActivityValueType>(
     ).length;
     return (
       <div
-        className="text-right w-full"
+        className="w-full text-right"
         title={`${known} of ${values.length} activities with a recorded value`}
         aria-label={`${summary}; ${known} of ${values.length} recorded`}
       >
@@ -141,7 +141,7 @@ function columnFromField<K extends ActivityValueType>(
       const dateFormat = useDateFormat();
       const display = useContext(SpeedDisplayContext);
       return (
-        <div className="text-right w-full">
+        <div className="w-full text-right">
           {id === 'average_speed'
             ? formatSpeed(getValue() as number, display, units)
             : spec.formatter(getValue() as K, units, dateFormat)}
@@ -159,8 +159,8 @@ function columnFromField<K extends ActivityValueType>(
           column={column}
           title={id === 'average_speed' ? speedLabel(display) : undefined}
         >
-          <div className="w-full justify-end flex">
-            {spec.Icon && <spec.Icon className="w-4 h-4" />}
+          <div className="flex w-full justify-end">
+            {spec.Icon && <spec.Icon className="h-4 w-4" />}
           </div>
         </DataTableColumnHeader>
       );
@@ -179,7 +179,7 @@ function WidthModeToggle({ table }: { table: Table<Features, Activity> }) {
     <Button
       variant="outline"
       size="sm"
-      className="p-1 border"
+      className="border p-1"
       onClick={() => setWidthMode(table, next)}
       aria-label={`${label}. Switch to: ${widthModes[next].label.toLowerCase()}`}
       title={`${label} (click to change)`}
@@ -200,8 +200,8 @@ export const columns: ColumnDef<Features, Activity>[] = [
     filterFn: (
       row: { original: Activity },
       _columnId: string,
-      filterValue: number[],
-    ) => filterValue.includes(row.original.id),
+      filterValue: ReadonlySet<number>,
+    ) => filterValue.has(row.original.id),
   },
   {
     id: 'name',
@@ -293,7 +293,7 @@ export const columns: ColumnDef<Features, Activity>[] = [
     cell: ({ getValue }) => {
       const geometryState = getValue() as Activity['geometryState'];
       return (
-        <div className="text-right w-full">{geometryState ?? 'Unknown'}</div>
+        <div className="w-full text-right">{geometryState ?? 'Unknown'}</div>
       );
     },
   },
@@ -308,3 +308,32 @@ export const columns: ColumnDef<Features, Activity>[] = [
     accessorFn: (row) => row.id,
   },
 ];
+
+/** Screen-owned commands are captured once, independent of displayed row count. */
+export function activityColumns(
+  onShowOnMap: ActivityMapCommand,
+  eligibleIDs: ReadonlySet<number>,
+) {
+  return columns.map((column) =>
+    column.id === 'name'
+      ? {
+          ...column,
+          cell: ({
+            row,
+          }: {
+            row: Parameters<typeof ActivityCard>[0]['row'];
+          }) => (
+            <ActivityCard
+              row={row}
+              onShowOnMap={onShowOnMap}
+              mapActionVariant={
+                eligibleIDs.has(row.original.id)
+                  ? 'show'
+                  : 'clear-filters-and-show'
+              }
+            />
+          ),
+        }
+      : column,
+  );
+}

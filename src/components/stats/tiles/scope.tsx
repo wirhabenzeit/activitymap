@@ -1,17 +1,18 @@
 'use client';
 
-import { useMemo } from 'react';
 import { Filter } from 'lucide-react';
-import { useActivities } from '~/hooks/use-activities';
-import { useShallowStore } from '~/store';
+import { useMemo } from 'react';
+
+import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
 import {
   filterStatsActivities,
   statsFilterScope,
 } from '~/lib/stats/filter-scope';
 import { toStatsActivity } from '~/lib/stats/tile-series';
+import { useShallowStore } from '~/store';
 
 export function useStatsActivities() {
-  const query = useActivities();
+  const { query } = useBrowsingLibrary();
   const state = useShallowStore((s) => ({
     sportType: s.sportType,
     sportGroup: s.sportGroup,
@@ -52,7 +53,7 @@ export function FilterScope({
         {labels.map((label) => (
           <span
             key={label}
-            className="max-w-full break-words rounded bg-muted px-2 py-1"
+            className="max-w-full rounded bg-muted px-2 py-1 break-words"
           >
             {label}
           </span>

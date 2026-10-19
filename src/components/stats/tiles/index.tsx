@@ -192,10 +192,8 @@ export function StatsTileGrid({
   const { activeID, open, close } = useStatsFocus();
   const [scrollRef, retainScroll] = useRetainedScrollRef('stats:dashboard');
   const previousID = useRef<StatsTileID | null>(null);
-  const [options, setOptions] = useBrowsingState<
-    Partial<Record<StatsTileID, string>>
-  >('stats:options', {});
-  const [calendarDay, setCalendarDay] = useBrowsingState<number | null>(
+  const [options, setOptions] = useBrowsingState('stats:options', {});
+  const [calendarDay, setCalendarDay] = useBrowsingState(
     'stats:calendarDay',
     null,
   );

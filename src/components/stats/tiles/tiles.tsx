@@ -3,68 +3,67 @@
 // What each tile shows on its face and in its detail view. The switch over
 // StatsTileID is exhaustive, so a tile added to shared/stats-tiles.json
 // fails the build here until it has a view.
-
-import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
-import { type UnitSystem } from '~/lib/units';
-import { Activity, useMemo, type ReactNode } from 'react';
-import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { Medal } from 'lucide-react';
+import { Activity, type ReactNode, useMemo } from 'react';
+
+import { useBrowsingState } from '~/hooks/use-browsing-context';
+import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
 import { comparisonBand } from '~/lib/stats/comparison-band';
 import { periodComparisons, volumeHistoryAverage } from '~/lib/stats/history';
-
-import { categorySettings } from '~/settings/category';
 import {
-  type StatsMetric,
-  type StatsTileID,
-} from '~/settings/stats-tiles.generated';
-import {
+  type ActivityRecord,
+  type StatsActivity,
   best30Days,
-  sameDateLastYear,
   climbing,
   dayOf,
   fourWeekVolume,
   mondayOf,
   monthVsLastMonth,
-  records,
   recordRankings,
+  records,
+  sameDateLastYear,
   sportMix,
   thisWeek,
   typicalWeek,
   weeklyVolume,
   yearPace,
   yearToDate,
-  type ActivityRecord,
-  type StatsActivity,
 } from '~/lib/stats/tile-data';
 import {
+  comparisonYear,
   cumulativeByDay,
   cumulativeYearPoints,
-  comparisonYear,
   dateOfDay,
   monthStart,
   sportBreakdown,
   yearStart,
 } from '~/lib/stats/tile-series';
+import { type UnitSystem } from '~/lib/units';
 import { cn } from '~/lib/utils';
+import { categorySettings } from '~/settings/category';
+import {
+  type StatsMetric,
+  type StatsTileID,
+} from '~/settings/stats-tiles.generated';
 
 import { ActivityRow } from './activity-row';
-import { VolumeHistory, CalendarHistory } from './history';
-import { MonthRhythm, YearRhythm } from './period-rhythm';
 import {
   CumulativeLines,
+  type LineSeries,
   Measure,
   PlainBars,
   VolumeArea,
-  type LineSeries,
 } from './charts';
 import {
-  statsFormat,
+  type TilePalette,
   metricLabel,
   monthName,
   percentChange,
   shortDate,
-  type TilePalette,
+  statsFormat,
 } from './format';
+import { CalendarHistory, VolumeHistory } from './history';
+import { MonthRhythm, YearRhythm } from './period-rhythm';
 
 export type TileContext = {
   units?: UnitSystem;
@@ -879,7 +878,7 @@ const sportMixView: TileView = {
                 className="flex flex-wrap justify-between gap-2 py-2"
               >
                 <dt>{categorySettings[sport].name}</dt>
-                <dd className="tabular-nums text-muted-foreground">
+                <dd className="text-muted-foreground tabular-nums">
                   {formatWithUnit(
                     breakdown.get(sport)?.distance ?? 0,
                     'distance',
@@ -917,7 +916,7 @@ const sportMixView: TileView = {
               const row = breakdown.get(sport);
               return (
                 <tr key={sport} className="border-b border-muted">
-                  <td className="whitespace-nowrap py-1.5 pr-2 font-sans">
+                  <td className="py-1.5 pr-2 font-sans whitespace-nowrap">
                     <span
                       className="mr-2 inline-block h-2 w-2 rounded-full"
                       style={{ background: categorySettings[sport].color }}
@@ -1418,10 +1417,10 @@ function RecordsPodium({
                               aria-hidden="true"
                               strokeWidth={1.7}
                               className={cn(
-                                'size-[18px] [&>path]:stroke-sky-600 [&>path:first-child]:fill-sky-100 dark:[&>path]:stroke-sky-400 dark:[&>path:first-child]:fill-sky-950',
+                                'size-[18px] [&>path]:stroke-sky-600 dark:[&>path]:stroke-sky-400 [&>path:first-child]:fill-sky-100 dark:[&>path:first-child]:fill-sky-950',
                                 [
-                                  '[&>circle]:fill-yellow-400 [&>circle]:stroke-yellow-700 [&>path:last-child]:stroke-yellow-900 dark:[&>circle]:fill-yellow-300 dark:[&>path:last-child]:stroke-yellow-900',
-                                  '[&>circle]:fill-slate-200 [&>circle]:stroke-slate-500 [&>path:last-child]:stroke-slate-700 dark:[&>circle]:fill-slate-300 dark:[&>path:last-child]:stroke-slate-700',
+                                  '[&>circle]:fill-yellow-400 [&>circle]:stroke-yellow-700 dark:[&>circle]:fill-yellow-300 [&>path:last-child]:stroke-yellow-900 dark:[&>path:last-child]:stroke-yellow-900',
+                                  '[&>circle]:fill-slate-200 [&>circle]:stroke-slate-500 dark:[&>circle]:fill-slate-300 [&>path:last-child]:stroke-slate-700 dark:[&>path:last-child]:stroke-slate-700',
                                   '[&>circle]:fill-orange-300 [&>circle]:stroke-amber-800 [&>path:last-child]:stroke-amber-950 dark:[&>path:last-child]:stroke-amber-950',
                                 ][place],
                               )}
@@ -1446,7 +1445,7 @@ function RecordsPodium({
                           </span>
                           <span
                             className={cn(
-                              'whitespace-nowrap font-mono text-sm tabular-nums',
+                              'font-mono text-sm whitespace-nowrap tabular-nums',
                               place === 0 && 'font-semibold',
                             )}
                           >
@@ -1482,7 +1481,7 @@ function RecordsPodium({
                                 'w-full rounded px-1 focus-visible:outline-2',
                                 activity.activityId ===
                                   context.selectedActivityId
-                                  ? 'bg-header-background/10 ring-1 ring-inset ring-header-background/40 hover:bg-header-background/15'
+                                  ? 'bg-header-background/10 ring-1 ring-header-background/40 ring-inset hover:bg-header-background/15'
                                   : 'hover:bg-muted/40',
                               )}
                             >
@@ -1506,7 +1505,7 @@ function RecordsPodium({
 }
 
 function RecordsDetail({ context }: { context: TileContext }) {
-  const [range, setRange] = useBrowsingState<'currentYear' | 'allTime'>(
+  const [range, setRange] = useBrowsingState(
     'stats:recordsPeriod',
     'currentYear',
   );
