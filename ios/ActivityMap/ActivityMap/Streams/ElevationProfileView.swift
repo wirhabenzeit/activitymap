@@ -272,7 +272,7 @@ struct ElevationPlot: View {
             .chartOverlay { proxy in
                 GeometryReader { geometry in
                     Color.clear.contentShape(Rectangle())
-                        .gesture(ElevationScrubGesture { location in
+                        .gesture(ElevationScrubGesture(bounds: geometry.size) { location in
                             guard let location, let plotFrame = proxy.plotFrame else {
                                 gestureSelection.wrappedValue = nil
                                 return
@@ -313,9 +313,15 @@ struct ElevationPlot: View {
 /// Reject vertical movement before recognition so the enclosing scroll view
 /// keeps native scrolling and overscroll, including when a pull starts on a chart.
 private struct ElevationScrubGesture: UIGestureRecognizerRepresentable {
+    let bounds: CGSize
     let select: (CGPoint?) -> Void
 
-    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator {
+        Coordinator(converter: converter, bounds: bounds)
+    }
+    func updateUIGestureRecognizer(_ recognizer: UIPanGestureRecognizer, context: Context) {
+        context.coordinator.bounds = bounds
+    }
     func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
         let pan = UIPanGestureRecognizer()
         pan.maximumNumberOfTouches = 1
@@ -330,8 +336,18 @@ private struct ElevationScrubGesture: UIGestureRecognizerRepresentable {
         }
     }
     final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        let converter: CoordinateSpaceConverter
+        var bounds: CGSize
+        init(converter: CoordinateSpaceConverter, bounds: CGSize) {
+            self.converter = converter
+            self.bounds = bounds
+        }
         func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
             guard let pan = recognizer as? UIPanGestureRecognizer else { return false }
+            let location = converter.localLocation
+            let translation = converter.localTranslation ?? .zero
+            let origin = CGPoint(x: location.x - translation.x, y: location.y - translation.y)
+            guard CGRect(origin: .zero, size: bounds).contains(origin) else { return false }
             let velocity = pan.velocity(in: pan.view)
             return abs(velocity.x) > abs(velocity.y)
         }

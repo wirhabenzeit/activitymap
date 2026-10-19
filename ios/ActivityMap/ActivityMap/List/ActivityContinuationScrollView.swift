@@ -50,6 +50,8 @@ struct ActivityContinuationScrollView<Content: View>: View {
     @State private var pull = ActivityContinuationPull()
     @State private var position = ScrollPosition(edge: .top)
     @State private var previousIndicator = ActivityContinuationIndicatorState()
+    @State private var previousCueHeight: CGFloat?
+    @State private var nextCueHeight: CGFloat?
 
     private var navigation: ActivityDetailContinuation? {
         guard let continuation, continuation.currentID == activityID else { return nil }
@@ -121,7 +123,11 @@ struct ActivityContinuationScrollView<Content: View>: View {
            let destination = navigation?.destination(for: direction) {
             cue(direction: direction, destination: destination, state: state)
                 .fixedSize(horizontal: false, vertical: true)
-                .frame(height: state.distance, alignment: direction == .previous ? .bottom : .top)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                    if direction == .previous { previousCueHeight = height }
+                    else { nextCueHeight = height }
+                }
+                .frame(height: state.distance, alignment: .center)
                 .clipped()
                 .opacity(min(1, state.distance / 24))
                 .allowsHitTesting(false)
@@ -132,6 +138,8 @@ struct ActivityContinuationScrollView<Content: View>: View {
                      destination: ActivityDetailContinuation.Destination,
                      state: ActivityContinuationIndicatorState) -> some View {
         let previous = direction == .previous
+        let labelOpacity = (previous ? previousCueHeight : nextCueHeight)
+            .map { min(1, max(0, (state.distance - $0) / 8)) } ?? 0
         return HStack(spacing: 12) {
             ZStack {
                 Circle().stroke(.secondary.opacity(0.2), lineWidth: 2)
@@ -142,6 +150,7 @@ struct ActivityContinuationScrollView<Content: View>: View {
                     .font(.system(size: 12, weight: .semibold))
             }
             .frame(width: 28, height: 28)
+            .scaleEffect(min(1, state.distance / 32))
             .foregroundStyle(state.isArmed ? AppTheme.accent : .secondary)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
@@ -156,6 +165,7 @@ struct ActivityContinuationScrollView<Content: View>: View {
                 Text(destination.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .opacity(labelOpacity)
         }
         .padding(.horizontal, AppTheme.Spacing.large)
         .padding(.vertical, 12)

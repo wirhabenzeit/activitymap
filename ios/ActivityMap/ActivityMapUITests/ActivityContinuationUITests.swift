@@ -29,6 +29,52 @@ final class ActivityContinuationUITests: XCTestCase {
         capture(app, name: "\(list ? "List" : "Map") native inertia after finger lift")
     }
 
+    func testMapContentBackFromMetricText() async throws {
+        try await metricBackJourney(list: false)
+    }
+
+    func testListContentBackFromMetricText() async throws {
+        try await metricBackJourney(list: true)
+    }
+
+    private func metricBackJourney(list: Bool) async throws {
+        let app = launch(list: list, expanded: false, profile: true)
+        defer { app.terminate() }
+        let initial = try await state(in: app) { $0.ready }
+        try await open(2, app: app, list: list)
+        let opened = try await state(in: app) { $0.ready && $0.currentID(list: list) == 2 }
+        let viewport = rect(opened.detailContentFrame)
+        let metrics = app.descendants(matching: .any).matching(NSPredicate(format:
+            "identifier BEGINSWITH %@ AND NOT identifier BEGINSWITH %@", "activity-metric-", "activity-metric-group-"))
+        var metric: XCUIElement?
+        for _ in 0..<5 {
+            metric = metrics.allElementsBoundByIndex.first { $0.isHittable && $0.frame.midX < viewport.midX }
+            if metric != nil { break }
+            detailScroll(in: app).swipeUp(velocity: 300)
+            _ = try await state(in: app) { $0.ready }
+        }
+        let text = try XCTUnwrap(metric, "A metric in the leading column must be visible")
+        let frame = text.frame
+        let start = coordinate(app, x: frame.minX + 35, y: frame.minY + min(10, frame.height / 2))
+        capture(app, name: "\(list ? "List" : "Map") content Back begins on metric text")
+        start.press(forDuration: 0.05,
+            thenDragTo: coordinate(app, x: frame.minX + 78, y: frame.minY + min(10, frame.height / 2)),
+            withVelocity: .slow, thenHoldForDuration: 0.3)
+        let cancelled = try await state(in: app) { $0.ready }
+        XCTAssertEqual(cancelled.currentID(list: list), 2, "A short content Back must cancel")
+        XCTAssertEqual(cancelled.selection, initial.selection)
+        start.press(forDuration: 0.05,
+            thenDragTo: coordinate(app, x: viewport.maxX - 15, y: frame.minY + min(10, frame.height / 2)),
+            withVelocity: 1200, thenHoldForDuration: 0)
+        let returned = try await state(in: app) { $0.ready && (list ? $0.inspectedID == -1 : $0.detailID == -1) }
+        XCTAssertEqual(returned.selection, initial.selection)
+        if !list {
+            XCTAssertEqual(returned.navigationDepth, 1)
+            XCTAssertEqual(returned.controllerID, initial.controllerID)
+        }
+        capture(app, name: "\(list ? "List" : "Map") content Back returned to activities")
+    }
+
     func testMapPushAndInteractiveBackRetainResultsAndSelection() async throws {
         let app = launch()
         defer { app.terminate() }

@@ -22,6 +22,7 @@ struct DetailBackGesture: UIViewControllerRepresentable {
         private weak var previousDelegate: (any UIGestureRecognizerDelegate)?
         private var previousEnabled = false
         private weak var contentGesture: UIGestureRecognizer?
+        private weak var previousContentDelegate: (any UIGestureRecognizerDelegate)?
         private var previousContentEnabled = false
 
         override func viewWillAppear(_ animated: Bool) {
@@ -32,12 +33,15 @@ struct DetailBackGesture: UIViewControllerRepresentable {
         override func viewDidAppear(_ animated: Bool) {
             super.viewDidAppear(animated)
             navigationReference?.controller = navigationController
-            // Enable UIKit's content Back gesture alongside its screen-edge
-            // gesture. Its own delegate retains horizontal-content arbitration.
+            // Hidden native Back controls also suppress content pop through
+            // its delegate. Apply the same depth/transition guard to both
+            // native recognizers, preserving content gesture arbitration below.
             if let recognizer = navigationController?.interactiveContentPopGestureRecognizer,
                contentGesture !== recognizer {
                 contentGesture = recognizer
                 previousContentEnabled = recognizer.isEnabled
+                previousContentDelegate = recognizer.delegate
+                recognizer.delegate = self
                 recognizer.isEnabled = true
             }
             guard let recognizer = navigationController?.interactivePopGestureRecognizer else { return }
@@ -55,8 +59,12 @@ struct DetailBackGesture: UIViewControllerRepresentable {
         }
 
         func restore() {
-            contentGesture?.isEnabled = previousContentEnabled
+            if let contentGesture, contentGesture.delegate === self {
+                contentGesture.delegate = previousContentDelegate
+                contentGesture.isEnabled = previousContentEnabled
+            }
             contentGesture = nil
+            previousContentDelegate = nil
             guard let gesture, gesture.delegate === self else { return }
             gesture.delegate = previousDelegate
             gesture.isEnabled = previousEnabled
@@ -64,8 +72,43 @@ struct DetailBackGesture: UIViewControllerRepresentable {
 
         func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
             guard let navigationController else { return false }
-            return navigationController.viewControllers.count > 1
-                && navigationController.transitionCoordinator == nil
+            guard navigationController.viewControllers.count > 1,
+                  navigationController.transitionCoordinator == nil else { return false }
+            return true
+        }
+
+        // Keep UIKit's touch and arbitration decisions, giving horizontal Back
+        // priority over the vertical scroll pan. UIKit owns direction detection;
+        // its content recognizer may report zero velocity in shouldBegin.
+        private func contentDelegate(for recognizer: UIGestureRecognizer) -> (any UIGestureRecognizerDelegate)? {
+            recognizer === contentGesture ? previousContentDelegate : nil
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer,
+                shouldRecognizeSimultaneouslyWith: otherGestureRecognizer) ?? false
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldRequireFailureOf otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer,
+                shouldRequireFailureOf: otherGestureRecognizer) ?? false
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            if gestureRecognizer === contentGesture, otherGestureRecognizer.view is UIScrollView {
+                return true
+            }
+            return contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer,
+                shouldBeRequiredToFailBy: otherGestureRecognizer) ?? false
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive touch: UITouch) -> Bool {
+            contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer, shouldReceive: touch) ?? true
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive press: UIPress) -> Bool {
+            contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer, shouldReceive: press) ?? true
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldReceive event: UIEvent) -> Bool {
+            contentDelegate(for: gestureRecognizer)?.gestureRecognizer?(gestureRecognizer, shouldReceive: event) ?? true
         }
     }
 }
