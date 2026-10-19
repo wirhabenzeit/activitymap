@@ -1,3 +1,4 @@
+/* eslint-disable drizzle/enforce-delete-with-where -- This module uses IndexedDB, never Drizzle. */
 'use client';
 
 /**
@@ -21,6 +22,7 @@
 
 import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { PhotoDTO } from '~/contracts/v1/photo';
+import type { SyncChangeItemDTO } from '~/contracts/v1/sync';
 import {
   canReuseCachedStreamSummary,
   type CachedStreamSummary,
@@ -186,6 +188,177 @@ const openDatabase = async (): Promise<IDBDatabase | null> => {
 
 const buildPk = (scope: string, id: string): string => `${scope}:${id}`;
 
+/** One ordered feed/bootstrap mutation. IDs and data are the wire DTOs. */
+export type V1SyncMutation = SyncChangeItemDTO;
+
+/**
+ * Commit the page and the cursor acknowledging it in ONE transaction. Reads
+ * and writes stay inside IDB request callbacks, with no network/callback await
+ * that could let the transaction auto-commit. An abort rolls back all stores.
+ * Replacement is used only after a complete bootstrap and catch-up is staged.
+ */
+export const applyV1SyncPage = async (
+  scope: string,
+  mutations: V1SyncMutation[],
+  state: V1SyncState,
+  options: { replace?: boolean; signal?: AbortSignal } = {},
+): Promise<void> => {
+  options.signal?.throwIfAborted();
+  if (state.scope !== scope) throw new Error('Sync checkpoint scope mismatch');
+  if (options.replace && (!state.bootstrapComplete || !state.lastSyncAt)) {
+    throw new Error('Cannot replace with an incomplete snapshot');
+  }
+  const db = await openDatabase();
+  if (!db) throw new Error('IndexedDB is unavailable');
+  options.signal?.throwIfAborted();
+  const tx = db.transaction(
+    [ACTIVITIES_STORE, PHOTOS_STORE, SYNC_STATE_STORE, STREAM_SUMMARIES_STORE],
+    'readwrite',
+  );
+  const completed = txToPromise(tx);
+  const abort = () => {
+    try {
+      tx.abort();
+    } catch {
+      /* Already finished. */
+    }
+  };
+  options.signal?.addEventListener('abort', abort, { once: true });
+  let failure: unknown;
+  try {
+    // Only parent deletes need existing photos, and only activity upserts need
+    // summary metadata. Empty polls must not materialize the whole library.
+    const photos = tx.objectStore(PHOTOS_STORE);
+    const summaries = tx.objectStore(STREAM_SUMMARIES_STORE);
+    const needsPhotos =
+      options.replace === true ||
+      mutations.some(
+        (item) => item.entityType === 'activity' && item.operation === 'delete',
+      );
+    const photoRequest = needsPhotos
+      ? (photos.index('by_scope').getAll(scope) as IDBRequest<PhotoRecord[]>)
+      : null;
+    const upsertIds = new Set(
+      mutations
+        .filter(
+          (item) =>
+            item.entityType === 'activity' && item.operation === 'upsert',
+        )
+        .map((item) => item.id),
+    );
+    const summaryRequests = options.replace
+      ? []
+      : [...upsertIds].map(
+          (id) =>
+            summaries.get(buildPk(scope, id)) as IDBRequest<
+              StreamSummaryRecord | undefined
+            >,
+        );
+    const activityKeys = options.replace
+      ? tx.objectStore(ACTIVITIES_STORE).index('by_scope').getAllKeys(scope)
+      : null;
+    const summaryKeys = options.replace
+      ? summaries.index('by_scope').getAllKeys(scope)
+      : null;
+    const reads = [
+      photoRequest,
+      activityKeys,
+      summaryKeys,
+      ...summaryRequests,
+    ].filter((request) => request !== null);
+    let pending = Math.max(1, reads.length);
+    const apply = () => {
+      if (--pending > 0) return;
+      try {
+        options.signal?.throwIfAborted();
+        const photoRows = new Map(
+          (photoRequest?.result ?? []).map((row) => [row.id, row]),
+        );
+        const summaryRows = new Map<string, StreamSummaryRecord>(
+          summaryRequests.flatMap((request) =>
+            request.result ? [[request.result.id, request.result]] : [],
+          ),
+        );
+        const activities = tx.objectStore(ACTIVITIES_STORE);
+        if (options.replace) {
+          for (const key of activityKeys!.result) activities.delete(key);
+          for (const row of photoRows.values()) photos.delete(row.pk);
+          for (const key of summaryKeys!.result) summaries.delete(key);
+          photoRows.clear();
+          summaryRows.clear();
+        }
+        const replacementActivityIds = new Set<string>();
+        for (const item of mutations) {
+          const pk = buildPk(scope, item.id);
+          if (item.entityType === 'activity') {
+            if (item.operation === 'delete') {
+              replacementActivityIds.delete(item.id);
+              activities.delete(pk);
+              summaries.delete(pk);
+              summaryRows.delete(item.id);
+              for (const [id, row] of photoRows) {
+                if (row.data.activity_id === item.id) {
+                  photos.delete(row.pk);
+                  photoRows.delete(id);
+                }
+              }
+            } else {
+              if (item.activity?.id !== item.id || item.photo)
+                throw new Error('Invalid activity mutation');
+              const summary = summaryRows.get(item.id);
+              if (
+                summary &&
+                !canReuseCachedStreamSummary(summary, item.activity.streams)
+              ) {
+                summaries.delete(pk);
+                summaryRows.delete(item.id);
+              }
+              replacementActivityIds.add(item.id);
+              activities.put({
+                pk,
+                scope,
+                id: item.id,
+                data: item.activity,
+              } satisfies ActivityRecord);
+            }
+          } else if (item.operation === 'delete') {
+            photos.delete(pk);
+            photoRows.delete(item.id);
+          } else {
+            if (item.photo?.unique_id !== item.id || item.activity)
+              throw new Error('Invalid photo mutation');
+            const row: PhotoRecord = {
+              pk,
+              scope,
+              id: item.id,
+              data: item.photo,
+            };
+            photoRows.set(item.id, row);
+            photos.put(row);
+          }
+        }
+        if (options.replace) {
+          for (const row of photoRows.values()) {
+            if (!replacementActivityIds.has(row.data.activity_id))
+              photos.delete(row.pk);
+          }
+        }
+        tx.objectStore(SYNC_STATE_STORE).put(state);
+      } catch (error) {
+        failure = error;
+        abort();
+      }
+    };
+    if (reads.length === 0) apply();
+    else for (const request of reads) request.onsuccess = apply;
+    await completed;
+  } catch (error) {
+    throw failure ?? (options.signal?.aborted ? options.signal.reason : error);
+  } finally {
+    options.signal?.removeEventListener('abort', abort);
+  }
+};
+
 export const getCachedActivityDTOs = async (
   scope: string,
 ): Promise<ActivityDTO[]> => {
@@ -224,7 +397,6 @@ export const upsertActivityDTOs = async (
         request.result &&
         !canReuseCachedStreamSummary(request.result, item.streams)
       ) {
-        // eslint-disable-next-line drizzle/enforce-delete-with-where
         summaries.delete(pk);
       }
     };
@@ -252,9 +424,7 @@ export const deleteActivityDTOsByIds = async (
   );
   const store = tx.objectStore(ACTIVITIES_STORE);
   for (const id of ids) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     store.delete(buildPk(scope, id));
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     tx.objectStore(STREAM_SUMMARIES_STORE).delete(buildPk(scope, id));
   }
   await txToPromise(tx);
@@ -306,7 +476,6 @@ export const deletePhotoDTOsByIds = async (
   const tx = db.transaction(PHOTOS_STORE, 'readwrite');
   const store = tx.objectStore(PHOTOS_STORE);
   for (const id of ids) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     store.delete(buildPk(scope, id));
   }
   await txToPromise(tx);
@@ -328,7 +497,6 @@ export const deletePhotoDTOsByActivityIds = async (
   const activityIdSet = new Set(activityIds);
   for (const row of rows) {
     if (activityIdSet.has(row.data.activity_id)) {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where
       store.delete(row.pk);
     }
   }
@@ -377,11 +545,9 @@ export const clearV1Scope = async (scope: string): Promise<void> => {
       store.index('by_scope').getAllKeys(scope),
     );
     for (const key of keys) {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where
       store.delete(key);
     }
   }
-  // eslint-disable-next-line drizzle/enforce-delete-with-where
   tx.objectStore(SYNC_STATE_STORE).delete(scope);
 
   await txToPromise(tx);
@@ -487,7 +653,6 @@ export const clearCachedStreamSummaries = async (
     store.index('by_scope').getAllKeys(scope),
   );
   for (const key of keys) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where
     store.delete(key);
   }
   await completed;
@@ -500,7 +665,6 @@ export const deleteCachedStreamSummary = async (
   const db = await openDatabase();
   if (!db) return;
   const tx = db.transaction(STREAM_SUMMARIES_STORE, 'readwrite');
-  // eslint-disable-next-line drizzle/enforce-delete-with-where
   tx.objectStore(STREAM_SUMMARIES_STORE).delete(buildPk(scope, id));
   await txToPromise(tx);
 };

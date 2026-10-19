@@ -59,7 +59,8 @@
     "test:browser:install": "playwright-core install chromium",
     "test:browser": "node scripts/quality/browser-harness.mjs",
     "test:ios": "node scripts/quality/native-harness.mjs",
-    "format:check": "node scripts/quality/format-check.mjs"
+    "format:check": "node scripts/quality/format-check.mjs",
+    "test:sync-integrity": "node scripts/verify-sync-integrity.mjs"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
