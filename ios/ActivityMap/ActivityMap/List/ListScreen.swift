@@ -179,13 +179,23 @@ struct SelectionBar: View {
     var showsClear = true
     var expandsCount = false
 
+    private var combineForeground: Color {
+        if onNavigationBar { return store.isCombining ? AppTheme.navigationBlue : .white }
+        return store.isCombining ? AppTheme.accent : .secondary
+    }
+
+    private var combineBackground: Color {
+        guard store.isCombining else { return .clear }
+        return onNavigationBar ? .white : AppTheme.accent.opacity(0.14)
+    }
+
     var body: some View {
         HStack(spacing: 2) {
             Button { store.setCombine(!store.isCombining) } label: {
                 Image(systemName: "checklist").font(.body)
-                    .foregroundStyle(onNavigationBar ? Color.white : store.isCombining ? AppTheme.accent : Color.secondary)
+                    .foregroundStyle(combineForeground)
                     .frame(width: 32, height: 32)
-                    .background(store.isCombining ? AppTheme.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                    .background(combineBackground, in: RoundedRectangle(cornerRadius: 10))
                     .frame(width: 44, height: 44).contentShape(Rectangle())
             }
             .accessibilityLabel("Combine selections")

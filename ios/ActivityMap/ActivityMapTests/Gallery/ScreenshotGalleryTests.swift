@@ -91,6 +91,8 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
 
     @MainActor func stage(_ activities: [Activity], scenario: GalleryManifest.Scenario) throws -> Staged {
         let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
+        // Review the active selection control on both blue and neutral surfaces.
+        store.setCombine(GalleryEnvironment.values["ACTIVITYMAP_GALLERY_COMBINE"] == "1")
         // Optional native list variants share the normal activity fixture.
         if GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LIST_VIEW"] == "details" {
             store.listPresentation.settings.width = .details
