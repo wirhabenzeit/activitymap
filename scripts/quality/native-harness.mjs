@@ -280,7 +280,9 @@ export async function runNativeHarness({
       {
         cwd: root,
         log: join(output, 'xcodebuild-test.log'),
-        timeoutMs: 12 * 60 * 1000,
+        // Fifteen continuation journeys alone took 9m46s on the hosted runner.
+        // Preserve time for the remaining selection, photo and rotation suites.
+        timeoutMs: 25 * 60 * 1000,
         signal: abort.signal,
         echo: false,
       },

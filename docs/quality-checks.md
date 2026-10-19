@@ -13,7 +13,7 @@ explicit disposable Postgres service.
 | `pnpm test:browser:install`            | Provision the lockfile-matched Playwright Chromium; append `--with-deps` on Linux                                                 |
 | `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
 | `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
-| `pnpm test:ios`                        | Build and run the seventeen selected iOS suites on an owned simulator                                                             |
+| `pnpm test:ios`                        | Build and run the twenty-one selected iOS suites on an owned simulator                                                            |
 | `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
 | `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
 | `pnpm format:check src/path.ts`        | Check explicit files                                                                                                              |
@@ -91,18 +91,23 @@ The bounded suite is:
 - `ActivityStoreSelectionTests`: selection/reconciliation contracts.
 - `SelectionFixtureTests`: shared selection fixtures.
 - `MapPhotoTests`: photo availability, payloads and shared fixture parity.
+- `MapResultsTests`, `ActivityContinuationTests`: result navigation and pull threshold/direction policies.
 - `PhotoGalleryTests`: gallery state and image request/cache behavior.
-- `MapPhotoUITests`: three real XCUI map/photo interactions using the offline app fixture.
+- `MapPhotoUITests`: four real XCUI map/photo interactions using the offline app fixture.
+- `MapRotationUITests`: retained native sheets, detail content and detents across rotation.
+- `ActivityContinuationUITests`: fifteen real previous/next, inertia, content Back, header and action journeys.
 - `ListSelectionUITests`: real List push/Back and phone rotation, with selection controls restricted to the visible list; also covers standalone hosting and adjacent inspection when run on iPad.
 
 `xcodebuild build-for-testing` has an eighteen-minute cold-build budget, followed
-by `xcodebuild test-without-building` with a separate twelve-minute runtime budget.
+by `xcodebuild test-without-building` with a separate twenty-five-minute runtime budget.
 The first CI cold build took about eleven and a half minutes and exhausted the
 former combined allowance as tests launched; separate phases preserve the test
 allowance and identify which phase failed. Parallel execution is disabled, with
 90/180-second default/maximum per-test allowances. Boot readiness has a
-three-minute budget; the whole CI job has forty minutes, including setup and
-artifact upload.
+three-minute budget; the whole CI job has fifty-five minutes, including setup and
+artifact upload. The expanded continuation suite took 9m46s on the hosted runner;
+all fifteen cases passed, but the former twelve-minute runtime limit interrupted
+the next suite. The larger allowance retains all suites and per-test limits.
 The wrapper records the toolchain, validates a positive passing test count, zero
 failures/skips, and a positive number of passing cases in every selected suite.
 `ACTIVITYMAP_API_BASE_URL`/Mapbox build settings use inert fixture values.
