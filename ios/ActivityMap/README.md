@@ -445,3 +445,43 @@ Swift Charts chooses round distance ticks automatically. Native chart selection 
 ## Bounded runtime regression command
 
 Run `pnpm test:ios` (or `node scripts/quality/native-harness.mjs` without web dependencies) from the repository root with Xcode 27. It owns a fresh simulator, executes six selected suites, requires nonzero passing results with no skipped tests, and saves logs plus an xcresult bundle. See [Quality checks](../../docs/quality-checks.md) for suite boundaries, timeouts, artifacts, and explicit existing-simulator reuse. Broader rendered and physical-device acceptance remains separate.
+## Photo request and decode pipeline
+
+`PhotoImageCache` coalesces gallery demand and adjacent-page prefetch for the same
+photo URL, revision and decoded size (256 or 2048 pixels). `PhotoByteCache` also
+shares downloads between sizes. Work belongs to the cache: cancelling a consumer
+rejects its result after shared work completes, without cancelling another
+consumer's download or decode. If all consumers leave, work completes for reuse;
+network resources retain their 45-second timeout. Scope/metadata reconciliation
+cancels and fences obsolete work. In-flight entries retire on both success and
+failure, so Retry starts a fresh attempt. Invalid-image cleanup includes the
+revision fence, including a failed old decode arriving after replacement bytes.
+
+ImageIO thumbnail creation and immediate decompression run in a detached task.
+UIImage construction and the 16 MiB decoded-image cache remain on MainActor.
+The byte cache retains its 64 MiB disk budget, 12 MiB file limit, protected atomic
+writes, backup exclusion, offline reopen and metadata pruning.
+
+`PhotoPipelineTests` gates downloads and decodes to cover shared work, different
+sizes, cancellation, network/invalid-image retry, suspended decode invalidation
+on logout/account/metadata changes, and old invalid-image cleanup. The existing
+`PhotoGalleryTests` exercise adjacent-page demand and rendered viewer behavior.
+
+Representative synthetic evidence, 18 October 2026, Xcode 27.1 Debug,
+iPhone 18 Pro / iOS 27.0 simulator: five concurrent 2048-pixel consumers of one
+2400×1600 JPEG produced **5 downloads / 5 decodes / 5 main-thread decodes** in a
+reconstruction of the old cache-miss path and **1 / 1 / 0** through the shared
+pipeline. Aggregate time inside ImageIO was **114.52 ms before / 21.64 ms after**
+in that sample. The baseline omits disk bookkeeping, so these are decode-work
+measurements rather than total request latency. The mixed-size regression
+produces one download and one decode per requested size. Reproduce the synthetic
+measurement with `PhotoPipelineTests/syntheticBeforeAfterDemandAndMainThreadEvidence`;
+it prints `PHOTO_PIPELINE_SYNTHETIC` and asserts counts, never timing thresholds.
+These are synthetic simulator measurements, not physical-device frame-time or
+Instruments results. Named-device gallery scrolling, memory pressure and frame
+budgets remain #229; no physical-device performance claim is made here.
+
+The focused pipeline/gallery/map-policy suites passed 21 test methods on that
+simulator. All three broader `RenderedMapPhotoTests` timed out discovering map
+pins or the layers menu before photo demand; the unchanged pre-#414 photo cache
+reproduced those same failures. This rendering limitation needs separate review.
