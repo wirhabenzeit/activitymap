@@ -29,6 +29,8 @@ import {
 } from './browser-harness.mjs';
 import { waitForFixtureRoute } from './browser-support.mjs';
 import {
+  nativeSuiteEligibility,
+  nativeSuites,
   validateNativeSuites,
   validateNativeSummary,
 } from './native-harness.mjs';
@@ -39,6 +41,27 @@ async function temporary(t) {
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }
+
+test('native runtime eligibility reports iOS 27 rotation coverage without skipping iOS 26 cases', () => {
+  const older = nativeSuiteEligibility('26.2');
+  assert.deepEqual(older.ineligibleSuites, [
+    {
+      suite: 'ActivityMapUITests/MapRotationUITests',
+      requires: 'iOS 27+',
+      actual: '26.2',
+      reason: 'Retained native-sheet rotation contract',
+    },
+  ]);
+  assert.equal(older.suites.length, nativeSuites.length - 1);
+  assert(older.suites.includes('ActivityMapUITests/MapPhotoUITests'));
+  assert(!older.suites.includes('ActivityMapUITests/MapRotationUITests'));
+  assert.deepEqual(nativeSuiteEligibility('27.0.1'), {
+    suites: nativeSuites,
+    ineligibleSuites: [],
+  });
+  assert.throws(() => nativeSuiteEligibility('25.0'), /iOS 26/);
+  assert.throws(() => nativeSuiteEligibility('unknown'), /iOS 26/);
+});
 
 test('fixture startup drops inherited service credentials and uses an inert database', () => {
   const environment = fixtureEnvironment(

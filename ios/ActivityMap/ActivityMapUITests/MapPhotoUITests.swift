@@ -39,9 +39,18 @@ final class MapPhotoUITests: XCTestCase {
         try await journey(resultsPresented: true)
     }
 
-    private func journey(resultsPresented: Bool) async throws {
+    func testLandscapeViewerRetainsNativeResultsPresentation() async throws {
+        try await journey(resultsPresented: true, orientation: .landscapeLeft)
+    }
+
+    private func journey(resultsPresented: Bool,
+                         orientation: UIDeviceOrientation = .portrait) async throws {
+        XCUIDevice.shared.orientation = orientation
         let app = launch(resultsPresented: resultsPresented)
-        defer { app.terminate() }
+        defer {
+            app.terminate()
+            XCUIDevice.shared.orientation = .portrait
+        }
         let initial = try await state(in: app) { $0.ready }
         let pin = button(in: app, prefix: "Zoom into 2 photos")
         XCTAssertTrue(pin.waitForExistence(timeout: 15), app.debugDescription)
@@ -75,7 +84,7 @@ final class MapPhotoUITests: XCTestCase {
                        "Opening photos or switching nearby activities must preserve route selection")
         XCTAssertEqual(returned.resultsPresented, resultsPresented)
         XCTAssertEqual(returned.resultsDetent, initial.resultsDetent)
-        XCTAssertEqual(returned.lastViewerDepth, resultsPresented && !returned.isSidePanel ? 2 : 1)
+        XCTAssertEqual(returned.lastViewerDepth, resultsPresented && returned.usesNativePresentation ? 2 : 1)
         XCTAssertTrue(returned.lastViewerHasTransition, "Photos must retain the native zoom transition")
         XCTAssertFalse(returned.lastViewerDragLocked, "Results must not disable photo swipe dismissal")
 
@@ -141,7 +150,7 @@ final class MapPhotoUITests: XCTestCase {
         let lastViewerHasTransition: Bool
         let lastViewerDragLocked: Bool
         let selectionChangedDuringViewer: Bool
-        let isSidePanel: Bool
+        let usesNativePresentation: Bool
         let deletedAfterPresentation: Bool
     }
 

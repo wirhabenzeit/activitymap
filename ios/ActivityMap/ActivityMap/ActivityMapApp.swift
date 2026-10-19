@@ -6,6 +6,7 @@ struct ActivityMapApp: App {
     private let isTesting = ProcessInfo.processInfo.arguments.contains("--unit-testing")
     private let persistence: Result<LocalStore, Error>
     #if DEBUG
+    private let isMapRotationUITesting = ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
     private let isMapPhotoUITesting = ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
     private let isListSelectionUITesting = ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing")
     #endif
@@ -19,7 +20,8 @@ struct ActivityMapApp: App {
 
     private static var usesInMemoryPersistence: Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
+        if ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
+            || ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
             || ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing") { return true }
         #endif
         return ProcessInfo.processInfo.arguments.contains("--unit-testing")
@@ -28,7 +30,9 @@ struct ActivityMapApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if isListSelectionUITesting {
+            if isMapRotationUITesting {
+                MapRotationUITestFixture(expanded: ProcessInfo.processInfo.arguments.contains("--map-rotation-expanded"))
+            } else if isListSelectionUITesting {
                 ListSelectionUITestFixture(standalone: ProcessInfo.processInfo.arguments.contains("--list-standalone"))
             } else if isMapPhotoUITesting {
                 MapPhotoUITestFixture(resultsPresented: ProcessInfo.processInfo.arguments.contains("--map-photo-results"))

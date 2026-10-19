@@ -17,6 +17,7 @@ struct RoutePickerSheet: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var panelHeaderHeight: CGFloat = 44
     @State private var resultsViewportHeight: CGFloat = 0
+    @State private var resultsScrollID: Int?
 
     private var candidates: [Activity] {
         picker.candidateIDs.filter(store.visibleActivityIDs.contains).compactMap { store.activity(id: $0) }
@@ -94,14 +95,21 @@ struct RoutePickerSheet: View {
             ScrollView {
                 LazyVStack(spacing: 0) {
                     ForEach(candidates) { activity in
-                        resultRow(activity)
-                        if activity.id != candidates.last?.id { Divider().padding(.leading, 56) }
+                        VStack(spacing: 0) {
+                            resultRow(activity)
+                            if activity.id != candidates.last?.id { Divider().padding(.leading, 56) }
+                        }
+                        .id(activity.id)
                     }
                 }
+                .scrollTargetLayout()
                 // Keep the final row clear of the home indicator without a
                 // fixed strip masking rows as they scroll past the bottom.
                 .padding(.bottom, bottomInset)
             }
+            // Keep the visible activity through rotation and text reflow,
+            // instead of preserving an offset based on stale lazy-row sizes.
+            .scrollPosition(id: $resultsScrollID, anchor: .top)
             .scrollBounceBehavior(.basedOnSize)
             .accessibilityIdentifier("map-results-scroll")
         }

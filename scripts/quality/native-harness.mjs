@@ -23,8 +23,36 @@ export const nativeSuites = [
   'ActivityMapTests/MapPhotoTests',
   'ActivityMapTests/PhotoGalleryTests',
   'ActivityMapUITests/MapPhotoUITests',
+  'ActivityMapUITests/MapRotationUITests',
   'ActivityMapUITests/ListSelectionUITests',
 ];
+
+// This regression exercises the iOS 27 retained native sheet. iOS 26 still
+// runs the ordinary map/photo suites against its custom wide-panel fallback.
+export function nativeSuiteEligibility(runtimeVersion) {
+  const major = Number(runtimeVersion.split('.')[0]);
+  assert(
+    Number.isInteger(major) && major >= 26,
+    'An iOS 26+ runtime is required',
+  );
+  const ineligibleSuites =
+    major < 27
+      ? [
+          {
+            suite: 'ActivityMapUITests/MapRotationUITests',
+            requires: 'iOS 27+',
+            actual: runtimeVersion,
+            reason: 'Retained native-sheet rotation contract',
+          },
+        ]
+      : [];
+  return {
+    suites: nativeSuites.filter(
+      (suite) => !ineligibleSuites.some((item) => item.suite === suite),
+    ),
+    ineligibleSuites,
+  };
+}
 
 export function validateNativeSummary(summary) {
   assert(
@@ -122,10 +150,10 @@ export async function runNativeHarness({
       /Xcode (2[7-9]|[3-9]\d)(?:\.|\s)/.test(version),
       'Xcode 27 or newer is required for availability-guarded APIs',
     );
+    const { runtimes } = JSON.parse(
+      await command(['simctl', 'list', 'runtimes', '--json']),
+    );
     if (!simulator) {
-      const { runtimes } = JSON.parse(
-        await command(['simctl', 'list', 'runtimes', '--json']),
-      );
       const runtime = runtimes
         .filter(
           (item) =>
@@ -163,10 +191,31 @@ export async function runNativeHarness({
     const devices = JSON.parse(
       await command(['simctl', 'list', 'devices', '--json']),
     );
-    const device = Object.values(devices.devices)
-      .flat()
-      .find((item) => item.udid === simulator);
+    const runtimeEntry = Object.entries(devices.devices).find(([, items]) =>
+      items.some((item) => item.udid === simulator),
+    );
+    const device = runtimeEntry?.[1].find((item) => item.udid === simulator);
     assert(device?.isAvailable, 'The requested simulator is unavailable');
+    const runtime = runtimes.find(
+      (item) => item.identifier === runtimeEntry[0],
+    );
+    assert(
+      runtime?.isAvailable,
+      'The requested simulator runtime is unavailable',
+    );
+    const { suites, ineligibleSuites } = nativeSuiteEligibility(
+      runtime.version,
+    );
+    manifest.runtime = {
+      identifier: runtime.identifier,
+      version: runtime.version,
+    };
+    manifest.suites = suites;
+    manifest.ineligibleSuites = ineligibleSuites;
+    for (const item of ineligibleSuites)
+      console.log(
+        `Not eligible on iOS ${item.actual}: ${item.suite} requires ${item.requires} (${item.reason}).`,
+      );
     if (device.state !== 'Booted')
       await command(['simctl', 'boot', simulator], 'boot.log');
     await command(
@@ -189,7 +238,7 @@ export async function runNativeHarness({
       resolve(
         process.env.IOS_DERIVED_DATA || join(root, '.quality/ios-derived'),
       ),
-      ...nativeSuites.map((suite) => `-only-testing:${suite}`),
+      ...suites.map((suite) => `-only-testing:${suite}`),
       'CODE_SIGNING_ALLOWED=NO',
       'ACTIVITYMAP_API_BASE_URL=http:$(SLASH)$(SLASH)127.0.0.1:1',
       'MAPBOX_ACCESS_TOKEN=pk.offline-test',
@@ -253,11 +302,14 @@ export async function runNativeHarness({
       '--compact',
     ]);
     await writeFile(join(output, 'tests.json'), tests);
-    manifest.executedCasesBySuite = validateNativeSuites(JSON.parse(tests));
+    manifest.executedCasesBySuite = validateNativeSuites(
+      JSON.parse(tests),
+      suites,
+    );
     manifest.passed = true;
     manifest.passedTests = summary.passedTests;
     console.log(
-      `Native regression passed: ${summary.passedTests} tests, ${nativeSuites.length} suites.`,
+      `Native regression passed: ${summary.passedTests} tests, ${suites.length} suites.`,
     );
   } catch (error) {
     manifest.error = error.stack ?? String(error);

@@ -43,6 +43,7 @@ struct MapScreen: View {
     @State private var pendingPhotoActivity: Int?
     @State private var lastPhotoAction: (id: String, time: Date)?
     @State private var picker: RoutePicker
+    @State private var resultsGeometry: MapResultsPresentationGeometry?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -58,7 +59,8 @@ struct MapScreen: View {
                 if let center = MapCompassLayout.center(size: geometry.size,
                     topInset: max(topOcclusion, geometry.safeAreaInsets.top),
                     bottomInset: geometry.safeAreaInsets.bottom, showingResults: picker.isPresented,
-                    detent: picker.detent, largeText: typeSize.isAccessibilitySize) {
+                    detent: picker.detent, largeText: typeSize.isAccessibilitySize,
+                    resultsFrame: resultsFrame(in: geometry)) {
                     MapCompassButton(state: compass) { context.request(.resetBearing) }
                         .position(center)
                 }
@@ -68,19 +70,20 @@ struct MapScreen: View {
                 // so UIKit receives a normal false-to-true presentation event.
                 MapResultsContainer(picker: picker, store: store, size: geometry.size,
                                         topInset: max(topOcclusion, geometry.safeAreaInsets.top),
-                                        bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize)
+                                        bottomInset: geometry.safeAreaInsets.bottom, largeText: typeSize.isAccessibilitySize,
+                                        geometryChanged: { resultsGeometry = $0 })
                     .environment(\.stackedMapPhotoViewer, StackedMapPhotoViewer(
                         request: $photoPresentation, content: photoViewer, onDismiss: finishPhotoPresentation))
-                // A wide map without selected routes has no results panel.
-                // Keep its viewer presenter mounted on a separate map anchor.
+                // Only a custom panel (or no results) needs the map anchor.
+                // A retained native sheet presents photos in every orientation.
                 Color.clear.allowsHitTesting(false)
                     .fullScreenCover(item: Binding(
                         get: {
-                            let sidePanel = MapResultsLayout(size: geometry.size,
+                            let layout = MapResultsLayout(size: geometry.size,
                                 topInset: max(topOcclusion, geometry.safeAreaInsets.top),
                                 bottomInset: geometry.safeAreaInsets.bottom, detent: picker.detent,
-                                largeText: typeSize.isAccessibilitySize).isSidePanel
-                            return sidePanel || !picker.isPresented ? photoPresentation : nil
+                                largeText: typeSize.isAccessibilitySize)
+                            return !layout.usesNativePresentation || !picker.isPresented ? photoPresentation : nil
                         }, set: { photoPresentation = $0 }
                     ), onDismiss: finishPhotoPresentation) { selected in
                         photoViewer(selected)
@@ -141,6 +144,7 @@ struct MapScreen: View {
         .onChange(of: context.scopeRevision) { _, _ in
             cameraTransitionID = nil
             picker.isPresented = false
+            resultsGeometry = nil
             photoGroups = []
             photoModels = [:]
             photoMetadataRevision = nil
@@ -290,6 +294,7 @@ struct MapScreen: View {
             if !enabled { clearInactiveTerrain(proxy: proxy) }
         }
         .onChange(of: picker.detent) { _, _ in scheduleNavigation(proxy: proxy) }
+        .onChange(of: resultsGeometry) { _, _ in scheduleNavigation(proxy: proxy) }
         .onChange(of: picker.isPresented) { _, _ in
             scheduleNavigation(proxy: proxy)
             refreshPositions(proxy: proxy)
@@ -439,7 +444,8 @@ struct MapScreen: View {
                     ? NativeMapResultsSizing.openingHeight(height: geometry.size.height, largeText: typeSize.isAccessibilitySize,
                         topInset: max(topOcclusion, safeArea.top)) + safeArea.bottom
                     : layout.bottomOcclusion) : 0, topOcclusion: topOcclusion,
-            trailingOcclusion: showingResults && layout.isSidePanel ? layout.trailingOcclusion + safeArea.trailing : 0
+            trailingOcclusion: showingResults && layout.isSidePanel
+                ? layout.resolvedTrailingOcclusion(presentedFrame: resultsFrame(in: geometry)) + safeArea.trailing : 0
         ) else { return }
         let padding = camera.padding ?? context.camera.padding
         let target = Viewport.camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
@@ -465,6 +471,14 @@ struct MapScreen: View {
         default:
             withViewportAnimation(.default(maxDuration: 0.5)) { viewport = target }
         }
+    }
+
+    private func resultsFrame(in geometry: GeometryProxy) -> CGRect {
+        let layout = MapResultsLayout(size: geometry.size,
+            topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,
+            detent: picker.detent, largeText: typeSize.isAccessibilitySize)
+        return layout.presentationFrame(measuredFrame: resultsGeometry?.frame(in: geometry.size),
+            leadingSafeInset: geometry.safeAreaInsets.leading, trailingSafeInset: geometry.safeAreaInsets.trailing)
     }
 
     private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {

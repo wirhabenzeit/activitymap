@@ -87,6 +87,40 @@ struct MapResultsTests {
         }
     }
 
+    @Test func nativeMeasurementsRejectPreviousOrientationAndInvalidFrames() {
+        let size = CGSize(width: 800, height: 382)
+        let frame = CGRect(x: 410, y: 40, width: 334, height: 354)
+        let measurement = MapResultsPresentationGeometry(frame: frame, containerSize: size)
+        #expect(measurement.frame(in: size) == frame)
+        #expect(measurement.frame(in: CGSize(width: 382, height: 800)) == nil)
+        #expect(MapResultsPresentationGeometry(frame: .zero, containerSize: size).frame(in: size) == nil)
+    }
+
+    @Test func nativeFrameDrivesCameraAndCompassClearance() throws {
+        let size = CGSize(width: 800, height: 382)
+        let frame = CGRect(x: 410, y: 40, width: 334, height: 354)
+        let layout = MapResultsLayout(size: size, topInset: 44, bottomInset: 20, detent: .medium)
+        #expect(layout.resolvedTrailingOcclusion(presentedFrame: frame) == 402)
+        #expect(layout.resolvedTrailingOcclusion(presentedFrame: frame) > layout.trailingOcclusion,
+                "Native safe-area placement can cover more map than the custom-panel estimate")
+        let center = try #require(MapCompassLayout.center(size: size, topInset: 44, bottomInset: 20,
+            showingResults: true, detent: .medium, largeText: false, resultsFrame: frame))
+        let target = CGRect(x: center.x - 22, y: center.y - 22, width: 44, height: 44)
+        #expect(target.maxX == frame.minX - 12)
+        #expect(!target.intersects(frame))
+    }
+
+    @Test func nativeFallbackProtectsReclaimedSafeAreaUntilMeasured() {
+        if #available(iOS 27.0, *) {
+            let layout = MapResultsLayout(size: CGSize(width: 800, height: 382),
+                topInset: 44, bottomInset: 20, detent: .medium)
+            let fallback = layout.presentationFrame(measuredFrame: nil, leadingSafeInset: 62, trailingSafeInset: 16)
+            #expect(fallback.minX == layout.frame.minX - 46)
+            let native = CGRect(x: 410, y: 40, width: 334, height: 354)
+            #expect(layout.presentationFrame(measuredFrame: native, leadingSafeInset: 62, trailingSafeInset: 16) == native)
+        }
+    }
+
     @Test func shortPhoneOpeningSheetLeavesRoomForAccessibleRouteFraming() {
         let height: CGFloat = 551, top: CGFloat = 116
         let opening = NativeMapResultsSizing.openingHeight(height: height,

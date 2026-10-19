@@ -1,8 +1,8 @@
 import SwiftUI
 import UIKit
 
-/// Phones use the native sheet. Wide windows use a bottom-trailing panel; expanding
-/// the card never changes selection, scroll context or the map camera.
+/// A native sheet retains its content through rotation on iOS 27. Earlier
+/// systems use the custom trailing panel in wide windows.
 struct MapResultsContainer: View {
     @Bindable var picker: RoutePicker
     let store: ActivityStore
@@ -10,34 +10,34 @@ struct MapResultsContainer: View {
     let topInset: CGFloat
     let bottomInset: CGFloat
     let largeText: Bool
+    var geometryChanged: (MapResultsPresentationGeometry?) -> Void = { _ in }
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @GestureState private var drag: MapResultsDrag? = nil
 
     var body: some View {
         let layout = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
                                       detent: picker.detent, largeText: largeText)
-        if layout.isSidePanel {
-            if picker.isPresented {
-                let compact = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
-                    detent: .compact, largeText: largeText).contentHeight
-                let expanded = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
-                    detent: .expanded, largeText: largeText).contentHeight
-                let height = drag?.height(compact: compact, expanded: expanded) ?? layout.contentHeight
-                RoutePickerSheet(picker: picker, store: store, isSidePanel: true, bottomInset: bottomInset,
-                    panelExpandedHeight: expanded,
-                    collapsedOverride: height <= compact + 1,
-                    panelHandle: AnyView(handle(start: layout.contentHeight, compact: compact, expanded: expanded)))
-                    .frame(width: layout.frame.width, height: height + bottomInset)
-                    .position(x: layout.frame.midX, y: size.height - height / 2 + bottomInset / 2)
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: picker.detent)
-                    .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drag == nil)
-                    .transaction { if drag != nil { $0.animation = nil } }
-            }
-        } else {
+        let compact = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
+            detent: .compact, largeText: largeText).contentHeight
+        let expanded = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
+            detent: .expanded, largeText: largeText).contentHeight
+        if layout.usesNativePresentation {
             let openingHeight = NativeMapResultsSizing.openingHeight(
                 height: size.height, largeText: largeText, topInset: topInset)
-            NativeMapResultsSheet(picker: picker, store: store, openingHeight: openingHeight, largeText: largeText)
-
+            NativeMapResultsSheet(picker: picker, store: store, layout: layout,
+                compactHeight: layout.isSidePanel ? compact : NativeMapResultsSizing.compactHeight(largeText: largeText),
+                openingHeight: openingHeight, expandedHeight: expanded, geometryChanged: geometryChanged)
+        } else if picker.isPresented {
+            let height = drag?.height(compact: compact, expanded: expanded) ?? layout.contentHeight
+            RoutePickerSheet(picker: picker, store: store, isSidePanel: true, bottomInset: bottomInset,
+                panelExpandedHeight: expanded,
+                collapsedOverride: height <= compact + 1,
+                panelHandle: AnyView(handle(start: layout.contentHeight, compact: compact, expanded: expanded)))
+                .frame(width: layout.frame.width, height: height + bottomInset)
+                .position(x: layout.frame.midX, y: size.height - height / 2 + bottomInset / 2)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: picker.detent)
+                .animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: drag == nil)
+                .transaction { if drag != nil { $0.animation = nil } }
         }
     }
 
@@ -108,8 +108,11 @@ struct StackedShellSheet {
 private struct NativeMapResultsSheet: View {
     @Bindable var picker: RoutePicker
     let store: ActivityStore
+    let layout: MapResultsLayout
+    let compactHeight: CGFloat
     let openingHeight: CGFloat
-    let largeText: Bool
+    let expandedHeight: CGFloat
+    let geometryChanged: (MapResultsPresentationGeometry?) -> Void
     @Environment(\.mapResultsSheetSuspended) private var suspended
     @Environment(\.mapResultsPresentationChanged) private var presentationChanged
     @Environment(\.stackedMapPhotoViewer) private var photoViewer
@@ -120,12 +123,17 @@ private struct NativeMapResultsSheet: View {
         NativeMapResultsPresenter(
             isPresented: picker.isPresented && store.selectedTab == .map && !suspended,
             detent: Binding(get: { picker.detent }, set: { picker.detent = $0 }),
-            compactHeight: NativeMapResultsSizing.compactHeight(largeText: largeText),
-            openingHeight: openingHeight, presentationChanged: presentationChanged,
+            compactHeight: compactHeight, openingHeight: openingHeight,
+            wideExpandedHeight: layout.isSidePanel ? expandedHeight : nil,
+            preferredWidth: layout.frame.width, presentationChanged: presentationChanged,
+            geometryChanged: geometryChanged,
             content: GeometryReader { geometry in
-                RoutePickerSheet(picker: picker, store: store, isSidePanel: false,
+                RoutePickerSheet(picker: picker, store: store, isSidePanel: layout.isSidePanel,
                     bottomInset: geometry.safeAreaInsets.bottom,
                     collapsedOverride: picker.detent == .compact, nativePresentation: true)
+                    // The wide header normally puts a custom handle beside its
+                    // controls. Native sheets use the system grabber above them.
+                    .padding(.top, layout.isSidePanel ? 13 : 0)
                     .ignoresSafeArea(.container, edges: .bottom)
             }
             .fullScreenCover(item: photoViewer?.request ?? .constant(nil), onDismiss: { photoViewer?.onDismiss() }) { destination in
@@ -148,7 +156,10 @@ private struct NativeMapResultsPresenter<Content: View>: UIViewControllerReprese
     var detent: Binding<MapResultsDetent>
     let compactHeight: CGFloat
     let openingHeight: CGFloat
+    let wideExpandedHeight: CGFloat?
+    let preferredWidth: CGFloat
     let presentationChanged: (Bool) -> Void
+    let geometryChanged: (MapResultsPresentationGeometry?) -> Void
     let content: Content
 
     func makeUIViewController(context: Context) -> Presenter { Presenter() }
@@ -165,12 +176,32 @@ private struct NativeMapResultsPresenter<Content: View>: UIViewControllerReprese
 
     final class Presenter: UIViewController, UISheetPresentationControllerDelegate {
         var configuration: NativeMapResultsPresenter?
-        private var panel: UIHostingController<Content>?
+        private var panel: Panel?
         private var closing = false
         private let compactID = UISheetPresentationController.Detent.Identifier("activitymap.compact")
         private let openingID = UISheetPresentationController.Detent.Identifier("activitymap.opening")
-        private var lastCompactHeight: CGFloat?
-        private var lastOpeningHeight: CGFloat?
+        private let expandedID = UISheetPresentationController.Detent.Identifier("activitymap.expanded")
+        private struct Sizing: Equatable {
+            let compactHeight: CGFloat
+            let openingHeight: CGFloat
+            let wideExpandedHeight: CGFloat?
+            let preferredWidth: CGFloat
+        }
+        private var lastSizing: Sizing?
+        private var geometryReportScheduled = false
+        private var lastReportedGeometry: MapResultsPresentationGeometry?
+
+        private final class Panel: UIHostingController<Content> {
+            var layoutChanged: (() -> Void)?
+            override func viewDidAppear(_ animated: Bool) {
+                super.viewDidAppear(animated)
+                layoutChanged?()
+            }
+            override func viewDidLayoutSubviews() {
+                super.viewDidLayoutSubviews()
+                layoutChanged?()
+            }
+        }
 
         override func loadView() {
             view = UIView()
@@ -183,29 +214,62 @@ private struct NativeMapResultsPresenter<Content: View>: UIViewControllerReprese
             reconcile()
         }
 
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            scheduleGeometryReport()
+        }
+
+        override func viewSafeAreaInsetsDidChange() {
+            super.viewSafeAreaInsetsDidChange()
+            scheduleGeometryReport()
+        }
+
+        private func scheduleGeometryReport() {
+            guard !geometryReportScheduled else { return }
+            geometryReportScheduled = true
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.geometryReportScheduled = false
+                let next: MapResultsPresentationGeometry?
+                if !self.closing, self.configuration?.isPresented == true,
+                   let panel = self.panel, let window = self.viewIfLoaded?.window,
+                   panel.viewIfLoaded?.window === window {
+                    next = MapResultsPresentationGeometry(
+                        frame: panel.view.convert(panel.view.bounds, to: self.view),
+                        containerSize: self.view.bounds.size)
+                } else { next = nil }
+                guard next != self.lastReportedGeometry else { return }
+                self.lastReportedGeometry = next
+                self.configuration?.geometryChanged(next)
+            }
+        }
+
         func reconcile() {
             guard let configuration, isViewLoaded, view.window != nil, !closing else { return }
             guard configuration.isPresented else { close(animated: true); return }
             if let panel {
                 panel.rootView = configuration.content
                 guard let sheet = panel.sheetPresentationController else { return }
-                updateSizing(sheet)
-                let target = identifier(configuration.detent.wrappedValue)
-                if sheet.selectedDetentIdentifier != target {
-                    sheet.animateChanges { sheet.selectedDetentIdentifier = target }
-                }
+                updateSizing(sheet, panel: panel)
                 return
             }
             guard presentedViewController == nil else { return }
-            let panel = UIHostingController(rootView: configuration.content)
+            let panel = Panel(rootView: configuration.content)
+            panel.layoutChanged = { [weak self] in self?.scheduleGeometryReport() }
             panel.view.backgroundColor = .clear
             panel.modalPresentationStyle = .pageSheet
             panel.isModalInPresentation = true
             guard let sheet = panel.sheetPresentationController else { return }
-            updateSizing(sheet)
-            sheet.selectedDetentIdentifier = identifier(configuration.detent.wrappedValue)
+            if #available(iOS 27.0, *) {
+                // Placement stays stable; UIKit adapts the same sheet as its
+                // container rotates instead of dismissing and recreating it.
+                sheet.preferredPlacement = .trailing
+                sheet.prefersPageSizing = false
+                sheet.prefersEdgeAttachedInCompactHeight = true
+                sheet.widthFollowsPreferredContentSizeWhenEdgeAttached = true
+            }
+            updateSizing(sheet, panel: panel)
             sheet.prefersGrabberVisible = true
-            sheet.largestUndimmedDetentIdentifier = .large
             sheet.prefersScrollingExpandsWhenScrolledToEdge = false
             // iOS 26.0 keeps the system sheet background.
             if #available(iOS 26.1, *) {
@@ -218,31 +282,62 @@ private struct NativeMapResultsPresenter<Content: View>: UIViewControllerReprese
             }
         }
 
-        private func updateSizing(_ sheet: UISheetPresentationController) {
+        private func updateSizing(_ sheet: UISheetPresentationController, panel: UIHostingController<Content>) {
             guard let configuration else { return }
-            let compactHeight = configuration.compactHeight
-            let openingHeight = configuration.openingHeight
-            guard compactHeight != lastCompactHeight || openingHeight != lastOpeningHeight else { return }
-            lastCompactHeight = compactHeight
-            lastOpeningHeight = openingHeight
-            sheet.detents = [
-                .custom(identifier: compactID) { _ in compactHeight },
-                .custom(identifier: openingID) { _ in openingHeight },
-                .large()
-            ]
+            let sizing = Sizing(compactHeight: configuration.compactHeight,
+                openingHeight: configuration.openingHeight,
+                wideExpandedHeight: configuration.wideExpandedHeight,
+                preferredWidth: configuration.preferredWidth)
+            let target = identifier(configuration.detent.wrappedValue)
+            if sizing != lastSizing {
+                lastSizing = sizing
+                if #available(iOS 27.0, *) {
+                    // Form sizing follows the complete preferred size, so
+                    // supply meaningful dimensions for both axes.
+                    panel.preferredContentSize = CGSize(width: sizing.preferredWidth,
+                        height: sizing.wideExpandedHeight ?? sizing.openingHeight)
+                }
+                let compact = UISheetPresentationController.Detent.custom(identifier: compactID) {
+                    min(sizing.compactHeight, $0.maximumDetentValue)
+                }
+                if let height = sizing.wideExpandedHeight {
+                    // Wide medium/expanded share one stop. Keep the logical
+                    // picker detent so returning to portrait restores its size.
+                    sheet.detents = [compact, .custom(identifier: expandedID) {
+                        min(height, $0.maximumDetentValue)
+                    }]
+                    sheet.largestUndimmedDetentIdentifier = expandedID
+                } else {
+                    sheet.detents = [compact, .custom(identifier: openingID) {
+                        min(sizing.openingHeight, $0.maximumDetentValue)
+                    }, .large()]
+                    sheet.largestUndimmedDetentIdentifier = .large
+                }
+                // Geometry changes participate in UIKit's rotation layout;
+                // only a requested detent change starts its own animation.
+                sheet.selectedDetentIdentifier = target
+            } else if sheet.selectedDetentIdentifier != target {
+                sheet.animateChanges { sheet.selectedDetentIdentifier = target }
+            }
         }
 
         private func identifier(_ detent: MapResultsDetent) -> UISheetPresentationController.Detent.Identifier {
             switch detent {
             case .compact: compactID
-            case .medium: openingID
-            case .expanded: .large
+            case .medium: configuration?.wideExpandedHeight == nil ? openingID : expandedID
+            case .expanded: configuration?.wideExpandedHeight == nil ? .large : expandedID
             }
         }
 
         func sheetPresentationControllerDidChangeSelectedDetentIdentifier(_ sheet: UISheetPresentationController) {
-            let value: MapResultsDetent = sheet.selectedDetentIdentifier == compactID ? .compact
-                : sheet.selectedDetentIdentifier == .large ? .expanded : .medium
+            guard let selected = sheet.selectedDetentIdentifier else { return }
+            let value: MapResultsDetent
+            switch selected {
+            case compactID: value = .compact
+            case openingID: value = .medium
+            case expandedID, .large: value = .expanded
+            default: return
+            }
             if configuration?.detent.wrappedValue != value { configuration?.detent.wrappedValue = value }
         }
 
@@ -256,8 +351,8 @@ private struct NativeMapResultsPresenter<Content: View>: UIViewControllerReprese
                 guard let self else { return }
                 self.panel = nil
                 self.closing = false
-                self.lastCompactHeight = nil
-                self.lastOpeningHeight = nil
+                self.lastSizing = nil
+                self.scheduleGeometryReport()
                 self.configuration?.presentationChanged(false)
                 self.reconcile()
             }

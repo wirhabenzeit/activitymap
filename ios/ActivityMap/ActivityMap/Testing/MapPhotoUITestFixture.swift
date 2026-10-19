@@ -146,9 +146,9 @@ private final class MapPhotoUITestState {
         selectionChangedDuringViewer = false
     }
 
-    private var isSidePanel: Bool {
+    private var usesNativePresentation: Bool {
         MapResultsLayout(size: mapSize, topInset: 0, bottomInset: 0,
-                         detent: picker.detent).isSidePanel
+                         detent: picker.detent).usesNativePresentation
     }
 
     var diagnostics: String {
@@ -162,7 +162,7 @@ private final class MapPhotoUITestState {
             "pendingCamera": store.mapContext.pendingRequest != nil,
             "zoom": store.mapContext.camera.zoom,
             "resultsPresented": picker.isPresented, "resultsDetent": picker.detent.rawValue,
-            "isSidePanel": isSidePanel,
+            "usesNativePresentation": usesNativePresentation,
             "fetchPaths": requests.paths, "fetchCount": requests.paths.count,
             "presenterDepth": presenterDepth, "lastViewerDepth": lastViewerDepth,
             "lastViewerHasTransition": lastViewerHasTransition, "lastViewerDragLocked": lastViewerDragLocked,
@@ -185,7 +185,7 @@ private final class MapPhotoUITestState {
             current = controller.presentedViewController
         }
         if presenterDepth != chain.count { presenterDepth = chain.count }
-        let baselineDepth = initiallyPresentedResults && !isSidePanel && picker.isPresented ? 1 : 0
+        let baselineDepth = initiallyPresentedResults && usesNativePresentation && picker.isPresented ? 1 : 0
         guard chain.count > baselineDepth else { return }
         let viewer = chain[baselineDepth]
         guard viewer.modalPresentationStyle == .fullScreen || viewer.modalPresentationStyle == .overFullScreen
