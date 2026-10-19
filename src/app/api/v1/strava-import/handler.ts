@@ -1,13 +1,17 @@
-import type { Actor } from '~/server/auth/actor';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
 import {
-  stravaImportDTOSchema,
   type StravaImportDTO,
+  stravaImportDTOSchema,
 } from '~/contracts/v1/strava-import';
+import {
+  PRIVATE_API_HEADERS,
+  mutationOriginAllowed,
+} from '~/server/api/transport';
 import { StravaImportError } from '~/server/application/strava-import';
-import type { ImportClaim } from '~/server/repositories/strava-import';
+import type { Actor } from '~/server/auth/actor';
 import { requestIdFor } from '~/server/http/request-id';
+import type { ImportClaim } from '~/server/repositories/strava-import';
 
 type Dependencies = {
   resolveActor: (request: Request) => Promise<Actor | null>;
@@ -20,8 +24,7 @@ type Dependencies = {
   onError: (error: unknown, requestId: string) => void;
 };
 const headers = {
-  'Cache-Control': 'private, no-store',
-  Vary: 'Cookie, Authorization',
+  ...PRIVATE_API_HEADERS,
 };
 export function createStravaImportHandler(
   deps: Dependencies,
@@ -38,8 +41,7 @@ export function createStravaImportHandler(
           'not_authenticated',
           'Sign in to fetch from Strava.',
         );
-      const origin = request.headers.get('origin');
-      if (method === 'POST' && origin && origin !== new URL(request.url).origin)
+      if (method === 'POST' && !mutationOriginAllowed(request, 'if-present'))
         throw new StravaImportError(
           403,
           'forbidden',

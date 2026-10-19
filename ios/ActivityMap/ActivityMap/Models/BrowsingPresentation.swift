@@ -125,16 +125,24 @@ struct BrowsingPresentation: Equatable {
         statusTitle = title
         statusMessage = message
         self.recovery = recovery
-        if let blocking { empty = blocking }
-        else if activityCount == 0 {
-            empty = EmptyState(kind: .emptyLibrary, title: "No activities in your library",
-                               message: "The completed sync contains no activities. Record an activity in Strava, then sync again.", symbol: "tray", recovery: retry)
+        empty = blocking ?? Self.resultEmpty(tab: tab, activityCount: activityCount,
+                                              filteredCount: filteredCount, routeCount: routeCount, retry: retry)
+    }
+
+    /// Evaluate only after session/completeness guards. A completed offline or
+    /// stale cache still has ordinary empty-library / no-matching-result states.
+    static func resultEmpty(tab: AppTab, activityCount: Int, filteredCount: Int,
+                            routeCount: Int = 0, retry: Recovery? = nil) -> EmptyState? {
+        if activityCount == 0 {
+            return EmptyState(kind: .emptyLibrary, title: "No activities in your library",
+                              message: "The completed sync contains no activities. Record an activity in Strava, then sync again.", symbol: "tray", recovery: retry)
         } else if filteredCount == 0 {
-            empty = EmptyState(kind: .noMatches, title: "No activities match your filters",
-                               message: "Your library is still saved. Clear filters or change a restriction to see activities.", symbol: "line.3.horizontal.decrease", recovery: .clearFilters)
+            return EmptyState(kind: .noMatches, title: "No activities match your filters",
+                              message: "Your library is still saved. Clear filters or change a restriction to see activities.", symbol: "line.3.horizontal.decrease", recovery: .clearFilters)
         } else if tab == .map && routeCount == 0 {
-            empty = EmptyState(kind: .noRoutes, title: "These activities have no GPS routes",
-                               message: "\(filteredCount) filtered activities remain available in the list, including their measurements and known photo metadata.", symbol: "map", recovery: .showList)
-        } else { empty = nil }
+            return EmptyState(kind: .noRoutes, title: "These activities have no GPS routes",
+                              message: "\(filteredCount) filtered activities remain available in the list, including their measurements and known photo metadata.", symbol: "map", recovery: .showList)
+        }
+        return nil
     }
 }

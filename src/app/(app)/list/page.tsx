@@ -1,15 +1,17 @@
 'use client';
 
 import { Suspense } from 'react';
+
 import { ActivityListView } from '~/components/list/activity-list';
-import { useActivities } from '~/hooks/use-activities';
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
 import { usePhotos } from '~/hooks/use-photos';
 
 function ActivityList() {
-  const { data: activities, hasNextPage, isFetching } = useActivities();
+  const {
+    query: { data: activities, hasNextPage, isFetching },
+    filterIDs,
+  } = useBrowsingLibrary();
   const { data: photos } = usePhotos();
-  const { filterIDs } = useFilteredActivities(activities);
   return (
     <ActivityListView
       activities={activities}

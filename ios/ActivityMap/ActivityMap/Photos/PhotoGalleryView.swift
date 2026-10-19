@@ -137,7 +137,7 @@ struct PhotoViewer: View {
                             .font(.subheadline).padding(.horizontal, 12).frame(minHeight: 44)
                             .background(.black.opacity(0.55), in: Capsule())
                     }
-                    Button { dismiss() } label: { floatingIcon("xmark") }
+                    Button { dismiss() } label: { floatingIcon(ActionPresentation.glyph(.close)) }
                         .accessibilityLabel("Close photo viewer")
                         .accessibilityIdentifier("photo-viewer-close")
                 }

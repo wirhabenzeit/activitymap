@@ -81,6 +81,31 @@ try {
       mode,
     );
   };
+  const enterSubmenu = async (triggerName, choice) => {
+    const trigger = page.getByRole('menuitem', {
+      name: triggerName,
+      exact: true,
+    });
+    const menu = page.getByRole('menu').filter({ has: choice });
+    const triggerBounds = await trigger.boundingBox();
+    const menuBounds = await menu.boundingBox();
+    assert(triggerBounds && menuBounds);
+    // Enter across the shared row before moving to a different submenu row.
+    // A single diagonal mouse jump can leave Radix's pointer grace corridor.
+    await page.mouse.move(
+      (await menu.getAttribute('data-side')) === 'left'
+        ? menuBounds.x + menuBounds.width - 2
+        : menuBounds.x + 2,
+      Math.max(
+        menuBounds.y + 2,
+        Math.min(
+          menuBounds.y + menuBounds.height - 2,
+          triggerBounds.y + triggerBounds.height / 2,
+        ),
+      ),
+      { steps: 8 },
+    );
+  };
   const firstID = '20279947341';
   for (const [width, height, mode] of [
     [1440, 1000, 'panel'],
@@ -307,19 +332,19 @@ try {
   await page.getByRole('menuitem', { name: 'Scrolling', exact: true }).hover();
   assert.equal(
     await page
-      .getByRole('menuitemcheckbox', {
+      .getByRole('menuitemradio', {
         name: 'Fit to width',
         exact: true,
       })
       .getAttribute('aria-checked'),
     'true',
   );
-  await page
-    .getByRole('menuitemcheckbox', {
-      name: 'Scroll freely',
-      exact: true,
-    })
-    .click();
+  const scrollFreelyOption = page.getByRole('menuitemradio', {
+    name: 'Scroll freely',
+    exact: true,
+  });
+  await enterSubmenu('Scrolling', scrollFreelyOption);
+  await scrollFreelyOption.click();
   await page.waitForFunction(() => !document.querySelector('[role="menu"]'));
   assert.equal(id(), '205', 'Changing the width mode leaves detail open');
   await assertWidthBehavior('Scroll freely');
@@ -390,9 +415,12 @@ try {
 
   await page.getByRole('button', { name: 'View', exact: true }).click();
   await page.getByRole('menuitem', { name: 'Columns', exact: true }).hover();
-  await page
-    .getByRole('menuitemcheckbox', { name: 'Date', exact: true })
-    .click();
+  const dateOption = page.getByRole('menuitemcheckbox', {
+    name: 'Date',
+    exact: true,
+  });
+  await enterSubmenu('Columns', dateOption);
+  await dateOption.click();
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
   assert.equal(
@@ -595,9 +623,21 @@ try {
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal(id(), '205', 'Escape in Edit only dismisses the dialog');
+  await page.waitForFunction(
+    () =>
+      document.activeElement?.getAttribute('aria-label') ===
+      'More route actions',
+  );
+  assert.equal(
+    await page
+      .getByRole('button', { name: 'More route actions', exact: true })
+      .evaluate((element) => element === document.activeElement),
+    true,
+    'Edit restores its menu trigger, not the removed Edit menu item',
+  );
   assert(
     await detail
-      .getByRole('button', { name: 'Show Activity 205 on map', exact: true })
+      .getByRole('button', { name: 'Show on map: Activity 205', exact: true })
       .isEnabled(),
   );
   console.log('PASS actions menu and Edit keep their own keyboard handling');

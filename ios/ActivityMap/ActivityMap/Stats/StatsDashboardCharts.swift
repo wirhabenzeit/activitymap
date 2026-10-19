@@ -1,12 +1,20 @@
 import SwiftUI
 import Charts
 
+enum StatsSeriesRole: String { case current, comparison, weeklyTotal, rollingAverage, hilliness }
+
 struct StatsChartPoint: Identifiable {
     let x: Int
     let value: Double?
     let series: String
+    let seriesID: String
+    let role: StatsSeriesRole
     let partial: Bool
-    var id: String { "\(series)-\(x)" }
+    init(x: Int, value: Double?, series: String, partial: Bool, role: StatsSeriesRole = .current, seriesID: String? = nil) {
+        self.x = x; self.value = value; self.series = series; self.partial = partial
+        self.role = role; self.seriesID = seriesID ?? role.rawValue
+    }
+    var id: String { "\(seriesID)-\(x)" }
 }
 
 struct StatsSeriesChart: View {
@@ -30,7 +38,7 @@ struct StatsSeriesChart: View {
         guard let selectedX, let closest = points.min(by: { abs($0.x - selectedX) < abs($1.x - selectedX) }) else { return [] }
         return points.filter { $0.x == closest.x }
     }
-    private var series: [String] { points.reduce(into: []) { if !$0.contains($1.series) { $0.append($1.series) } } }
+    private var series: [String] { points.reduce(into: []) { if !$0.contains($1.seriesID) { $0.append($1.seriesID) } } }
     private func label(_ x: Int) -> String {
         switch axis {
         case .date: StatsDisplay.date(x)
@@ -41,7 +49,7 @@ struct StatsSeriesChart: View {
     private func value(_ point: StatsChartPoint) -> String {
         guard let value = point.value else { return "Not yet elapsed" }
         if style == .consistency { return "\(StatsDisplay.number(value)) active days" }
-        if point.series == "m / km" { return "\(StatsDisplay.number(value)) m / km" }
+        if point.role == .hilliness { return "\(StatsDisplay.number(value)) m / km" }
         return StatsDisplay.measurement(value, metric: metric)
     }
 
@@ -57,7 +65,7 @@ struct StatsSeriesChart: View {
                                 .accessibilityLabel("\(label(point.x))\(point.partial ? ", incomplete" : "")")
                                 .accessibilityValue(self.value(point))
                         } else {
-                            if style == .volume, point.series == "Weekly total", !point.partial {
+                            if style == .volume, point.role == .weeklyTotal, !point.partial {
                                 // The lighter tail overlaps this series at its first point.
                                 // Both fills share a zero baseline; they must never stack.
                                 AreaMark(x: .value("Period", point.x), y: .value("Value", value), stacking: .unstacked)
@@ -65,10 +73,10 @@ struct StatsSeriesChart: View {
                                     .accessibilityHidden(true)
                             }
                             if !compact || style != .volume || !point.partial {
-                            LineMark(x: .value("Period", point.x), y: .value("Value", value), series: .value("Series", point.series))
-                                .foregroundStyle(by: .value("Series", point.series))
+                            LineMark(x: .value("Period", point.x), y: .value("Value", value), series: .value("Series", point.seriesID))
+                                .foregroundStyle(by: .value("Series", point.seriesID))
                                 .lineStyle(StrokeStyle(lineWidth: isReference(point) ? 1.5 : 2,
-                                                       dash: isReference(point) || point.series == "4-week average" ? [4, 3] : []))
+                                                       dash: isReference(point) || point.role == .rollingAverage ? [4, 3] : []))
                                 .accessibilityLabel("\(point.series), \(label(point.x))\(point.partial ? ", incomplete" : "")")
                                 .accessibilityValue(self.value(point))
                             }
@@ -76,7 +84,7 @@ struct StatsSeriesChart: View {
                     }
                 }
                 if compact && style == .volume {
-                    ForEach(Array(points.filter { $0.series == "Weekly total" }.suffix(2))) { point in
+                    ForEach(Array(points.filter { $0.role == .weeklyTotal }.suffix(2))) { point in
                         AreaMark(x: .value("Period", point.x), y: .value("Total", point.value ?? 0), series: .value("Series", "Incomplete week"), stacking: .unstacked)
                             .foregroundStyle(Color.primary.opacity(0.04)).accessibilityHidden(true)
                         LineMark(x: .value("Period", point.x), y: .value("Total", point.value ?? 0), series: .value("Series", "Incomplete week"))
@@ -102,7 +110,13 @@ struct StatsSeriesChart: View {
                     RuleMark(x: .value("Selected period", point.x)).foregroundStyle(.secondary.opacity(0.4))
                 }
             }
-            .chartForegroundStyleScale(domain: series, range: [Color.primary, style == .lines ? Color.secondary : AppTheme.accent])
+            .chartForegroundStyleScale(domain: series, range: series.map { id in
+                switch points.first(where: { $0.seriesID == id })?.role {
+                case .comparison: Color.secondary
+                case .rollingAverage: AppTheme.accent
+                default: Color.primary
+                }
+            })
             .chartYScale(domain: 0...maximum)
             .chartXScale(domain: xDomain)
             .chartXAxis {
@@ -115,7 +129,7 @@ struct StatsSeriesChart: View {
                         }
                     }
                 } else if compact && style == .volume {
-                    AxisMarks(values: points.filter { $0.series == "Weekly total" }.enumerated().filter { $0.offset % 4 == 0 }.map { $0.element.x }) { value in
+                    AxisMarks(values: points.filter { $0.role == .weeklyTotal }.enumerated().filter { $0.offset % 4 == 0 }.map { $0.element.x }) { value in
                         AxisValueLabel {
                             if let day = value.as(Int.self) { Text(shortAxisLabel(day)).font(.caption2) }
                         }
@@ -138,7 +152,13 @@ struct StatsSeriesChart: View {
                     AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value), step: axisStep)).font(.caption2) } }
                 } }
             }
-            .chartLegend(position: .bottom, alignment: .leading)
+            .chartLegend(position: .bottom, alignment: .leading) {
+                HStack { ForEach(series, id: \.self) { id in
+                    if let point = points.first(where: { $0.seriesID == id }) {
+                        Label(point.series, systemImage: point.role == .comparison ? "line.diagonal" : "minus").font(.caption2)
+                    }
+                } }
+            }
             .chartLegend(series.count > 1 && !compact ? .visible : .hidden)
             .padding(.trailing, style == .lines ? endpointPadding : 0)
             .chartXSelection(value: $selectedX)
@@ -190,10 +210,10 @@ struct StatsSeriesChart: View {
     private func isReference(_ point: StatsChartPoint) -> Bool {
         // The first distinct series is the first point's series. Rebuilding
         // the full series list for every mark makes long charts quadratic.
-        style == .lines && point.series != points.first?.series
+        point.role == .comparison
     }
     private var endpoints: [StatsChartPoint] {
-        series.compactMap { name in points.last { $0.series == name && $0.value != nil } }
+        series.compactMap { name in points.last { $0.seriesID == name && $0.value != nil } }
     }
     /// Early in a period the current line ends mid-chart, where a trailing
     /// label would run along the comparison line. Put it above or below the

@@ -10,15 +10,15 @@ struct ActivityGPXWorkflowTests {
         let source = ActivityGPXExportSource(snapshot: ActivityGPX(activity: activity), summary: cached)
         let sampled = ActivityGPXExportAvailability.prepare(source)
         #expect(sampled.canExport)
-        #expect(sampled.subtitle == "Sampled route with elevation · available offline")
+        #expect(sampled.subtitle == "Route with elevation")
         #expect(sampled.snapshot?.hasSampledElevation == true)
         let missing = ActivityGPXExportAvailability.prepare(.init(snapshot: ActivityGPX(activity: activity), summary: nil))
-        #expect(!missing.canExport && missing.subtitle == "Unavailable · no GPS route")
+        #expect(!missing.canExport && missing.subtitle == "No GPS route")
         #expect(missing.hint == "This activity has no GPS route to export")
         let routed = ActivityStoreSelectionTests.activity(Int(StreamFixtures.activityID)!)
         let malformed = try GPXFixtures.cached(ElevationFixtures.summary(altitude: nil))
         let fallback = ActivityGPXExportAvailability.prepare(.init(snapshot: ActivityGPX(activity: routed), summary: malformed))
-        #expect(fallback.canExport && fallback.snapshot?.hasSampledElevation == false)
+        #expect(fallback.canExport && fallback.snapshot?.hasSampledElevation == false && fallback.subtitle == "Route only")
         #expect(fallback.snapshot?.points == ActivityGPX(activity: routed).points)
     }
 

@@ -1,16 +1,19 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
-import { createElement, type ReactElement } from 'react';
+import { type ReactElement, createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+
+import { type StatsActivity, dayFromISODate } from '~/lib/stats/tile-data';
 import { statsTiles } from '~/settings/stats-tiles.generated';
-import { dayFromISODate, type StatsActivity } from '~/lib/stats/tile-data';
-import { tileView, type TileContext } from './tiles';
-import { tilePalette, formatDailyRate, statsFormat } from './format';
-import { PlainBars } from './charts';
-import { WeekdayRows } from './calendar';
-import { focusTiles } from './focus';
+
 import { statsCapabilitiesSchema } from '../../../../scripts/lib/stats-parity-schema';
+import { WeekdayRows } from './calendar';
+import { PlainBars } from './charts';
+import { focusTiles } from './focus';
+import { formatDailyRate, statsFormat, tilePalette } from './format';
+import { type TileContext, tileView } from './tiles';
 
 void test('the shared capability matrix matches actual visible and expandable web tiles', () => {
   const contract = statsCapabilitiesSchema.parse(
@@ -417,7 +420,7 @@ void test('month and year expansion retain the current-period comparison without
           children: (size: { width: number; height: number }) => ReactElement<{
             series: {
               label: string;
-              current: boolean;
+              role: 'current' | 'comparison';
               points: { x: number; y: number }[];
             }[];
           }>;
@@ -431,8 +434,11 @@ void test('month and year expansion retain the current-period comparison without
           series.map((line) => line.label),
           id === 'yearToDate' ? ['2025', '2026'] : ['Aug', 'Sep'],
         );
-        assert.equal(series.filter((line) => line.current).length, 1);
-        const current = series.find((line) => line.current)!;
+        assert.equal(
+          series.filter((line) => line.role === 'current').length,
+          1,
+        );
+        const current = series.find((line) => line.role === 'current')!;
         assert.equal(
           current.points.at(-1)?.x,
           id === 'yearToDate' ? 244 : 1,

@@ -65,9 +65,44 @@ nonisolated struct StatsTotals: Equatable, Sendable {
         for metric in StatsMetric.allCases { self[metric] += activity.value(metric) }
     }
 }
+nonisolated struct StatsComparisonPeriods: Equatable, Sendable {
+    struct Period: Equatable, Sendable { let first: Int; let last: Int; let complete: Bool }
+    let current: Period
+    let previous: Period
+    static func make(today: Int, monthly: Bool) -> Self {
+        let c = StatsDates.parts(today), year = c.year!, month = c.month!
+        let first = StatsDates.start(year: year, month: monthly ? month : 1)
+        let previousFirst = monthly ? StatsDates.start(year: year, month: month - 1) : StatsDates.start(year: year - 1)
+        let previousLast = monthly ? min(previousFirst + c.day! - 1, first - 1) : StatsDates.previousYear(today)
+        return .init(current: .init(first: first, last: today, complete: false),
+                     previous: .init(first: previousFirst, last: previousLast, complete: previousLast == first - 1))
+    }
+}
+
+nonisolated struct StatsComparisonPresentation: Equatable, Sendable {
+    enum Direction: String, Sendable { case higher, lower, unchanged }
+    let direction: Direction
+    let magnitude: Double?
+    let lessThanOne: Bool
+    init(current: Double, previous: Double) {
+        let delta = current - previous
+        direction = delta == 0 ? .unchanged : delta > 0 ? .higher : .lower
+        let raw = previous == 0 ? Double.nan : delta / previous * 100
+        magnitude = raw.isFinite ? abs(raw).rounded(.toNearestOrAwayFromZero) : nil
+        lessThanOne = magnitude == 0 && delta != 0
+    }
+    func percentage(locale: Locale = .current) -> String? {
+        guard let magnitude else { return nil }
+        let sign = direction == .unchanged ? "" : direction == .higher ? "+" : "−"
+        let value = lessThanOne ? "<1" : magnitude.formatted(.number.precision(.fractionLength(0)).locale(locale))
+        return "\(sign)\(value)%"
+    }
+}
+
 nonisolated struct StatsPeriodComparison: Equatable, Sendable {
     let current: Double
     let previous: Double
+    var periods: StatsComparisonPeriods? = nil
     /// A zero baseline has no percentage comparison. Preserve raw totals.
     var percentageChange: Double? {
         guard previous != 0 else { return nil }
@@ -179,18 +214,24 @@ nonisolated struct StatsEngine: Sendable {
     }
     func totals(today: Int) -> StatsTotals { totals(first: StatsDates.start(year: StatsDates.parts(today).year!), last: today) }
     func yearToDate(today: Int, metric: StatsMetric) -> StatsPeriodComparison {
-        let year = StatsDates.parts(today).year!
-        return .init(current: sum(metric, first: StatsDates.start(year: year), last: today),
-                     previous: sum(metric, first: StatsDates.start(year: year - 1), last: StatsDates.previousYear(today)))
+        let periods = StatsComparisonPeriods.make(today: today, monthly: false)
+        return .init(current: sum(metric, first: periods.current.first, last: periods.current.last),
+                     previous: sum(metric, first: periods.previous.first, last: periods.previous.last), periods: periods)
     }
     func monthComparison(today: Int, metric: StatsMetric, offset: Int = 0) -> StatsPeriodComparison {
         let offset = max(0, offset)
+        if offset == 0 {
+            let periods = StatsComparisonPeriods.make(today: today, monthly: true)
+            return .init(current: sum(metric, first: periods.current.first, last: periods.current.last),
+                         previous: sum(metric, first: periods.previous.first, last: periods.previous.last), periods: periods)
+        }
         let c = StatsDates.parts(today), first = StatsDates.start(year: c.year!, month: c.month! - max(0, offset))
         let next = StatsDates.start(year: c.year!, month: c.month! - max(0, offset) + 1)
         let previous = StatsDates.start(year: c.year!, month: c.month! - max(0, offset) - 1)
         let last = offset == 0 ? today : next - 1
         let previousLast = offset == 0 ? min(previous + c.day! - 1, first - 1) : first - 1
-        return .init(current: sum(metric, first: first, last: last), previous: sum(metric, first: previous, last: previousLast))
+        return .init(current: sum(metric, first: first, last: last), previous: sum(metric, first: previous, last: previousLast),
+                     periods: offset == 0 ? .make(today: today, monthly: true) : nil)
     }
     func yearComparison(today: Int, metric: StatsMetric, offset: Int = 0) -> StatsPeriodComparison {
         let offset = max(0, offset)
@@ -371,5 +412,29 @@ nonisolated struct StatsEngine: Sendable {
         hillPoints(first: StatsDates.previousYear(today), last: today).filter { $0.distance >= 5 }
             .enumerated().sorted { a, b in a.element.metersPerKm == b.element.metersPerKm ? a.offset < b.offset : a.element.metersPerKm > b.element.metersPerKm }
             .prefix(5).map(\.element)
+    }
+}
+
+/// Hardware-keyboard movement follows the rendered grid, including RTL columns.
+nonisolated enum StatsDayGrid {
+    enum Layout: String { case monthRows = "month-rows", weekColumns = "week-columns" }
+    static func target(day: Int, key: String, first: Int, last: Int, layout: Layout, rtl: Bool = false) -> Int? {
+        let horizontal = layout == .weekColumns ? 7 : 1
+        let vertical = layout == .weekColumns ? 1 : 7
+        let offset: Int
+        switch key {
+        case "Home": return first
+        case "End": return last
+        case "ArrowLeft": offset = rtl ? horizontal : -horizontal
+        case "ArrowRight": offset = rtl ? -horizontal : horizontal
+        case "ArrowUp": offset = -vertical
+        case "ArrowDown": offset = vertical
+        default: return nil
+        }
+        return min(last, max(first, day + offset))
+    }
+    static func selectedMonthDay(candidate: Int?, activeDays: [Int], first: Int, last: Int) -> Int? {
+        if let candidate, candidate >= first, candidate <= last { return candidate }
+        return activeDays.last { $0 >= first && $0 <= last }
     }
 }

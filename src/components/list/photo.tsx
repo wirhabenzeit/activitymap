@@ -1,29 +1,30 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import Image from 'next/image';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import {
+  ChevronLeft,
+  ChevronRight,
+  ImageOff,
+  LoaderCircle,
+} from 'lucide-react';
 import {
   AnimatePresence,
   motion,
   useIsPresent,
   useReducedMotion,
 } from 'motion/react';
+import Image from 'next/image';
+import { useEffect, useRef, useState } from 'react';
+
+import { DismissButton } from '~/components/dismiss-button';
 import {
-  ChevronLeft,
-  ChevronRight,
-  ImageOff,
-  LoaderCircle,
-  X,
-} from 'lucide-react';
-import type { Photo } from '~/server/db/schema';
-import {
+  type PhotoVariant,
   orderedPhotos,
   photoVariant,
-  type PhotoVariant,
 } from '~/lib/photo-gallery';
-import { useShallowStore } from '~/store';
 import { cn } from '~/lib/utils';
+import type { Photo } from '~/server/db/schema';
+import { useShallowStore } from '~/store';
 
 export function PhotoImage({
   variant,
@@ -280,7 +281,7 @@ function PhotoGallery({
               }
             }}
           >
-            <header className="flex shrink-0 items-center gap-3 pb-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-[max(1rem,env(safe-area-inset-top))]">
+            <header className="flex shrink-0 items-center gap-3 pt-[max(1rem,env(safe-area-inset-top))] pr-[max(1rem,env(safe-area-inset-right))] pb-3 pl-[max(1rem,env(safe-area-inset-left))]">
               <DialogPrimitive.Title className="min-w-0 flex-1 truncate text-sm font-medium">
                 {onViewActivity ? (current?.activity_name ?? title) : title}
               </DialogPrimitive.Title>
@@ -293,11 +294,11 @@ function PhotoGallery({
                   View activity
                 </button>
               )}
-              <DialogPrimitive.Close
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white/15 focus-visible:outline focus-visible:outline-2"
-                aria-label="Close photo viewer"
-              >
-                <X aria-hidden="true" />
+              <DialogPrimitive.Close asChild>
+                <DismissButton
+                  label="Close photo viewer"
+                  className="rounded-full bg-white/15 text-white focus-visible:ring-white"
+                />
               </DialogPrimitive.Close>
             </header>
             <div
@@ -356,7 +357,7 @@ function PhotoGallery({
                 )}
               </div>
             </div>
-            <footer className="shrink-0 px-[max(1rem,env(safe-area-inset-left))] pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+            <footer className="shrink-0 px-[max(1rem,env(safe-area-inset-left))] pt-3 pb-[max(1rem,env(safe-area-inset-bottom))]">
               <div className="mx-auto flex max-w-3xl items-center justify-center gap-6">
                 {ordered.length > 1 && (
                   <button
@@ -390,7 +391,7 @@ function PhotoGallery({
                 )}
               </div>
               {current?.caption?.trim() && (
-                <p className="mx-auto mt-3 max-h-[20dvh] max-w-3xl overflow-y-auto whitespace-pre-wrap break-words text-center text-sm text-white/85">
+                <p className="mx-auto mt-3 max-h-[20dvh] max-w-3xl overflow-y-auto text-center text-sm break-words whitespace-pre-wrap text-white/85">
                   {current.caption.trim()}
                 </p>
               )}

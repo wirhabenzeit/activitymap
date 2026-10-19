@@ -5,7 +5,7 @@ import UIKit
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
-    @Test(arguments: ["single", "multiple", "compact", "wide", "landscape", "large-text", "hidden", "hidden-request", "no-gps"])
+    @Test(arguments: ["single", "multiple", "compact", "wide", "landscape", "landscape-detail", "wide-detail", "large-text", "hidden", "hidden-request", "no-gps"])
     func renderedMapResults(scenario: String) async throws {
         let oldToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
@@ -24,7 +24,7 @@ extension RenderedRoutePickingTests {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let oldWindow = scene.keyWindow
         let window = UIWindow(windowScene: scene)
-        let size = scenario == "wide" ? CGSize(width: 768, height: 1024) : scenario == "landscape" ? CGSize(width: 844, height: 390) : CGSize(width: 390, height: 844)
+        let size = scenario.hasPrefix("wide") ? CGSize(width: 768, height: 1024) : scenario.hasPrefix("landscape") ? CGSize(width: 844, height: 390) : CGSize(width: 390, height: 844)
         window.frame = CGRect(origin: .zero, size: size)
         let root = MapScreen(store: store, topOcclusion: 62, picker: picker)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style))
@@ -39,7 +39,7 @@ extension RenderedRoutePickingTests {
         try await resultsWait { map.mapboxMap.isStyleLoaded }
         try await Task.sleep(for: .milliseconds(100))
         map.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005), zoom: 13))
-        let single = scenario == "single" || scenario == "compact" || scenario == "large-text" || scenario == "hidden"
+        let single = scenario == "single" || scenario.hasSuffix("-detail") || scenario == "compact" || scenario == "large-text" || scenario == "hidden"
         store.replaceSelection(with: single ? [1] : [1, 2, 3, 4])
         picker.reviewSelection(store: store)
         if scenario == "no-gps" { picker.showDetail(4, store: store) }

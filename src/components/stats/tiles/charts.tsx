@@ -2,36 +2,30 @@
 
 // Small TanStack Charts builders shared by the tile faces (no axes or grid)
 // and the detail views (with axes). Both have hover tooltips.
-
-import {
-  useLayoutEffect,
-  useRef,
-  useState,
-  type CSSProperties,
-  type ReactNode,
-} from 'react';
-import * as d3 from 'd3';
 import {
   areaY,
   barY,
+  crosshair,
   defineChart,
   dot,
   lineY,
   ruleY,
   stack,
   text,
-  crosshair,
 } from '@tanstack/charts';
+import { Chart } from '@tanstack/charts/react';
 import { tooltip } from '@tanstack/charts/tooltip';
 import { portal } from '@tanstack/charts/tooltip/portal';
-import { Chart } from '@tanstack/charts/react';
+import * as d3 from 'd3';
+import { type CSSProperties, type ReactNode } from 'react';
 
+import { useElementSize } from '~/hooks/use-element-size';
 import { type ComparisonBand } from '~/lib/stats/comparison-band';
-import { categorySettings } from '~/settings/category';
-import { sportOrder, type Sport } from '~/lib/stats/tile-data';
+import { type Sport, sportOrder } from '~/lib/stats/tile-data';
 import { dateOfDay, volumeDomain } from '~/lib/stats/tile-series';
+import { categorySettings } from '~/settings/category';
 
-import { axisTicks, formatShort, type TilePalette } from './format';
+import { type TilePalette, axisTicks, formatShort } from './format';
 
 export function Measure({
   className,
@@ -46,43 +40,12 @@ export function Measure({
   retainSize?: boolean;
   children: (size: { width: number; height: number }) => ReactNode;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ width: 0, height: 0 });
-  useLayoutEffect(() => {
-    const element = ref.current;
-    if (!element) return;
-    // Activity resumes layout effects when a retained focus view is revealed.
-    // Measure synchronously so its first navigation snapshot includes charts;
-    // ResizeObserver cannot deliver a new size while snapshotting is paused.
-    const style = getComputedStyle(element);
-    const width = Math.floor(
-      element.clientWidth -
-        parseFloat(style.paddingLeft) -
-        parseFloat(style.paddingRight),
-    );
-    const height = Math.floor(
-      element.clientHeight -
-        parseFloat(style.paddingTop) -
-        parseFloat(style.paddingBottom),
-    );
-    setSize((previous) =>
-      retainSize && (width <= 0 || height <= 0) ? previous : { width, height },
-    );
-    const observer = new ResizeObserver(([entry]) => {
-      if (!entry) return;
-      const { width, height } = entry.contentRect;
-      if (retainSize && (Math.floor(width) <= 0 || Math.floor(height) <= 0))
-        return;
-      setSize((previous) =>
-        previous.width === Math.floor(width) &&
-        previous.height === Math.floor(height)
-          ? previous
-          : { width: Math.floor(width), height: Math.floor(height) },
-      );
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [retainSize]);
+  const [ref, measured] = useElementSize<HTMLDivElement>({ retainSize });
+  const size = {
+    width: Math.floor(measured.width),
+    height: Math.floor(measured.height),
+  };
+
   return (
     <div ref={ref} className={className} style={style}>
       {size.width > 0 && size.height > 0 && children(size)}
@@ -97,7 +60,7 @@ export type LineSeries = {
   key: string;
   label: string;
   points: { x: number; y: number }[];
-  current: boolean;
+  role: 'current' | 'comparison';
 };
 
 export function CumulativeLines({
@@ -306,7 +269,7 @@ export function CumulativeLines({
     color: {
       domain: keys,
       range: series.map((s, index) =>
-        s.current
+        s.role === 'current'
           ? palette.foreground
           : d3.interpolateRgb(
               palette.faint,
@@ -384,7 +347,7 @@ export function CumulativeLines({
 }
 
 function currentKey(series: LineSeries[]) {
-  return series.find((s) => s.current)?.key;
+  return series.find((s) => s.role === 'current')?.key;
 }
 
 // Weekly totals as a filled area, with a dashed tail into the current,

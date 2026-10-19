@@ -27,8 +27,8 @@ extension RenderedRoutePickingTests {
             .ignoresSafeArea(), size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(300))
-        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
-        let page = try #require(pager.viewControllers?.first as? MapActivityPager.Page)
+        let pager = try #require(host.controllers(of: UINavigationController.self).first)
+        let page = try #require(pager.viewControllers.last)
         func scrolls(_ view: UIView) -> [UIScrollView] {
             ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrolls)
         }
@@ -36,6 +36,16 @@ extension RenderedRoutePickingTests {
         let viewport = scroll.convert(scroll.bounds, to: host.host.view)
         #expect(viewport.height >= 100, "Short landscapes must have a usable detail viewport: \(viewport)")
         #expect(abs(viewport.maxY - size.height) < 1, "Content must scroll through the bottom safe area, without a fixed blank strip: \(viewport)")
+        let initialImage = host.snapshot()
+        func titleFrame(in image: UIImage) throws -> CGRect {
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+            return try #require(request.results?.first {
+                $0.topCandidates(1).first?.string.contains("A long") == true
+            }).boundingBox
+        }
+        let initialTitleFrame = try titleFrame(in: initialImage)
         scroll.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
         try await Task.sleep(for: .milliseconds(150))
         let offset = scroll.contentOffset
@@ -43,7 +53,7 @@ extension RenderedRoutePickingTests {
         try await Task.sleep(for: .milliseconds(250))
         picker.detent = .expanded
         try await Task.sleep(for: .milliseconds(250))
-        #expect(pager.viewControllers?.first === page)
+        #expect(pager.viewControllers.last === page)
         #expect(scroll.contentOffset == offset, "Resizing must retain the detail's scroll position")
         let end = max(-scroll.adjustedContentInset.top,
                       scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)
@@ -55,7 +65,10 @@ extension RenderedRoutePickingTests {
         request.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(text.contains("offline"), "The final export row must be visible at the end of scrolling: \(text)")
+        let scrolledTitleFrame = try titleFrame(in: image)
+        #expect(abs(scrolledTitleFrame.minY - initialTitleFrame.minY) * size.height < 2,
+                "The activity name must stay pinned while the details scroll")
+        #expect(text.contains("Route only"), "The final export row must be visible at the end of scrolling: \(text)")
         let lowestText = (request.results ?? []).map(\.boundingBox.minY).min() ?? 0
         #expect(lowestText * size.height >= bottom - 1, "Final text must still stop above the home indicator")
         #expect(store.mapContext.pendingRequest == nil)
@@ -187,22 +200,22 @@ extension RenderedRoutePickingTests {
             .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large).ignoresSafeArea(), size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(250))
-        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
-        let page = try #require(pager.viewControllers?.first)
+        let pager = try #require(host.controllers(of: UINavigationController.self).first)
+        let page = try #require(pager.viewControllers.last)
         let before = pager.view.bounds.height
         let selection = store.selectedActivityIDs
         try host.save(host.snapshot(), name: "fixed-panel-\(scenario)-expanded")
         picker.detent = .compact
         try await Task.sleep(for: .milliseconds(200))
-        #expect(host.controllers(of: UIPageViewController.self).first === pager)
-        #expect(pager.viewControllers?.first === page)
+        #expect(host.controllers(of: UINavigationController.self).first === pager)
+        #expect(pager.viewControllers.last === page)
         #expect(picker.detailID == 1 && store.selectedActivityIDs == selection)
         #expect(store.mapContext.pendingRequest == nil)
         try host.save(host.snapshot(), name: "fixed-panel-\(scenario)-collapsed")
         picker.detent = .expanded
         try await Task.sleep(for: .milliseconds(200))
         #expect(abs(pager.view.bounds.height - before) < 2, "Medium and expanded both use the full edge height")
-        #expect(pager.viewControllers?.first === page)
+        #expect(pager.viewControllers.last === page)
         #expect(store.mapContext.pendingRequest == nil, "Expansion never requests an unsolicited fit")
         picker.showResults()
         try await Task.sleep(for: .milliseconds(200))
@@ -241,51 +254,61 @@ extension RenderedRoutePickingTests {
                 "Distance, elapsed time and elevation are visibly rendered: \(text)")
     }
 
-    @Test(arguments: [2, 60]) func nativeMapPagerDragsBeforeCommittingAndCancelsWithoutChangingFocus(count: Int) async throws {
+    @Test(arguments: [false, true])
+    func mapDetailHeaderHeightDoesNotGrowWithSelection(isSidePanel: Bool) async throws {
+        let store = ActivityStore(activities: (1...3).map { ActivityStoreSelectionTests.activity($0) })
+        store.replaceSelection(with: [1])
+        let picker = RoutePicker()
+        picker.reviewSelection(store: store)
+        let size = isSidePanel ? CGSize(width: 354, height: 320) : CGSize(width: 375, height: 500)
+        let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: isSidePanel), size: size)
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(250))
+        let pager = try #require(host.controllers(of: UINavigationController.self).first)
+        let page = try #require(pager.viewControllers.last)
+        let initialTop = pager.view.convert(pager.view.bounds, to: host.window).minY
+        try host.save(host.snapshot(), name: "header-single-\(isSidePanel ? "landscape" : "phone")")
+        store.addToSelection([2, 3])
+        picker.reconcile(with: store)
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(host.controllers(of: UINavigationController.self).first === pager)
+        #expect(pager.viewControllers.last === page)
+        #expect(abs(pager.view.convert(pager.view.bounds, to: host.window).minY - initialTop) < 1,
+                "Opening one of several selected activities must not add another header row")
+        #expect(picker.detailID == 1 && store.activeActivityID == 1 && store.selectedActivityIDs == [1, 2, 3])
+        #expect(store.mapContext.pendingRequest == nil)
+        try host.save(host.snapshot(), name: "header-multiple-\(isSidePanel ? "landscape" : "phone")")
+    }
+
+    @Test(arguments: [2, 60]) func nativeMapNavigationRetainsOneResultsRootAndOneDetail(count: Int) async throws {
         let store = ActivityStore(activities: (1...count).map { ActivityStoreSelectionTests.activity($0) })
         store.replaceSelection(with: Array(1...count))
         let picker = RoutePicker()
-        picker.reviewSelection(store: store)
-        let start = min(30, count)
-        picker.showDetail(start, store: store, motion: .none)
+        picker.reconcile(with: store)
         let host = try DetailHarness(root: RoutePickerSheet(picker: picker, store: store, isSidePanel: false), size: CGSize(width: 375, height: 500))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(300))
-        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
-        #expect(pager.transitionStyle == .scroll && pager.navigationOrientation == .horizontal)
-        let scroll = try #require(host.descendants(of: UIScrollView.self).first { $0.contentSize.width > $0.bounds.width * 1.5 })
-        #expect(scroll.panGestureRecognizer.isEnabled)
-        let initialOffset = scroll.contentOffset
-        let before = host.snapshot()
-        scroll.setContentOffset(CGPoint(x: initialOffset.x + 30, y: initialOffset.y), animated: false)
-        try await Task.sleep(for: .milliseconds(50))
-        #expect(before.pngData() != host.snapshot().pngData(), "Native page content moves before the drag is committed")
-        #expect(picker.detailID == start && store.activeActivityID == start)
-        try host.save(host.snapshot(), name: "map-native-page-drag")
-        scroll.setContentOffset(initialOffset, animated: false)
-        let initial = try #require(pager.viewControllers?.first)
-        let next = try #require(pager.dataSource?.pageViewController(pager, viewControllerAfter: initial))
-        let headerBefore = host.snapshotRegion(CGRect(x: 0, y: 18, width: 375, height: 52))
-        pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
-        #expect(picker.isPaging)
-        try await Task.sleep(for: .milliseconds(50))
-        #expect(host.snapshotRegion(CGRect(x: 0, y: 18, width: 375, height: 52)) == headerBefore,
-                "Paging arrows keep their appearance during a native drag")
-        pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [initial], transitionCompleted: false)
-        #expect(!picker.isPaging && picker.detailID == start && store.activeActivityID == start)
-        pager.delegate?.pageViewController?(pager, willTransitionTo: [next])
-        pager.setViewControllers([next], direction: .forward, animated: false)
-        pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [initial], transitionCompleted: true)
-        #expect(picker.detailID == start - 1 && store.activeActivityID == start - 1)
-        let coordinator = try #require(pager.delegate as? MapActivityPager.Coordinator)
-        for _ in 0..<20 {
-            let current = try #require(pager.viewControllers?.first)
-            let following = try #require(pager.dataSource?.pageViewController(pager, viewControllerAfter: current))
-            pager.setViewControllers([following], direction: .forward, animated: false)
-            pager.delegate?.pageViewController?(pager, didFinishAnimating: true, previousViewControllers: [current], transitionCompleted: true)
-            #expect(coordinator.pages.count <= 3, "Large selections retain only current/adjacent hosted pages")
-        }
-        #expect(store.selectedActivityIDs.count == count && store.mapContext.pendingRequest == nil)
+        let navigation = try #require(host.controllers(of: UINavigationController.self).first)
+        let root = try #require(navigation.viewControllers.first)
+        #expect(navigation.viewControllers.count == 1)
+        picker.showDetail(count, store: store)
+        try await Task.sleep(for: .milliseconds(700))
+        #expect(navigation.viewControllers.count == 2)
+        #expect(navigation.viewControllers.first === root)
+        #expect(navigation.interactivePopGestureRecognizer?.isEnabled == true)
+        #expect(host.controllers(of: UIPageViewController.self).isEmpty,
+                "A horizontal detail pager must not compete with native Back")
+        picker.step(1, store: store)
+        try await Task.sleep(for: .milliseconds(500))
+        #expect(picker.detailID == count - 1 && store.activeActivityID == count - 1)
+        #expect(navigation.viewControllers.count == 2, "Adjacent activities replace the detail, without growing history")
+        #expect(navigation.viewControllers.first === root)
+        navigation.popViewController(animated: false)
+        try await Task.sleep(for: .milliseconds(300))
+        #expect(picker.detailID == nil)
+        #expect(navigation.viewControllers.count == 1 && navigation.viewControllers.first === root)
+        #expect(store.selectedActivityIDs.count == count && store.activeActivityID == count - 1)
+        #expect(store.mapContext.pendingRequest == nil)
     }
 
     @Test(arguments: ["phone", "accessibility", "tablet", "landscape", "no-gps"])
@@ -475,7 +498,7 @@ extension RenderedRoutePickingTests {
         let map = try #require(host.descendants(of: MapView.self).first)
         map.mapboxMap.setCamera(to: CameraOptions(center: activity.coordinates[2], zoom: 14))
         try await Task.sleep(for: .milliseconds(300))
-        let pager = try #require(host.controllers(of: UIPageViewController.self).first)
+        let pager = try #require(host.controllers(of: UINavigationController.self).first)
         let scroll = try #require(pager.view.subviews.compactMap { $0 as? UIScrollView }.first)
         #expect(scroll.isScrollEnabled)
         let baseline = host.snapshot()
@@ -745,7 +768,7 @@ extension RenderedRoutePickingTests {
 
 
 extension RenderedRoutePickingTests {
-    @Test func landscapePanelShowsLoadedProfileWithScrollingHeading() async throws {
+    @Test func landscapePanelShowsLoadedProfileWithPinnedHeading() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity(["id": "1", "name": "Landscape ride"])
         try await storage.apply([.upsertActivity(dto)], scope: Fixtures.scope)
@@ -773,7 +796,7 @@ extension RenderedRoutePickingTests {
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
         #expect(text.contains("Landscape ride") && text.contains("Elevation (m)") && text.contains("Distance (km)"),
-                "The scrolling heading and complete chart axes must fit in the opening landscape panel: \(text)")
+                "The pinned heading and complete chart axes must fit in the opening landscape panel: \(text)")
         #expect(!text.contains("Fit route"), "Detail content must not add another Fit action")
     }
 }

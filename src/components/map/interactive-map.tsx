@@ -1,43 +1,76 @@
 'use client';
 
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  useEffect,
-  useRef,
-} from 'react';
-import { useSidebar } from '~/components/ui/sidebar';
 import {
-  Maximize2,
-  Minimize2,
-  Globe,
-  Scan,
+  ArrowLeft,
   ChevronLeft,
   ChevronRight,
-  ArrowLeft,
+  Globe,
+  Maximize2,
+  Minimize2,
+  Scan,
 } from 'lucide-react';
-import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
-import { store } from '~/store';
-import { SelectionBar } from '~/components/activity-selection-controls';
-import { columns } from '~/components/list/columns';
-import { ActivityCard, ActivityCardContent } from '~/components/list/card';
-import { usePrefetchStreamSummaries } from '~/components/list/elevation-chart';
-import { Button } from '~/components/ui/button';
-import { activityFields } from '~/settings/activity';
-
+import { LngLat, type SkyLayer } from 'mapbox-gl';
+import { useSearchParams } from 'next/navigation';
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import ReactMapGL, {
-  NavigationControl,
-  GeolocateControl,
   FullscreenControl,
+  GeolocateControl,
   Layer,
-  Source,
   type MapRef,
+  NavigationControl,
+  Source,
   type ViewState,
 } from 'react-map-gl/mapbox';
-import { LngLat, type SkyLayer } from 'mapbox-gl';
 
+import { SelectionBar } from '~/components/activity-selection-controls';
+import { ActivityCard, ActivityCardContent } from '~/components/list/card';
+import { columns } from '~/components/list/columns';
 import { DataTable } from '~/components/list/data-table';
+import { usePrefetchStreamSummaries } from '~/components/list/elevation-chart';
+import { Download } from '~/components/map/download-control';
+import { LayerSwitcher } from '~/components/map/layer-switcher';
+import { LegacySharingDisabledNotice } from '~/components/map/legacy-sharing-disabled-notice';
+import { MapControlIconButton } from '~/components/map/map-control-icon-button';
+import Overlay from '~/components/map/overlay';
+import PhotoLayer from '~/components/map/photo';
+import { Selection } from '~/components/map/selection-control';
+import { UploadControl } from '~/components/map/upload-control';
+import { Button } from '~/components/ui/button';
+import { useActivityGeoJsonFromActivities } from '~/hooks/use-activities';
+import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
+import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
+import { usePhotos } from '~/hooks/use-photos';
+import { sortActivities } from '~/lib/activity-presentation';
+import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+import { observeMapResize } from '~/lib/map-resize';
+import { parseMapShareParams } from '~/lib/map-share';
+import {
+  routeBounds,
+  routeCoordinates,
+  routeFitPadding,
+  routeFramingPolicy,
+} from '~/lib/route-framing';
+import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
+import { cn, groupBy } from '~/lib/utils';
+import type { Activity } from '~/server/db/schema';
+import { activityFields } from '~/settings/activity';
+import { categorySettings } from '~/settings/category';
+import {
+  type OverlaySetting,
+  baseMaps,
+  defaultMapPosition,
+  overlayMaps,
+} from '~/settings/map';
+import { store } from '~/store';
+import { useShallowStore } from '~/store';
+
+import { ElevationRouteMarker } from './elevation-route-marker';
 
 const skyLayer: SkyLayer = {
   id: 'sky',
@@ -48,45 +81,6 @@ const skyLayer: SkyLayer = {
     'sky-atmosphere-sun-intensity': 15,
   },
 };
-import { useShallowStore } from '~/store';
-
-import Overlay from '~/components/map/overlay';
-
-import {
-  baseMaps,
-  defaultMapPosition,
-  overlayMaps,
-  type OverlaySetting,
-} from '~/settings/map';
-import { categorySettings } from '~/settings/category';
-import { parseMapShareParams } from '~/lib/map-share';
-
-import { Download } from '~/components/map/download-control';
-import { UploadControl } from '~/components/map/upload-control';
-import { Selection } from '~/components/map/selection-control';
-import { LayerSwitcher } from '~/components/map/layer-switcher';
-import { MapControlIconButton } from '~/components/map/map-control-icon-button';
-import PhotoLayer from '~/components/map/photo';
-import { ElevationRouteMarker } from './elevation-route-marker';
-import { cn, groupBy } from '~/lib/utils';
-import { sortActivities } from '~/lib/activity-presentation';
-
-import {
-  useActivityGeoJsonFromActivities,
-  useActivities,
-} from '~/hooks/use-activities';
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
-import { usePhotos } from '~/hooks/use-photos';
-import type { Activity } from '~/server/db/schema';
-import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
-import { LegacySharingDisabledNotice } from '~/components/map/legacy-sharing-disabled-notice';
-import { useSearchParams } from 'next/navigation';
-import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
-import {
-  routeBounds,
-  routeCoordinates,
-  routeFitPadding,
-} from '~/lib/route-framing';
 
 type OverlayMapId = keyof typeof overlayMaps;
 
@@ -104,15 +98,18 @@ const getOverlayMapSetting = (overlayId: OverlayMapId): OverlaySetting => {
   return overlayMaps[overlayId];
 };
 
-const RouteLayer = React.memo(function RouteLayer() {
+const RouteLayer = React.memo(function RouteLayer({
+  activities,
+  filterIDs,
+}: {
+  activities: Activity[];
+  filterIDs: number[];
+}) {
   const { selected, highlighted } = useShallowStore((state) => ({
     selected: state.selected,
     highlighted: state.highlighted,
   }));
 
-  const { data: activities = [] } = useActivities();
-  const { filterIDs: ordinaryFilterIDs } = useFilteredActivities(activities);
-  const filterIDs = useBrowsingIDs(ordinaryFilterIDs);
   const geoJson = useActivityGeoJsonFromActivities(activities);
 
   const color: mapboxgl.Expression = ['match', ['get', 'sport_type']];
@@ -247,23 +244,15 @@ export default function InteractiveMap() {
   const onMouseLeave = useCallback(() => setCursor('auto'), []);
 
   // Fetch data via hooks
-  const { data: activities = [], isPending: activitiesPending } =
-    useActivities();
+  const {
+    query: { data: activities = [], isPending: activitiesPending },
+    filterIDs,
+    filterIDSet,
+    byID: activityDict,
+  } = useBrowsingLibrary();
+  const visibleIDs = useBrowsingIDs(filterIDs);
+  const visibleIDSet = useMemo(() => new Set(visibleIDs), [visibleIDs]);
   const { data: photos = [] } = usePhotos();
-  const { filterIDs } = useFilteredActivities(activities);
-
-  // Memoize activity dictionary for efficient lookup
-  const activityDict = useMemo(
-    () =>
-      activities.reduce(
-        (acc, act) => {
-          acc[act.id] = act;
-          return acc;
-        },
-        {} as Record<number, Activity>,
-      ),
-    [activities],
-  );
 
   const {
     selected,
@@ -313,8 +302,8 @@ export default function InteractiveMap() {
       !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
   }));
   const visibleSelected = useMemo(
-    () => selected.filter((id) => filterIDs.includes(id) && activityDict[id]),
-    [selected, filterIDs, activityDict],
+    () => selected.filter((id) => filterIDSet.has(id) && activityDict.has(id)),
+    [selected, filterIDSet, activityDict],
   );
   // Follow active changes only while inspecting details. Results can toggle
   // the highlighted route independently, just like the native results list.
@@ -326,14 +315,14 @@ export default function InteractiveMap() {
   } else if (
     !activitiesPending &&
     detailId &&
-    (!selected.includes(detailId) || !filterIDs.includes(detailId))
+    (!selected.includes(detailId) || !filterIDSet.has(detailId))
   ) {
     setDetailId(0);
   }
   const selectedSummaryActivities = useMemo(
     () =>
       selected.flatMap((id) => {
-        const activity = activityDict[id];
+        const activity = activityDict.get(id);
         return activity
           ? [{ id, streamsMetadata: activityStreamMetadata(activity) }]
           : [];
@@ -341,7 +330,6 @@ export default function InteractiveMap() {
     [activityDict, selected],
   );
   usePrefetchStreamSummaries(selectedSummaryActivities, summaryUserId);
-  const { open } = useSidebar();
   const mapRefLoc = useRef<MapRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const detailBackButtonRef = useRef<HTMLButtonElement>(null);
@@ -358,17 +346,16 @@ export default function InteractiveMap() {
     }
   }, [mapLoaded]);
   const columnFilters = useMemo(
-    () => [{ id: 'id', value: filterIDs }],
-    [filterIDs],
+    () => [{ id: 'id', value: filterIDSet }],
+    [filterIDSet],
   );
   const hydratedFromUrlRef = useRef(false);
 
   useEffect(() => {
+    if (!mapLoaded) return;
     const map = mapRefLoc.current?.getMap();
-    if (map) {
-      setTimeout(() => map.resize(), 200);
-    }
-  }, [open]);
+    if (map) return observeMapResize(map);
+  }, [mapLoaded]);
 
   const initialViewport = sharedMapState.patch.position ?? mapPosition;
   const [viewport, setViewport] = useState(initialViewport);
@@ -433,12 +420,13 @@ export default function InteractiveMap() {
         return;
       }
       const targets = routeFitRequest.activityIDs.filter((id) =>
-        filterIDs.includes(id),
+        filterIDSet.has(id),
       );
       const bounds = routeBounds(
-        targets.flatMap((id) =>
-          activityDict[id] ? routeCoordinates(activityDict[id]) : [],
-        ),
+        targets.flatMap((id) => {
+          const activity = activityDict.get(id);
+          return activity ? routeCoordinates(activity) : [];
+        }),
       );
       if (!bounds) {
         finish('These activities have no visible GPS route to frame.');
@@ -451,7 +439,7 @@ export default function InteractiveMap() {
       hasAutoCenteredOnLatest.current = true;
       const camera = map.cameraForBounds(bounds, {
         padding,
-        maxZoom: 16,
+        maxZoom: routeFramingPolicy.maxZoom,
         bearing: map.getBearing(),
         pitch: map.getPitch(),
       });
@@ -509,7 +497,7 @@ export default function InteractiveMap() {
     mapLoaded,
     activitiesPending,
     activityDict,
-    filterIDs,
+    filterIDSet,
     addNotification,
     completeRouteFit,
     setPosition,
@@ -642,7 +630,7 @@ export default function InteractiveMap() {
     () =>
       visibleSelected
         .map((key) => {
-          const activity = activityDict[key];
+          const activity = activityDict.get(key);
           if (!activity) return undefined;
           return {
             ...activity,
@@ -655,10 +643,10 @@ export default function InteractiveMap() {
   const resultIds = useMemo(
     () =>
       sortActivities(
-        rows.filter((row) => filterIDs.includes(row.id)),
+        rows.filter((row) => filterIDSet.has(row.id)),
         compactList.sorting,
       ).map((row) => row.id),
-    [rows, filterIDs, compactList.sorting],
+    [rows, filterIDSet, compactList.sorting],
   );
   const detailIndex = resultIds.indexOf(detailId);
   const openDetail = (id: number) => {
@@ -716,7 +704,11 @@ export default function InteractiveMap() {
   const panelControls = (fitIds: number[], fitLabel: string) => (
     <div className="flex shrink-0 items-center gap-0.5">
       {detailId > 0 && resultIds.length > 1 && (
-        <div className="flex items-center" role="group" aria-label="Browse selected activities">
+        <div
+          className="flex items-center"
+          role="group"
+          aria-label="Browse selected activities"
+        >
           <Button
             variant="ghost"
             size="icon"
@@ -886,9 +878,12 @@ export default function InteractiveMap() {
             />
           </Source>
         )}
-        <RouteLayer />
-        <ElevationRouteMarker />
-        {showPhotos && <PhotoLayer />}
+        <RouteLayer activities={activities} filterIDs={visibleIDs} />
+        <ElevationRouteMarker
+          activities={activityDict}
+          visibleIDs={visibleIDSet}
+        />
+        {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}
       </ReactMapGL>
       {selected.length > 0 && (
         <div
@@ -900,7 +895,7 @@ export default function InteractiveMap() {
             } as React.CSSProperties
           }
           className={cn(
-            'z-10 absolute right-2 bottom-2 lg:right-5 lg:bottom-5 bg-background rounded-lg shadow-lg overflow-hidden flex flex-col',
+            'absolute right-2 bottom-2 z-10 flex flex-col overflow-hidden rounded-lg bg-background shadow-lg lg:right-5 lg:bottom-5',
             selected.length > 0 &&
               'left-2 lg:left-auto lg:w-[min(70vw,48rem)] [@media(min-width:650px)_and_(max-height:500px)]:left-auto [@media(min-width:650px)_and_(max-height:500px)]:w-[min(42vw,24rem)]',
           )}
@@ -908,19 +903,21 @@ export default function InteractiveMap() {
           {
             <SelectionBar
               filterIDs={filterIDs}
-              backButton={detailId > 0 ? (
-                <Button
-                  ref={detailBackButtonRef}
-                  variant="ghost"
-                  size="icon"
-                  className="size-8 shrink-0"
-                  aria-label={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
-                  title="Back to selected activities"
-                  onClick={() => setDetailId(0)}
-                >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              ) : undefined}
+              backButton={
+                detailId > 0 ? (
+                  <Button
+                    ref={detailBackButtonRef}
+                    variant="ghost"
+                    size="icon"
+                    className="size-8 shrink-0"
+                    aria-label={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
+                    title="Back to selected activities"
+                    onClick={() => setDetailId(0)}
+                  >
+                    <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                ) : undefined
+              }
               controls={
                 selected.length > 0
                   ? panelControls(

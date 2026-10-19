@@ -6,11 +6,33 @@ enum MapResultsDetent: Int, CaseIterable {
 }
 
 struct MapResultsLayout {
+    let containerSize: CGSize
     let isSidePanel: Bool
     let contentHeight: CGFloat
     let frame: CGRect
     let bottomOcclusion: CGFloat
     let trailingOcclusion: CGFloat
+
+    /// iOS 27 can keep one native sheet through narrow and wide layouts.
+    /// Earlier systems retain the existing custom trailing panel fallback.
+    var usesNativePresentation: Bool {
+        if #available(iOS 27.0, *) { return true }
+        return !isSidePanel
+    }
+
+    func presentationFrame(measuredFrame: CGRect?, leadingSafeInset: CGFloat, trailingSafeInset: CGFloat) -> CGRect {
+        guard usesNativePresentation else { return frame }
+        if let measuredFrame { return measuredFrame }
+        guard isSidePanel else { return frame }
+        // Native sheets can retain the window's protected gutter even when
+        // browsing reclaims the opposite side. Be conservative until measured.
+        return frame.offsetBy(dx: -max(0, leadingSafeInset - trailingSafeInset), dy: 0)
+    }
+
+    func resolvedTrailingOcclusion(presentedFrame: CGRect) -> CGFloat {
+        guard isSidePanel else { return 0 }
+        return max(0, containerSize.width - presentedFrame.minX) + 12
+    }
 
     static func controlsCenter(size: CGSize, topInset: CGFloat = 0) -> CGPoint {
         // Three 44×48 targets, two dividers and 4pt padding: 52×154.
@@ -19,11 +41,12 @@ struct MapResultsLayout {
 
     init(size: CGSize, topInset: CGFloat, bottomInset: CGFloat, detent: MapResultsDetent,
          largeText: Bool = false) {
+        containerSize = size
         isSidePanel = size.width >= 650 || size.width > size.height
         let width = isSidePanel ? min(380, size.width * 0.42) : max(0, size.width - 8)
         // Keep navigation clear. Results overlay the top-right controls when
         // expanded; no empty control lane is reserved beside the panel.
-        let top = topInset + 12
+        let top = topInset + (isSidePanel ? 4 : 12)
         let available = max(120, size.height - top - (isSidePanel ? 0 : 12))
         let compact = min(available, isSidePanel ? (largeText ? 120 : 64) : NativeMapResultsSizing.compactHeight(largeText: largeText))
         let height: CGFloat
@@ -39,6 +62,19 @@ struct MapResultsLayout {
                        width: width, height: contentHeight + bottomInset)
         bottomOcclusion = isSidePanel ? 0 : contentHeight + bottomInset
         trailingOcclusion = isSidePanel ? size.width - frame.minX + 12 : 0
+    }
+}
+
+/// Native placement is expressed in the map container's coordinates. A
+/// measurement from the previous orientation must never drive a new viewport.
+struct MapResultsPresentationGeometry: Equatable {
+    let frame: CGRect
+    let containerSize: CGSize
+
+    func frame(in size: CGSize) -> CGRect? {
+        guard containerSize == size, !frame.isNull, !frame.isInfinite,
+              frame.width > 0, frame.height > 0 else { return nil }
+        return frame
     }
 }
 

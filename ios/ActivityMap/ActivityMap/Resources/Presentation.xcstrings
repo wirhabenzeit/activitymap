@@ -1,0 +1,810 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "category.bcXcSki": {
+      "comment": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "BC & XC Ski"
+          }
+        }
+      }
+    },
+    "category.trailHike": {
+      "comment": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Trail / Hike"
+          }
+        }
+      }
+    },
+    "category.run": {
+      "comment": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Run"
+          }
+        }
+      }
+    },
+    "category.ride": {
+      "comment": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ride"
+          }
+        }
+      }
+    },
+    "category.misc": {
+      "comment": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Miscellaneous"
+          }
+        }
+      }
+    },
+    "action.back": {
+      "comment": "Return to the preceding screen; does not dismiss a modal.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        }
+      }
+    },
+    "action.close": {
+      "comment": "Dismiss the current presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close"
+          }
+        }
+      }
+    },
+    "action.fit": {
+      "comment": "Fit available activity routes in the map viewport.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fit activities"
+          }
+        }
+      }
+    },
+    "action.showOnMap": {
+      "comment": "Activate an activity and show its route; selection is independent.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show on map"
+          }
+        }
+      }
+    },
+    "action.clearFiltersAndShowOnMap": {
+      "comment": "Clear incompatible filters before activating an activity.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clear filters and show on map"
+          }
+        }
+      }
+    },
+    "action.select": {
+      "comment": "Add to the selection set, independent of map activation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select"
+          }
+        }
+      }
+    },
+    "action.activate": {
+      "comment": "Make this activity the active map route without changing selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activate on map"
+          }
+        }
+      }
+    },
+    "action.exportGPX": {
+      "comment": "Export route data: browser downloads a file; iOS presents the system share sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Download GPX"
+          }
+        }
+      }
+    },
+    "metric.distance": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Distance"
+          }
+        }
+      }
+    },
+    "metric.moving_time": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moving time"
+          }
+        }
+      }
+    },
+    "metric.elapsed_time": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elapsed time"
+          }
+        }
+      }
+    },
+    "metric.total_elevation_gain": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elevation gain"
+          }
+        }
+      }
+    },
+    "metric.elev_high": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maximum elevation"
+          }
+        }
+      }
+    },
+    "metric.elev_low": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minimum elevation"
+          }
+        }
+      }
+    },
+    "metric.date": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
+          }
+        }
+      }
+    },
+    "metric.average_speed": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Average speed"
+          }
+        }
+      }
+    },
+    "metric.max_speed": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maximum speed"
+          }
+        }
+      }
+    },
+    "metric.average_pace": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Average pace"
+          }
+        }
+      }
+    },
+    "metric.best_pace": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Best pace"
+          }
+        }
+      }
+    },
+    "metric.average_watts": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Average power"
+          }
+        }
+      }
+    },
+    "metric.max_watts": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maximum power"
+          }
+        }
+      }
+    },
+    "metric.weighted_average_watts": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weighted average power"
+          }
+        }
+      }
+    },
+    "metric.average_heartrate": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Average heart rate"
+          }
+        }
+      }
+    },
+    "metric.max_heartrate": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Maximum heart rate"
+          }
+        }
+      }
+    },
+    "metric.calories": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Energy"
+          }
+        }
+      }
+    },
+    "metric.kilojoules": {
+      "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Work"
+          }
+        }
+      }
+    },
+    "connect.title": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect Strava to see your activities"
+          }
+        }
+      }
+    },
+    "connect.purpose": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ActivityMap shows your Strava activities on a map, in a list and as stats."
+          }
+        }
+      }
+    },
+    "connect.permissions": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ActivityMap reads your activities, including private ones, and updates those you edit here."
+          }
+        }
+      }
+    },
+    "connect.button": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect with Strava"
+          }
+        }
+      }
+    },
+    "connect.hint": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Opens Strava to approve access to your activities."
+          }
+        }
+      }
+    },
+    "connect.waiting": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for Strava"
+          }
+        }
+      }
+    },
+    "connect.failed": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t connect to Strava. Please try again."
+          }
+        }
+      }
+    },
+    "connect.cancelled": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strava connection was cancelled. Connect again whenever you’re ready."
+          }
+        }
+      }
+    },
+    "connect.expired.title": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your sign-in has expired"
+          }
+        }
+      }
+    },
+    "connect.expired.message": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect with Strava again to restore access to your activities."
+          }
+        }
+      }
+    },
+    "connect.disconnected.title": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strava is disconnected"
+          }
+        }
+      }
+    },
+    "connect.disconnected.message": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect with Strava again to load your activities."
+          }
+        }
+      }
+    },
+    "connect.verify.title": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t verify your session"
+          }
+        }
+      }
+    },
+    "connect.verify.pending": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking session…"
+          }
+        }
+      }
+    },
+    "connect.verify.retry": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retry session verification"
+          }
+        }
+      }
+    },
+    "permission.none": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No activities are shared."
+          }
+        }
+      }
+    },
+    "permission.public": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Private activities aren’t shared."
+          }
+        }
+      }
+    },
+    "permission.edit": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editing isn’t allowed."
+          }
+        }
+      }
+    },
+    "permission.reconnect": {
+      "comment": "Strava authorization permission, recovery or accessibility copy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Connect with Strava again to grant the missing permissions."
+          }
+        }
+      }
+    },
+    "selection.selected": {
+      "comment": "Accessible state; selection is independent of activation. Missing values are never zero.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected"
+          }
+        }
+      }
+    },
+    "selection.notSelected": {
+      "comment": "Accessible state; selection is independent of activation. Missing values are never zero.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not selected"
+          }
+        }
+      }
+    },
+    "selection.mixed": {
+      "comment": "Accessible state; selection is independent of activation. Missing values are never zero.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Partially selected"
+          }
+        }
+      }
+    },
+    "metric.notRecorded": {
+      "comment": "Accessible state; selection is independent of activation. Missing values are never zero.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not recorded"
+          }
+        }
+      }
+    },
+    "connect.verify.message": {
+      "comment": "Session verification recovery; reason is a verbatim diagnostic from the current error owner, not translated here.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your sign-in was saved. %@"
+          }
+        }
+      }
+    },
+    "selection.count": {
+      "comment": "Complete selected activity count; zero uses the other form in English. Do not build the sentence by concatenation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld activity"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld activities"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "action.exportGPXNative": {
+      "comment": "Native export action. Presents the system share sheet after preparing a GPX file.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export GPX"
+          }
+        }
+      }
+    },
+    "action.preparingGPX": {
+      "comment": "Native GPX export action while the file is being prepared.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing GPX…"
+          }
+        }
+      }
+    },
+    "action.closeActivityDetails": {
+      "comment": "Dismiss adjacent activity inspection; leaves selection unchanged.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close activity details"
+          }
+        }
+      }
+    },
+    "action.activateActivity": {
+      "comment": "Make the named activity the active map route without changing selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make active: %@"
+          }
+        }
+      }
+    },
+    "action.deactivateActivity": {
+      "comment": "Clear the active map route without changing selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deactivate: %@"
+          }
+        }
+      }
+    },
+    "action.activateHint": {
+      "comment": "Accessibility hint for the inactive route toggle.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Makes this activity active without opening details or changing selection"
+          }
+        }
+      }
+    },
+    "action.deactivateHint": {
+      "comment": "Accessibility hint for the active route toggle.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clears the active route without changing selection"
+          }
+        }
+      }
+    },
+    "state.activeRoute": {
+      "comment": "The activity is the active map route; distinct from selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active on map"
+          }
+        }
+      }
+    },
+    "state.inactiveRoute": {
+      "comment": "The activity is not the active map route; distinct from selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not active"
+          }
+        }
+      }
+    },
+    "state.selectedActiveRoute": {
+      "comment": "Accessibility value for a selected activity that is also the active map route.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected. Active on map"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

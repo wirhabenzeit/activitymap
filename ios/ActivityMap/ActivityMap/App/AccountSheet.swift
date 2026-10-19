@@ -11,7 +11,8 @@ struct AccountSheet: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var ingestionStatus = IngestionStatusController()
     @State private var stravaImport = StravaImportController()
-    @Bindable private var preferences = DisplayPreferences.shared
+    @Environment(DisplayPreferences.self) private var injectedPreferences: DisplayPreferences?
+    private var preferences: DisplayPreferences { injectedPreferences ?? .shared }
     /// Profile opened while signed out is only a login presentation: once the
     /// connection is verified it closes and returns to the browsing context.
     /// Profile opened for account management stays open (#304).
@@ -293,7 +294,8 @@ struct AccountSheet: View {
     }
 
     private var settingsContent: some View {
-        Group {
+        @Bindable var preferences = preferences
+        return Group {
             syncContent
             if let session = syncSession {
                 IngestionStatusSection(session: session, controller: ingestionStatus, stravaImport: stravaImport)

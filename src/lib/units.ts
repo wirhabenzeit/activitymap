@@ -1,3 +1,5 @@
+import { numberFormatter } from './presentation/formatters';
+
 /** API/storage values stay SI. Conversions happen only at display/input boundaries. */
 export type UnitSystem = 'metric' | 'imperial';
 export type Measurement = 'distance' | 'elevation' | 'speed';
@@ -31,11 +33,23 @@ export function formatMeasurement(
   value: number | null | undefined,
   kind: Measurement,
   units: UnitSystem,
+  locale = 'en',
 ): string {
   if (value == null || !Number.isFinite(value)) return '—';
-  const text = displayMeasurement(value, kind, units).toFixed(
-    kind === 'elevation' ? 0 : 1,
-  );
-  // toFixed keeps the sign of values that round to zero ("-0").
-  return `${/^-0(\.0+)?$/.test(text) ? text.slice(1) : text} ${measurementUnit(kind, units)}`;
+  const decimals = kind === 'elevation' ? 0 : 1;
+  const converted = displayMeasurement(value, kind, units);
+  const normalized = Number(converted.toFixed(decimals)) === 0 ? 0 : converted;
+  const unit = {
+    distance: units === 'imperial' ? 'mile' : 'kilometer',
+    elevation: units === 'imperial' ? 'foot' : 'meter',
+    speed: units === 'imperial' ? 'mile-per-hour' : 'kilometer-per-hour',
+  }[kind];
+  return numberFormatter(locale, {
+    style: 'unit',
+    unit,
+    unitDisplay: 'short',
+    useGrouping: false,
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  }).format(normalized);
 }

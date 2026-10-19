@@ -6,10 +6,10 @@ struct BrowseContent: View {
     var sync: SyncController? = nil
     var isSigningIn = false
     var mapPicker: RoutePicker? = nil
-    @Environment(\.listFooterHostedByShell) private var footerHostedByShell
     @Environment(\.browseStatsDestination) private var statsDestination
     @Environment(\.stravaConnect) private var stravaConnect
     @Environment(\.browsePaneWidth) private var paneWidth
+    @Environment(\.listRootHeader) private var listRootHeader
     @State private var landscapeInsets = PhoneLandscapeInsets()
 
     var body: some View {
@@ -17,16 +17,16 @@ struct BrowseContent: View {
             ZStack {
                 // Retaining this native List preserves the exact scroll offset,
                 // including partially visible rows. No reconstructed anchor jump.
-                VStack(spacing: 0) {
-                    NavigationStack {
-                        ListScreen(store: store, emptyState: presentation.empty, recover: recover)
-                            .environment(\.browsePaneWidth, landscapeInsets == PhoneLandscapeInsets()
-                                ? paneWidth : geometry.size.width)
-                            // Establish inline metrics before the first detail push.
-                            .navigationBarTitleDisplayMode(.inline)
-                    }
-                    if !footerHostedByShell { BrowseListFooter(store: store) }
+                NavigationStack {
+                    ListScreen(store: store, emptyState: presentation.empty, recover: recover)
+                        .environment(\.browsePaneWidth, landscapeInsets == PhoneLandscapeInsets()
+                            ? paneWidth : geometry.size.width)
+                        // Establish inline metrics before the first detail push.
+                        .navigationBarTitleDisplayMode(.inline)
                 }
+                    // Compact List owns its header inside this stack. Reclaim
+                    // the shell's placeholder consistently, including offscreen.
+                    .ignoresSafeArea(.container, edges: listRootHeader == nil ? [] : .top)
                     .id(store.mapContext.scopeRevision)
                     .refreshable {
                         guard sync?.canRefresh ?? true else { return }
@@ -72,7 +72,7 @@ struct BrowseContent: View {
             set: { if !$0 { store.mapContext.hiddenTargetID = nil } }
         ), titleVisibility: .visible) {
             if let id = store.mapContext.hiddenTargetID {
-                Button("Clear filters and show on map") { store.clearFiltersAndShowOnMap(id) }
+                Button { store.clearFiltersAndShowOnMap(id) } label: { BrowseActionLabel(.clearFiltersAndShowOnMap) }
             }
             Button("Cancel", role: .cancel) { store.mapContext.hiddenTargetID = nil }
         }
@@ -129,25 +129,12 @@ private struct BrowseStatsDestinationKey: EnvironmentKey {
     var detailPresented = false
 }
 
-/// Compact browsing pages share one native bar so UIKit preserves retained
-/// content insets and scroll positions across push and Back.
-struct BrowseRootToolbar: ToolbarContent {
-    let leading: AnyView
-    let principal: AnyView
-    let trailing: AnyView
-    var body: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarLeading) { leading }
-            .sharedBackgroundVisibility(.hidden)
-        ToolbarItem(placement: .principal) { principal }
-        ToolbarItemGroup(placement: .topBarTrailing) { trailing }
-            .sharedBackgroundVisibility(.hidden)
-    }
-}
-
 extension EnvironmentValues {
-    @Entry var listFooterHostedByShell = false
     @Entry var listShellNavigation: ListShellNavigation? = nil
-    @Entry var listRootToolbar: BrowseRootToolbar? = nil
+    @Entry var listRootToolbar: AppToolbar? = nil
+    /// Compact landscape chrome belongs to the List's root page, so pushing
+    /// native detail does not resize the navigation controller itself.
+    @Entry var listRootHeader: AppToolbar? = nil
 
     /// The shell's target column width, independent of a retained native
     /// navigation root's temporarily stale frame during destination switches.
@@ -167,10 +154,14 @@ enum BrowsePaneLayout {
     static let filterWidth: CGFloat = 320
     static let minimumDetailWidth: CGFloat = 760
 
+    static func supportsDetail(width: CGFloat, regular: Bool, accessibilityText: Bool) -> Bool {
+        regular && width >= minimumDetailWidth && !accessibilityText
+    }
+
     /// Wide regular windows keep the filter rail beside the content; narrower
     /// ones and accessibility text use the phone's filter sheet.
     static func filtersUseSidebar(width: CGFloat, regular: Bool, accessibilityText: Bool) -> Bool {
-        regular && width >= minimumDetailWidth && !accessibilityText
+        supportsDetail(width: width, regular: regular, accessibilityText: accessibilityText)
     }
 
     /// The full panel leaves no room for List and its adjacent detail, but the

@@ -10,70 +10,38 @@ struct ActivityDetailView: View {
     var onMapShown: (() -> Void)? = nil
     var hostTab = AppTab.list
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.activityDetailPaging) private var paging
+    @AppToolbarEnvironment private var toolbarLayout
     @State private var navigationReference = DetailNavigationReference()
 
     var body: some View {
-        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false, hostTab: hostTab)
+        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false, hostTab: hostTab,
+                            showOnMap: { id in
+            showActivityOnMapFromDetail(id, store: store, navigationController: navigationReference.controller)
+            onMapShown?()
+        })
         .background(AppTheme.surface)
-        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .accessibilityLabel(backLabel)
-                .accessibilityIdentifier(backIdentifier)
-            }.sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .principal) {
-                if let activity = store.activity(id: activityID) {
-                    ActivityDetailIdentity(activity: activity, titleLineLimit: 2, onNavigationBar: true)
-                }
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                if let editing = store.activityEditing, let activity = store.activity(id: activityID) {
-                    ActivityEditButton(activity: activity, service: editing, onNavigationBar: true)
-                }
-            }.sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .topBarTrailing) {
-                Button {
-                    showActivityOnMapFromDetail(activityID, store: store, navigationController: navigationReference.controller)
-                    onMapShown?()
-                } label: {
-                    Image(systemName: "map")
-                        .font(.body.weight(.semibold))
-                        .frame(width: 44, height: 44)
-                        .background(.white.opacity(0.18), in: Circle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .disabled(!store.routableActivityIDs.contains(activityID))
-                .opacity(store.routableActivityIDs.contains(activityID) ? 1 : 0.4)
-                .accessibilityLabel("Show on map")
-                .accessibilityIdentifier("activity-show-on-map")
-                .accessibilityHint(store.routableActivityIDs.contains(activityID)
-                    ? "Select this activity and frame its route" : "This activity has no GPS route")
-            }.sharedBackgroundVisibility(.hidden)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if hostTab == .list && verticalSizeClass == .compact && !typeSize.isAccessibilitySize {
-                SelectionBar(store: store, includesTotal: true, expandsCount: true)
-                    .padding(.horizontal, 8).background(.bar)
-            }
-        }
+        .appNavigationBar(toolbar)
         .background(DetailBackGesture(navigationReference: navigationReference))
         .accessibilityAction(.escape) { dismiss() }
     }
+
+    private var toolbar: AppToolbar {
+        AppToolbar(leading: AnyView(AppToolbarBackButton(label: backLabel, identifier: backIdentifier) { dismiss() }),
+            principal: AnyView(Group {
+                if let activity = store.activity(id: activityID) {
+                    ActivityDetailIdentity(activity: activity, titleLineLimit: toolbarLayout.titleLineLimit, onNavigationBar: true)
+                }
+            }), trailing: AnyView(Group {
+                if let paging, paging.position(activityID) != nil {
+                    ActivityDetailStepButtons(
+                        previous: paging.canGoPrevious(activityID) ? paging.previous : nil,
+                        next: paging.canGoNext(activityID) ? paging.next : nil, onNavigationBar: true)
+                }
+            }))
+    }
+
 }
 
 /// This action changes browsing destinations, rather than going Back to List.
@@ -94,7 +62,7 @@ struct ActivityDetailView: View {
 }
 
 /// Resolve by identity on every update, never retain the destination's initial snapshot.
-/// Editing/map actions stay by the title; Strava/GPX rows scroll with detail.
+/// Identity stays at the top; activity actions scroll with the shared footer.
 struct ActivityDetailPanel: View {
     @Environment(\.activityDetailOverMap) private var overMap
     @Bindable var store: ActivityStore
@@ -103,7 +71,6 @@ struct ActivityDetailPanel: View {
     var showsHeading = true
     var mapExpansion: MapActivityExpansion? = nil
     var compactMapProfile = false
-    var scrollsMapHeading = false
     var mapBottomContentInset: CGFloat = 0
     /// Only the visible tab's panel loads its elevation profile.
     var hostTab = AppTab.list
@@ -112,21 +79,26 @@ struct ActivityDetailPanel: View {
     private var activity: Activity? { store.activity(id: activityID) }
 
     var body: some View {
+        ActivityDetailPageTransition(activityID: activityID) {
+            detail
+        }
+        .background { if !overMap { AppTheme.surface } }
+    }
+
+    private var detail: some View {
         Group {
             if let activity {
                 if let mapExpansion {
                     MapActivityDetailReveal(store: store, activity: activity, expansion: mapExpansion, compactProfile: compactMapProfile,
-                                            scrollsHeading: scrollsMapHeading, bottomContentInset: mapBottomContentInset,
-                                            trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID)) { id in
-                        if let showOnMap { showOnMap(id) }
-                        else if overMap { store.mapContext.request(.fitActivity(id)) }
-                        else { store.showOnMap(id) }
-                    }
+                                            bottomContentInset: mapBottomContentInset,
+                                            trailingInset: headerTrailingInset)
                 } else {
-                    ScrollView {
+                    // Keep native safe-area scrolling: an extra clipping mask
+                    // cuts content off above the home indicator.
+                    ActivityContinuationScrollView(activityID: activityID) {
                         ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
                                               showsHeading: showsHeading,
-                                              hasRoute: store.routableActivityIDs.contains(activityID),
+                                              hasRoute: store.canShowOnMap(activityID),
                                               showOnMap: { id in
                             if let showOnMap { showOnMap(id) }
                             else if overMap { store.mapContext.request(.fitActivity(id)) }
@@ -137,14 +109,12 @@ struct ActivityDetailPanel: View {
                         }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
                     }
                     .accessibilityIdentifier("activity-detail-scroll")
-                    .clipped()
                 }
             } else {
                 ContentUnavailableView("Activity unavailable", systemImage: "figure.run.circle",
                                        description: Text("This activity is no longer in your library."))
             }
         }
-        .background { if !overMap { AppTheme.surface } }
     }
 }
 
@@ -155,42 +125,34 @@ private struct MapActivityDetailReveal: View {
     let activity: Activity
     let expansion: MapActivityExpansion
     let compactProfile: Bool
-    let scrollsHeading: Bool
     let bottomContentInset: CGFloat
-    private var progress: CGFloat { scrollsHeading ? 1 : expansion.progress }
+    @Environment(\.dynamicTypeSize) private var typeSize
+    // Side panels reveal a fixed-height viewport when expanded. Keep their
+    // content layout stable while the outer host collapses or expands.
+    private var progress: CGFloat { compactProfile ? expansion.progress : 1 }
     let trailingInset: CGFloat
-    let hasRoute: Bool
-    let showOnMap: (Int) -> Void
     private var reveal: CGFloat { min(1, max(0, (progress - 0.25) / 0.75)) }
 
     var body: some View {
-        if scrollsHeading {
-            // Keep the entire landscape/iPad detail in the stable scroll viewport.
-            ScrollView {
-                VStack(spacing: 0) {
-                    heading
-                    fullDetail
-                }
-                .padding(.bottom, bottomContentInset)
-            }
-            .accessibilityIdentifier("activity-detail-scroll")
-            .clipped()
-        } else {
-            VStack(spacing: 0) {
-                heading
-                ScrollView { fullDetail.padding(.bottom, bottomContentInset) }
-                    .accessibilityIdentifier("activity-detail-scroll")
-                    .clipped()
-                    .allowsHitTesting(progress > 0.8)
-            }
+        VStack(spacing: 0) {
+            heading
+            ActivityContinuationScrollView(activityID: activity.id, bottomContentInset: bottomContentInset) { fullDetail }
+                .accessibilityIdentifier("activity-detail-scroll")
+                .clipped()
+                .allowsHitTesting(progress > 0.8)
         }
+    }
+
+    // A short side panel must retain space to scroll at accessibility sizes.
+    // The title remains complete in VoiceOver and the activity editor.
+    private var titleLineLimit: Int {
+        if !compactProfile && typeSize.isAccessibilitySize { return 1 }
+        return progress > 0.8 ? 2 : 1
     }
 
     // The Map title row has no duplicate Fit action; the group header owns it.
     private var heading: some View {
-        ActivityDetailHeading(activity: activity, trailingInset: trailingInset,
-                              titleLineLimit: compactProfile ? (expansion.progress > 0.8 ? 2 : 1) : nil,
-                              hasRoute: hasRoute, showOnMap: showOnMap, editing: store.activityEditing)
+        ActivityDetailHeading(activity: activity, trailingInset: trailingInset, titleLineLimit: titleLineLimit)
             .padding(.horizontal, AppTheme.Spacing.large)
             .padding(.vertical, AppTheme.Spacing.small)
     }
@@ -207,11 +169,11 @@ private struct MapActivityDetailReveal: View {
                 .padding(.horizontal, AppTheme.Spacing.large)
                 .padding(.vertical, AppTheme.Spacing.small)
                 ActivityDetailContent(activity: activity, showsHeading: false, showsPrimaryMetrics: false, showsDescription: false,
-                                      streamSummaries: store.streamSummaries, exportStore: store,
+                                      editing: store.activityEditing, streamSummaries: store.streamSummaries, exportStore: store,
                                       profile: { _ in EmptyView() }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             } else {
                 ActivityDetailContent(activity: activity, showsHeading: false,
-                                      streamSummaries: store.streamSummaries, exportStore: store,
+                                      editing: store.activityEditing, streamSummaries: store.streamSummaries, exportStore: store,
                                       profile: { _ in elevation }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             }
         }

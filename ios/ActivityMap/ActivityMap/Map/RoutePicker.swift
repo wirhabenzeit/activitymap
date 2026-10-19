@@ -121,10 +121,10 @@ final class RoutePicker {
 
     func step(_ offset: Int, store: ActivityStore) {
         reconcile(with: store)
-        guard !candidateIDs.isEmpty else { return }
-        let index = detailID.flatMap { candidateIDs.firstIndex(of: $0) } ?? 0
-        let next = (index + offset + candidateIDs.count) % candidateIDs.count
-        showDetail(candidateIDs[next], store: store, motion: offset < 0 ? .backward : .forward)
+        guard !isPaging, let detailID else { return }
+        let sequence = ActivityDetailSequence(ids: candidateIDs, currentID: detailID)
+        guard let next = offset < 0 ? sequence.previousID : sequence.nextID else { return }
+        showDetail(next, store: store, motion: offset < 0 ? .backward : .forward)
     }
 
     func showDetail(_ id: Int, store: ActivityStore, motion: NavigationMotion = .forward) {

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Keep presentation state on the row, rather than in the transient menu.
 struct ActivityRowContextMenu: ViewModifier {
+    @Environment(\.locale) private var locale
     let activity: Activity
     let store: ActivityStore
     var showsMapAction = false
@@ -37,13 +38,15 @@ struct ActivityRowContextMenu: ViewModifier {
         Group {
             Button("Edit", systemImage: "pencil") { showsEditor = true }
                 .disabled(store.activityEditing == nil)
-            Button(!workflow.isExporting ? "Share GPX" : "Preparing GPX…", systemImage: "square.and.arrow.up",
-                   action: { workflow.export(source: source, current: { source }) })
+            Button { workflow.export(source: source, current: { source }) } label: {
+                Label { Text(workflow.isExporting ? AppMessages.actionPreparingGPX(locale: locale) : AppMessages.actionExportGPXNative(locale: locale)) }
+                      icon: { BrowseActionIcon(.exportGPX) }
+            }
                 .disabled(!availability.canExport || workflow.isExporting || workflow.file != nil)
                 .accessibilityHint(availability.hint)
             if showsMapAction {
-                Button("Show on map", systemImage: "map") { store.showOnMap(activity.id) }
-                    .disabled(activity.coordinates.isEmpty)
+                Button { store.showOnMap(activity.id) } label: { BrowseActionLabel(.showOnMap) }
+                    .disabled(!store.canShowOnMap(activity.id))
             }
         }
         .task(id: key) { await workflow.prepare(source, key: key, current: { self.source }) }

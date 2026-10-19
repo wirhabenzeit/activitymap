@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import polyline from '@mapbox/polyline';
+import test from 'node:test';
+
 import {
+  canFrameRoute,
   routeBounds,
   routeCoordinates,
   routeFitPadding,
@@ -82,4 +85,31 @@ void test('a larger but unusably narrow strip does not hide a valid fit', () => 
   assert.ok(padding);
   assert.equal(padding.bottom, 1074);
   assert.equal(padding.right, 64);
+});
+
+void test('a short landscape recipient map fits above its scrollable card', () => {
+  const map = { left: 0, top: 0, right: 844, bottom: 390 };
+  const card = { left: 38, top: 156, right: 806, bottom: 370 };
+  const padding = routeFitPadding(map, card)!;
+  assert.ok(padding);
+  assert.ok(map.bottom - padding.bottom < card.top);
+  assert.ok(map.bottom - padding.top - padding.bottom >= 80);
+});
+
+void test('route availability matches bounds for empty, invalid, point and mixed geometry', () => {
+  for (const coordinates of [
+    [],
+    [
+      [NaN, 5],
+      [8, 91],
+      [181, 0],
+    ],
+    [[8, 46]],
+    [
+      [8, 91],
+      [8, 46],
+    ],
+  ]) {
+    assert.equal(canFrameRoute(coordinates), routeBounds(coordinates) !== null);
+  }
 });

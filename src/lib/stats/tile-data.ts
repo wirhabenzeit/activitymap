@@ -1,8 +1,9 @@
 // Numbers behind the stats tiles. shared/stats-rules.md defines every rule
 // here, and shared/stats-fixtures holds the numbers the web and iOS
 // implementations must both produce.
-
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
+
+import { comparisonPeriods } from './presentation-policy';
 
 export type Sport = 'bcXcSki' | 'trailHike' | 'run' | 'ride' | 'misc';
 
@@ -109,23 +110,43 @@ function sumBetween(
 
 export type Comparison = { current: number; previous: number };
 
+/** Totals and explanation are derived from the exact same date windows. */
+export function periodComparison(
+  activities: readonly StatsActivity[],
+  today: Day,
+  metric: StatsMetric,
+  kind: 'month' | 'year',
+) {
+  const periods = comparisonPeriods(today, kind);
+  return {
+    periods,
+    current: sumBetween(
+      activities,
+      metric,
+      periods.current.first,
+      periods.current.last,
+    ),
+    previous: sumBetween(
+      activities,
+      metric,
+      periods.previous.first,
+      periods.previous.last,
+    ),
+  };
+}
+
 export function yearToDate(
   activities: readonly StatsActivity[],
   today: Day,
   metric: StatsMetric,
 ): Comparison {
-  const date = new Date(today * millisecondsPerDay);
-  const year = date.getUTCFullYear();
-  const previousEnd = sameDateLastYear(today);
-  return {
-    current: sumBetween(activities, metric, dayFromParts(year, 0, 1), today),
-    previous: sumBetween(
-      activities,
-      metric,
-      dayFromParts(year - 1, 0, 1),
-      previousEnd,
-    ),
-  };
+  const { current, previous } = periodComparison(
+    activities,
+    today,
+    metric,
+    'year',
+  );
+  return { current, previous };
 }
 
 export function totals(
@@ -206,31 +227,13 @@ export function monthVsLastMonth(
   today: Day,
   metric: StatsMetric,
 ): Comparison {
-  const date = new Date(today * millisecondsPerDay);
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const previousMonthStart = new Date(Date.UTC(year, month - 1, 1));
-  const previousYear = previousMonthStart.getUTCFullYear();
-  const previousMonth = previousMonthStart.getUTCMonth();
-  const previousEnd = dayFromParts(
-    previousYear,
-    previousMonth,
-    Math.min(date.getUTCDate(), daysInMonth(previousYear, previousMonth)),
+  const { current, previous } = periodComparison(
+    activities,
+    today,
+    metric,
+    'month',
   );
-  return {
-    current: sumBetween(
-      activities,
-      metric,
-      dayFromParts(year, month, 1),
-      today,
-    ),
-    previous: sumBetween(
-      activities,
-      metric,
-      dayOf(previousMonthStart),
-      previousEnd,
-    ),
-  };
+  return { current, previous };
 }
 
 export type SportShare = { sport: Sport; share: number };

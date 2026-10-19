@@ -1,11 +1,11 @@
-import { Calendar, Clock, Heart, Mountain, Zap } from 'lucide-react';
-import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
-import { type Activity } from '~/server/db/schema';
-import { formatPreferredDate, type DateFormat } from '~/lib/date-preferences';
-import { formatLocalDate } from '~/lib/local-date-time';
-import { aggregateMetric } from '~/lib/activity-presentation';
-import { formatMeasurement, type UnitSystem } from '~/lib/units';
 import { type ComponentType } from 'react';
+
+import { aggregateMetric } from '~/lib/activity-presentation';
+import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
+import { formatLocalDate } from '~/lib/local-date-time';
+import { semanticMetric } from '~/lib/presentation/icons';
+import { type UnitSystem, formatMeasurement } from '~/lib/units';
+import { type Activity } from '~/server/db/schema';
 
 function decFormatter(unit = '', decimals = 0) {
   return (num: number | undefined) =>
@@ -44,42 +44,42 @@ export const activityFields = {
   distance: {
     formatter: (value: number, units: UnitSystem = 'metric') =>
       formatMeasurement(value, 'distance', units),
-    Icon: RulerHorizontalIcon,
-    title: 'Distance',
+    Icon: semanticMetric('distance').Icon,
+    title: semanticMetric('distance').label,
     reducer: (values: number[]) => aggregateMetric(values, 'sum').value,
   },
   moving_time: {
     formatter: durationFormatter,
-    Icon: StopwatchIcon,
-    title: 'Moving Time',
+    Icon: semanticMetric('moving_time').Icon,
+    title: semanticMetric('moving_time').label,
     reducer: (values: number[]) => aggregateMetric(values, 'sum').value,
   },
   elapsed_time: {
     formatter: durationFormatter,
-    Icon: StopwatchIcon,
-    title: 'Elapsed Time',
+    Icon: semanticMetric('elapsed_time').Icon,
+    title: semanticMetric('elapsed_time').label,
     reducer: (values: number[]) => aggregateMetric(values, 'sum').value,
   },
   total_elevation_gain: {
     formatter: (v: number, units: UnitSystem = 'metric') =>
       formatMeasurement(v, 'elevation', units),
-    Icon: Mountain,
-    title: 'Elevation Gain',
+    Icon: semanticMetric('total_elevation_gain').Icon,
+    title: semanticMetric('total_elevation_gain').label,
     reducer: (values: number[]) => aggregateMetric(values, 'sum').value,
   },
   elev_high: {
     formatter: (v: number, units: UnitSystem = 'metric') =>
       formatMeasurement(v, 'elevation', units),
-    Icon: Mountain,
-    title: 'Elevation High',
+    Icon: semanticMetric('elev_high').Icon,
+    title: semanticMetric('elev_high').label,
     reducer: (values: number[]) => aggregateMetric(values, 'max').value,
     reducerSymbol: '≤',
   },
   elev_low: {
     formatter: (v: number, units: UnitSystem = 'metric') =>
       formatMeasurement(v, 'elevation', units),
-    Icon: Mountain,
-    title: 'Elevation Low',
+    Icon: semanticMetric('elev_low').Icon,
+    title: semanticMetric('elev_low').label,
     reducer: (values: number[]) => aggregateMetric(values, 'min').value,
     reducerSymbol: '≥',
   },
@@ -90,8 +90,8 @@ export const activityFields = {
       _units: UnitSystem = 'metric',
       dateFormat: DateFormat = 'system',
     ) => (date == null ? '—' : formatPreferredDate(date, dateFormat)),
-    Icon: Calendar,
-    title: 'Date',
+    Icon: semanticMetric('date').Icon,
+    title: semanticMetric('date').label,
     summary: (v: Date[]) => {
       const dates = new Set(
         v
@@ -114,43 +114,43 @@ export const activityFields = {
   average_speed: {
     formatter: (v: number, units: UnitSystem = 'metric') =>
       formatMeasurement(v, 'speed', units),
-    Icon: Clock,
-    title: 'Average Speed',
+    Icon: semanticMetric('average_speed').Icon,
+    title: semanticMetric('average_speed').label,
     reducer: (values: number[]) => aggregateMetric(values, 'mean').value,
     reducerSymbol: '∅',
   },
   weighted_average_watts: {
     formatter: (v: number) => decFormatter('W', 0)(v),
-    Icon: Zap,
-    title: 'Weighted Average Watts',
+    Icon: semanticMetric('weighted_average_watts').Icon,
+    title: semanticMetric('weighted_average_watts').label,
     reducer: (values: number[]) => aggregateMetric(values, 'mean').value,
     reducerSymbol: '∅',
   },
   average_watts: {
     formatter: (v: number) => decFormatter('W', 0)(v),
-    Icon: Zap,
-    title: 'Average Watts',
+    Icon: semanticMetric('average_watts').Icon,
+    title: semanticMetric('average_watts').label,
     reducer: (values: number[]) => aggregateMetric(values, 'mean').value,
     reducerSymbol: '∅',
   },
   max_watts: {
     formatter: (v: number) => decFormatter('W', 0)(v),
-    Icon: Zap,
-    title: 'Max Watts',
+    Icon: semanticMetric('max_watts').Icon,
+    title: semanticMetric('max_watts').label,
     reducer: (values: number[]) => aggregateMetric(values, 'max').value,
     reducerSymbol: '≤',
   },
   max_heartrate: {
     formatter: (v: number) => decFormatter('bpm', 0)(v),
-    Icon: Heart,
-    title: 'Max Heartrate',
+    Icon: semanticMetric('max_heartrate').Icon,
+    title: semanticMetric('max_heartrate').label,
     reducer: (values: number[]) => aggregateMetric(values, 'max').value,
     reducerSymbol: '≤',
   },
   average_heartrate: {
     formatter: (v: number) => decFormatter('bpm', 0)(v),
-    Icon: Heart,
-    title: 'Average Heartrate',
+    Icon: semanticMetric('average_heartrate').Icon,
+    title: semanticMetric('average_heartrate').label,
     reducer: (values: number[]) => aggregateMetric(values, 'mean').value,
     reducerSymbol: '∅',
   },

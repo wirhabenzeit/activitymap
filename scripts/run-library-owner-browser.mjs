@@ -278,8 +278,8 @@ try {
   assert.equal(evidence.passed, true, 'Browser assertions did not pass');
   assert.equal(
     evidence.results.length,
-    3,
-    'All three composed scenarios must execute',
+    4,
+    'All four composed scenarios must execute',
   );
   assert(
     evidence.results.every(
@@ -287,7 +287,12 @@ try {
     ),
     'Every scenario must execute real mocked sync requests',
   );
+  assert.equal(evidence.workCounts?.largeLibrary?.activities, 10000);
+  assert.deepEqual(evidence.workCounts.largeLibrary.displayedRows, [200, 1]);
+  assert(evidence.workCounts.largeLibrary.queryObservers <= 4);
+  assert.equal(evidence.workCounts.largeLibrary.observedContainerWidth, 240);
   summary.results = evidence.results;
+  summary.workCounts = evidence.workCounts;
   summary.passed = true;
 } catch (error) {
   summary.error = error.stack ?? String(error);

@@ -2,43 +2,36 @@
 
 import dynamic from 'next/dynamic';
 import {
+  type ReactNode,
   useCallback,
   useRef,
   useSyncExternalStore,
-  type ReactNode,
 } from 'react';
-import { type Activity } from '~/server/db/schema';
-import { ListDetailTransition } from '~/components/list/list-detail-transition';
+
 import {
-  activityURL,
   detailPresentation,
   inspectedActivity,
 } from '~/components/list/inspection';
+import { ListDetailTransition } from '~/components/list/list-detail-transition';
+import { useShowOnMap } from '~/hooks/use-show-on-map';
+import {
+  browsingHistoryServerSnapshot,
+  browsingHistorySnapshot,
+  closeActivityInspection,
+  openActivityInspection,
+  subscribeBrowsingHistory,
+} from '~/lib/browsing-history';
+import { type Activity } from '~/server/db/schema';
+import { statsTiles } from '~/settings/stats-tiles.generated';
+import { useShallowStore } from '~/store';
+import { applyFilters } from '~/store/filter';
+
 import { Measure } from './charts';
 import { focusedTile } from './focus';
-import { statsTiles } from '~/settings/stats-tiles.generated';
 
 const ActivityDetails = dynamic(() => import('./activity-details'), {
   ssr: false,
 });
-
-type StatsHistory = {
-  statsTileFocus?: { dashboardURL: string };
-  statsActivityDetail?: { returnTo: string };
-};
-const inspectionChanged = 'activitymap:stats-inspection';
-const snapshot = () => inspectedActivity(window.location.search) || null;
-const serverSnapshot = () => null;
-function subscribe(notify: () => void) {
-  window.addEventListener('popstate', notify);
-  window.addEventListener(inspectionChanged, notify);
-  window.addEventListener('activitymap:stats-focus', notify);
-  return () => {
-    window.removeEventListener('popstate', notify);
-    window.removeEventListener(inspectionChanged, notify);
-    window.removeEventListener('activitymap:stats-focus', notify);
-  };
-}
 
 /** Keep the originating chart mounted while inspecting an activity. */
 export function StatsActivityInspector({
@@ -54,7 +47,13 @@ export function StatsActivityInspector({
     inspection: { availableWidth: number; selectedActivityId: number | null },
   ) => ReactNode;
 }) {
-  const detailId = useSyncExternalStore(subscribe, snapshot, serverSnapshot);
+  const showOnMap = useShowOnMap(activities);
+  const href = useSyncExternalStore(
+    subscribeBrowsingHistory,
+    browsingHistorySnapshot,
+    browsingHistoryServerSnapshot,
+  );
+  const detailId = inspectedActivity(href ? new URL(href).search : '') || null;
   const tile =
     typeof window === 'undefined' ? null : focusedTile(window.location.search);
   const title =
@@ -75,49 +74,18 @@ export function StatsActivityInspector({
       ) ?? null
     );
   }, []);
-  const close = useCallback(() => {
-    const state = window.history.state as StatsHistory | null;
-    if (state?.statsActivityDetail?.returnTo) window.history.back();
-    else {
-      window.history.replaceState(
-        { statsTileFocus: state?.statsTileFocus },
-        '',
-        activityURL(window.location.href, 0),
-      );
-      window.dispatchEvent(new Event(inspectionChanged));
-    }
-  }, []);
+  const close = useCallback(() => closeActivityInspection('stats'), []);
   const detail = activities.find((activity) => activity.id === detailId);
+  const mapActionVariant = useShallowStore((state) =>
+    detail && !applyFilters(state, detail) ? 'clear-filters-and-show' : 'show',
+  );
   const open = (id: number) => {
     originId.current = id;
     origin.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
-    if (detailId === id) return;
-    const state = window.history.state as StatsHistory | null;
-    // One entry per inspection session at every width. Choosing another row
-    // replaces that entry so Back returns to the originating chart in one step.
-    const metadata = {
-      statsTileFocus: state?.statsTileFocus,
-      // Replacing a direct link must not invent an originating history entry.
-      statsActivityDetail: detailId
-        ? state?.statsActivityDetail
-        : { returnTo: activityURL(window.location.href, 0) },
-    };
-    if (detailId)
-      window.history.replaceState(
-        metadata,
-        '',
-        activityURL(window.location.href, id),
-      );
-    else
-      window.history.pushState(
-        metadata,
-        '',
-        activityURL(window.location.href, id),
-      );
-    window.dispatchEvent(new Event(inspectionChanged));
+    openActivityInspection('stats', id);
   };
   return (
     <Measure retainSize className="h-full min-h-0 w-full">
@@ -126,7 +94,12 @@ export function StatsActivityInspector({
           detailId={detailId ?? 0}
           detail={
             detail ? (
-              <ActivityDetails activity={detail} preview={preview} />
+              <ActivityDetails
+                activity={detail}
+                preview={preview}
+                onShowOnMap={showOnMap}
+                mapActionVariant={mapActionVariant}
+              />
             ) : undefined
           }
           onBack={close}

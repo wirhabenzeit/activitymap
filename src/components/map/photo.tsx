@@ -1,26 +1,28 @@
 'use client';
 
-import { Marker, useMap } from 'react-map-gl/mapbox';
-import { useEffect, useMemo, useRef, useState } from 'react';
 import { Camera } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useShallowStore } from '~/store';
-import { usePhotos } from '~/hooks/use-photos';
-import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
-import type { Photo } from '~/server/db/schema';
-import { photoVariant, validPhotoLocation } from '~/lib/photo-gallery';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Marker, useMap } from 'react-map-gl/mapbox';
+
 import {
+  type MapPhotoGroup,
   groupMapPhotos,
   mapPhotoPolicy,
-  type MapPhotoGroup,
 } from '~/lib/map-photos';
+import { photoVariant, validPhotoLocation } from '~/lib/photo-gallery';
+import type { Photo } from '~/server/db/schema';
+import { useShallowStore } from '~/store';
+
 import { PhotoImage, PhotoLightbox } from '../list/photo';
 
-export default function PhotoLayer() {
-  const { data: photos = [] } = usePhotos();
-  const { filterIDs: eligibleIDs } = useFilteredActivities();
-  const visibleIDs = useBrowsingIDs(eligibleIDs);
+export default function PhotoLayer({
+  photos,
+  visibleIDs,
+}: {
+  photos: Photo[];
+  visibleIDs: number[];
+}) {
   const scope = useShallowStore((s) =>
     JSON.stringify([s.user?.id, s.isGuest, s.guestMode]),
   );
@@ -159,7 +161,7 @@ export function MapPhotos({
                   <Camera size={14} aria-hidden="true" />
                 )}
                 {count > 1 && (
-                  <span className="absolute -right-1 -top-1 min-w-4 rounded-full border border-white bg-slate-800 px-1 text-center text-[9px] font-semibold leading-4">
+                  <span className="absolute -top-1 -right-1 min-w-4 rounded-full border border-white bg-slate-800 px-1 text-center text-[9px] leading-4 font-semibold">
                     {count}
                   </span>
                 )}

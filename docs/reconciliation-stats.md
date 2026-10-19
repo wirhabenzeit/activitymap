@@ -1,0 +1,42 @@
+# Stats presentation reconciliation
+
+This migration gives existing analytics and presentation policies explicit owners. It does not add a library cache, change API/protocol IDs, or introduce a shared UI runtime.
+
+## Owners and consumers
+
+| Responsibility                           | Web owner / consumers                                                                                                                                   | Native owner / consumers                                                                                                                          |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Comparison date windows and completeness | `presentation-policy.ts` supplies date-only bounds; `tile-data.ts` returns them with comparison totals; month/year headline captions consume the result | `StatsComparisonPeriods` in `StatsEngine.swift`; month/year query results carry the same periods to `StatsDashboardTile`                          |
+| Percentage facts                         | `comparisonPresentation` and `comparisonPercentage`; tile `Delta` and compatibility `percentChange`                                                     | `StatsComparisonPresentation`; `StatsDashboardTile` delegates comparison chrome to `StatsComparison`                                              |
+| Stable chart identity and semantic role  | `LineSeries.key` and `role`; cumulative charts                                                                                                          | `StatsChartPoint.seriesID` and `StatsSeriesRole`; strokes, fills, endpoints and legends never branch on translated display labels or series order |
+| Tick precision                           | `formatShort` receives converted value and tick interval through `statsFormat`                                                                          | `StatsDisplay.compactAxis`; series charts, period bars and Training volume convert each raw value/interval once before formatting                 |
+| Day-grid focus                           | `day-grid.ts` plus `useDayGrid`; month rhythm and chronological calendar                                                                                | `StatsDayGrid` plus `statsDayKeys`; month rhythm and chronological calendar retain native focus/accessibility                                     |
+| Contextual choices                       | `StatsChoices`; compact tile metrics and standard Records periods                                                                                       | Existing `StatsRangePicker`; compact metrics and standard/contextual ranges retain the same native control policy                                 |
+| Projection derivation                    | `createStatsTileModels`, created per screen data/day lifetime; Year-end projection summary and face share a result per metric                           | Existing `StatsDashboardState` / `StatsController` query cache remains the owner                                                                  |
+| Element measurement                      | Shared `useElementSize`, with `retainSize` passed through by `Measure`; floor only at the chart boundary                                                | Existing SwiftUI geometry observation remains native                                                                                              |
+
+## Comparison contract
+
+Percent change uses `(current - previous) / previous * 100`. Zero or non-finite baselines/results have no percentage. Round the magnitude to the nearest whole percent, with exact halves away from zero; apply the direction afterwards. A nonzero change whose rounded magnitude is zero is shown as `+<1%` or `−<1%`. Equal values show `0%`, without a positive or negative zero. Examples include both signs of 0.5% and 12.5%.
+
+Current month/year windows run from their first date through today. They remain in progress throughout today, including their final calendar day. The previous comparison window ends on the same elapsed calendar date, capped at the previous month/year's valid date. Its completeness describes whether that previous window reaches its full period end. These are UTC date-only coordinates for activity-local wall time; display locale cannot shift them. Calculation totals and explanatory captions use the same returned bounds. Historical full-period curves remain distinct from the elapsed comparison window.
+
+Tick labels use the actual tick spacing after unit conversion, rather than headline precision. Sparse fractional distance/elevation histories remain distinguishable. Compact-axis rounding uses the same symmetric magnitude rule and suppresses rounded negative zero. Native Training volume now follows the same policy as native period bars and the web charts.
+
+## Interaction and intentional variants
+
+Arrow keys move day focus without selecting it; Enter/Space retain native button activation. A month-row grid moves one day horizontally and seven vertically. A chronological week-column calendar moves seven horizontally and one vertically. Horizontal direction follows RTL layout. Movement clamps to available dates; Home/End focus the first/last available day. Web grids expose one roving tab stop. Native buttons retain SwiftUI focus and accessibility, with the same hardware-key movement facts.
+
+Month rhythm deliberately starts at the most recent day with matching activities. Explicit selection of an empty day is preserved. An invalid/out-of-period selection falls back to the latest active day, or no selected day for an empty month. Calendar overview/history do not silently select a day on initial display; their keyboard entry point is the selected day or most recent available date. Focus and selection are separate.
+
+Compact and standard web choices share selected-state, keyboard, accessible-label and minimum 44px target policy. Arrow keys move/activate a choice, Home/End choose the extremes, and Enter/Space retain button activation. Native choices preserve the accepted accent/blue treatment, 44pt targets and menu fallback for accessibility text or insufficient width. Web retains its neutral raised selection treatment. This is an explicit platform variant; it does not imply different metric meanings, defaults or selection state.
+
+Increased volume comparisons retain the accepted green emphasis and decreases remain neutral on both platforms. Hilliness remains neutral in either direction. Native comparison chrome has one owner; the old pilot branch no longer bypasses that policy.
+
+## Validation and remaining scope
+
+`shared/stats-presentation-fixtures.v1.json` pins percent rounding/zero-baseline cases, leap/month-end bounds, axis examples, RTL/boundary keyboard movement and activation keys. TypeScript and Swift tests execute production helpers against those examples. Additional tests cover one projection derivation per summary/face, screen/data lifetime replacement, explicit empty-day selection, stable series IDs under translated labels and role order, and real browser month-grid focus/activation/RTL.
+
+The shared measurement hook is supplied by the parallel React reconciliation change; this branch consumes its API rather than introducing another observer implementation. Broader locale propagation, full message migration, detail metric sections and general accessibility acceptance remain with their existing owners. Chart libraries, layouts, animation, touch inspection, theme resolution and navigation remain platform-native.
+
+Validated in this worktree: 145 analytical Stats tests, 36 Stats UI tests, full TypeScript and focused ESLint/format checks, and the composed Stats browser proof (three viewport journeys, grouping/navigation/retained scroll, calendar and month keyboard/RTL). The isolated native harness built the real app/test targets and passed 25 tests in `StatsPresentationPolicyTests`, `StatsDashboardTests`, `StatsFixtureTests`, and `StatsCalendarLayoutTests`; all four suite validators required nonzero passing cases. No physical-device installation or live service mutation was performed.

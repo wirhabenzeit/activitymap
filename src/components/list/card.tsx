@@ -9,18 +9,16 @@ import type { Feature, LineString } from 'geojson';
 import {
   Download,
   ExternalLink,
-  Map,
-  Minus,
   MoreHorizontal,
   Pencil,
   Image as PhotosIcon,
   Route,
 } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 
 import { ActivitySelectionSymbol } from '~/components/activity-selection-controls';
+import { DismissButton } from '~/components/dismiss-button';
 import { Button } from '~/components/ui/button';
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
 import {
@@ -29,14 +27,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
-import { useActivities } from '~/hooks/use-activities';
 import { useDateFormat } from '~/hooks/use-display-preferences';
+import { useElementSize } from '~/hooks/use-element-size';
 import { usePhotos } from '~/hooks/use-photos';
+import type {
+  ActivityMapCommand,
+  MapActionVariant,
+} from '~/hooks/use-show-on-map';
 import { useToast } from '~/hooks/use-toast';
 import { reloadStreamSummaryActivity } from '~/lib/activity-stream-summary';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
-import { showActivityOnMap } from '~/lib/show-on-map';
 import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
 import { requestLibrarySync } from '~/lib/sync/library-sync';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
@@ -46,9 +47,9 @@ import { refreshActivity } from '~/server/strava/actions';
 import { categorySettings } from '~/settings/category';
 import { aliasMap } from '~/settings/category';
 import { store, useShallowStore } from '~/store';
-import { applyFilters } from '~/store/filter';
 
 import { ActivityDetailStats } from './activity-detail-stats';
+import { ActivityMapAction } from './activity-map-action';
 import { EditActivity } from './edit';
 import { ElevationChart } from './elevation-chart';
 import { PhotoLightbox } from './photo';
@@ -62,62 +63,12 @@ interface ActivityCardContentProps {
   showMapButton?: boolean;
   stickyHeader?: boolean;
   readOnly?: boolean;
-}
-
-/**
- * Adds the activity to the selection, keeps whatever else is selected, and
- * frames its route on the map.
- */
-function useShowOnMap(row: Row<Features, Activity>) {
-  const router = useRouter();
-  const pathname = usePathname();
-  const { data: activities } = useActivities();
-  const hidden = useShallowStore((state) => !applyFilters(state, row.original));
-  const label = hidden ? 'Clear filters and show on map' : 'Show on map';
-  const show = () => {
-    const result = showActivityOnMap(
-      store,
-      row.original,
-      activities ?? [row.original],
-      hidden,
-    );
-    if (result !== 'shown') {
-      store.getState().addNotification({
-        type: 'info',
-        title: 'Map camera',
-        message:
-          result === 'no-route'
-            ? 'This activity has no GPS route to frame.'
-            : result === 'unavailable'
-              ? 'This activity is no longer available.'
-              : 'This activity is hidden by filters. Clear filters and try again.',
-      });
-      return;
-    }
-    router.push(
-      pathname === '/selection-prototype'
-        ? '/selection-prototype?view=map'
-        : '/map',
-    );
-  };
-  return { show, label };
+  onShowOnMap?: ActivityMapCommand;
+  mapActionVariant?: MapActionVariant;
 }
 
 /** Cards this wide label "Show on map" and keep Edit beside it (as on iOS). */
 const LABELLED_ACTIONS_WIDTH = 520;
-
-function useElementWidth() {
-  const [width, setWidth] = useState(0);
-  const ref = useCallback((element: HTMLElement | null) => {
-    if (!element) return;
-    const observer = new ResizeObserver(([entry]) => {
-      if (entry) setWidth(entry.contentRect.width);
-    });
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
-  return [ref, width] as const;
-}
 
 export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
   const [open, setOpen] = useState(false);
@@ -144,6 +95,8 @@ export function ActivityCardContent({
   showMapButton = true,
   stickyHeader = false,
   readOnly = false,
+  onShowOnMap,
+  mapActionVariant = 'show',
 }: ActivityCardContentProps) {
   const dateFormat = useDateFormat();
   const [open, setOpen] = useState(false);
@@ -156,12 +109,8 @@ export function ActivityCardContent({
   const { data: allPhotos = [] } = usePhotos();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { show: showOnMap, label: showOnMapLabel } = useShowOnMap(row);
-  const [cardRef, cardWidth] = useElementWidth();
+  const [cardRef, { width: cardWidth }] = useElementSize();
   const labelled = cardWidth >= LABELLED_ACTIONS_WIDTH;
-  const hasRoute = !!(
-    row.original.map_polyline ?? row.original.map_summary_polyline
-  );
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
@@ -310,26 +259,13 @@ export function ActivityCardContent({
               </p>
             </div>
             {/* The map overlay provides its fit action in the navigation header. */}
-            {showMapButton && (
-              <Button
-                variant="secondary"
-                size="sm"
-                className={cn(
-                  'h-8 shrink-0 gap-1.5 bg-header-background/10 text-header-background hover:bg-header-background/15',
-                  labelled ? 'px-3' : 'w-8 px-0',
-                )}
-                onClick={showOnMap}
-                disabled={!hasRoute}
-                aria-label={
-                  showOnMapLabel === 'Show on map'
-                    ? `Show ${String(row.getValue('name'))} on map`
-                    : `${showOnMapLabel}: ${String(row.getValue('name'))}`
-                }
-                title={hasRoute ? showOnMapLabel : 'No GPS route recorded'}
-              >
-                <Map className="h-4 w-4" aria-hidden="true" />
-                {labelled && showOnMapLabel}
-              </Button>
+            {showMapButton && onShowOnMap && (
+              <ActivityMapAction
+                activity={row.original}
+                onShowOnMap={onShowOnMap}
+                variant={mapActionVariant}
+                labelled={labelled}
+              />
             )}
             {labelled && (
               <Button
@@ -389,16 +325,11 @@ export function ActivityCardContent({
               </DropdownMenuContent>
             </DropdownMenu>
             {onCollapse && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 shrink-0"
+              <DismissButton
+                intent="collapse"
+                label="Collapse route details"
                 onClick={onCollapse}
-                aria-label="Collapse route details"
-                title="Collapse route details"
-              >
-                <Minus className="h-4 w-4" aria-hidden="true" />
-              </Button>
+              />
             )}
             {onClearSelection && (
               <Button
@@ -454,22 +385,24 @@ export function ActivityCard({
   row,
   showMapButton = true,
   showHighlightButton = false,
+  onShowOnMap,
+  mapActionVariant = 'show',
 }: {
   row: Row<Features, Activity>;
   showMapButton?: boolean;
   showHighlightButton?: boolean;
+  onShowOnMap?: ActivityMapCommand;
+  mapActionVariant?: MapActionVariant;
 }) {
   const [open, setOpen] = useState(false);
-  const { highlighted, isGuest } = useShallowStore((state) => ({
-    highlighted: state.highlighted,
+  const { isHighlighted, isGuest } = useShallowStore((state) => ({
+    isHighlighted: state.highlighted === row.original.id,
     isGuest: state.isGuest,
   }));
-  const { show: handleMapClick, label: showOnMapLabel } = useShowOnMap(row);
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
-  const isHighlighted = highlighted === row.original.id;
   const highlightLabel = `${isHighlighted ? 'Deactivate' : 'Make active'}: ${row.original.name}`;
 
   const prototypeSelected = useShallowStore((state) =>
@@ -477,7 +410,7 @@ export function ActivityCard({
   );
   const nameClassName = cn(
     'text-left truncate justify-start max-w-full hover:underline',
-    highlighted === Number(row.id) || prototypeSelected
+    isHighlighted || prototypeSelected
       ? 'text-header-background'
       : 'text-primary',
     prototypeSelected && 'font-medium',
@@ -528,21 +461,13 @@ export function ActivityCard({
             <Route aria-hidden="true" strokeWidth={isHighlighted ? 2.5 : 2} />
           </Button>
         )}
-        {showMapButton && (
-          <Button
-            variant="ghost"
-            className="h-4 px-0"
-            size="sm"
-            onClick={handleMapClick}
-            aria-label={
-              showOnMapLabel === 'Show on map'
-                ? `Show ${String(row.getValue('name'))} on map`
-                : `${showOnMapLabel}: ${String(row.getValue('name'))}`
-            }
-            title={showOnMapLabel}
-          >
-            <Map className="h-4 w-4" />
-          </Button>
+        {showMapButton && onShowOnMap && (
+          <ActivityMapAction
+            activity={row.original}
+            onShowOnMap={onShowOnMap}
+            variant={mapActionVariant}
+            compact
+          />
         )}
       </div>
       <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />

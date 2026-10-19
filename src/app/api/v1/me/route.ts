@@ -1,24 +1,19 @@
 import { toAuthenticationDTO } from '~/contracts/v1/auth';
 import { toCurrentUserDTOv1 } from '~/contracts/v1/user';
-import { auth } from '~/lib/auth';
 import { stravaPermissionsFromScope } from '~/lib/strava-permissions';
-import { resolveRequestSession } from '~/server/auth/request-session';
-import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
+import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { db } from '~/server/db';
 import { logger } from '~/server/logging/logger';
-import { withApiV1Observability } from '~/server/api/observability';
-import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
+
 import { createCurrentUserHandler } from './handler';
 
 const ROUTE = 'GET /api/v1/me';
 
-export const GET = withApiV1Observability(
-  withApiV1RateLimit(
+export const GET = withAuthenticatedApiV1(
+  (request, context) =>
     createCurrentUserHandler({
       resolveCurrentUser: async (request) => {
-        const session = await resolveRequestSession(request, ({ headers }) =>
-          auth.api.getSession({ headers }),
-        );
+        const session = await context.session();
         if (!session?.user?.id) return null;
 
         const [user, account] = await Promise.all([
@@ -61,8 +56,6 @@ export const GET = withApiV1Observability(
       onError: (error, requestId) => {
         logger.error('GET /api/v1/me failed', { error, requestId });
       },
-    }),
-    { route: ROUTE, resolveUserId: resolveRateLimitUserId },
-  ),
-  { route: ROUTE },
+    })(request),
+  { route: ROUTE, cache: 'private-no-store' },
 );

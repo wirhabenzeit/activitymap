@@ -11,18 +11,12 @@ struct FilterRail: View {
 
     static let width: CGFloat = 52
 
-    private var activeCount: Int { scope == .stats ? store.activeStatsFilterCount : store.activeFilterCount }
-
     var body: some View {
         ScrollView {
             VStack(spacing: 4) {
                 ForEach(FilterPart.available(in: scope)) { item(for: $0) }
                 Divider().padding(.horizontal, 12)
-                Button { scope.reset(store) } label: {
-                    Image(systemName: "arrow.counterclockwise").frame(width: 44, height: 44)
-                }
-                .disabled(activeCount == 0)
-                .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
+                FilterResetButton(store: store, scope: scope, iconOnly: true)
             }
             .padding(.vertical, 8)
             .frame(maxWidth: .infinity)

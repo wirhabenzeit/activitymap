@@ -4,7 +4,7 @@ These are interactive-layout mockups for the [approved selection design](../acti
 
 ## List with Combine enabled
 
-The checklist precedes the selected count in the existing footer. Clear and display options remain on the right. Selected sport icons gain a small checkmark inside their existing hit target; outside Combine, the badge and membership action disappear while row selection remains identifiable. The footer stays available when an activity is pushed.
+The checklist precedes the selected count in the existing footer. Clear and display options remain on the right. Selected sport icons gain a small checkmark inside their existing hit target; outside Combine, the badge and membership action disappear while row selection remains identifiable. The original proposal retained the footer when an activity was pushed. Device review on 19 October superseded that behavior: selection controls now appear only while the list is visible, including beside an adjacent iPad inspector. Full-page details hide them; Back preserves selection and Combine mode.
 
 ![Proposed native List footer and sport-icon checkmarks](ios-list-layout-proposal.png)
 
@@ -22,25 +22,23 @@ The browsing Form exposes a native toggle, included in its count and Reset. The 
 
 The illustrated interactions were checked for mode/badge gating, shared scope, inspection/footer retention, clear/zero state and a 320-pixel layout. The SwiftUI implementation and focused simulator verification are now recorded below. Physical iPhone/iPad/VoiceOver and release acceptance remain open.
 
-
 ## Implemented native captures
 
-The following are actual production SwiftUI captures on the iPhone 18 Pro / iOS 27 simulator, Xcode 27, 13 October 2026. The harness renders phone, landscape and iPad-sized windows and explicitly sets size classes/Dynamic Type. The offline synthetic map style isolates control behavior and does not verify remote basemap loading. These differ from the HTML proposals above.
+The following are actual production SwiftUI captures on the iPhone 18 Pro / iOS 27 simulator, Xcode 27, 13 October 2026. The harness renders phone, landscape and iPad-sized windows and explicitly sets size classes/Dynamic Type. The offline synthetic map style isolates control behavior and does not verify remote basemap loading. These differ from the HTML proposals above. The detail-footer capture records the earlier behavior; the 19 October policy described above supersedes it.
 
-| Surface | Capture |
-| --- | --- |
-| Phone List, Combine on | [List footer and sport checkmarks](native/phone-list.png) |
+| Surface                    | Capture                                                                       |
+| -------------------------- | ----------------------------------------------------------------------------- |
+| Phone List, Combine on     | [List footer and sport checkmarks](native/phone-list.png)                     |
 | Completed List detail push | [Footer retained outside the outer navigation stack](native/phone-detail.png) |
-| Dark List | [Dark controls and selected rows](native/dark-list.png) |
-| Accessibility 3 text | [Stacked rows and persistent controls](native/large-text-list.png) |
-| Landscape Map | [Persistent group header with Combine before count](native/landscape-map.png) |
-| Empty Map, Combine on | [No selection controls until a route pick](native/phone-map-empty.png) |
-| iPad-sized List detail | [Adjacent detail and shared footer](native/tablet-detail.png) |
+| Dark List                  | [Dark controls and selected rows](native/dark-list.png)                       |
+| Accessibility 3 text       | [Stacked rows and persistent controls](native/large-text-list.png)            |
+| Landscape Map              | [Persistent group header with Combine before count](native/landscape-map.png) |
+| Empty Map, Combine on      | [No selection controls until a route pick](native/phone-map-empty.png)        |
+| iPad-sized List detail     | [Adjacent detail and shared footer](native/tablet-detail.png)                 |
 
 `SelectionFixtureTests` consumes 72 v2 transitions. The focused run passed 61 native tests across state, store/cache/lifetime, list behavior, route hit/query and rendered selection controls; another six tests passed for summary scope and retained navigation/Map handoff. Three isolated filter tests and twelve camera/sheet checks also passed. The native result list keeps its exact position through collapse/detail transitions; camera assertions wait for the animation to finish before checking invariance. Native sport and mode targets are checked at 44 points, with Select/Deselect labels, mode On/Off, and available exit during detail/zero selection. Automated accessibility inspection supplements physical VoiceOver acceptance.
 
-Reproduce model checks with `xcodebuild -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO -only-testing:ActivityMapTests/SelectionFixtureTests -only-testing:ActivityMapTests/SelectionBrowsingScopeTests test`. The rendered cases live in `RenderedActivityListTests.swift` (`selectionControlsSurviveListInspection`, `mapSelectionControlsDisappearUntilAnotherPick`) and `RenderedRoutePickingTests.swift` (offline query/projection adapter).
-
+Reproduce model checks with `xcodebuild -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap -destination 'platform=iOS Simulator,name=iPhone 18 Pro' CODE_SIGNING_ALLOWED=NO -only-testing:ActivityMapTests/SelectionFixtureTests -only-testing:ActivityMapTests/SelectionBrowsingScopeTests test`. Selection-control visibility and Back retention run through `ActivityMapUITests/ListSelectionUITests` using a DEBUG fixture. This replaces the hosted selection-control traversal, whose SwiftUI accessibility tree can be empty on iOS 27. The remaining rendered Map cases live in `RenderedActivityListTests.swift` (`mapSelectionControlsDisappearUntilAnotherPick`) and `RenderedRoutePickingTests.swift` (offline query/projection adapter).
 
 Physical-device review subsequently changed the sheet policy: Results and detail now share one stable middle height, and the collapsed sheet shows only group controls. Activity content stays hidden while collapsed; opening/back no longer resize the sheet or crossfade overlapping results/detail. Frame-sampled regressions check constant height through navigation and membership changes, manual detents and retained scroll; collapsed captures check that activity titles do not leak through. The static captures above illustrate the selection controls, not the updated animation timing. Physical-device review of this refinement remains open.
 

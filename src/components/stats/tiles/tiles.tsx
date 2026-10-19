@@ -3,71 +3,72 @@
 // What each tile shows on its face and in its detail view. The switch over
 // StatsTileID is exhaustive, so a tile added to shared/stats-tiles.json
 // fails the build here until it has a view.
-
-import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
-import { type UnitSystem } from '~/lib/units';
-import { Activity, useMemo, type ReactNode } from 'react';
-import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { Medal } from 'lucide-react';
+import { Activity, type ReactNode, useMemo } from 'react';
+
+import { useBrowsingState } from '~/hooks/use-browsing-context';
+import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
 import { comparisonBand } from '~/lib/stats/comparison-band';
 import { periodComparisons, volumeHistoryAverage } from '~/lib/stats/history';
-
-import { categorySettings } from '~/settings/category';
+import { comparisonPercentage } from '~/lib/stats/presentation-policy';
 import {
-  type StatsMetric,
-  type StatsTileID,
-} from '~/settings/stats-tiles.generated';
-import {
+  type ActivityRecord,
+  type StatsActivity,
   best30Days,
-  sameDateLastYear,
   climbing,
   dayOf,
   fourWeekVolume,
   mondayOf,
-  monthVsLastMonth,
-  records,
+  periodComparison,
   recordRankings,
+  records,
+  sameDateLastYear,
   sportMix,
   thisWeek,
   typicalWeek,
   weeklyVolume,
   yearPace,
-  yearToDate,
-  type ActivityRecord,
-  type StatsActivity,
 } from '~/lib/stats/tile-data';
+import type { StatsTileModels } from '~/lib/stats/tile-models';
 import {
+  comparisonYear,
   cumulativeByDay,
   cumulativeYearPoints,
-  comparisonYear,
   dateOfDay,
   monthStart,
   sportBreakdown,
   yearStart,
 } from '~/lib/stats/tile-series';
+import { type UnitSystem } from '~/lib/units';
 import { cn } from '~/lib/utils';
+import { categorySettings } from '~/settings/category';
+import {
+  type StatsMetric,
+  type StatsTileID,
+} from '~/settings/stats-tiles.generated';
 
 import { ActivityRow } from './activity-row';
-import { VolumeHistory, CalendarHistory } from './history';
-import { MonthRhythm, YearRhythm } from './period-rhythm';
 import {
   CumulativeLines,
+  type LineSeries,
   Measure,
   PlainBars,
   VolumeArea,
-  type LineSeries,
 } from './charts';
+import { StatsChoices } from './choices';
 import {
-  statsFormat,
+  type TilePalette,
   metricLabel,
   monthName,
-  percentChange,
   shortDate,
-  type TilePalette,
+  statsFormat,
 } from './format';
+import { CalendarHistory, VolumeHistory } from './history';
+import { MonthRhythm, YearRhythm } from './period-rhythm';
 
 export type TileContext = {
   units?: UnitSystem;
+  models?: StatsTileModels;
   dateFormat?: DateFormat;
   activities: StatsActivity[];
   today: number;
@@ -172,8 +173,8 @@ function Delta({
 }) {
   const { formatWithUnit } = statsFormat(units);
 
-  const change = percentChange(current, previous);
-  if (change === null) return <>{text}</>;
+  const percentage = comparisonPercentage(current, previous);
+  if (percentage === null) return <>{text}</>;
   return (
     <>
       <span
@@ -185,10 +186,7 @@ function Delta({
       >
         {metric &&
           `${signed(current - previous, (value) => formatWithUnit(value, metric))} · `}
-        {change === 0 && current !== previous
-          ? `${current > previous ? '+' : '−'}<1`
-          : signed(change, String)}
-        %
+        {percentage}
       </span>{' '}
       {text}
     </>
@@ -298,7 +296,7 @@ function yearSeries(
     key: String(year),
     label: String(year),
     points,
-    current: year === currentYear,
+    role: year === currentYear ? 'current' : 'comparison',
   };
 }
 
@@ -410,7 +408,12 @@ const yearToDateView: TileView = {
     const { formatMetric, metricUnit } = statsFormat(units);
 
     const metric = asMetric(option, 'distance');
-    const { current, previous } = yearToDate(activities, today, metric);
+    const { current, previous, periods } = periodComparison(
+      activities,
+      today,
+      metric,
+      'year',
+    );
     return {
       value: formatMetric(current, metric),
       unit: `${metric === 'count' ? 'activities' : metricUnit[metric]} so far`,
@@ -421,7 +424,7 @@ const yearToDateView: TileView = {
           current={current}
           previous={previous}
           metric={metric}
-          text={`vs ${dateOfDay(today).getUTCFullYear() - 1} by ${shortDate(dateOfDay(today))}`}
+          text={`vs ${dateOfDay(periods.previous.first).getUTCFullYear()} by ${shortDate(dateOfDay(periods.previous.last))}`}
         />
       ),
     };
@@ -591,7 +594,7 @@ function monthPair(context: TileContext, metric: StatsMetric): LineSeries[] {
           thisStart - 1,
         ),
       ),
-      current: false,
+      role: 'comparison',
     },
     {
       key: 'current',
@@ -599,21 +602,9 @@ function monthPair(context: TileContext, metric: StatsMetric): LineSeries[] {
       points: toPoints(
         cumulativeByDay(context.activities, metric, thisStart, context.today),
       ),
-      current: true,
+      role: 'current',
     },
   ];
-}
-
-// "Aug 1–26": last month up to today's day number, capped at its last day.
-function samePeriodLastMonth(today: number) {
-  const date = dateOfDay(today);
-  const previous = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth() - 1, 1),
-  );
-  const lastDay = new Date(
-    Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), 0),
-  ).getUTCDate();
-  return `${monthName(previous)} 1–${Math.min(date.getUTCDate(), lastDay)}`;
 }
 
 const monthVsLastMonthView: TileView = {
@@ -643,7 +634,12 @@ const monthVsLastMonthView: TileView = {
     const { formatMetric, metricUnit } = statsFormat(units);
 
     const metric = asMetric(option, 'distance');
-    const { current, previous } = monthVsLastMonth(activities, today, metric);
+    const { current, previous, periods } = periodComparison(
+      activities,
+      today,
+      metric,
+      'month',
+    );
     return {
       value: formatMetric(current, metric),
       unit: `${metric === 'count' ? 'activities' : metricUnit[metric]} so far`,
@@ -654,7 +650,7 @@ const monthVsLastMonthView: TileView = {
           current={current}
           previous={previous}
           metric={metric}
-          text={`vs ${samePeriodLastMonth(today)}`}
+          text={`vs ${monthName(dateOfDay(periods.previous.first))} 1–${dateOfDay(periods.previous.last).getUTCDate()}`}
         />
       ),
     };
@@ -879,7 +875,7 @@ const sportMixView: TileView = {
                 className="flex flex-wrap justify-between gap-2 py-2"
               >
                 <dt>{categorySettings[sport].name}</dt>
-                <dd className="tabular-nums text-muted-foreground">
+                <dd className="text-muted-foreground tabular-nums">
                   {formatWithUnit(
                     breakdown.get(sport)?.distance ?? 0,
                     'distance',
@@ -917,7 +913,7 @@ const sportMixView: TileView = {
               const row = breakdown.get(sport);
               return (
                 <tr key={sport} className="border-b border-muted">
-                  <td className="whitespace-nowrap py-1.5 pr-2 font-sans">
+                  <td className="py-1.5 pr-2 font-sans whitespace-nowrap">
                     <span
                       className="mr-2 inline-block h-2 w-2 rounded-full"
                       style={{ background: categorySettings[sport].color }}
@@ -1201,11 +1197,12 @@ const yearPaceView: TileView = {
   expandable: false,
   headlineControls: true,
   period: ({ today }) => `${dateOfDay(today).getUTCFullYear()} projection`,
-  summary: ({ activities, today, units = 'metric' }, option) => {
+  summary: ({ activities, today, units = 'metric', models }, option) => {
     const { formatMetric, metricUnit } = statsFormat(units);
 
     const metric = asMetric(option, 'distance');
-    const pace = yearPace(activities, today, metric);
+    const pace =
+      models?.yearPace(metric) ?? yearPace(activities, today, metric);
     return {
       value: formatMetric(pace.projected, metric),
       unit: `${metricUnit[metric]} projected`,
@@ -1213,12 +1210,13 @@ const yearPaceView: TileView = {
       sub: "At this year's daily average",
     };
   },
-  face: ({ activities, today, units = 'metric' }, option) => {
+  face: ({ activities, today, units = 'metric', models }, option) => {
     const { formatMetric, formatWithUnit, formatDailyRate, metricUnit } =
       statsFormat(units);
 
     const metric = asMetric(option, 'distance');
-    const pace = yearPace(activities, today, metric);
+    const pace =
+      models?.yearPace(metric) ?? yearPace(activities, today, metric);
     const year = dateOfDay(today).getUTCFullYear();
     const unit = metricUnit[metric];
     const scale = Math.max(pace.projected, pace.lastYear, 1);
@@ -1418,10 +1416,10 @@ function RecordsPodium({
                               aria-hidden="true"
                               strokeWidth={1.7}
                               className={cn(
-                                'size-[18px] [&>path]:stroke-sky-600 [&>path:first-child]:fill-sky-100 dark:[&>path]:stroke-sky-400 dark:[&>path:first-child]:fill-sky-950',
+                                'size-[18px] [&>path]:stroke-sky-600 dark:[&>path]:stroke-sky-400 [&>path:first-child]:fill-sky-100 dark:[&>path:first-child]:fill-sky-950',
                                 [
-                                  '[&>circle]:fill-yellow-400 [&>circle]:stroke-yellow-700 [&>path:last-child]:stroke-yellow-900 dark:[&>circle]:fill-yellow-300 dark:[&>path:last-child]:stroke-yellow-900',
-                                  '[&>circle]:fill-slate-200 [&>circle]:stroke-slate-500 [&>path:last-child]:stroke-slate-700 dark:[&>circle]:fill-slate-300 dark:[&>path:last-child]:stroke-slate-700',
+                                  '[&>circle]:fill-yellow-400 [&>circle]:stroke-yellow-700 dark:[&>circle]:fill-yellow-300 [&>path:last-child]:stroke-yellow-900 dark:[&>path:last-child]:stroke-yellow-900',
+                                  '[&>circle]:fill-slate-200 [&>circle]:stroke-slate-500 dark:[&>circle]:fill-slate-300 [&>path:last-child]:stroke-slate-700 dark:[&>path:last-child]:stroke-slate-700',
                                   '[&>circle]:fill-orange-300 [&>circle]:stroke-amber-800 [&>path:last-child]:stroke-amber-950 dark:[&>path:last-child]:stroke-amber-950',
                                 ][place],
                               )}
@@ -1446,7 +1444,7 @@ function RecordsPodium({
                           </span>
                           <span
                             className={cn(
-                              'whitespace-nowrap font-mono text-sm tabular-nums',
+                              'font-mono text-sm whitespace-nowrap tabular-nums',
                               place === 0 && 'font-semibold',
                             )}
                           >
@@ -1482,7 +1480,7 @@ function RecordsPodium({
                                 'w-full rounded px-1 focus-visible:outline-2',
                                 activity.activityId ===
                                   context.selectedActivityId
-                                  ? 'bg-header-background/10 ring-1 ring-inset ring-header-background/40 hover:bg-header-background/15'
+                                  ? 'bg-header-background/10 ring-1 ring-header-background/40 ring-inset hover:bg-header-background/15'
                                   : 'hover:bg-muted/40',
                               )}
                             >
@@ -1506,7 +1504,7 @@ function RecordsPodium({
 }
 
 function RecordsDetail({ context }: { context: TileContext }) {
-  const [range, setRange] = useBrowsingState<'currentYear' | 'allTime'>(
+  const [range, setRange] = useBrowsingState(
     'stats:recordsPeriod',
     'currentYear',
   );
@@ -1519,26 +1517,14 @@ function RecordsDetail({ context }: { context: TileContext }) {
         {' · Use Filters to adjust these rankings.'}
       </p>
       <Activity mode={showBothPeriods ? 'hidden' : 'visible'}>
-        <div
-          role="group"
-          aria-label="Records period"
-          className="inline-flex rounded-md bg-muted p-0.5"
-        >
-          {(['currentYear', 'allTime'] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              aria-pressed={range === value}
-              onClick={() => setRange(value)}
-              className={cn(
-                'min-h-11 rounded-[5px] px-3 text-xs font-medium text-muted-foreground',
-                range === value && 'bg-background text-foreground shadow-xs',
-              )}
-            >
-              {optionLabels[value]}
-            </button>
-          ))}
-        </div>
+        <StatsChoices
+          label="Records period"
+          options={['currentYear', 'allTime'] as const}
+          value={range}
+          onChange={setRange}
+          accessibleLabel={(value) => optionLabels[value]!}
+          visibleLabel={(value) => optionLabels[value]}
+        />
         <p className="text-xs text-muted-foreground">
           {range === 'allTime'
             ? 'All-time records'

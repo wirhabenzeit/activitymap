@@ -90,6 +90,10 @@ final class AuthController: NSObject {
 
     override init() {
         super.init()
+        #if DEBUG
+        // The real-shell rotation fixture must not restore a device session or avatar.
+        if ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing") { return }
+        #endif
         if let token = SessionStore.load() {
             currentUser = SessionIdentityStore.load(token: token, deployment: APIConfiguration.baseURL)
             // A returning person is not asked to sign in while the stored

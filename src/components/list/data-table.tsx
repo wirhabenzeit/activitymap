@@ -1,34 +1,23 @@
 'use client';
 
-import * as React from 'react';
-import {
-  useBrowsingState,
-  useRetainedScroll,
-} from '~/hooks/use-browsing-context';
-import { SpeedDisplayContext } from './speed-display-context';
-import { speedDisplayForSports } from '~/lib/speed-display';
-import { sortActivities } from '~/lib/activity-presentation';
-import {
-  useDisplayUnits,
-  useDateFormat,
-} from '~/hooks/use-display-preferences';
-
 import {
   type ColumnDef,
-  type ColumnVisibilityState,
-  type ColumnPinningState,
-  type SortingState,
   type ColumnFiltersState,
-  type Updater,
-  type RowSelectionState,
-  type RowData,
+  type ColumnPinningState,
+  type ColumnVisibilityState,
   type Row,
+  type RowData,
+  type RowSelectionState,
+  type SortingState,
   type TableFeatures,
-  type PaginationState,
-  useTable,
+  type Updater,
   flexRender,
+  useTable,
 } from '@tanstack/react-table';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import * as React from 'react';
 
+import { Button } from '~/components/ui/button';
 import {
   Table,
   TableBody,
@@ -37,18 +26,27 @@ import {
   TableHeader,
   TableRow,
 } from '~/components/ui/table';
-
+import {
+  useBrowsingState,
+  useRetainedScroll,
+} from '~/hooks/use-browsing-context';
+import {
+  useDateFormat,
+  useDisplayUnits,
+} from '~/hooks/use-display-preferences';
+import { useElementSize } from '~/hooks/use-element-size';
+import { sortActivities } from '~/lib/activity-presentation';
+import { speedDisplayForSports } from '~/lib/speed-display';
 import { cn } from '~/lib/utils';
 
 import { DataTablePagination } from './data-table-pagination';
+import { type DetailPresentation, inspectionStep } from './inspection';
 import { ListDetailTransition } from './list-detail-transition';
-import { inspectionStep, type DetailPresentation } from './inspection';
-import { Button } from '~/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { SpeedDisplayContext } from './speed-display-context';
 import {
   type DensityState,
-  type SummaryRowState,
   type Features,
+  type SummaryRowState,
   features,
 } from './table-extensions';
 
@@ -83,7 +81,7 @@ interface ListActions {
 }
 
 interface DataTableProps<TData extends RowData> extends ListState, ListActions {
-  browsingKey?: string;
+  browsingKey?: 'list';
   browsingDataReady?: boolean;
   columns: ColumnDef<Features, TData>[];
   data: TData[];
@@ -162,7 +160,7 @@ export const DataTable = React.memo(function DataTable<
   browsingKey,
   browsingDataReady = true,
 }: DataTableProps<TData>) {
-  const [pagination, setPagination] = useBrowsingState<PaginationState>(
+  const [pagination, setPagination] = useBrowsingState(
     browsingKey && `${browsingKey}:pagination`,
     {
       pageIndex: 0,
@@ -187,8 +185,8 @@ export const DataTable = React.memo(function DataTable<
   );
   const speedDisplay = React.useMemo(() => {
     const ids = columnFilters.find((filter) => filter.id === 'id')?.value as
-      number[] | undefined;
-    const included = ids ? new Set(ids) : null;
+      ReadonlySet<number> | undefined;
+    const included = ids;
     return speedDisplayForSports(
       data
         .filter((activity) => !included || included.has(activity.id))
@@ -275,17 +273,15 @@ export const DataTable = React.memo(function DataTable<
   // at their natural width, instead of scrolling sideways. Natural widths come
   // from a hidden sizing row (header and summary at max-content), so they
   // follow each column's real content rather than a guessed minimum.
-  const [availableWidth, setAvailableWidth] = React.useState(0);
-  React.useEffect(() => {
-    const scroller =
-      containerRef.current?.querySelector('#table-main')?.parentElement;
-    if (!fitWidth || !scroller) return;
-    const observer = new ResizeObserver(() =>
-      setAvailableWidth(scroller.clientWidth),
-    );
-    observer.observe(scroller);
-    return () => observer.disconnect();
-  }, [fitWidth]);
+  const [measureScroller, { width: availableWidth }] =
+    useElementSize<HTMLElement>({
+      box: 'client',
+    });
+  const measureTable = React.useCallback(
+    (element: HTMLTableElement | null) =>
+      measureScroller(element?.parentElement ?? null),
+    [measureScroller],
+  );
   const visibleColumns = table.getVisibleFlatColumns();
   const sizerRef = React.useRef<HTMLTableRowElement>(null);
   const [naturalWidths, setNaturalWidths] = React.useState<
@@ -294,11 +290,6 @@ export const DataTable = React.memo(function DataTable<
   React.useLayoutEffect(() => {
     const cells = sizerRef.current?.children;
     if (!fitWidth || !cells) return;
-    // The observer below only reports later resizes; read the current width
-    // too, since the table can mount before it has its final layout.
-    const scroller =
-      containerRef.current?.querySelector('#table-main')?.parentElement;
-    if (scroller) setAvailableWidth(scroller.clientWidth);
     const measured: Record<string, number> = {};
     visibleColumns.forEach((column, index) => {
       const cell = cells[index];
@@ -549,8 +540,9 @@ export const DataTable = React.memo(function DataTable<
       >
         {listHeader}
         <Table
+          ref={fitWidth ? measureTable : undefined}
           id="table-main"
-          className="text-xs grid"
+          className="grid text-xs"
           // An inline-size container lets expanded cards match the visible
           // width (100cqw) instead of the full, horizontally scrolling table.
           wrapperClassName={cn(
@@ -566,14 +558,14 @@ export const DataTable = React.memo(function DataTable<
         >
           <TableHeader
             className={cn(
-              'sticky [&_tr]:border-b-0 grid grid-cols-subgrid col-span-full',
+              'sticky col-span-full grid grid-cols-subgrid [&_tr]:border-b-0',
               headerClassName,
             )}
           >
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow
                 key={headerGroup.id}
-                className="border-b-0 grid grid-cols-subgrid col-span-full"
+                className="col-span-full grid grid-cols-subgrid border-b-0"
               >
                 {headerGroup.headers
                   .filter((header) => isShown(header.column.id))
@@ -581,11 +573,11 @@ export const DataTable = React.memo(function DataTable<
                     return (
                       <TableHead
                         className={cn(
-                          'py-0 flex items-center',
+                          'flex items-center py-0',
                           header.column.getIsPinned() == 'start' &&
-                            'sticky left-0 z-1 bg-muted border-border border-r',
+                            'sticky left-0 z-1 border-r border-border bg-muted',
                           header.column.getIsPinned() == 'end' &&
-                            'sticky right-0 z-1 bg-muted border-border border-l',
+                            'sticky right-0 z-1 border-l border-border bg-muted',
                         )}
                         key={header.id}
                       >
@@ -604,7 +596,7 @@ export const DataTable = React.memo(function DataTable<
               <TableRow
                 key={footerGroup.id}
                 className={cn(
-                  'border-b grid grid-cols-subgrid col-span-full',
+                  'col-span-full grid grid-cols-subgrid border-b',
                   !summaryRow && 'hidden',
                 )}
               >
@@ -615,11 +607,11 @@ export const DataTable = React.memo(function DataTable<
                       <TableHead
                         key={footer.id}
                         className={cn(
-                          'h-8 border-b border-t border-border text-xs font-bold flex items-center',
+                          'flex h-8 items-center border-t border-b border-border text-xs font-bold',
                           footer.column.getIsPinned() == 'start' &&
-                            'sticky left-0 z-1 bg-muted border-r border-border',
+                            'sticky left-0 z-1 border-r border-border bg-muted',
                           footer.column.getIsPinned() == 'end' &&
-                            'sticky right-0 z-1 bg-muted border-l border-border',
+                            'sticky right-0 z-1 border-l border-border bg-muted',
                         )}
                       >
                         {flexRender(
@@ -632,7 +624,7 @@ export const DataTable = React.memo(function DataTable<
               </TableRow>
             ))}
           </TableHeader>
-          <TableBody className="grid grid-cols-subgrid col-span-full">
+          <TableBody className="col-span-full grid grid-cols-subgrid">
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
@@ -650,7 +642,7 @@ export const DataTable = React.memo(function DataTable<
                   }
                   data-state={row.getIsSelected() && 'selected'}
                   className={cn(
-                    'group grid grid-cols-subgrid col-span-full',
+                    'group col-span-full grid grid-cols-subgrid',
                     onRowClick && 'cursor-pointer',
                   )}
                   {...(onRowClick && {
@@ -687,7 +679,7 @@ export const DataTable = React.memo(function DataTable<
                     .map((cell) => (
                       <TableCell
                         className={cn(
-                          'bg-background group-data-[state=selected]:bg-muted flex items-center',
+                          'flex items-center bg-background group-data-[state=selected]:bg-muted',
                           // Blend into an opaque surface so pinned cells cover
                           // scrolling content even when inspected or selected.
                           ((detailStepping && Number(row.id) === activeId) ||
@@ -701,14 +693,14 @@ export const DataTable = React.memo(function DataTable<
                             cell.column.id === 'name' &&
                             'shadow-[inset_3px_0_0_var(--color-header-background)]',
                           cell.column.getIsPinned() == 'start' &&
-                            'sticky left-0 z-1 border-border border-r',
+                            'sticky left-0 z-1 border-r border-border',
                           cell.column.getIsPinned() == 'end' &&
-                            'sticky right-0 z-1 border-border border-l',
+                            'sticky right-0 z-1 border-l border-border',
                           density == 'sm'
-                            ? 'py-1 px-1'
+                            ? 'px-1 py-1'
                             : density == 'md'
                               ? 'p-2'
-                              : 'py-3 px-2 text-sm',
+                              : 'px-2 py-3 text-sm',
                           cellClassName,
                         )}
                         key={cell.id}
@@ -737,15 +729,15 @@ export const DataTable = React.memo(function DataTable<
           <table
             aria-hidden
             inert
-            className="pointer-events-none invisible absolute left-0 top-0 grid h-0 overflow-hidden text-xs"
+            className="pointer-events-none invisible absolute top-0 left-0 grid h-0 overflow-hidden text-xs"
             style={{
               gridTemplateColumns: `repeat(${visibleColumns.length}, max-content)`,
             }}
           >
-            <TableHeader className="grid grid-cols-subgrid col-span-full">
+            <TableHeader className="col-span-full grid grid-cols-subgrid">
               <TableRow
                 ref={sizerRef}
-                className="grid grid-cols-subgrid col-span-full"
+                className="col-span-full grid grid-cols-subgrid"
               >
                 {visibleColumns.map((column) => {
                   const header = table
@@ -754,7 +746,7 @@ export const DataTable = React.memo(function DataTable<
                   return (
                     <TableHead
                       key={column.id}
-                      className="py-0 flex items-center"
+                      className="flex items-center py-0"
                     >
                       {header &&
                         flexRender(
@@ -765,7 +757,7 @@ export const DataTable = React.memo(function DataTable<
                   );
                 })}
               </TableRow>
-              <TableRow className="grid grid-cols-subgrid col-span-full">
+              <TableRow className="col-span-full grid grid-cols-subgrid">
                 {visibleColumns.map((column) => {
                   const footer = table
                     .getFooterGroups()[0]
@@ -773,7 +765,7 @@ export const DataTable = React.memo(function DataTable<
                   return (
                     <TableHead
                       key={column.id}
-                      className="h-8 text-xs font-bold flex items-center"
+                      className="flex h-8 items-center text-xs font-bold"
                     >
                       {summaryRow &&
                         footer &&

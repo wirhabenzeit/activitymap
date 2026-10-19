@@ -2,7 +2,9 @@
 import assert from 'node:assert/strict';
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
+
 import { chromium } from 'playwright-core';
+
 const base = new URL(process.argv[2] || 'http://127.0.0.1:3020');
 assert(['127.0.0.1', 'localhost'].includes(base.hostname));
 const output = resolve(
@@ -163,7 +165,7 @@ try {
   await page.keyboard.press('Escape');
   // In ordinary mode rows inspect. Show on map still replaces the group.
   await rows()
-    .getByRole('button', { name: 'Show Morning Walk on map', exact: true })
+    .getByRole('button', { name: 'Show on map: Morning Walk', exact: true })
     .click();
   await count(1);
   await page.waitForURL((url) => url.searchParams.get('view') === 'map');
@@ -308,7 +310,7 @@ try {
   await reset();
   // Show on map respects exclusive selection and keeps the prototype destination.
   await rows()
-    .getByRole('button', { name: 'Show Morning Walk on map', exact: true })
+    .getByRole('button', { name: 'Show on map: Morning Walk', exact: true })
     .click();
   await count(1);
   await page.waitForURL((url) => url.searchParams.get('view') === 'map');

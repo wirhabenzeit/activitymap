@@ -8,12 +8,12 @@ The web List's **Show on map** centered the activity's bounding box at zoom 12 w
 
 The fit uses the larger usable rectangle above or beside the panel, caps point-route zoom at 16, and uses the shortest longitude arc for date-line routes. Activities without GPS stay in List with an explanation. A user gesture cancels pending navigation. Expanding or resizing a panel after the completed fit does not move the camera; another explicit fit collapses expanded results and fits again.
 
-| Web detail viewport | Visible route points before | After | Before | After |
-| --- | ---: | ---: | --- | --- |
-| Phone, 402 × 874 | 225 / 324 | 324 / 324 | [Capture](route-framing/before-web-detail--phone.png) | [Capture](route-framing/after-web-detail--phone.jpg) |
-| Small, 375 × 667, 150% browser text | 150 / 324 | 324 / 324 | [Capture](route-framing/before-web-detail--small-large-text.png) | [Capture](route-framing/after-web-detail--small-large-text.jpg) |
-| Tablet, 820 × 1180 | 324 / 324 | 324 / 324 | Metrics in captures below | Metrics in captures below |
-| Wide, 1180 × 820 | 208 / 324 | 324 / 324 | Metrics in captures below | Metrics in captures below |
+| Web detail viewport                 | Visible route points before |     After | Before                                                           | After                                                           |
+| ----------------------------------- | --------------------------: | --------: | ---------------------------------------------------------------- | --------------------------------------------------------------- |
+| Phone, 402 × 874                    |                   225 / 324 | 324 / 324 | [Capture](route-framing/before-web-detail--phone.png)            | [Capture](route-framing/after-web-detail--phone.jpg)            |
+| Small, 375 × 667, 150% browser text |                   150 / 324 | 324 / 324 | [Capture](route-framing/before-web-detail--small-large-text.png) | [Capture](route-framing/after-web-detail--small-large-text.jpg) |
+| Tablet, 820 × 1180                  |                   324 / 324 | 324 / 324 | Metrics in captures below                                        | Metrics in captures below                                       |
+| Wide, 1180 × 820                    |                   208 / 324 | 324 / 324 | Metrics in captures below                                        | Metrics in captures below                                       |
 
 Before/after use the same fixture, viewport and List action. The new fit button adds to the measured panel height. The wide four-route result is [shown here](route-framing/web-map-results--wide.jpg).
 
@@ -35,3 +35,11 @@ Standard's projected wide-detail route extended about 3.5 points into the fitter
 - Additional browser checks passed for a point route (zoom 16), a date-line route (short arc), no GPS (List retained with feedback), persisted fitted cameras, and unchanged camera after results expansion.
 
 Native evidence invokes production intents in the screenshot harness; it does not certify manually tapping the native controls or dragging the native sheet on a physical device. That real native UI acceptance remains outstanding, so this PR addresses #275 without automatically closing it. Browser text scaling and iOS Dynamic Type are different stress cases, not equivalent accessibility certification. Full expansion may intentionally cover the map; it must not cause unsolicited repeated fits.
+
+## Recipient-map reconciliation — 2026-10-19
+
+The capability-link recipient map now consumes the same `routeBounds`, `routeFitPadding` and `routeFramingPolicy` as browsing. Both clients of that policy use the shortest longitude arc, valid-coordinate handling, measured panel clearance, minimum usable viewport and maximum zoom. The recipient view still receives only its explicit `SharedActivityDTO` subset and performs one initial fit; selecting a different activity, scrolling its card or resizing does not reset the camera. Its card scrolls within a height derived from the fitter's minimum clearance, so a short landscape window does not conceal the entire route area.
+
+Consumer inventory: `InteractiveMap` retains its explicit-fit request lifecycle, settled-layout wait and gesture cancellation; `SharedActivityMap` retains its initial-load lifecycle and public DTO boundary. Those are intentional lifecycle differences around the common geometry policy.
+
+Validation: all nine route-framing/shared-route tests passed, including a disclosed date-line crossing and a measured landscape card. TypeScript and scoped ESLint passed. A temporary browser fixture rendered the production recipient component with a recording map adapter at 390×844, 844×390 and 1180×820: the fit requested the approximately 2-degree arc, cleared the measured card, retained at least 80 pixels in both dimensions, and did not repeat after selecting the second activity. The landscape card scrolled and stayed within the viewport. This validates component layout and camera arguments; it does not certify live Mapbox rendering.

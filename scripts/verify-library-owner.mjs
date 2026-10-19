@@ -75,6 +75,7 @@ const bootstrap = (resource, items, cursor, gate = false) => ({
   gate,
 });
 const results = [];
+const workCounts = {};
 const contexts = [];
 let browser;
 let timeout;
@@ -291,6 +292,7 @@ async function verify() {
   await start(emptyPage, 'empty');
   await consume(empty, first);
   await state(emptyPage, 'unloaded');
+  await emptyPage.evaluate(() => window.libraryProof.select([123, 456]));
   assert.equal(
     await emptyPage.locator('[data-has-next]').getAttribute('data-has-next'),
     'true',
@@ -298,6 +300,11 @@ async function verify() {
   first.release.resolve();
   await consume(empty, photos);
   await state(emptyPage, 'partial');
+  assert.deepEqual(
+    await emptyPage.evaluate(() => window.libraryProof.selection()),
+    [123, 456],
+    'Partial empty pages retain unknown selected IDs',
+  );
   photos.release.resolve();
   await consume(empty, caughtUp);
   await state(emptyPage, 'partial');
@@ -305,12 +312,94 @@ async function verify() {
   await ready(emptyPage);
   await state(emptyPage, 'complete');
   await view(emptyPage, [], []);
+  assert.deepEqual(
+    await emptyPage.evaluate(() => window.libraryProof.selection()),
+    [],
+    'A complete committed empty library prunes missing IDs',
+  );
   assert.equal(
     await emptyPage.locator('[data-has-next]').getAttribute('data-has-next'),
     'false',
   );
   empty.finish();
   await empty.close();
+
+  // Representative large library: displayed rows must add no query observers.
+  const large = await scenario(
+    'large-library browsing commands and observed geometry',
+  );
+  large.enqueue(
+    bootstrap(
+      'activities',
+      Array.from({ length: 10000 }, (_, index) =>
+        activity(
+          String(index + 1),
+          `Large activity ${String(index + 1).padStart(5, '0')}`,
+        ),
+      ),
+      'large0',
+    ),
+    bootstrap('photos', [], null),
+    changes('large0'),
+  );
+  const largePage = await large.open();
+  await start(largePage, 'large');
+  await ready(largePage);
+  await state(largePage, 'complete');
+  await largePage.waitForFunction(
+    () => document.querySelectorAll('tr[data-activity-id]').length === 200,
+  );
+  const manyObservers = await largePage.evaluate(() =>
+    window.libraryProof.observers(),
+  );
+  assert(
+    manyObservers <= 4,
+    `200 displayed rows must not add full-library observers: ${manyObservers}`,
+  );
+  const beforeSelectionRenders = await largePage.evaluate(() =>
+    window.libraryProof.renderCount(),
+  );
+  await largePage.evaluate(async () => {
+    window.libraryProof.select([1, 10000]);
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+  });
+  assert.equal(
+    await largePage.evaluate(() => window.libraryProof.renderCount()),
+    beforeSelectionRenders,
+    'Selection changes do not fan out through the library provider',
+  );
+  await largePage.evaluate(() =>
+    window.libraryProof.search('Large activity 10000'),
+  );
+  await largePage.waitForFunction(
+    () => document.querySelectorAll('tr[data-activity-id]').length === 1,
+  );
+  assert.equal(
+    await largePage.evaluate(() => window.libraryProof.observers()),
+    manyObservers,
+    'Query subscriptions stay constant with 1 versus 200 rows',
+  );
+  assert.deepEqual(
+    await largePage.evaluate(() => window.libraryProof.selection()),
+    [1, 10000],
+    'Ordinary filtering retains hidden selected members',
+  );
+  await largePage.evaluate(() => window.libraryProof.resize());
+  await largePage
+    .locator('[data-resize-probe][data-observed-width="240"]')
+    .waitFor();
+  workCounts.largeLibrary = {
+    activities: 10000,
+    displayedRows: [200, 1],
+    queryObservers: manyObservers,
+    selectionLibraryRerenders: 0,
+    legacyRowObservers: 400,
+    observedContainerWidth: 240,
+  };
+  large.finish();
+  await large.close();
 
   // Publish each committed page into both mounted hook consumers, without a full fetch.
   const live = await scenario('ordered changes and durable offline reopening');
@@ -520,9 +609,9 @@ import { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { QueryClient, QueryClientProvider, useQueryClient } from '@tanstack/react-query';
 import { ActivityListView } from '~/components/list/activity-list';
 import { OfflineSyncProvider } from '~/components/providers/offline-sync';
-import { useActivities } from '~/hooks/use-activities';
+import { BrowsingProvider, useBrowsingLibrary } from '~/hooks/use-browsing-library';
 import { usePhotos } from '~/hooks/use-photos';
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import { observeMapResize } from '~/lib/map-resize';
 import { getLibraryOwner } from '~/lib/sync/library-owner';
 import { requestLibrarySync } from '~/lib/sync/library-sync';
 import { useBrowserSyncStatus } from '~/lib/sync/browser-status';
@@ -541,6 +630,12 @@ function Controls({ setMounted }: { setMounted: (value: boolean) => void }) {
     (window as any).libraryProof = {
       start: (id: string) => useShallowStore.getState().initializeAuth({ currentUser: { id, name: id, email: null, image: null, athlete_id: 42, stravaConnected: true } }),
       seed: seedLibrary,
+      renderCount: () => (window as any).libraryRenders ?? 0,
+      observers: () => client.getQueryCache().getAll().reduce((count, query) => count + query.getObserversCount(), 0),
+      selection: () => useShallowStore.getState().selected,
+      select: (ids: number[]) => useShallowStore.getState().setSelected(ids),
+      search: (value: string) => useShallowStore.getState().setSearch(value),
+      resize: () => { const element = document.querySelector<HTMLElement>('[data-resize-probe]')!; element.style.width = '240px'; },
       clearCache: clearLibrary,
       mount: setMounted,
       inspect: inspectLibrary,
@@ -556,13 +651,13 @@ function Controls({ setMounted }: { setMounted: (value: boolean) => void }) {
     };
     return () => { delete (window as any).libraryProof; };
   }, [client, setMounted]);
-  return null;
+  return <div data-resize-probe style={{ width: 100, height: 1 }} ref={element => { if (!element) return; return observeMapResize({ getContainer: () => element, resize: () => { element.dataset.observedWidth = String(element.getBoundingClientRect().width); } }); }} />;
 }
 function Library() {
+  if (typeof window !== 'undefined') (window as any).libraryRenders = ((window as any).libraryRenders ?? 0) + 1;
   const userId = useShallowStore(state => state.user?.id);
-  const activities = useActivities();
+  const { query: activities, filterIDs } = useBrowsingLibrary();
   const photos = usePhotos();
-  const { filterIDs } = useFilteredActivities();
   const phase = useBrowserSyncStatus(state => userId ? state.byUser[userId]?.phase : 'idle');
   return <div className="flex h-dvh flex-col" data-library-user={userId ?? 'none'}>
     <OfflineSyncProvider />
@@ -574,7 +669,7 @@ function Library() {
 export default function Review() {
   const [client] = useState(() => new QueryClient({ defaultOptions: { queries: { retry: false } } }));
   const [mounted, setMounted] = useState(true);
-  return <Suspense><QueryClientProvider client={client}><Controls setMounted={setMounted} /><div data-library-mounted={String(mounted)}>{mounted && <Library />}</div></QueryClientProvider></Suspense>;
+  return <Suspense><QueryClientProvider client={client}><Controls setMounted={setMounted} /><div data-library-mounted={String(mounted)}>{mounted && <BrowsingProvider><Library /></BrowsingProvider>}</div></QueryClientProvider></Suspense>;
 }
 `;
 
@@ -657,6 +752,7 @@ async function main() {
           passed: true,
           runId: process.env.LIBRARY_OWNER_RUN_ID ?? null,
           results,
+          workCounts,
         },
         null,
         2,
@@ -668,6 +764,7 @@ async function main() {
           passed: true,
           runId: process.env.LIBRARY_OWNER_RUN_ID ?? null,
           results,
+          workCounts,
         },
         null,
         2,

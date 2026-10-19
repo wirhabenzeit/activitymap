@@ -112,27 +112,17 @@ struct StatsComparison: View {
     let value: String
     let context: String
     let direction: Direction
+    var emphasisesIncrease = false
 
-    private var symbol: String {
-        switch direction {
-        case .higher: "arrow.up"
-        case .lower: "arrow.down"
-        case .unchanged: "minus"
-        }
-    }
-
+    @Environment(\.colorScheme) private var colorScheme
     var body: some View {
-        // A direction describes a comparison, not success or failure. Keep
-        // semantic text and a non-colour cue instead of red/green-only meaning.
-        Label {
-            Text("\(Text(value).fontWeight(.medium)) \(Text(context).foregroundStyle(.secondary))")
-        } icon: {
-            Image(systemName: symbol)
-        }
-        .font(AppTheme.Typography.caption)
-        .fixedSize(horizontal: false, vertical: true)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel("\(directionLabel): \(value) \(context)")
+        let colour: Color = direction == .higher && emphasisesIncrease
+            ? (colorScheme == .dark ? .green : Color(red: 0.08, green: 0.43, blue: 0.2)) : .primary
+        Text("\(Text(value).fontWeight(.medium).foregroundColor(colour)) \(Text(context).foregroundStyle(.secondary))")
+            .font(AppTheme.Typography.caption)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel("\(directionLabel): \(value) \(context)")
     }
 
     private var directionLabel: String {
@@ -566,4 +556,21 @@ struct StatsActivityRow: View {
 /// Explicit presentation is useful for hosts that render an iPad-sized preview on a phone.
 enum StatsDetailPresentation {
     case automatic, navigation, inline
+}
+
+extension View {
+    /// Buttons retain native activation and accessibility; arrows only move focus.
+    func statsDayKeys(day: Int, first: Int, last: Int, layout: StatsDayGrid.Layout, rtl: Bool, focus: @escaping (Int) -> Void) -> some View {
+        func move(_ key: String) -> KeyPress.Result {
+            if let next = StatsDayGrid.target(day: day, key: key, first: first, last: last, layout: layout, rtl: rtl) { focus(next) }
+            return .handled
+        }
+        return self
+            .onKeyPress(.leftArrow) { move("ArrowLeft") }
+            .onKeyPress(.rightArrow) { move("ArrowRight") }
+            .onKeyPress(.upArrow) { move("ArrowUp") }
+            .onKeyPress(.downArrow) { move("ArrowDown") }
+            .onKeyPress(.home) { move("Home") }
+            .onKeyPress(.end) { move("End") }
+    }
 }

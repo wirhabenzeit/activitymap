@@ -4,6 +4,25 @@ import { join } from 'node:path';
 
 // Shared by standalone proofs and the owned harness: source is identical in both.
 export const browserFixtures = {
+  reconciliation: {
+    route: 'react-ui-reconciliation-test',
+    source:
+      "export { default } from '../../../scripts/fixtures/react-ui-reconciliation';\n",
+  },
+  presentation: {
+    route: 'presentation-test',
+    source: `
+'use client';
+import { Suspense, useEffect } from 'react';
+import { StravaConnectProvider, SignedOutConnectPanel } from '~/components/auth/strava-connect';
+import { useShallowStore } from '~/store';
+function Connection() {
+  useEffect(() => { useShallowStore.setState({ isInitialized: true, user: null, isGuest: false }); }, []);
+  return <StravaConnectProvider><SignedOutConnectPanel /></StravaConnectProvider>;
+}
+export default function Review() { return <Suspense><Connection /></Suspense>; }
+`,
+  },
   list: {
     route: 'list-inspection-test',
     source: `
@@ -16,6 +35,7 @@ import { AppSidebar } from '~/components/layout/app-sidebar';
 import { AppHeader } from '~/components/layout/app-header';
 import { SidebarProvider } from '~/components/ui/sidebar';
 import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import { useSelectionReconciliation } from '~/hooks/use-selection-reconciliation';
 import { activityDTOSchema } from '~/contracts/v1/activity';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
@@ -27,6 +47,7 @@ function FixtureList() {
     return raw.map(item => dtoToActivity(activityDTOSchema.parse({...defaults, ...item})));
   }, [dense]);
   const { filterIDs } = useFilteredActivities(activities);
+  useSelectionReconciliation(activities, true, filterIDs);
   return <ActivityListView activities={activities} filterIDs={filterIDs} />;
 }
 export default function Review() {

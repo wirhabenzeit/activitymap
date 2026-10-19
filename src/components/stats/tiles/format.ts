@@ -1,11 +1,13 @@
-import { type UnitSystem, METRES_PER_MILE, METRES_PER_FOOT } from '~/lib/units';
+import { dateFormatter, numberFormatter } from '~/lib/presentation/formatters';
+import { comparisonPresentation } from '~/lib/stats/presentation-policy';
+import { METRES_PER_FOOT, METRES_PER_MILE, type UnitSystem } from '~/lib/units';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
 
-const whole = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
-const oneDecimal = new Intl.NumberFormat('en-US', {
-  minimumFractionDigits: 1,
-  maximumFractionDigits: 1,
-});
+const number = (locale = 'en', decimals = 0) =>
+  numberFormatter(locale, {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
 
 export const metricUnit: Record<StatsMetric, string> = {
   count: 'activities',
@@ -21,40 +23,51 @@ export const metricLabel: Record<StatsMetric, string> = {
   time: 'Moving time',
 };
 
-export function formatMetric(value: number, metric: StatsMetric): string {
+export function formatMetric(
+  value: number,
+  metric: StatsMetric,
+  locale = 'en',
+): string {
   return metric === 'time' && value < 10
-    ? oneDecimal.format(value)
-    : whole.format(value);
+    ? number(locale, 1).format(value)
+    : number(locale).format(value);
 }
 
 // Hilliness is displayed in metres climbed per kilometre, with one decimal.
-export const formatHilliness = (metersPerKm: number) =>
-  oneDecimal.format(metersPerKm);
+export const formatHilliness = (metersPerKm: number, locale = 'en') =>
+  number(locale, 1).format(metersPerKm);
 
-export const formatDailyRate = (value: number) =>
+export const formatDailyRate = (value: number, locale = 'en') =>
   value !== 0 && Math.abs(value) < 1
-    ? new Intl.NumberFormat('en-US', { maximumSignificantDigits: 2 }).format(
-        value,
-      )
-    : oneDecimal.format(value);
+    ? numberFormatter(locale, {
+        maximumSignificantDigits: 2,
+      }).format(value)
+    : number(locale, 1).format(value);
 
-export function formatWithUnit(value: number, metric: StatsMetric): string {
-  return `${formatMetric(value, metric)} ${metricUnit[metric]}`;
+export function formatWithUnit(
+  value: number,
+  metric: StatsMetric,
+  locale = 'en',
+): string {
+  return `${formatMetric(value, metric, locale)} ${metricUnit[metric]}`;
 }
 
 /** Precision follows the spacing of displayed ticks, including after conversion. */
-export function formatShort(value: number, step = 1): string {
+export function formatShort(value: number, step = 1, locale = 'en'): string {
   const scale = Math.abs(value) >= 1000 ? 1000 : 1;
   const interval = Math.abs(step) / scale;
   const decimals =
     Number.isFinite(interval) && interval > 0
       ? Math.min(12, Math.max(0, Math.ceil(-Math.log10(interval))))
       : 0;
-  const rounded = Number((value / scale).toFixed(decimals));
+  const factor = 10 ** decimals;
+  const rounded =
+    (Math.sign(value) * Math.floor(Math.abs(value / scale) * factor + 0.5)) /
+    factor;
   return (
-    new Intl.NumberFormat('en-US', { maximumFractionDigits: decimals }).format(
-      rounded === 0 ? 0 : rounded,
-    ) + (scale === 1000 ? 'k' : '')
+    numberFormatter(locale, {
+      maximumFractionDigits: decimals,
+    }).format(rounded === 0 ? 0 : rounded) + (scale === 1000 ? 'k' : '')
   );
 }
 
@@ -71,31 +84,28 @@ export function axisTicks(
 }
 
 export function percentChange(current: number, previous: number) {
-  if (previous === 0) return null;
-  return Math.round((current / previous - 1) * 100);
+  const facts = comparisonPresentation(current, previous);
+  if (facts.magnitude === null) return null;
+  return facts.magnitude === 0
+    ? 0
+    : facts.direction === 'lower'
+      ? -facts.magnitude
+      : facts.magnitude;
 }
 
-const monthNames = [
-  'Jan',
-  'Feb',
-  'Mar',
-  'Apr',
-  'May',
-  'Jun',
-  'Jul',
-  'Aug',
-  'Sep',
-  'Oct',
-  'Nov',
-  'Dec',
-];
-
-export function monthName(date: Date) {
-  return monthNames[date.getUTCMonth()]!;
+/** Activity-local calendar coordinates stay in UTC; locale changes ordering only. */
+export function monthName(date: Date, locale = 'en') {
+  return dateFormatter(locale, {
+    month: 'short',
+    timeZone: 'UTC',
+  }).format(date);
 }
-
-export function shortDate(date: Date) {
-  return `${monthName(date)} ${date.getUTCDate()}`;
+export function shortDate(date: Date, locale = 'en') {
+  return dateFormatter(locale, {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
 }
 
 export type TilePalette = {
@@ -128,7 +138,7 @@ export function tilePalette(dark: boolean): TilePalette {
 }
 
 /** Stats calculations use kilometres/metres/hours. Keep that contract unchanged. */
-export function statsFormat(units: UnitSystem = 'metric') {
+export function statsFormat(units: UnitSystem = 'metric', locale = 'en') {
   const convert = (value: number, metric: StatsMetric) =>
     units === 'metric'
       ? value
@@ -145,23 +155,24 @@ export function statsFormat(units: UnitSystem = 'metric') {
   return {
     metricUnit: unit,
     formatMetric: (value: number, metric: StatsMetric) =>
-      formatMetric(convert(value, metric), metric),
+      formatMetric(convert(value, metric), metric, locale),
     formatWithUnit: (value: number, metric: StatsMetric) =>
-      `${formatMetric(convert(value, metric), metric)} ${unit[metric]}`,
+      `${formatMetric(convert(value, metric), metric, locale)} ${unit[metric]}`,
     formatShort: (value: number, metric: StatsMetric, step = 1) =>
-      formatShort(convert(value, metric), convert(step, metric)),
+      formatShort(convert(value, metric), convert(step, metric), locale),
     formatHillinessAxis: (value: number, step: number) => {
       const scale =
         units === 'metric' ? 1 : METRES_PER_MILE / 1000 / METRES_PER_FOOT;
-      return formatShort(value * scale, step * scale);
+      return formatShort(value * scale, step * scale, locale);
     },
     formatDailyRate: (value: number, metric: StatsMetric = 'count') =>
-      formatDailyRate(convert(value, metric)),
+      formatDailyRate(convert(value, metric), locale),
     formatHilliness: (value: number) =>
       formatHilliness(
         units === 'metric'
           ? value
           : (value * METRES_PER_MILE) / 1000 / METRES_PER_FOOT,
+        locale,
       ),
     hillinessUnit: units === 'imperial' ? 'ft / mi' : 'm / km',
   };

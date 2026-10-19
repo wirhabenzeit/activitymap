@@ -1,22 +1,19 @@
 'use client';
 
-import * as React from 'react';
-import Image from 'next/image';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import Image from 'next/image';
 import { usePathname, useSearchParams } from 'next/navigation';
+import * as React from 'react';
 
-import {
-  DialogDescription,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-} from '~/components/ui/dialog';
+import { AppDialogContent } from '~/components/app-dialog';
+import { DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import { signIn } from '~/lib/auth-client';
 import {
+  type ConnectFailure,
   connectFailure,
   safeReturnPath,
-  type ConnectFailure,
 } from '~/lib/auth-return';
+import { message } from '~/lib/presentation/messages';
 import { STRAVA_FORCE_CONSENT } from '~/lib/strava-permissions';
 import { cn } from '~/lib/utils';
 import { useShallowStore } from '~/store';
@@ -24,17 +21,14 @@ import { useShallowStore } from '~/store';
 /**
  * Why ActivityMap asks to connect Strava, and what the requested `read`,
  * `activity:read`, `activity:read_all` and `activity:write` scopes are for. Mirrored by the
- * iOS `StravaConnect` copy; keep them in step (issue #304).
+ * iOS `StravaConnect` through the shared presentation messages (issue #304).
  */
-export const STRAVA_CONNECT_PURPOSE =
-  'ActivityMap shows your Strava activities on a map, in a list and as stats.';
-export const STRAVA_CONNECT_PERMISSIONS =
-  'ActivityMap reads your activities, including private ones, and updates those you edit here.';
+export const STRAVA_CONNECT_PURPOSE = message('connect.purpose');
+export const STRAVA_CONNECT_PERMISSIONS = message('connect.permissions');
 
 const FAILURE_MESSAGES: Record<ConnectFailure, string> = {
-  cancelled:
-    'Strava connection was cancelled. Connect again whenever you’re ready.',
-  failed: 'Couldn’t connect to Strava. Please try again.',
+  cancelled: message('connect.cancelled'),
+  failed: message('connect.failed'),
 };
 
 type StravaConnect = {
@@ -138,13 +132,14 @@ export function StravaConnectButton({ className }: { className?: string }) {
       disabled={pending}
       aria-busy={pending}
       className={cn(
-        'shrink-0 self-start rounded-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait',
+        'max-w-full shrink-0 self-start rounded-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden disabled:cursor-wait',
         className,
       )}
     >
       <Image
         src="/btn_strava.svg"
-        alt="Connect with Strava"
+        className="h-auto max-w-full"
+        alt={message('connect.button')}
         width={193}
         height={48}
         priority
@@ -182,37 +177,39 @@ export function SignedOutConnectPanel() {
   );
   // The development screenshot bridge supplies a review dataset without an
   // authenticated session. Keep its production navigation visible for capture.
-  const gallery = process.env.NODE_ENV === 'development'
-    && typeof window !== 'undefined' && Boolean(window.__ACTIVITYMAP_GALLERY__);
+  const gallery =
+    process.env.NODE_ENV === 'development' &&
+    typeof window !== 'undefined' &&
+    Boolean(window.__ACTIVITYMAP_GALLERY__);
   // Nothing behind the dialog is usable without an account, so it cannot be
   // closed; connecting (which reloads the shell) is the way forward.
   const keepOpen = (event: Event) => event.preventDefault();
   return (
     <DialogPrimitive.Root open={signedOut && !gallery}>
-      <DialogPortal>
-        {/* Above the app header (z-[60]) so the whole app sits behind the glass. */}
-        <DialogOverlay className="z-[70] bg-background/20 backdrop-blur-md" />
-        <DialogPrimitive.Content
-          onEscapeKeyDown={keepOpen}
-          onPointerDownOutside={keepOpen}
-          onInteractOutside={keepOpen}
-          className="fixed top-1/2 left-1/2 z-[70] w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 -translate-y-1/2 space-y-4 rounded-2xl border border-white/20 bg-card/75 p-6 text-card-foreground shadow-2xl ring-1 ring-black/5 backdrop-blur-xl duration-200 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 dark:border-white/10"
-        >
-          <div className="space-y-2">
-            <DialogTitle className="text-lg leading-tight font-semibold">
-              Connect Strava to see your activities
-            </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
-              {STRAVA_CONNECT_PURPOSE}
-            </DialogDescription>
-          </div>
-          <StravaConnectButton />
-          <StravaConnectFailure />
-          <p className="text-xs text-muted-foreground">
-            {STRAVA_CONNECT_PERMISSIONS}
-          </p>
-        </DialogPrimitive.Content>
-      </DialogPortal>
+      <AppDialogContent
+        onEscapeKeyDown={keepOpen}
+        onPointerDownOutside={keepOpen}
+        onInteractOutside={keepOpen}
+        closeLabel="Close Connect with Strava"
+        showClose={false}
+        appearance="glass"
+        overlayClassName="z-[70] bg-background/20 backdrop-blur-md"
+        className="z-[70] max-w-sm"
+      >
+        <div className="space-y-2">
+          <DialogTitle className="text-lg leading-tight font-semibold">
+            {message('connect.title')}
+          </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            {STRAVA_CONNECT_PURPOSE}
+          </DialogDescription>
+        </div>
+        <StravaConnectButton />
+        <StravaConnectFailure />
+        <p className="text-xs text-muted-foreground">
+          {STRAVA_CONNECT_PERMISSIONS}
+        </p>
+      </AppDialogContent>
     </DialogPrimitive.Root>
   );
 }

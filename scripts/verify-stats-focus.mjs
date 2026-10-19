@@ -525,6 +525,67 @@ try {
   await active(null);
   console.log('Compact calendar day selection carries into focus');
 
+  // Month rhythm and chronological calendar share navigation rules, not selection-on-focus.
+  await loaded('?tile=this-month');
+  const monthGrid = focus.locator('[data-stats-month-day]');
+  const selectedMonthCell = focus.locator(
+    '[data-stats-month-day][aria-pressed="true"]',
+  );
+  assert.equal(
+    await selectedMonthCell.count(),
+    1,
+    'Month deliberately starts at the latest active day',
+  );
+  assert.equal(
+    await monthGrid
+      .locator('xpath=..')
+      .first()
+      .locator('[tabindex="0"]')
+      .count(),
+    1,
+  );
+  const selectedMonthDay = Number(
+    await selectedMonthCell.getAttribute('data-stats-month-day'),
+  );
+  await selectedMonthCell.focus();
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(
+    await page.evaluate(() =>
+      Number(document.activeElement.dataset.statsMonthDay),
+    ),
+    selectedMonthDay - 1,
+  );
+  assert.equal(
+    Number(await selectedMonthCell.getAttribute('data-stats-month-day')),
+    selectedMonthDay,
+    'Arrow browsing does not activate a day',
+  );
+  await page.keyboard.press('Enter');
+  assert.equal(
+    Number(
+      await focus
+        .locator('[data-stats-month-day][aria-pressed="true"]')
+        .getAttribute('data-stats-month-day'),
+    ),
+    selectedMonthDay - 1,
+  );
+  await focus.evaluate((element) => {
+    element.dir = 'rtl';
+  });
+  await page.keyboard.press('ArrowRight');
+  assert.equal(
+    await page.evaluate(() =>
+      Number(document.activeElement.dataset.statsMonthDay),
+    ),
+    selectedMonthDay - 2,
+  );
+  await focus.evaluate((element) => {
+    element.dir = 'ltr';
+  });
+  console.log(
+    'Month grid roving focus, explicit activation and RTL direction pass',
+  );
+
   // Weekday rows browse continuous history, including years outside the face.
   await loaded('?tile=activity-calendar');
   const calendarScroll = focus.locator('[data-calendar-scroll]');

@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "messages": [
+    {
+      "id": "selection.count",
+      "arguments": { "count": 0 },
+      "source": "0 activities"
+    },
+    {
+      "id": "selection.count",
+      "arguments": { "count": 1 },
+      "source": "1 activity"
+    },
+    {
+      "id": "selection.count",
+      "arguments": { "count": 9 },
+      "source": "9 activities"
+    },
+    {
+      "id": "connect.verify.message",
+      "arguments": { "reason": "🌍 {count} <Berg> مرحبا" },
+      "source": "Your sign-in was saved. 🌍 {count} <Berg> مرحبا"
+    }
+  ],
+  "previews": [
+    {
+      "id": "english-compact",
+      "language": "en",
+      "direction": "ltr",
+      "width": 320,
+      "textScale": 1,
+      "expansion": 1
+    },
+    {
+      "id": "long-compact",
+      "language": "en-XA",
+      "direction": "ltr",
+      "width": 320,
+      "textScale": 2,
+      "expansion": 1.8
+    },
+    {
+      "id": "rtl-wide",
+      "language": "ar-XB",
+      "direction": "rtl",
+      "width": 768,
+      "textScale": 2,
+      "expansion": 1.8
+    }
+  ]
+}

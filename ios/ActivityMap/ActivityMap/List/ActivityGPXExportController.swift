@@ -60,9 +60,8 @@ nonisolated struct ActivityGPXExportAvailability: Sendable {
     init(snapshot: ActivityGPX?) {
         self.snapshot = snapshot
         canExport = snapshot?.points.isEmpty == false
-        let quality = snapshot?.hasSampledElevation == true ? "Sampled route with elevation"
-            : snapshot?.simplified == false ? "Detailed route" : "Simplified route"
-        subtitle = canExport ? "\(quality) · available offline" : "Unavailable · no GPS route"
+        subtitle = !canExport ? "No GPS route"
+            : snapshot?.hasSampledElevation == true ? "Route with elevation" : "Route only"
     }
     /// A first-open menu can offer export immediately without decoding every
     /// visible row. The worker validates cached samples before writing; malformed
@@ -74,9 +73,8 @@ nonisolated struct ActivityGPXExportAvailability: Sendable {
             && summary?.dto.summary?.basis != nil && (summary?.dto.summary?.count ?? 0) > 0
             && summary?.dto.summary?.altitude != nil && summary?.dto.summary?.latlng != nil
         let available = sampled || !activity.coordinates.isEmpty
-        let quality = sampled ? "Sampled route with elevation" : activity.geometrySource == .detailed ? "Detailed route" : "Simplified route"
         return Self(snapshot: nil, canExport: available,
-                    subtitle: available ? "\(quality) · available offline" : "Unavailable · no GPS route")
+                    subtitle: !available ? "No GPS route" : sampled ? "Route with elevation" : "Route only")
     }
     private init(snapshot: ActivityGPX?, canExport: Bool, subtitle: String) {
         self.snapshot = snapshot; self.canExport = canExport; self.subtitle = subtitle

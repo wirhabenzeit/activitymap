@@ -1,16 +1,13 @@
 'use client';
 
-import { useActivities } from './use-activities';
-import { store, useShallowStore } from '~/store';
-import { applyFilters } from '~/store/filter';
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
+
+import { projectActivities } from '~/lib/browsing-projection';
 import type { Activity } from '~/server/db/schema';
+import { useShallowStore } from '~/store';
 
-export function useFilteredActivities(activitiesOverride?: Activity[]) {
-  const { data: activitiesFromHook, hasNextPage } = useActivities();
-  const activities = activitiesOverride ?? activitiesFromHook;
-
-  // We selector the entire filter state parts required for filtering
+/** Pure projection: no library observer and no selection writes. */
+export function useFilteredActivities(activities: Activity[] | undefined) {
   const filterState = useShallowStore((state) => ({
     sportType: state.sportType,
     sportGroup: state.sportGroup,
@@ -19,25 +16,8 @@ export function useFilteredActivities(activitiesOverride?: Activity[]) {
     search: state.search,
     binary: state.binary,
   }));
-
-  const filteredActivities = useMemo(() => {
-    if (!activities) return [];
-    return activities.filter((act) => applyFilters(filterState, act));
-  }, [activities, filterState]);
-
-  const filterIDs = useMemo(() => {
-    return filteredActivities.map((a) => a.id);
-  }, [filteredActivities]);
-
-  useEffect(() => {
-    if (activitiesFromHook !== undefined && activities)
-      store
-        .getState()
-        .reconcileSelection(
-          hasNextPage ? null : activities.map((a) => a.id),
-          filterIDs,
-        );
-  }, [activities, activitiesFromHook, filterIDs, hasNextPage]);
-
-  return { filteredActivities, filterIDs };
+  return useMemo(
+    () => projectActivities(activities, filterState),
+    [activities, filterState],
+  );
 }

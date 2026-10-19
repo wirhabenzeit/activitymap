@@ -1,27 +1,31 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import { useBrowsingState } from '~/hooks/use-browsing-context';
-import { type StatsMetric } from '~/settings/stats-tiles.generated';
-import { categorySettings } from '~/settings/category';
 import { formatPreferredDate } from '~/lib/date-preferences';
+import { selectedMonthDay } from '~/lib/stats/day-grid';
 import {
+  type PeriodSportValues,
+  monthActivityRhythm,
+  periodTotal,
+  yearMonthlyRhythm,
+} from '~/lib/stats/period-rhythm';
+import {
+  type Sport,
   metricValue,
   sameDateLastYear,
   sportOrder,
-  type Sport,
 } from '~/lib/stats/tile-data';
 import { dateOfDay } from '~/lib/stats/tile-series';
-import {
-  monthActivityRhythm,
-  yearMonthlyRhythm,
-  periodTotal,
-  type PeriodSportValues,
-} from '~/lib/stats/period-rhythm';
 import { cn } from '~/lib/utils';
+import { categorySettings } from '~/settings/category';
+import { type StatsMetric } from '~/settings/stats-tiles.generated';
+
 import { ActivityRow } from './activity-row';
 import { formatDailyRate, metricLabel, monthName, statsFormat } from './format';
 import { type TileContext } from './tiles';
+import { useDayGrid } from './use-day-grid';
 
 function SportLegend({ sports }: { sports: readonly Sport[] }) {
   return (
@@ -50,13 +54,26 @@ export function MonthRhythm({
     () => monthActivityRhythm(context.activities, context.today, metric),
     [context.activities, context.today, metric],
   );
-  const [selectedDay, setSelectedDay] = useBrowsingState<number | null>(
+  const [selectedDay, setSelectedDay] = useBrowsingState(
     'stats:monthDay',
     null,
   );
-  const selected =
-    rhythm.days.find((day) => day.day === selectedDay) ??
-    rhythm.days.filter((day) => day.activities.length > 0).at(-1);
+  const firstDay = rhythm.days[0]!.day;
+  const selectedID = selectedMonthDay(
+    selectedDay,
+    rhythm.days
+      .filter((day) => day.activities.length > 0)
+      .map((day) => day.day),
+    firstDay,
+    context.today,
+  );
+  const selected = rhythm.days.find((day) => day.day === selectedID);
+  const dayGrid = useDayGrid(
+    firstDay,
+    context.today,
+    selectedID ?? context.today,
+    'month-rows',
+  );
   const { formatWithUnit } = statsFormat(context.units);
   const dateLabel = (day: number) =>
     formatPreferredDate(dateOfDay(day), context.dateFormat, undefined, {
@@ -127,6 +144,8 @@ export function MonthRhythm({
               <button
                 key={day.day}
                 type="button"
+                {...dayGrid(day.day)}
+                data-stats-month-day={day.day}
                 disabled={future}
                 aria-pressed={isSelected}
                 aria-label={`${dateLabel(day.day)}: ${future ? 'upcoming' : `${day.activities.length} ${day.activities.length === 1 ? 'activity' : 'activities'}, ${formatWithUnit(total, metric)}`}`}

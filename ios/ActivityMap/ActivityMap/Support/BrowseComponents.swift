@@ -1,5 +1,19 @@
 import SwiftUI
 
+/// Localized app-owned text retains String Catalog metadata until rendering.
+/// Activity titles, descriptions and other user content use `.verbatim`.
+enum BrowseText {
+    case localized(LocalizedStringResource)
+    case verbatim(String)
+
+    var text: Text {
+        switch self {
+        case .localized(let resource): Text(resource)
+        case .verbatim(let value): Text(verbatim: value)
+        }
+    }
+}
+
 /// Presentation primitives only. Callers own values, availability and actions.
 /// These components never filter, select, fetch, format or calculate activity data.
 struct BrowseSectionHeading: View {
@@ -41,7 +55,18 @@ struct BrowseSportSymbol: View {
 }
 
 struct BrowseIconButton: View {
-    let title: String
+    let title: BrowseText
+
+    init(title: String, systemImage: String, isSelected: Bool = false, action: @escaping () -> Void) {
+        self.init(title: .verbatim(title), systemImage: systemImage, isSelected: isSelected, action: action)
+    }
+
+    init(title: BrowseText, systemImage: String, isSelected: Bool = false, action: @escaping () -> Void) {
+        self.title = title
+        self.systemImage = systemImage
+        self.isSelected = isSelected
+        self.action = action
+    }
     let systemImage: String
     var isSelected = false
     let action: () -> Void
@@ -53,7 +78,7 @@ struct BrowseIconButton: View {
         }
         .buttonStyle(.plain)
         .opacity(isEnabled ? 1 : 0.4)
-        .accessibilityLabel(title)
+        .accessibilityLabel(title.text)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -101,7 +126,7 @@ struct BrowseSelectionButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)
-        .accessibilityValue(isMixed ? "Partially selected" : isSelected ? "Selected" : "Not selected")
+        .accessibilityValue(Text(isMixed ? AppMessages.selectionMixed() : isSelected ? AppMessages.selectionSelected() : AppMessages.selectionNotSelected()))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
@@ -203,6 +228,7 @@ struct BrowseStatusLine: View {
 /// Shared identification for List rows and map results. Compact rows keep the
 /// local date beside the title; accessibility sizes retain full sport/time text.
 struct BrowseActivityHeading: View {
+    @Environment(\.locale) private var locale
     let activity: Activity
     var isActive = false
     var comfortable = true
@@ -214,11 +240,11 @@ struct BrowseActivityHeading: View {
             : AnyLayout(HStackLayout(alignment: .firstTextBaseline, spacing: 8))
         layout {
             HStack(spacing: 4) {
-                Text(activity.name)
+                Text(verbatim: activity.name)
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(typeSize.isAccessibilitySize ? nil : comfortable ? 2 : 1)
                 if isActive {
-                    Image(systemName: "location.fill").font(.caption2).foregroundStyle(AppTheme.accent)
+                    Image(systemName: ActiveRoutePresentation.glyph(active: true, variant: .badge)).font(.caption2).foregroundStyle(AppTheme.accent)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -233,6 +259,6 @@ struct BrowseActivityHeading: View {
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(activity.name)
-        .accessibilityValue("\(activity.sportType.rawValue), \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))\(isActive ? ", active on map" : "")")
+        .accessibilityValue("\(activity.sportType.rawValue), \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))\(isActive ? ", \(String(localized: ActiveRoutePresentation.state(true, locale: locale)))" : "")")
     }
 }

@@ -1,20 +1,24 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
-import Image from 'next/image';
-import { useSearchParams, useRouter } from 'next/navigation';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RotateCcw } from 'lucide-react';
-import InteractiveMap from '~/components/map/interactive-map';
-import { ActivityListView } from '~/components/list/activity-list';
+import Image from 'next/image';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+
 import { AppSidebar } from '~/components/layout/app-sidebar';
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
+import { ActivityListView } from '~/components/list/activity-list';
+import InteractiveMap from '~/components/map/interactive-map';
 import { Button } from '~/components/ui/button';
-import { useActivities } from '~/hooks/use-activities';
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
+import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
+import {
+  BrowsingProvider,
+  useBrowsingLibrary,
+} from '~/hooks/use-browsing-library';
 import { prepareGallery } from '~/lib/gallery-fixture';
 import { activityFields } from '~/settings/activity';
 import { store } from '~/store';
+
 import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
 
 const initialIDs = [
@@ -47,8 +51,10 @@ function reset() {
 function PreviewContent() {
   const router = useRouter();
   const view = useSearchParams().get('view') === 'list' ? 'list' : 'map';
-  const { data: activities } = useActivities();
-  const { filterIDs } = useFilteredActivities(activities);
+  const {
+    query: { data: activities },
+    filterIDs,
+  } = useBrowsingLibrary();
   return (
     <SidebarProvider defaultOpen={false} className="flex h-dvh flex-col">
       <header className="z-[60] shrink-0 bg-header-background px-2 text-header-foreground">
@@ -133,7 +139,9 @@ export default function SelectionPreview() {
     <Suspense>
       <QueryClientProvider client={client}>
         {ready ? (
-          <PreviewContent />
+          <BrowsingProvider>
+            <PreviewContent />
+          </BrowsingProvider>
         ) : (
           <p className="p-6">Loading selection prototype…</p>
         )}

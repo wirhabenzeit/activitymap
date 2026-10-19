@@ -1,21 +1,27 @@
 'use client';
 
-import { memo, useMemo } from 'react';
-import { Marker } from 'react-map-gl/mapbox';
 import { useQueryClient } from '@tanstack/react-query';
-import { useElevationCursor } from '~/store/elevation-cursor';
-import { useShallowStore } from '~/store';
-import { useActivities } from '~/hooks/use-activities';
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
-import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
+import { memo } from 'react';
+import { Marker } from 'react-map-gl/mapbox';
+
 import {
   isStreamSummaryCurrent,
   streamSummaryQueryKey,
 } from '~/lib/activity-stream-summary';
+import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
+import type { Activity } from '~/server/db/schema';
+import { useShallowStore } from '~/store';
+import { useElevationCursor } from '~/store/elevation-cursor';
 
 // Memoized like RouteLayer: the map re-renders on every camera frame, while
 // this marker only depends on the cursor, selection and filters.
-export const ElevationRouteMarker = memo(function ElevationRouteMarker() {
+export const ElevationRouteMarker = memo(function ElevationRouteMarker({
+  activities,
+  visibleIDs,
+}: {
+  activities: ReadonlyMap<number, Activity>;
+  visibleIDs: ReadonlySet<number>;
+}) {
   const cursor = useElevationCursor((state) => state.cursor);
   const { user, selected, highlighted, isGuest } = useShallowStore((state) => ({
     user: state.user,
@@ -23,14 +29,11 @@ export const ElevationRouteMarker = memo(function ElevationRouteMarker() {
     highlighted: state.highlighted,
     isGuest: state.isGuest,
   }));
-  const { data: activities = [] } = useActivities();
-  const { filterIDs } = useFilteredActivities(activities);
-  const visibleIDs = useMemo(() => new Set(filterIDs), [filterIDs]);
   const queryClient = useQueryClient();
   if (!cursor || isGuest || !user?.stravaConnected || cursor.userId !== user.id)
     return null;
   const id = Number(cursor.activityId);
-  const activity = activities.find((activity) => activity.id === id);
+  const activity = activities.get(id);
   if (
     !activity ||
     !visibleIDs.has(id) ||

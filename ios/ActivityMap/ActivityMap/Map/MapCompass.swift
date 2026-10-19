@@ -48,16 +48,18 @@ struct MapCompassButton: View {
 
 enum MapCompassLayout {
     static func center(size: CGSize, topInset: CGFloat, bottomInset: CGFloat,
-                       showingResults: Bool, detent: MapResultsDetent, largeText: Bool) -> CGPoint? {
+                       showingResults: Bool, detent: MapResultsDetent, largeText: Bool,
+                       resultsFrame: CGRect? = nil) -> CGPoint? {
         let controls = MapResultsLayout.controlsCenter(size: size, topInset: topInset)
         var center = CGPoint(x: controls.x - 26 - 12 - 22, y: topInset + 12 + 22)
         if showingResults {
             let results = MapResultsLayout(size: size, topInset: topInset, bottomInset: bottomInset,
                                            detent: detent, largeText: largeText)
+            let frame = resultsFrame ?? results.frame
             if results.isSidePanel {
                 // Stay outside the panel even while its handle is being dragged.
-                center.x = min(center.x, results.frame.minX - 12 - 22)
-            } else if detent == .expanded || center.y + 22 > results.frame.minY - 8 {
+                center.x = min(center.x, frame.minX - 12 - 22)
+            } else if detent == .expanded || center.y + 22 > frame.minY - 8 {
                 // A full-height phone sheet leaves no usable map touch target.
                 return nil
             }

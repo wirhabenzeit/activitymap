@@ -1,35 +1,31 @@
-import { ZodError, z } from 'zod';
+import { ZodError } from 'zod';
 
+import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
 import {
+  type UpdateActivityRequest,
   activityRefreshResultSchema,
   activitySummaryFetchResultSchema,
   updateActivityRequestSchema,
-  type UpdateActivityRequest,
 } from '~/contracts/v1/activity-mutations';
-import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
-import { errorEnvelope } from '~/contracts/v1/error';
 import { toPhotoDTO } from '~/contracts/v1/photo';
-import type { Actor } from '~/server/auth/actor';
+import {
+  apiFailure as failure,
+  mutationOriginAllowed,
+  PRIVATE_API_HEADERS as privateHeaders,
+} from '~/server/api/transport';
 import {
   ActivityMutationError,
   fetchInitialActivitySummariesForActor,
   refreshActivityForActor,
   updateActivityForActor,
 } from '~/server/application/activities';
-import { requestIdFor } from '~/server/http/request-id';
 import {
   SIGNUP_WARMUP_TIME_MS,
   warmSignupActivitiesForActor,
 } from '~/server/application/signup-warmup';
-
-const path = /^\/api\/v1\/activities\/([^/]+)(?:\/refresh)?\/?$/;
-const activityIdSchema = z
-  .string()
-  .regex(/^[1-9]\d*$/)
-  .refine((id) => Number.isSafeInteger(Number(id)), {
-    message: 'Activity ID exceeds the server storage range',
-  });
+import type { Actor } from '~/server/auth/actor';
+import { requestIdFor } from '~/server/http/request-id';
 
 type UpdateResult = Awaited<ReturnType<typeof updateActivityForActor>>;
 type RefreshResult = Awaited<ReturnType<typeof refreshActivityForActor>>;
@@ -48,52 +44,12 @@ type MutationHandlerDependencies = {
   onError?: (error: unknown, requestId: string) => void;
 };
 
-const privateHeaders = {
-  'Cache-Control': 'private, no-store',
-  Vary: 'Cookie, Authorization',
-};
-
-function failure(
-  requestId: string,
-  status: number,
-  code: string,
-  message: string,
-  options: {
-    retryable?: boolean;
-    retryAfterSeconds?: number;
-    details?: unknown;
-  } = {},
-) {
-  return Response.json(
-    errorEnvelope(code, message, {
-      requestId,
-      retryable: options.retryable,
-      details: options.details,
-    }),
-    {
-      status,
-      headers: {
-        ...privateHeaders,
-        ...(options.retryAfterSeconds
-          ? { 'Retry-After': String(options.retryAfterSeconds) }
-          : {}),
-      },
-    },
-  );
-}
-
 function mutationFailure(error: ActivityMutationError, requestId: string) {
   return failure(requestId, error.status, error.code, error.message, {
     retryable: error.retryable,
     retryAfterSeconds: error.retryAfterSeconds,
     details: error.details,
   });
-}
-
-function parseActivityId(request: Request): number | null {
-  const match = path.exec(new URL(request.url).pathname);
-  const parsed = activityIdSchema.safeParse(match?.[1]);
-  return parsed.success ? Number(parsed.data) : null;
 }
 
 /** Blocking first-page summary fetch, using the same mutation/error boundary. */
@@ -112,8 +68,7 @@ export function createFetchActivitySummariesHandler(
           'not_authenticated',
           'Authentication is required.',
         );
-      const origin = request.headers.get('origin');
-      if (origin && origin !== new URL(request.url).origin)
+      if (!mutationOriginAllowed(request, 'if-present'))
         return failure(
           requestId,
           403,
@@ -170,7 +125,10 @@ export function createFetchActivitySummariesHandler(
 }
 
 export function createUpdateActivityHandler(deps: MutationHandlerDependencies) {
-  return async function PATCH(request: Request): Promise<Response> {
+  return async function PATCH(
+    request: Request,
+    id: number | null,
+  ): Promise<Response> {
     const requestId = requestIdFor(request);
     try {
       const actor = await deps.resolveActor(request);
@@ -181,7 +139,6 @@ export function createUpdateActivityHandler(deps: MutationHandlerDependencies) {
           'not_authenticated',
           'Authentication is required.',
         );
-      const id = parseActivityId(request);
       if (id === null)
         return failure(
           requestId,
@@ -231,7 +188,10 @@ export function createUpdateActivityHandler(deps: MutationHandlerDependencies) {
 export function createRefreshActivityHandler(
   deps: MutationHandlerDependencies,
 ) {
-  return async function POST(request: Request): Promise<Response> {
+  return async function POST(
+    request: Request,
+    id: number | null,
+  ): Promise<Response> {
     const requestId = requestIdFor(request);
     try {
       const actor = await deps.resolveActor(request);
@@ -242,7 +202,6 @@ export function createRefreshActivityHandler(
           'not_authenticated',
           'Authentication is required.',
         );
-      const id = parseActivityId(request);
       if (id === null)
         return failure(
           requestId,

@@ -265,8 +265,9 @@ enum StatsDisplay {
         let interval = abs(step) / scale
         let decimals = interval.isFinite && interval > 0 ? min(12, max(0, Int(ceil(-log10(interval))))) : 0
         let scaled = value / scale
-        let rounded = (scaled * pow(10, Double(decimals))).rounded(.toNearestOrEven)
-        let text = (rounded == 0 ? 0 : scaled).formatted(.number.precision(.fractionLength(0...decimals)).locale(locale))
+        let factor = pow(10, Double(decimals))
+        let rounded = (scaled * factor).rounded(.toNearestOrAwayFromZero) / factor
+        let text = (rounded == 0 ? 0 : rounded).formatted(.number.precision(.fractionLength(0...decimals)).locale(locale))
         return text + (scale == 1000 ? "k" : "")
     }
     static func number(_ value: Double, decimals: Int = 0) -> String {

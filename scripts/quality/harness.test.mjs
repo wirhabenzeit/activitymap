@@ -29,6 +29,8 @@ import {
 } from './browser-harness.mjs';
 import { waitForFixtureRoute } from './browser-support.mjs';
 import {
+  nativeSuiteEligibility,
+  nativeSuites,
   validateNativeSuites,
   validateNativeSummary,
 } from './native-harness.mjs';
@@ -39,6 +41,37 @@ async function temporary(t) {
   t.after(() => rm(directory, { recursive: true, force: true }));
   return directory;
 }
+
+test('native runtime eligibility reports iOS 27 native-sheet coverage without skipping iOS 26 cases', () => {
+  const older = nativeSuiteEligibility('26.2');
+  assert.deepEqual(older.ineligibleSuites, [
+    {
+      suite: 'ActivityMapUITests/MapRotationUITests',
+      requires: 'iOS 27+',
+      actual: '26.2',
+      reason: 'Retained native-sheet rotation contract',
+    },
+    {
+      suite: 'ActivityMapUITests/ActivityContinuationUITests',
+      requires: 'iOS 27+',
+      actual: '26.2',
+      reason: 'Retained native-sheet continuation fixture',
+    },
+  ]);
+  assert.equal(older.suites.length, nativeSuites.length - 2);
+  assert(older.suites.includes('ActivityMapUITests/MapPhotoUITests'));
+  assert(!older.suites.includes('ActivityMapUITests/MapRotationUITests'));
+  assert(
+    !older.suites.includes('ActivityMapUITests/ActivityContinuationUITests'),
+  );
+  assert(older.suites.includes('ActivityMapTests/ActivityContinuationTests'));
+  assert.deepEqual(nativeSuiteEligibility('27.0.1'), {
+    suites: nativeSuites,
+    ineligibleSuites: [],
+  });
+  assert.throws(() => nativeSuiteEligibility('25.0'), /iOS 26/);
+  assert.throws(() => nativeSuiteEligibility('unknown'), /iOS 26/);
+});
 
 test('fixture startup drops inherited service credentials and uses an inert database', () => {
   const environment = fixtureEnvironment(
@@ -75,6 +108,7 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'public',
     'node_modules',
     'scripts/quality',
+    'scripts/fixtures',
     'ios/ActivityMap/ActivityMapTests/Gallery',
   ])
     await mkdir(join(root, directory), { recursive: true });
@@ -88,6 +122,9 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'scripts/verify-list-inspection.mjs',
     'scripts/verify-stats-focus.mjs',
     'scripts/verify-account-deletion.mjs',
+    'scripts/verify-presentation.mjs',
+    'scripts/verify-react-ui-reconciliation.mjs',
+    'scripts/fixtures/react-ui-reconciliation.tsx',
     'scripts/quality/browser-support.mjs',
     'scripts/quality/browser-fixtures.mjs',
     'ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json',
@@ -100,6 +137,13 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
   );
   await prepareFixtureWorkspace(root, destination);
   await assert.rejects(access(join(destination, '.env.local')));
+  assert.equal(
+    await readFile(
+      join(destination, 'scripts/fixtures/react-ui-reconciliation.tsx'),
+      'utf8',
+    ),
+    '{}',
+  );
   assert.equal(
     await readFile(join(destination, 'next.config.fixture-base.mjs'), 'utf8'),
     '{}',

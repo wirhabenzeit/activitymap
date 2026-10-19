@@ -51,6 +51,12 @@ struct AppShell: View {
     private var nativeMapHeader: Bool { usesStatsNavigation && sizeClass == .compact }
 
     var body: some View {
+        browsingContent.overlay {
+            BrowseStatusBarStyle().allowsHitTesting(false)
+        }
+    }
+
+    private var browsingContent: some View {
         Group {
             if usesStatsNavigation {
                 shellContent
@@ -60,6 +66,7 @@ struct AppShell: View {
                 shellContent
             }
         }
+        .environment(\.appToolbarLayout, toolbarLayout)
         .environment(\.listShellNavigation, listNavigation)
         .environment(\.activitySharing, sync?.sharing)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { old, new in
@@ -157,37 +164,9 @@ struct AppShell: View {
     }
 
     @ViewBuilder private func statsFocusPage(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
-        let content = VStack(spacing: 0) {
-            if !nativeStatsHeader {
-                HStack(spacing: 8) {
-                    Button {
-                        if dashboard.inspectedActivityID != nil { dashboard.inspectedActivityID = nil }
-                        else { dashboard.expandedTile = nil }
-                    } label: {
-                        Image(systemName: "chevron.left").frame(width: 44, height: 44)
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(dashboard.inspectedActivityID != nil ? "Back to \(tile.title)" : "Back to Stats dashboard")
-                    .accessibilityIdentifier("stats-detail-back")
-                    Text(tile.title).font(.title2.weight(.semibold))
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("stats-detail-title")
-                    Spacer(minLength: 0)
-                }
-                .padding(.horizontal, 12)
-                .background(AppTheme.contentBackground)
-            }
-            StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync,
-                              usesShellHeader: !nativeStatsHeader)
-                .toolbar {
-                    if nativeStatsHeader {
-                        ToolbarItemGroup(placement: .topBarTrailing) {
-                            filterButton(sidebarAvailable: false)
-                        }.sharedBackgroundVisibility(.hidden)
-                    }
-                }
-        }
+        let content = StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync,
+                                        usesShellHeader: !nativeStatsHeader,
+                                        toolbarTrailing: nativeStatsHeader ? AnyView(filterButton(sidebarAvailable: false)) : AnyView(EmptyView()))
             .tint(AppTheme.accent)
         // Reduce Motion uses cross-fade on iOS 27 and standard navigation on iOS 26.
         if reduceMotion {
@@ -226,6 +205,7 @@ struct AppShell: View {
                         navigableContent(nativeListHeader: nativeListHeader, sidebarAvailable: sidebarAvailable)
                             .environment(\.browsePaneWidth, contentWidth)
                             .environment(\.listRootToolbar, usesStatsNavigation ? nil : browseRootToolbar(sidebarAvailable: sidebarAvailable))
+                            .environment(\.listRootHeader, toolbarLayout.isCompact && nativeListHeader ? browseRootToolbar(sidebarAvailable: sidebarAvailable) : nil)
                             .environment(\.filtersCollapseForDetail, panelTight && sheets.showsFilters && !panelFloats)
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
@@ -253,36 +233,23 @@ struct AppShell: View {
     }
 
     /// Stats focus animates only this column, with its header and filters
-    /// outside the moving page. Compact List and Stats share native toolbars.
+    /// outside the moving page. List and Stats share the adaptive navigation toolbar.
     @ViewBuilder private func navigableContent(nativeListHeader: Bool, sidebarAvailable: Bool) -> some View {
         if usesStatsNavigation {
-            VStack(spacing: 0) {
-                NavigationStack {
-                    content
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar((store.selectedTab == .list && nativeListHeader)
-                                 || (store.selectedTab == .stats && nativeStatsHeader)
-                                 || (store.selectedTab == .map && nativeMapHeader) ? .visible : .hidden, for: .navigationBar)
-                        .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-                        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-                        .toolbarColorScheme(.dark, for: .navigationBar)
-                        .toolbar {
-                            if (store.selectedTab == .list && nativeListHeader)
-                                || (store.selectedTab == .stats && nativeStatsHeader)
-                                || (store.selectedTab == .map && nativeMapHeader) {
-                                browseRootToolbar(sidebarAvailable: sidebarAvailable)
-                            }
+            NavigationStack {
+                content
+                    .appNavigationBar(browseRootToolbar(sidebarAvailable: sidebarAvailable),
+                        visible: (store.selectedTab == .list && nativeListHeader)
+                            || (store.selectedTab == .stats && nativeStatsHeader)
+                            || (store.selectedTab == .map && nativeMapHeader),
+                        compactPlaceholder: store.selectedTab == .list)
+                    .navigationDestination(item: statsDetailSelection) { id in
+                        if let dashboard = statsNavigation.dashboard,
+                           let tile = StatsDashboard.tiles.first(where: { $0.id == id }) {
+                            statsFocusPage(tile, dashboard: dashboard)
                         }
-                        .navigationDestination(item: statsDetailSelection) { id in
-                            if let dashboard = statsNavigation.dashboard,
-                               let tile = StatsDashboard.tiles.first(where: { $0.id == id }) {
-                                statsFocusPage(tile, dashboard: dashboard)
-                            }
-                        }
-                }
-                BrowseListFooter(store: store)
+                    }
             }
-            .environment(\.listFooterHostedByShell, true)
         } else {
             content
         }
@@ -403,49 +370,23 @@ struct AppShell: View {
                       restoreRetryAt: auth.restoreRetryAt)
     }
 
-    /// iPhone landscape: a slimmer bar that also carries the List's status row (#315).
-    private var compactBar: Bool { verticalSizeClass == .compact && !typeSize.isAccessibilitySize }
+    private var toolbarLayout: AppToolbarLayout {
+        AppToolbarLayout(size: shellSize, verticalSizeClass: verticalSizeClass, typeSize: typeSize)
+    }
     private var syncing: Bool { sync?.status.showsLoadingIndicator == true }
 
-    private func browseRootToolbar(sidebarAvailable: Bool) -> BrowseRootToolbar {
-        BrowseRootToolbar(leading: AnyView(HStack(spacing: 8) {
+    private func browseRootToolbar(sidebarAvailable: Bool) -> AppToolbar {
+        AppToolbar(leading: AnyView(HStack(spacing: 8) {
             filterButton(sidebarAvailable: sidebarAvailable)
-            if compactBar && store.selectedTab == .list { SelectionBar(store: store, includesTotal: true, onNavigationBar: true) }
+            if toolbarLayout.packsListControls && store.selectedTab == .list { SelectionBar(store: store, includesTotal: true, onNavigationBar: true) }
         }), principal: AnyView(destinationPicker), trailing: AnyView(HStack(spacing: 8) {
-            if compactBar && store.selectedTab == .list { ListControls(presentation: store.listPresentation, store: store, iconOnly: true, onNavigationBar: true) }
+            if toolbarLayout.packsListControls && store.selectedTab == .list { ListControls(presentation: store.listPresentation, store: store, iconOnly: true, onNavigationBar: true) }
             accountButton
-        }))
+        }), identifier: "browse-header")
     }
 
-    // Global destinations stay outside the List's native navigation stack.
     private func shellHeader(sidebarAvailable: Bool) -> some View {
-        HStack(spacing: 8) {
-            // Equal flexible sides keep the destination picker centred.
-            HStack(spacing: 8) {
-                filterButton(sidebarAvailable: sidebarAvailable)
-                if compactBar && store.selectedTab == .list {
-                    SelectionBar(store: store, includesTotal: true, onNavigationBar: true)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            destinationPicker
-            // Measured before the sides, so the full picker wins when it fits.
-            .layoutPriority(1)
-            HStack(spacing: 8) {
-                if compactBar && store.selectedTab == .list {
-                    ListControls(presentation: store.listPresentation, store: store, iconOnly: true, onNavigationBar: true)
-                }
-                accountButton
-            }
-            .frame(maxWidth: .infinity, alignment: .trailing)
-        }
-        .padding(.horizontal, 16)
-        .frame(height: compactBar ? 44 : 54)
-        // Controls stay inside the safe area; only the colour reaches the edges.
-        .background(AppTheme.navigationBlue.ignoresSafeArea(edges: [.top, .horizontal]))
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("browse-header")
+        browseRootToolbar(sidebarAvailable: sidebarAvailable).bar
     }
 
     private func filterButton(sidebarAvailable: Bool) -> some View {
@@ -557,18 +498,21 @@ struct AppShell: View {
                         .foregroundStyle(Color.white)
                         .frame(minWidth: 54)
                         .padding(.horizontal, 8)
-                        .frame(minHeight: compactBar ? 36 : 44)
+                        .frame(minHeight: toolbarLayout.pickerHeight)
                         .background(
                             store.selectedTab == tab ? Color.white.opacity(0.22) : .clear,
                             in: Capsule()
                         )
+                        .frame(minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityAddTraits(store.selectedTab == tab ? .isSelected : [])
                 .accessibilityIdentifier("browse-destination-\(tab.title.lowercased())")
             }
         }
-        .padding(compactBar ? 2 : 3)
+        .padding(.horizontal, toolbarLayout.pickerHorizontalInset)
+        .padding(.vertical, toolbarLayout.pickerVerticalInset)
         .background(Color.white.opacity(0.08), in: Capsule())
         .accessibilityElement(children: .contain)
         .accessibilityLabel("View")

@@ -1,7 +1,23 @@
 import assert from 'node:assert/strict';
+
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+
+import { createActivityStreamsHandler } from '../../src/app/api/v1/activities/[id]/streams/handler';
+import { createStreamSummariesHandler } from '../../src/app/api/v1/stream-summaries/handler';
+import { toActivityDTO } from '../../src/contracts/v1/activity';
+import {
+  activityCompactStreamSummariesDTOSchema,
+  activityCompactStreamSummaryDTOSchema,
+  activityStreamSummariesDTOSchema,
+  activityStreamSummaryDTOSchema,
+  activityStreamsDTOSchema,
+  toActivityStreamsDTO,
+} from '../../src/contracts/v1/activity-streams';
+import { encodeStreamSummary } from '../../src/lib/streams/compact-summary';
+import { fetchActivityStreams } from '../../src/server/application/activity-streams';
+import type { Actor } from '../../src/server/auth/actor';
 import { resolveMigrationTarget } from '../../src/server/db/migration-tooling';
 import {
   accounts,
@@ -10,29 +26,15 @@ import {
   stravaRequestBudgets,
   users,
 } from '../../src/server/db/schema';
-import { createActivityStreamsRepository } from '../../src/server/repositories/activity-streams';
 import { createActivitiesRepository } from '../../src/server/repositories/activities';
+import { createActivityStreamsRepository } from '../../src/server/repositories/activity-streams';
 import { createChangesRepository } from '../../src/server/repositories/changes';
 import { createStravaRequestBudget } from '../../src/server/repositories/strava-budget';
-import { fetchActivityStreams } from '../../src/server/application/activity-streams';
-import { createActivityStreamsHandler } from '../../src/app/api/v1/activities/[id]/streams/handler';
-import { toActivityDTO } from '../../src/contracts/v1/activity';
-import {
-  activityStreamSummariesDTOSchema,
-  activityCompactStreamSummaryDTOSchema,
-  activityCompactStreamSummariesDTOSchema,
-  activityStreamSummaryDTOSchema,
-  activityStreamsDTOSchema,
-  toActivityStreamsDTO,
-} from '../../src/contracts/v1/activity-streams';
-import { RAW_STREAMS_FIXTURE } from '../../src/server/strava/streams.fixture';
-import { encodeStreamSummary } from '../../src/lib/streams/compact-summary';
 import { convertStreamSummaryBatch } from '../../src/server/repositories/stream-summary-storage';
-import { summarizeStreams } from '../../src/server/strava/stream-summary';
-import { createStreamSummariesHandler } from '../../src/app/api/v1/stream-summaries/handler';
 import { StravaApiError } from '../../src/server/strava/client';
 import { StravaBudgetExceededError } from '../../src/server/strava/request-budget';
-import type { Actor } from '../../src/server/auth/actor';
+import { summarizeStreams } from '../../src/server/strava/stream-summary';
+import { RAW_STREAMS_FIXTURE } from '../../src/server/strava/streams.fixture';
 
 const target = resolveMigrationTarget(process.env);
 if (
@@ -143,11 +145,14 @@ async function run() {
   }
   await seedActivity();
   const ownerHandler = makeHandler(actor);
-  const never = await ownerHandler(request('fetch=none'));
+  const never = await ownerHandler(request('fetch=none'), ID);
   assert.equal(never.status, 200);
   assert.match(await never.text(), /"state":"not_fetched"/);
   for (const authentication of ['cookie', 'bearer'] as const) {
-    const denied = await makeHandler({ ...other, authentication })(request());
+    const denied = await makeHandler({ ...other, authentication })(
+      request(),
+      ID,
+    );
     assert.equal(denied.status, 404);
     assert.doesNotMatch(await denied.text(), /available_types/);
   }
@@ -169,9 +174,9 @@ async function run() {
       return RAW_STREAMS_FIXTURE;
     },
   }));
-  const first = slow(request());
+  const first = slow(request(), ID);
   await started;
-  const duplicate = await slow(request());
+  const duplicate = await slow(request(), ID);
   assert.equal(duplicate.status, 202);
   assert.equal(duplicate.headers.get('retry-after'), '3');
   assert.equal(calls, 1);
@@ -183,7 +188,7 @@ async function run() {
     activityStreamsDTOSchema.parse(body.data).streams,
     RAW_STREAMS_FIXTURE,
   );
-  await slow(request());
+  await slow(request(), ID);
   assert.equal(calls, 1, 'fresh read does not refetch');
   const stored = await repository.read(actor, ID);
   assert.ok(stored);
@@ -290,10 +295,10 @@ async function run() {
     [],
     "another athlete's activity is omitted",
   );
-  const summaryResponse = await makeHandlerView(
-    actor,
-    'summary',
-  )(new Request(`https://app.test/api/v1/activities/${ID}/streams/summary`));
+  const summaryResponse = await makeHandlerView(actor, 'summary')(
+    new Request(`https://app.test/api/v1/activities/${ID}/streams/summary`),
+    ID,
+  );
   assert.equal(summaryResponse.status, 200);
   const summaryBody = activityStreamSummaryDTOSchema.parse(
     ((await summaryResponse.json()) as { data: unknown }).data,
@@ -337,13 +342,11 @@ async function run() {
     { format: 'polyline-v1', apply: true },
   );
   const beforeConversion = (await repository.read(actor, ID))!;
-  const compactResponse = await makeHandlerView(
-    actor,
-    'compact',
-  )(
+  const compactResponse = await makeHandlerView(actor, 'compact')(
     new Request(
       `https://app.test/api/v1/activities/${ID}/streams/summary/compact?fetch=none`,
     ),
+    ID,
   );
   assert.equal(compactResponse.status, 200);
   assert.deepEqual(
@@ -596,16 +599,16 @@ async function run() {
       throw new StravaApiError('throttled', 429);
     },
   }));
-  assert.equal((await failing(request('refresh=true'))).status, 429);
+  assert.equal((await failing(request('refresh=true'), ID)).status, 429);
   assert.equal(
-    (await failing(request('refresh=true'))).status,
+    (await failing(request('refresh=true'), ID)).status,
     429,
     'cooldown does not make another upstream call',
   );
   const failed = await repository.read(actor, ID);
   assert.deepEqual(failed?.payload, {});
   assert.equal(failed?.lastError?.code, 'rate_limited');
-  const lastGood = await failing(request());
+  const lastGood = await failing(request(), ID);
   assert.equal(
     lastGood.status,
     200,
@@ -630,7 +633,7 @@ async function run() {
     await repository.commit(claim.claim, RAW_STREAMS_FIXTURE, now()),
     null,
   );
-  assert.equal((await ownerHandler(request('fetch=none'))).status, 404);
+  assert.equal((await ownerHandler(request('fetch=none'), ID)).status, 404);
   await testDb
     .update(accounts)
     .set({ revokedAt: null, accessToken: 'new-token', updatedAt: now() })
@@ -640,7 +643,7 @@ async function run() {
     null,
   );
   await activityRepository.deleteManyForAthlete(actor.athleteId, [Number(ID)]);
-  assert.equal((await ownerHandler(request())).status, 404);
+  assert.equal((await ownerHandler(request(), ID)).status, 404);
   const deletions = await changes.findAfter(actor.athleteId, priorSequence);
   assert.ok(
     deletions.some(

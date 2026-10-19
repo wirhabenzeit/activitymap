@@ -8,7 +8,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     var showsHeading = true
     var showsPrimaryMetrics = true
     var showsDescription = true
-    /// Puts the route action beside the title (List, iPad pane, Stats sheet).
+    /// Route and editing actions share the scrolling footer on every detail surface.
     var hasRoute = true
     var showOnMap: ((Int) -> Void)? = nil
     var editing: ActivityEditingService? = nil
@@ -25,8 +25,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if showsHeading {
-                ActivityDetailHeading(activity: activity, trailingInset: headerTrailingInset,
-                                      hasRoute: hasRoute, showOnMap: showOnMap, editing: editing)
+                ActivityDetailHeading(activity: activity, trailingInset: headerTrailingInset)
             }
             profile(activity)
             if showsDescription { ActivityDetailDescription(activity: activity) }
@@ -59,7 +58,9 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                 }
                 .accessibilityIdentifier("activity-metric-group-\(group.id)")
             }
-            ActivityDetailActions(activity: activity, summaries: streamSummaries, exportStore: exportStore).id(activity.id)
+            ActivityDetailActions(activity: activity, hasRoute: hasRoute, showOnMap: showOnMap,
+                                  editing: editing, summaries: streamSummaries, exportStore: exportStore)
+                .id(activity.id)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.horizontal, AppTheme.Spacing.large)
@@ -125,8 +126,23 @@ struct ActivityHeadlineStats: View {
     }
 }
 
+/// Optional navigation supplied by a paged detail host. Closures read the live
+/// selection so cached pages keep their accessibility actions up to date.
+struct ActivityDetailPaging {
+    let position: (Int) -> String?
+    let previous: () -> Void
+    let next: () -> Void
+    var canGoPrevious: (Int) -> Bool = { _ in true }
+    var canGoNext: (Int) -> Bool = { _ in true }
+}
+
+extension EnvironmentValues {
+    @Entry var activityDetailPaging: ActivityDetailPaging? = nil
+}
+
 /// Shared identity stays in one place while Map summary grows into detail.
 struct ActivityDetailIdentity: View {
+    @Environment(\.activityDetailPaging) private var paging
     let activity: Activity
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
@@ -138,14 +154,24 @@ struct ActivityDetailIdentity: View {
             VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
                 Text(activity.name).font(.headline)
                     .foregroundStyle(onNavigationBar ? Color.white : .primary)
-                    .lineLimit(titleLineLimit)
+                    // Native bars reserve one line for identity and one for
+                    // metadata; wrapping a long title must not grow the bar.
+                    .lineLimit(onNavigationBar ? 1 : titleLineLimit)
                     .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityAddTraits(.isHeader)
                     .accessibilityIdentifier("activity-detail-name")
+                    .accessibilityValue(paging?.position(activity.id) ?? "")
+                    .accessibilityActions {
+                        if let paging, paging.position(activity.id) != nil {
+                            if paging.canGoPrevious(activity.id) { Button("Previous activity", action: paging.previous) }
+                            if paging.canGoNext(activity.id) { Button("Next activity", action: paging.next) }
+                        }
+                    }
                 Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
                     .font(.caption).foregroundStyle(onNavigationBar ? Color.white.opacity(0.8) : AppTheme.secondaryText)
-                    .lineLimit(titleLineLimit == 1 ? 1 : nil)
+                    .lineLimit(onNavigationBar || titleLineLimit == 1 ? 1 : nil)
+                    .truncationMode(.tail)
                     .fixedSize(horizontal: false, vertical: true)
             }
         }
@@ -154,66 +180,25 @@ struct ActivityDetailIdentity: View {
     }
 }
 
-/// An activity's title row. The route action sits beside the title rather
-/// than in a footer row. Edit is a direct button beside the title.
+/// The title row stays focused on identity and moving between activities.
+/// Map owns its previous/next controls in the persistent group header.
 struct ActivityDetailHeading: View {
+    @Environment(\.activityDetailPaging) private var paging
+    @Environment(\.activityDetailOverMap) private var overMap
     let activity: Activity
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
     var onNavigationBar = false
-    var hasRoute = true
-    var showOnMap: ((Int) -> Void)? = nil
-    var editing: ActivityEditingService? = nil
-    @Environment(\.activityDetailOverMap) private var overMap
-    @Environment(\.dynamicTypeSize) private var typeSize
-    @State private var width: CGFloat = 0
-
-    /// Rows this wide keep a readable title beside "Show on map" (iPhone
-    /// landscape, full-width iPad). Narrower rows and accessibility text
-    /// sizes show the icon alone.
-    static let labelledWidth: CGFloat = 520
-    private var labelled: Bool { width >= Self.labelledWidth && !typeSize.isAccessibilitySize }
-    // Map sheets own their contextual Fit button in the persistent group header.
-    private var title: String { overMap ? "Fit route" : "Show on map" }
-    private let icon = "map"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
-            HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
-                ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit, onNavigationBar: onNavigationBar)
-                if let editing {
-                    ActivityEditButton(activity: activity, service: editing, onNavigationBar: onNavigationBar, showsIcon: labelled)
-                }
-                if let showOnMap, !overMap {
-                    Button { showOnMap(activity.id) } label: {
-                        if labelled {
-                            Label(title, systemImage: icon)
-                                .font(.subheadline.weight(.semibold))
-                                .padding(.horizontal, 14)
-                                .frame(minHeight: 36)
-                                .background(onNavigationBar ? Color.white.opacity(0.18) : AppTheme.selectionBackground, in: Capsule())
-                                .frame(minHeight: AppTheme.minimumTarget)
-                        } else {
-                            // Grows with Dynamic Type instead of clipping the symbol.
-                            Image(systemName: icon)
-                                .font(.body.weight(.semibold))
-                                .padding(10)
-                                .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
-                                .background(onNavigationBar ? Color.white.opacity(0.18) : AppTheme.selectionBackground, in: Circle())
-                        }
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
-                    .contentShape(Rectangle())
-                    .disabled(!hasRoute)
-                    .opacity(hasRoute ? 1 : 0.4)
-                    .accessibilityLabel(title)
-                    .accessibilityIdentifier("activity-show-on-map")
-                    .accessibilityHint(hasRoute ? (overMap ? "Frame this route while keeping its elevation profile visible" : "Select this activity and frame its route") : "This activity has no GPS route")
-                }
+        HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
+            ActivityDetailIdentity(activity: activity, titleLineLimit: titleLineLimit, onNavigationBar: onNavigationBar)
+            if !overMap, let paging, paging.position(activity.id) != nil {
+                ActivityDetailStepButtons(previous: paging.canGoPrevious(activity.id) ? paging.previous : nil,
+                                          next: paging.canGoNext(activity.id) ? paging.next : nil,
+                                          onNavigationBar: onNavigationBar)
             }
         }
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
         .padding(.trailing, trailingInset)
     }
 }
@@ -222,5 +207,53 @@ extension ActivityDetailContent where Profile == EmptyView, Photos == EmptyView 
     init(activity: Activity, headerTrailingInset: CGFloat = 0, showsHeading: Bool = true, streamSummaries: StreamSummaryLoader? = nil) {
         self.init(activity: activity, headerTrailingInset: headerTrailingInset, showsHeading: showsHeading,
                   streamSummaries: streamSummaries, profile: { _ in EmptyView() }, photos: { _ in EmptyView() })
+    }
+}
+
+/// Both browsing hosts use their visible order and stop at its boundaries.
+struct ActivityDetailSequence {
+    let ids: [Int]
+    let currentID: Int
+    private var index: Int? { ids.firstIndex(of: currentID) }
+    var previousID: Int? {
+        guard let index, index > 0 else { return nil }
+        return ids[index - 1]
+    }
+    var nextID: Int? {
+        guard let index, index + 1 < ids.count else { return nil }
+        return ids[index + 1]
+    }
+    var position: String? {
+        guard ids.count > 1, let index else { return nil }
+        return String(localized: "\(index + 1) of \(ids.count)")
+    }
+}
+
+/// Visible alternatives to pulling past the end; shared by Map and List.
+struct ActivityDetailStepButtons: View {
+    let previous: (() -> Void)?
+    let next: (() -> Void)?
+    var onNavigationBar = false
+    var body: some View {
+        HStack(spacing: 0) {
+            step("Previous activity", icon: "chevron.up", identifier: "activity-previous", action: previous)
+            step("Next activity", icon: "chevron.down", identifier: "activity-next", action: next)
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
+    }
+
+    private func step(_ label: LocalizedStringKey, icon: String, identifier: String,
+                      action: (() -> Void)?) -> some View {
+        Button { action?() } label: {
+            Image(systemName: icon)
+                .font(.body.weight(.semibold))
+                .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
+                .contentShape(Rectangle())
+        }
+        .disabled(action == nil)
+        .opacity(action == nil ? 0.35 : 1)
+        .accessibilityLabel(Text(label))
+        .accessibilityIdentifier(identifier)
     }
 }

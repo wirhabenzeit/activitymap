@@ -42,6 +42,8 @@ private struct StatsMonthRhythmView: View {
     let metric: StatsMetric
     let today: Int
     let openActivity: (Int) -> Void
+    @FocusState private var keyboardDay: Int?
+    @Environment(\.layoutDirection) private var layoutDirection
     @State private var selectedDay: Int?
     @State private var width: CGFloat = 0
     @Environment(\.statsTileInspection) private var inspection
@@ -113,8 +115,8 @@ private struct StatsMonthRhythmView: View {
     }
     private func activityCount(_ count: Int) -> String { count == 1 ? "1 activity" : "\(count) activities" }
     private func reconcileSelection() {
-        if let focusedDay, rhythm.days.contains(where: { $0.day == focusedDay && $0.day <= today }) { return }
-        focusedDay = rhythm.days.last { $0.day <= today && !$0.activities.isEmpty }?.day
+        focusedDay = StatsDayGrid.selectedMonthDay(candidate: focusedDay,
+            activeDays: rhythm.days.filter { !$0.activities.isEmpty }.map(\.day), first: rhythm.days.first?.day ?? today, last: today)
     }
     private func dayCell(_ day: StatsMonthRhythmDay) -> some View {
         let total = day.bySport.values.reduce(0, +)
@@ -137,6 +139,9 @@ private struct StatsMonthRhythmView: View {
             .background(day.day == focusedDay ? Color.accentColor.opacity(0.1) : Color.secondary.opacity(0.04), in: RoundedRectangle(cornerRadius: 6))
             .overlay { if day.day == focusedDay { RoundedRectangle(cornerRadius: 6).stroke(Color.accentColor, lineWidth: 2) } }.contentShape(Rectangle())
         }.buttonStyle(.plain).disabled(day.day > today)
+        .focused($keyboardDay, equals: day.day)
+        .statsDayKeys(day: day.day, first: rhythm.days.first?.day ?? today, last: today,
+                      layout: .monthRows, rtl: layoutDirection == .rightToLeft) { keyboardDay = $0 }
         .accessibilityLabel(StatsDisplay.date(day.day))
         .accessibilityValue(day.day > today ? "Not yet elapsed" : "\(activityCount(day.activities.count)), \(StatsDisplay.measurement(total, metric: metric))")
         .accessibilityAddTraits(day.day == focusedDay ? .isSelected : [])

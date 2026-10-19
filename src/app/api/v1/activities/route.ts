@@ -1,22 +1,21 @@
 import { after } from 'next/server';
+
 import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
-import { withApiV1Observability } from '~/server/api/observability';
-import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
-import { resolveActor } from '~/server/auth/actor';
-import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
+import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { warmSignupActivitiesForActor } from '~/server/application/signup-warmup';
 import { logger } from '~/server/logging/logger';
 import { activitiesRepository } from '~/server/repositories/activities';
+
 import { createListHandler } from '../list-handler';
 import { createFetchActivitySummariesHandler } from './[id]/mutation-handler';
 
 const ROUTE = 'GET /api/v1/activities';
 export const maxDuration = 60;
 
-export const POST = withApiV1Observability(
-  withApiV1RateLimit(
+export const POST = withAuthenticatedApiV1(
+  (request, context) =>
     createFetchActivitySummariesHandler({
-      resolveActor: (request) => resolveActor(request.headers),
+      resolveActor: context.actor,
       afterResponse: after,
       warmSignup: async (actor, count, options) => {
         const result = await warmSignupActivitiesForActor(
@@ -29,16 +28,14 @@ export const POST = withApiV1Observability(
       },
       onError: (error, requestId) =>
         logger.error('Summary fetch failed', { error, requestId }),
-    }),
-    { route: 'POST /api/v1/activities', resolveUserId: resolveRateLimitUserId },
-  ),
-  { route: 'POST /api/v1/activities' },
+    })(request),
+  { route: 'POST /api/v1/activities', cache: 'private-no-store' },
 );
 
-export const GET = withApiV1Observability(
-  withApiV1RateLimit(
+export const GET = withAuthenticatedApiV1(
+  (request, context) =>
     createListHandler({
-      resolveActor: (request) => resolveActor(request.headers),
+      resolveActor: context.actor,
       itemSchema: activityDTOSchema,
       findPage: (
         athleteId,
@@ -57,8 +54,6 @@ export const GET = withApiV1Observability(
       onError: (error, requestId) => {
         logger.error('GET /api/v1/activities failed', { error, requestId });
       },
-    }),
-    { route: ROUTE, resolveUserId: resolveRateLimitUserId },
-  ),
-  { route: ROUTE },
+    })(request),
+  { route: ROUTE, cache: 'private-no-store' },
 );

@@ -26,7 +26,7 @@ extension RenderedRoutePickingTests {
         #expect(gpx.accessibilityTraits.contains(.notEnabled) == (scenario == "no-gps"))
         #expect(!strava.accessibilityTraits.contains(.notEnabled))
         let label = gpx.accessibilityLabel ?? ""
-        #expect(label.contains(scenario == "no-gps" ? "no GPS" : scenario == "summary" ? "Simplified route" : "Detailed route"))
+        #expect(label.contains(scenario == "no-gps" ? "No GPS route" : "Route only"))
         host.reveal(gpx.accessibilityFrame)
         try await Task.sleep(for: .milliseconds(150))
         #expect(host.element("ACTIVITY ACTIONS") == nil && host.element("Activity actions") == nil)
@@ -115,7 +115,7 @@ extension RenderedRoutePickingTests {
             try await Task.sleep(for: .milliseconds(20))
         }
         let button = try #require(element)
-        #expect(button.accessibilityLabel?.contains("Sampled route with elevation") == true)
+        #expect(button.accessibilityLabel?.contains("Route with elevation") == true)
         host.reveal(button.accessibilityFrame)
         try host.save("rows-sampled-elevation")
         let before = try exportDirectories()

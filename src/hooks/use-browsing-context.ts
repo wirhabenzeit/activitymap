@@ -1,33 +1,42 @@
 'use client';
 
 import {
+  type RefObject,
+  type SetStateAction,
   useCallback,
   useLayoutEffect,
   useRef,
   useState,
-  type RefObject,
-  type SetStateAction,
 } from 'react';
-import { browsing } from '~/store/browsing';
 
-export function useBrowsingState<T>(key: string | undefined, initial: T) {
+import {
+  type BrowsingKey,
+  type BrowsingScrollKey,
+  type BrowsingValues,
+  browsing,
+} from '~/store/browsing';
+
+export function useBrowsingState<K extends BrowsingKey>(
+  key: K | undefined,
+  initial: BrowsingValues[K],
+) {
   const [fallback] = useState(initial);
   const [local, setLocal] = useState(initial);
   const saved = browsing((state) => (key ? state.values[key] : undefined));
-  const value = saved === undefined ? (key ? fallback : local) : (saved as T);
+  // Null is a valid retained value (for example a cleared calendar day).
+  // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+  const value = saved === undefined ? (key ? fallback : local) : saved;
   const set = useCallback(
-    (update: SetStateAction<T>) => {
+    (update: SetStateAction<BrowsingValues[K]>) => {
       if (!key) {
         setLocal(update);
         return;
       }
       browsing.setState((state) => {
         const previous =
-          state.values[key] === undefined ? fallback : (state.values[key] as T);
-        const next =
-          typeof update === 'function'
-            ? (update as (value: T) => T)(previous)
-            : update;
+          // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+          state.values[key] === undefined ? fallback : state.values[key];
+        const next = typeof update === 'function' ? update(previous) : update;
         return { values: { ...state.values, [key]: next } };
       });
     },
@@ -39,7 +48,7 @@ export function useBrowsingState<T>(key: string | undefined, initial: T) {
 /** Restore a scroller even when its rows/charts arrive after the first layout. */
 export function useRetainedScroll(
   ref: RefObject<HTMLDivElement | null>,
-  key: string | undefined,
+  key: BrowsingScrollKey | undefined,
   selector?: string,
 ) {
   useLayoutEffect(() => {
@@ -54,7 +63,7 @@ export function useRetainedScroll(
 
 // Measure can mount its children after the parent's layout effect. A callback
 // ref starts retention when the actual scroller appears, including after resize.
-export function useRetainedScrollRef(key: string) {
+export function useRetainedScrollRef(key: BrowsingScrollKey) {
   const elementRef = useRef<HTMLDivElement>(null);
   const attach = useCallback(
     (element: HTMLDivElement | null) => {
@@ -66,7 +75,7 @@ export function useRetainedScrollRef(key: string) {
   return [elementRef, attach] as const;
 }
 
-function retainScroll(element: HTMLElement, key: string) {
+function retainScroll(element: HTMLElement, key: BrowsingScrollKey) {
   let pending = browsing.getState().positions[key];
   const restore = () => {
     if (!pending) return;

@@ -2,6 +2,7 @@
 
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
+
 import { Label } from '~/components/ui/label';
 import {
   Select,
@@ -11,12 +12,13 @@ import {
   SelectValue,
 } from '~/components/ui/select';
 import {
-  useDisplayUnits,
+  setDateFormat,
   setDisplayUnits,
   useDateFormat,
-  setDateFormat,
+  useDisplayUnits,
 } from '~/hooks/use-display-preferences';
-import { dateFormatOptions, type DateFormat } from '~/lib/date-preferences';
+import { type DateFormat, dateFormatOptions } from '~/lib/date-preferences';
+
 const subscribe = () => () => undefined;
 
 export function DisplaySettings() {
@@ -47,7 +49,7 @@ export function DisplaySettings() {
           <SelectTrigger id="settings-appearance" className="h-10">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="z-[80]">
+          <SelectContent>
             <SelectItem value="system">System</SelectItem>
             <SelectItem value="light">Light</SelectItem>
             <SelectItem value="dark">Dark</SelectItem>
@@ -68,7 +70,7 @@ export function DisplaySettings() {
           <SelectTrigger id="settings-units" className="h-10">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="z-[80]">
+          <SelectContent>
             <SelectItem value="metric">Metric</SelectItem>
             <SelectItem value="imperial">Imperial</SelectItem>
           </SelectContent>
@@ -86,7 +88,7 @@ export function DisplaySettings() {
           <SelectTrigger id="settings-date-format" className="h-10">
             <SelectValue />
           </SelectTrigger>
-          <SelectContent className="z-[80]">
+          <SelectContent>
             {dateFormatOptions.map((option) => (
               <SelectItem key={option.value} value={option.value}>
                 {option.label}

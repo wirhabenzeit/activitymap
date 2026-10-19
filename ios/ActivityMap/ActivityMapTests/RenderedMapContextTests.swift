@@ -202,11 +202,15 @@ extension RenderedRoutePickingTests {
         }
     }
 
-    @Test func nativeTabRoundTripRestoresCameraAndListOffset() async throws {
+    @Test(arguments: [false, true])
+    func nativeTabRoundTripRestoresCameraAndListOffset(landscape: Bool) async throws {
         let oldToken = MapboxOptions.accessToken
         MapboxOptions.accessToken = "pk.offline-test"
         defer { MapboxOptions.accessToken = oldToken }
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: landscape ? .landscapeRight : .portrait))
+        try await cameraWait { scene.effectiveGeometry.interfaceOrientation == (landscape ? .landscapeRight : .portrait) }
+        defer { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) }
         let oldWindow = scene.keyWindow
         let window = UIWindow(windowScene: scene)
         let store = ActivityStore(activities: (1...200).map { ActivityStoreSelectionTests.activity($0) })
@@ -234,10 +238,22 @@ extension RenderedRoutePickingTests {
         store.mapContext.request(.resetView)
         try await cameraWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(650))
+        // A real gesture leaves the configured viewport state before moving
+        // the camera. Raw setCamera alone lets that old state move it back.
+        firstMap.viewport.idle()
+        try await cameraWait {
+            if case .idle = firstMap.viewport.status { return true }
+            return false
+        }
         firstMap.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 47.1, longitude: 8.7),
                                                       padding: UIEdgeInsets(top: 132, left: 24, bottom: 400, right: 80),
                                                       zoom: 10, bearing: 25, pitch: 40))
-        try await cameraWait { abs(store.mapContext.camera.zoom - 10) < 0.01 }
+        try await cameraWait {
+            let camera = store.mapContext.camera
+            return abs(camera.center.latitude - 47.1) < 0.001 && abs(camera.center.longitude - 8.7) < 0.001
+                && abs(camera.zoom - 10) < 0.01 && abs(camera.bearing - 25) < 0.01 && abs(camera.pitch - 40) < 0.01
+                && camera.padding == UIEdgeInsets(top: 132, left: 24, bottom: 400, right: 80)
+        }
         store.selectedTab = .stats
         try await Task.sleep(for: .milliseconds(200))
         try await cameraWait { dashboard.completedTiles.count == StatsDashboard.tiles.count }
@@ -270,6 +286,7 @@ extension RenderedRoutePickingTests {
         store.showOnMap(150)
         try await cameraWait { store.mapContext.pendingRequest == nil }
         let targetCoordinates = try #require(store.activities.first { $0.id == 150 }).coordinates
+        let bottomClearance: CGFloat = landscape ? 16 : 80
         // Consuming the intent precedes SwiftUI's viewport update. Wait for the
         // real transition to finish and the route to occupy the required screen
         // rect, rather than assuming a 650 ms sleep covers renderer scheduling.
@@ -279,15 +296,17 @@ extension RenderedRoutePickingTests {
                   abs(secondMap.mapboxMap.cameraState.center.latitude - 46.005) < 0.03 else { return false }
             return secondMap.mapboxMap.points(for: targetCoordinates).allSatisfy {
                 $0.y >= secondMap.safeAreaInsets.top + 16
-                    && $0.y <= secondMap.bounds.height - secondMap.safeAreaInsets.bottom - 80
+                    && $0.y <= secondMap.bounds.height - secondMap.safeAreaInsets.bottom - bottomClearance
             }
         }
         #expect(abs(secondMap.mapboxMap.cameraState.center.latitude - 46.005) < 0.03)
         let framed = secondMap.mapboxMap.points(for: targetCoordinates)
-        #expect(framed.allSatisfy { $0.y >= secondMap.safeAreaInsets.top + 16 && $0.y <= secondMap.bounds.height - secondMap.safeAreaInsets.bottom - 80 })
+        #expect(framed.allSatisfy { $0.y >= secondMap.safeAreaInsets.top + 16 && $0.y <= secondMap.bounds.height - secondMap.safeAreaInsets.bottom - bottomClearance })
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
         #expect(abs(list.contentOffset.y - offset) < 1)
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        try await cameraWait { scene.effectiveGeometry.interfaceOrientation == .portrait }
     }
 
     @Test(arguments: [false, true])

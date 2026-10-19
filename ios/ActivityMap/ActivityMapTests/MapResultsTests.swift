@@ -4,6 +4,17 @@ import Testing
 
 @MainActor
 struct MapResultsTests {
+    @Test func activityContinuationFollowsVisibleOrderAndStopsAtBoundaries() {
+        let first = ActivityDetailSequence(ids: [7, 2, 9], currentID: 7)
+        #expect(first.previousID == nil && first.nextID == 2 && first.position == "1 of 3")
+        let middle = ActivityDetailSequence(ids: [7, 2, 9], currentID: 2)
+        #expect(middle.previousID == 7 && middle.nextID == 9)
+        let last = ActivityDetailSequence(ids: [7, 2, 9], currentID: 9)
+        #expect(last.previousID == 2 && last.nextID == nil)
+        let missing = ActivityDetailSequence(ids: [7, 9], currentID: 2)
+        #expect(missing.previousID == nil && missing.nextID == nil && missing.position == nil)
+    }
+
     @Test func resultScopeIncludesExistingSelectionAndGPSLessActivities() {
         let store = ActivityStore(activities: (1...4).map { ActivityStoreSelectionTests.activity($0, route: $0 != 4) })
         let picker = RoutePicker()
@@ -17,7 +28,7 @@ struct MapResultsTests {
         picker.step(1, store: store)
         #expect(store.activeActivityID == 1 && picker.detailID == 1)
         picker.step(1, store: store)
-        #expect(store.activeActivityID == 3)
+        #expect(store.activeActivityID == 1, "Next stops at the last visible activity instead of wrapping")
         #expect(store.inspectedActivityID == 4)
         #expect(store.mapContext.pendingRequest == nil, "Result browsing must not issue camera fits")
     }
@@ -78,11 +89,46 @@ struct MapResultsTests {
                 }
                 #expect(layouts[0].contentHeight < layouts[1].contentHeight)
                 #expect(layouts[1].frame == layouts[2].frame)
+                #expect(layouts[2].frame.minY == 48, "Expanded side panels leave a 4pt gap below the toolbar")
                 #expect(layouts.allSatisfy { abs($0.frame.maxX - (size.width - 16)) < 0.01 })
                 #expect(layouts.allSatisfy { $0.bottomOcclusion == 0 && $0.trailingOcclusion == layouts[0].trailingOcclusion })
                 #expect(layouts.allSatisfy { $0.frame.maxY == size.height + 21 }, "Both states meet the physical bottom edge through the safe area")
                 #expect(layouts[0].frame.minY > layouts[1].frame.minY, "Expansion moves the top edge upward")
             }
+        }
+    }
+
+    @Test func nativeMeasurementsRejectPreviousOrientationAndInvalidFrames() {
+        let size = CGSize(width: 800, height: 382)
+        let frame = CGRect(x: 410, y: 40, width: 334, height: 354)
+        let measurement = MapResultsPresentationGeometry(frame: frame, containerSize: size)
+        #expect(measurement.frame(in: size) == frame)
+        #expect(measurement.frame(in: CGSize(width: 382, height: 800)) == nil)
+        #expect(MapResultsPresentationGeometry(frame: .zero, containerSize: size).frame(in: size) == nil)
+    }
+
+    @Test func nativeFrameDrivesCameraAndCompassClearance() throws {
+        let size = CGSize(width: 800, height: 382)
+        let frame = CGRect(x: 410, y: 40, width: 334, height: 354)
+        let layout = MapResultsLayout(size: size, topInset: 44, bottomInset: 20, detent: .medium)
+        #expect(layout.resolvedTrailingOcclusion(presentedFrame: frame) == 402)
+        #expect(layout.resolvedTrailingOcclusion(presentedFrame: frame) > layout.trailingOcclusion,
+                "Native safe-area placement can cover more map than the custom-panel estimate")
+        let center = try #require(MapCompassLayout.center(size: size, topInset: 44, bottomInset: 20,
+            showingResults: true, detent: .medium, largeText: false, resultsFrame: frame))
+        let target = CGRect(x: center.x - 22, y: center.y - 22, width: 44, height: 44)
+        #expect(target.maxX == frame.minX - 12)
+        #expect(!target.intersects(frame))
+    }
+
+    @Test func nativeFallbackProtectsReclaimedSafeAreaUntilMeasured() {
+        if #available(iOS 27.0, *) {
+            let layout = MapResultsLayout(size: CGSize(width: 800, height: 382),
+                topInset: 44, bottomInset: 20, detent: .medium)
+            let fallback = layout.presentationFrame(measuredFrame: nil, leadingSafeInset: 62, trailingSafeInset: 16)
+            #expect(fallback.minX == layout.frame.minX - 46)
+            let native = CGRect(x: 410, y: 40, width: 334, height: 354)
+            #expect(layout.presentationFrame(measuredFrame: native, leadingSafeInset: 62, trailingSafeInset: 16) == native)
         }
     }
 
@@ -115,7 +161,7 @@ struct MapResultsTests {
     func detentsLeaveNavigationAvailable(size: CGSize) {
         for detent in MapResultsDetent.allCases {
             let layout = MapResultsLayout(size: size, topInset: 106, bottomInset: 34, detent: detent)
-            #expect(layout.frame.minY >= 118 && layout.frame.maxY <= size.height + 34)
+            #expect(layout.frame.minY >= (layout.isSidePanel ? 110 : 118) && layout.frame.maxY <= size.height + 34)
             #expect(layout.frame.minX >= (layout.isSidePanel ? 12 : 4) && layout.frame.maxX <= size.width)
             if layout.isSidePanel {
                 #expect(size.width - layout.trailingOcclusion - 16 >= 160)

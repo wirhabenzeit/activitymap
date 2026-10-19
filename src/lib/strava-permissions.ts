@@ -1,3 +1,5 @@
+import { message } from './presentation/messages';
+
 /**
  * What a Strava grant lets ActivityMap do, derived from the scopes the person
  * actually approved (issue #303). Strava's consent screen lets people untick
@@ -93,7 +95,7 @@ export function stravaPermissionsLimited(
 /**
  * Short explanations of what a limited grant leaves out, in order of
  * impact. Empty for a full or unknown grant. Mirrored in iOS
- * `StravaPermissionsCopy`; keep them in step.
+ * `StravaPermissionsCopy` through the shared presentation messages.
  */
 export function stravaPermissionNotes(
   permissions: StravaPermissions | null | undefined,
@@ -101,13 +103,12 @@ export function stravaPermissionNotes(
   if (!permissions) return [];
   const notes: string[] = [];
   if (permissions.activities === 'none') {
-    notes.push('No activities are shared.');
+    notes.push(message('permission.none'));
   } else if (permissions.activities === 'public') {
-    notes.push('Private activities aren’t shared.');
+    notes.push(message('permission.public'));
   }
-  if (!permissions.edit) notes.push('Editing isn’t allowed.');
+  if (!permissions.edit) notes.push(message('permission.edit'));
   return notes;
 }
 
-export const STRAVA_PERMISSIONS_RECONNECT =
-  'Connect with Strava again to grant the missing permissions.';
+export const STRAVA_PERMISSIONS_RECONNECT = message('permission.reconnect');

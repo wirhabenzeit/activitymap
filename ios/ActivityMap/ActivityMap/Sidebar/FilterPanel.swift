@@ -49,13 +49,8 @@ struct FilterPanel: View {
                     }
                 }
                 Spacer()
-                Button("Reset") {
-                    scope.reset(store)
-                    editingCustomDates = false
-                }
-                .font(.caption).frame(minHeight: 44)
-                .disabled(activeCount == 0)
-                .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
+                FilterResetButton(store: store, scope: scope)
+                    .font(.caption)
             }
             searchField
             if scope != .stats { selectionFilter }
@@ -341,5 +336,25 @@ enum FilterScope {
     @MainActor func reset(_ store: ActivityStore) {
         if self == .stats { store.resetStatsActivityFilters() }
         else { store.resetFilters() }
+    }
+}
+
+/// Reset also discards local numeric/date drafts when no predicates are applied.
+/// Keep it available in both full-panel and rail presentations; the store's
+/// reset revision invalidates draft editors without unnecessary filter work.
+struct FilterResetButton: View {
+    let store: ActivityStore
+    let scope: FilterScope
+    var iconOnly = false
+    var body: some View {
+        Button { scope.reset(store) } label: {
+            if iconOnly {
+                Image(systemName: "arrow.counterclockwise")
+                    .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
+                    .contentShape(Rectangle())
+            } else { Text("Reset").frame(minHeight: AppTheme.minimumTarget) }
+        }
+        .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
+        .accessibilityIdentifier("filter-reset")
     }
 }

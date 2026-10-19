@@ -4,11 +4,11 @@ struct ListScreen: View {
     @Bindable var store: ActivityStore
     var emptyState: BrowsingPresentation.EmptyState? = nil
     var recover: (BrowsingPresentation.Recovery) -> Void = { _ in }
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.browsePaneWidth) private var paneWidth
     @Environment(\.listShellNavigation) private var shellNavigation
     @Environment(\.listRootToolbar) private var shellToolbar
+    @Environment(\.listRootHeader) private var shellHeader
     @State private var localPushedDetail = false
     private var hasPushedDetail: Bool {
         get { shellNavigation?.detailPresented ?? localPushedDetail }
@@ -17,51 +17,30 @@ struct ListScreen: View {
             else { localPushedDetail = newValue }
         }
     }
-    /// Inspection started while the shell collapses its filter panel; the
-    /// adjacent detail appears once the wider layout arrives.
-    @State private var awaitingWidth = false
     @Environment(\.filtersCollapseForDetail) private var filtersCollapseForDetail
     // iPhone landscape: the shell bar carries the status/options row (#315).
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
-        GeometryReader { geometry in
-            let width = paneWidth ?? geometry.size.width
-            // Filters overlay the List or are pinned only where detail still
-            // fits beside it, so this width never changes while inspecting (#354).
-            let sideBySide = sizeClass == .regular && width >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize
-            let showsDetail = sideBySide && store.inspectedActivityID != nil && !hasPushedDetail
-            let detailWidth = min(420, max(340, width * 0.42))
-            let listWidth = showsDetail ? width - detailWidth - 1 : width
-            HStack(spacing: 0) {
-                activityList(width: listWidth, inspectedID: showsDetail ? store.inspectedActivityID : nil)
-                    .frame(width: listWidth)
-                if showsDetail {
-                    // Flush with the status bar, which extends under the home indicator.
-                    Divider().ignoresSafeArea(edges: .bottom)
-                    detailColumn
-                        .frame(width: detailWidth)
-                        .frame(maxHeight: .infinity)
-                }
-            }
-            .modifier(ListRootChrome(toolbar: shellToolbar,
-                                     visible: store.selectedTab == .list && (!sideBySide || hasPushedDetail)))
-            // Inspecting is ordinary navigation. Back only clears inspection;
-            // the retained list and selection/camera owners remain unchanged.
-            .navigationDestination(item: inspectionID(sideBySide: sideBySide || awaitingWidth)) { id in
-                ActivityDetailView(store: store, activityID: id)
-            }
-            .onChange(of: store.inspectedActivityID, initial: true) { _, id in
-                if id == nil { hasPushedDetail = false; awaitingWidth = false }
-                else if !sideBySide && filtersCollapseForDetail { awaitingWidth = true }
-                else if !sideBySide { hasPushedDetail = true }
-            }
-            .onChange(of: sideBySide) { _, wide in
-                if wide { awaitingWidth = false }
-                // A hidden List can narrow while Map or Stats has the filter
-                // panel beside it; that must not turn its detail into a page.
-                else if store.inspectedActivityID != nil, store.selectedTab == .list { hasPushedDetail = true }
-            }
+        AdaptiveActivityInspection(selection: Binding(get: { store.inspectedActivityID }, set: { id in
+            if id == nil { store.dismissInspection() }
+        }), externalPushed: Binding(get: { hasPushedDetail }, set: { hasPushedDetail = $0 }),
+            active: store.selectedTab == .list, retainsPresentationWhenInactive: true,
+            waitsForWidth: filtersCollapseForDetail,
+            widthOverride: paneWidth, dividerIgnoresBottom: true, rootToolbar: shellToolbar, rootHeader: shellHeader,
+            closeIdentifier: "list-activity-close", panelIdentifier: "list-activity-panel") { layout in
+            activityList(width: layout.contentWidth, inspectedID: layout.showsPanel ? store.inspectedActivityID : nil)
+        } panel: { id in
+            ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: AppTheme.minimumTarget)
+                .modifier(ListActivityContinuation(store: store, activityID: id))
+        } destination: { id in
+            ActivityDetailView(store: store, activityID: id)
+                .modifier(ListActivityContinuation(store: store, activityID: id))
+        }
+        // The footer belongs to the root page, so native push/pop and
+        // interactive Back carry it with the list rather than hiding it later.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            BrowseListFooter(store: store)
         }
     }
 
@@ -106,61 +85,15 @@ struct ListScreen: View {
         .modifier(ListOptionsSheets(presentation: store.listPresentation, availableWidth: width, speedDisplay: speedDisplay))
     }
 
-    @ViewBuilder private var detailColumn: some View {
-        if let id = store.inspectedActivityID {
-            ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: 44)
-                .overlay(alignment: .topTrailing) {
-                    Button { store.dismissInspection() } label: {
-                        Image(systemName: "xmark")
-                            .frame(width: 44, height: 44)
-                            // A plain button only hits drawn pixels; keep the full target.
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, AppTheme.Spacing.large)
-                    .padding(.top, AppTheme.Spacing.small)
-                    .accessibilityLabel("Close activity details")
-                }
-        }
-    }
-
-    private func inspectionID(sideBySide: Bool) -> Binding<Int?> {
-        Binding(
-            get: { (!sideBySide || hasPushedDetail) && store.selectedTab == .list ? store.inspectedActivityID : nil },
-            set: { id in
-                // Keep an already-pushed detail open through width changes.
-                // Tab changes retain inspection; native Back clears it in List.
-                if id == nil, (!sideBySide || hasPushedDetail), store.selectedTab == .list {
-                    store.dismissInspection()
-                    hasPushedDetail = false
-                }
-            }
-        )
-    }
 }
 
-private struct ListRootChrome: ViewModifier {
-    let toolbar: BrowseRootToolbar?
-    let visible: Bool
-    @ViewBuilder func body(content: Content) -> some View {
-        if let toolbar {
-            content
-                .toolbar(visible ? .visible : .hidden, for: .navigationBar)
-                .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-                .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbar { toolbar }
-        } else { content }
-    }
-}
-
-/// Hosted outside the owning navigation stack, including the outer Stats shell.
+/// Root-page controls remain available beside an adjacent inspector and
+/// leave with the list during native navigation to a full-page detail.
 struct BrowseListFooter: View {
     @Bindable var store: ActivityStore
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @Environment(\.dynamicTypeSize) private var typeSize
+    @AppToolbarEnvironment private var toolbarLayout
     var body: some View {
-        if store.selectedTab == .list && (verticalSizeClass != .compact || typeSize.isAccessibilitySize) {
+        if store.selectedTab == .list && !toolbarLayout.packsListControls {
             HStack(spacing: 8) {
                 SelectionBar(store: store, includesTotal: true, expandsCount: true)
                 ListControls(presentation: store.listPresentation, store: store, iconOnly: true)
@@ -181,13 +114,23 @@ struct SelectionBar: View {
     var showsClear = true
     var expandsCount = false
 
+    private var combineForeground: Color {
+        if onNavigationBar { return store.isCombining ? AppTheme.navigationBlue : .white }
+        return store.isCombining ? AppTheme.accent : .secondary
+    }
+
+    private var combineBackground: Color {
+        guard store.isCombining else { return .clear }
+        return onNavigationBar ? .white : AppTheme.accent.opacity(0.14)
+    }
+
     var body: some View {
         HStack(spacing: 2) {
             Button { store.setCombine(!store.isCombining) } label: {
                 Image(systemName: "checklist").font(.body)
-                    .foregroundStyle(onNavigationBar ? Color.white : store.isCombining ? AppTheme.accent : Color.secondary)
+                    .foregroundStyle(combineForeground)
                     .frame(width: 32, height: 32)
-                    .background(store.isCombining ? AppTheme.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 10))
+                    .background(combineBackground, in: RoundedRectangle(cornerRadius: 10))
                     .frame(width: 44, height: 44).contentShape(Rectangle())
             }
             .accessibilityLabel("Combine selections")
@@ -235,5 +178,51 @@ struct ActivitySelectionSymbol: View {
                 .frame(width: 44, height: 44)
                 .accessibilityHidden(false).accessibilityLabel(activity.sportType.rawValue)
         }
+    }
+}
+
+/// Continue within the current sorted/filtered List, independently of map selection.
+private struct ListActivityContinuation: ViewModifier {
+    let store: ActivityStore
+    let activityID: Int
+    @State private var transitionTarget: (id: Int, direction: ActivityContinuationDirection)?
+    private var sequence: ActivityDetailSequence {
+        ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: activityID)
+    }
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.activityDetailPaging, ActivityDetailPaging(position: { id in
+                ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).position
+            }, previous: { if let id = sequence.previousID { inspect(id, direction: .previous) } },
+               next: { if let id = sequence.nextID { inspect(id, direction: .next) } },
+               canGoPrevious: { id in ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).previousID != nil },
+               canGoNext: { id in ActivityDetailSequence(ids: store.listedActivities.map(\.id), currentID: id).nextID != nil }))
+            .environment(\.activityDetailContinuation, continuation)
+            .environment(\.activityDetailTransitionDirection,
+                         transitionTarget?.id == activityID ? transitionTarget?.direction : nil)
+    }
+
+    private var continuation: ActivityDetailContinuation? {
+        let previous = sequence.previousID.flatMap { store.activity(id: $0) }
+            .map { ActivityDetailContinuation.Destination(id: $0.id, name: $0.name) }
+        let next = sequence.nextID.flatMap { store.activity(id: $0) }
+            .map { ActivityDetailContinuation.Destination(id: $0.id, name: $0.name) }
+        guard previous != nil || next != nil else { return nil }
+        return ActivityDetailContinuation(currentID: activityID, previous: previous, next: next,
+            isEnabled: store.selectedTab == .list) { direction in
+                // Resolve again on release: a filter or sort change must never
+                // continue to an activity from a stale sequence.
+                let target = direction == .previous ? previous : next
+                let liveID = direction == .previous ? sequence.previousID : sequence.nextID
+                guard let target, liveID == target.id else { return }
+                inspect(target.id, direction: direction)
+            }
+    }
+
+    private func inspect(_ id: Int, direction: ActivityContinuationDirection) {
+        guard store.selectedTab == .list, store.inspectedActivityID == activityID else { return }
+        transitionTarget = (id, direction)
+        store.inspect(id)
     }
 }

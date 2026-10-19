@@ -165,7 +165,8 @@ import Testing
         try await Task.sleep(for: .milliseconds(400))
         let navigation = try #require(host.contentNavigation())
         #expect(host.shellAccountButton() != nil)
-        #expect(!navigation.isNavigationBarHidden, "The phone dashboard and detail share a native header")
+        #expect(navigation.isNavigationBarHidden == (variant == "landscape"),
+                "The compact landscape dashboard and focus share app chrome; portrait retains native chrome")
         let root = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[0].view)
             .first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
@@ -255,12 +256,19 @@ import Testing
                         "The focused chart leaves account access on the dashboard")
                 #expect(host.shellControl(label: "Filters") != nil)
                 #expect(navigation.topViewController?.navigationItem.title == "Training volume")
-                let bar = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
-                #expect(abs(bar.minY - host.host.view.safeAreaInsets.top) < 2,
-                        "Stats detail takes over the top header instead of adding another row")
+                if variant == "landscape" {
+                    #expect(navigation.isNavigationBarHidden)
+                    let image = try host.capture("landscape-focus-toolbar")
+                    #expect(abs(try compactBrowseHeaderBottom(in: image) - host.window.safeAreaInsets.top - 44) < 1,
+                            "Stats focus uses the same compact 44pt toolbar as its dashboard")
+                } else {
+                    let bar = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
+                    #expect(abs(bar.minY - host.host.view.safeAreaInsets.top) < 2,
+                            "Stats detail takes over the top header instead of adding another row")
+                }
                 #expect(host.controllers(UINavigationController.self).filter {
                     !$0.isNavigationBarHidden && $0.navigationBar.window != nil
-                }.count == 1)
+                }.count == (variant == "landscape" ? 0 : 1))
             } else {
                 let settledAccount = try #require(host.shellAccountButton())
                 let settledFrame = host.host.view.convert(settledAccount.accessibilityFrame, from: nil)
@@ -738,7 +746,7 @@ import Testing
         let start = StatsDates.day("2026-08-31")
         let values = [10_000.0, 5_000, 5_000, 6_000, 7_000]
         let points = values.enumerated().map { index, value in
-            StatsChartPoint(x: start + index * 7, value: value, series: "Weekly total", partial: index == values.count - 1)
+            StatsChartPoint(x: start + index * 7, value: value, series: "Weekly total", partial: index == values.count - 1, role: .weeklyTotal)
         }
         let host = try StatsDashboardHarness(root: StatsSeriesChart(points: points, metric: .elevation,
             expanded: false, axis: .date, style: .volume, compact: true)
