@@ -1,13 +1,15 @@
 'use client';
 import {
+  type QueryClient,
+  queryOptions,
   useQuery,
   useQueryClient,
-  queryOptions,
-  type QueryClient,
 } from '@tanstack/react-query';
-import { retryDeadline } from '~/lib/sync/retry-deadline';
+
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { ingestionStatusDTOSchema } from '~/contracts/v1/ingestion-status';
+import { message } from '~/lib/presentation/messages';
+import { retryDeadline } from '~/lib/sync/retry-deadline';
 
 export class IngestionStatusError extends Error {
   constructor(
@@ -46,10 +48,10 @@ export function ingestionStatusOptions(
         if (!response.ok) {
           throw new IngestionStatusError(
             response.status === 404
-              ? 'Server import status is not available on this server yet.'
+              ? message('error.importStatus.notSupported')
               : response.status === 401
-                ? 'Sign in again to check server import status.'
-                : 'Could not check server import status. Your last known status is shown when available.',
+                ? message('error.importStatus.signIn')
+                : message('error.importStatus.failed'),
             retryDeadline(response.headers),
           );
         }
@@ -65,7 +67,7 @@ export function ingestionStatusOptions(
           error instanceof IngestionStatusError
             ? error
             : new IngestionStatusError(
-                'Could not check server import status. Your last known status is shown when available.',
+                message('error.importStatus.failed'),
                 Date.now() + 60_000,
               );
         failures.set(scope, failure);

@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "viewports": 3,
+  "checks": [
+    "dialog bounds/fixed footer/focus",
+    "actual Edit sport and Share expiry option hit testing/selection",
+    "nested dialog popover/menu/submenu interaction and dismissal",
+    "menu-to-Edit focus/Escape handoff with reduced and normal motion",
+    "persistent pointer+keyboard checkboxes",
+    "available-height menu",
+    "map availability+dispatch",
+    "replacement+resize+Activity measurement",
+    "feature/photo dismissal targets",
+    "non-dismissible onboarding"
+  ]
+}

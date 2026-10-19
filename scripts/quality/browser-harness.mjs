@@ -20,6 +20,7 @@ import { waitForFixtureRoute } from './browser-support.mjs';
 import { runCommand, startCommand } from './process.mjs';
 
 export const browserSuites = {
+  accessibility: 'verify-accessibility.mjs',
   reconciliation: 'verify-react-ui-reconciliation.mjs',
   list: 'verify-list-inspection.mjs',
   stats: 'verify-stats-focus.mjs',
@@ -166,7 +167,7 @@ export async function runBrowserHarness({
 }) {
   assert(
     suites.length > 0 && suites.every((suite) => browserSuites[suite]),
-    'Choose reconciliation, list, stats, account, and/or presentation',
+    'Choose accessibility, reconciliation, list, stats, account, and/or presentation',
   );
   await mkdir(output, { recursive: true });
   await mkdir(join(root, '.quality'), { recursive: true });

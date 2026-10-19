@@ -59,8 +59,8 @@ nonisolated struct ActivityGPX: Hashable, Sendable {
 
         var errorDescription: String? {
             switch self {
-            case .noGeometry: "This activity has no GPS route to export."
-            case .invalidCoordinate: "The saved route contains invalid coordinates. Sync the activity and try again."
+            case .noGeometry: String(localized: AppMessages.activityGpxNoGeometry())
+            case .invalidCoordinate: String(localized: AppMessages.activityGpxInvalidCoordinate())
             }
         }
     }

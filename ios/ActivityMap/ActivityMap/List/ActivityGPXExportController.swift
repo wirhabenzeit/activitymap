@@ -52,16 +52,27 @@ nonisolated struct ActivityGPXExportKey: Hashable {
 /// The row menu and detail surface use the same saved geometry and explanation.
 nonisolated struct ActivityGPXExportAvailability: Sendable {
     let snapshot: ActivityGPX?
-    let canExport: Bool
-    let subtitle: String
-    var hint: String {
-        canExport ? "Share the saved route as a GPX file" : "This activity has no GPS route to export"
+    enum RouteKind: Sendable { case unavailable, routeOnly, sampledElevation }
+    let kind: RouteKind
+    var canExport: Bool { kind != .unavailable }
+    /// Compatibility accessors resolve at use time. The prepared cache stores
+    /// semantic geometry state, so locale changes never retain stale prose.
+    var subtitle: String { String(localized: subtitleResource()) }
+    var hint: String { String(localized: hintResource()) }
+    func subtitleResource(locale: Locale = .current) -> LocalizedStringResource {
+        switch kind {
+        case .unavailable: AppMessages.activityGpxNoRoute(locale: locale)
+        case .routeOnly: AppMessages.activityGpxRouteOnly(locale: locale)
+        case .sampledElevation: AppMessages.activityGpxWithElevation(locale: locale)
+        }
+    }
+    func hintResource(locale: Locale = .current) -> LocalizedStringResource {
+        canExport ? AppMessages.activityGpxShareHint(locale: locale) : AppMessages.activityGpxUnavailableHint(locale: locale)
     }
     init(snapshot: ActivityGPX?) {
         self.snapshot = snapshot
-        canExport = snapshot?.points.isEmpty == false
-        subtitle = !canExport ? "No GPS route"
-            : snapshot?.hasSampledElevation == true ? "Route with elevation" : "Route only"
+        kind = snapshot?.points.isEmpty != false ? .unavailable
+            : snapshot?.hasSampledElevation == true ? .sampledElevation : .routeOnly
     }
     /// A first-open menu can offer export immediately without decoding every
     /// visible row. The worker validates cached samples before writing; malformed
@@ -73,11 +84,10 @@ nonisolated struct ActivityGPXExportAvailability: Sendable {
             && summary?.dto.summary?.basis != nil && (summary?.dto.summary?.count ?? 0) > 0
             && summary?.dto.summary?.altitude != nil && summary?.dto.summary?.latlng != nil
         let available = sampled || !activity.coordinates.isEmpty
-        return Self(snapshot: nil, canExport: available,
-                    subtitle: !available ? "No GPS route" : sampled ? "Route with elevation" : "Route only")
+        return Self(snapshot: nil, kind: !available ? .unavailable : sampled ? .sampledElevation : .routeOnly)
     }
-    private init(snapshot: ActivityGPX?, canExport: Bool, subtitle: String) {
-        self.snapshot = snapshot; self.canExport = canExport; self.subtitle = subtitle
+    private init(snapshot: ActivityGPX?, kind: RouteKind) {
+        self.snapshot = snapshot; self.kind = kind
     }
     static func prepare(_ source: ActivityGPXExportSource) -> Self {
         Self(snapshot: source.snapshot?.includingSampledElevation(from: source.summary))
@@ -162,8 +172,8 @@ final class ActivityGPXExportController {
             } catch is CancellationError { }
             catch {
                 guard !Task.isCancelled, operationID == id, current() == source else { return }
-                report(title: "Couldn’t export GPX", message: (error as? ActivityGPX.ExportError)?.localizedDescription
-                    ?? "The GPX file couldn’t be created. Please try again.")
+                report(title: String(localized: AppMessages.activityGpxExportFailed()), message: (error as? ActivityGPX.ExportError)?.localizedDescription
+                    ?? String(localized: AppMessages.activityGpxCreateFailed()))
             }
         }
     }

@@ -35,6 +35,7 @@ try {
   evidence = await recordBrowserEvidence(context, { base, output });
   const errors = [];
   const page = await context.newPage();
+  page.on('dialog', (prompt) => prompt.accept());
   page.on('pageerror', (error) => errors.push(error.message));
   const load = async () => {
     await page.goto(new URL('/react-ui-reconciliation-test', base).href);
@@ -96,7 +97,7 @@ try {
       'Edit actions stay fixed while fields scroll',
     );
     // Opening is insufficient: an option can be visible but covered by the dialog.
-    const sport = dialog.getByRole('combobox', { name: 'Sport type' });
+    const sport = dialog.getByRole('combobox', { name: 'Sport' });
     await sport.click();
     const run = page.getByRole('option', { name: 'Run', exact: true });
     await run.scrollIntoViewIfNeeded();

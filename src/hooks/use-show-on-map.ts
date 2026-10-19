@@ -3,8 +3,8 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 
+import type { Activity } from '~/lib/activity';
 import { showActivityOnMap } from '~/lib/show-on-map';
-import type { Activity } from '~/server/db/schema';
 import { store } from '~/store';
 
 export type MapActionVariant = 'show' | 'clear-filters-and-show';

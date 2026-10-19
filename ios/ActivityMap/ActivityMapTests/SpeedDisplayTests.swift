@@ -14,13 +14,10 @@ import Testing
             .deletingLastPathComponent().deletingLastPathComponent()
             .appending(path: "shared/parity/speed-display.v1.json")
         let fixture = try JSONDecoder().decode(Fixture.self, from: Data(contentsOf: url))
-        let oldUnits = DisplayPreferences.shared.units
-        defer { DisplayPreferences.shared.units = oldUnits }
         for row in fixture.formatCases {
             let sport = try #require(SportType(rawValue: row.sport))
             for units in UnitSystem.allCases {
-                DisplayPreferences.shared.units = units
-                #expect(SpeedDisplay.forSport(sport).format(row.speed) == (units == .metric ? row.metric : row.imperial))
+                #expect(SpeedDisplay.forSport(sport).format(row.speed, units: units, locale: Locale(identifier: "en_US")) == (units == .metric ? row.metric : row.imperial))
             }
         }
         for row in fixture.scopeCases {
@@ -37,9 +34,6 @@ import Testing
     }
 
     @Test func tableSortAndDetailSemantics() throws {
-        let previousUnits = DisplayPreferences.shared.units
-        DisplayPreferences.shared.units = .metric
-        defer { DisplayPreferences.shared.units = previousUnits }
         let activities = try [10.0 / 3, 2.5, 0].enumerated().map { index, speed in
             try StoredModelMapper.activity(Fixtures.activity(["id": String(index + 1), "sport_type": "Run", "average_speed": speed]))
         }
@@ -56,8 +50,7 @@ import Testing
         let groups = ActivityMetricGroup.groups(for: activities[0])
         #expect(groups.first?.title == "Time & pace")
         #expect(groups.flatMap(\.rows).contains { $0.id == "averageSpeed" && $0.value == "12.0 km/h" })
-        DisplayPreferences.shared.units = .imperial
-        #expect(ActivityTableLayout.title(.averageSpeed) == "Avg mph")
-        #expect(ActivityTableLayout.value(.averageSpeed, activity: activities[0], speedDisplay: .run) == "8:03")
+        #expect(ActivityTableLayout.title(.averageSpeed, units: .imperial) == "Avg mph")
+        #expect(ActivityTableLayout.value(.averageSpeed, activity: activities[0], speedDisplay: .run, units: .imperial, locale: Locale(identifier: "en_US")) == "8:03")
     }
 }

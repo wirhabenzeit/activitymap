@@ -1,42 +1,40 @@
 import type {
   IngestionProgress,
-  IngestionScheduling,
   IngestionReason,
-  IngestionStatusDTO,
   IngestionRunOutcomeDTO,
+  IngestionScheduling,
+  IngestionStatusDTO,
 } from '~/contracts/v1/ingestion-status';
+import { message } from '~/lib/presentation/messages';
 
 const progress: Record<IngestionProgress, string> = {
-  not_started: 'Not started',
-  in_progress: 'Partially available',
-  complete: 'Covered',
-  unknown: 'Unknown',
+  not_started: message('status.progress.notStarted'),
+  in_progress: message('status.progress.inProgress'),
+  complete: message('status.progress.complete'),
+  unknown: message('status.progress.unknown'),
 };
 const scheduling: Record<IngestionScheduling, string> = {
-  idle: 'No work pending',
-  scheduled: 'Automatic processing scheduled',
-  waiting: 'Waiting to retry',
-  blocked: 'Reconnect Strava to continue',
-  disabled: 'Background processing is disabled on the server',
-  stalled:
-    'Background processing has stopped reporting; contact support if this continues',
-  not_scheduled: 'No automatic refresh is scheduled',
-  unknown: 'No background run has been recorded',
+  idle: message('status.scheduling.idle'),
+  scheduled: message('status.scheduling.scheduled'),
+  waiting: message('status.scheduling.waiting'),
+  blocked: message('status.scheduling.blocked'),
+  disabled: message('status.scheduling.disabled'),
+  stalled: message('status.scheduling.stalled'),
+  not_scheduled: message('status.scheduling.notScheduled'),
+  unknown: message('status.scheduling.unknown'),
 };
 const reasons: Record<IngestionReason, string> = {
-  rate_limited:
-    'Strava request limit reached; processing will resume on a later run',
-  time_budget: 'More work remains for the next scheduled run',
-  credentials_unavailable: 'Reconnect Strava to continue',
-  unauthorized: 'Strava rejected the connection; reconnect Strava',
-  upstream_error: 'Strava could not be reached',
-  invalid_response: 'Strava returned data that could not be read',
-  detail_failures:
-    'Some activity details could not be fetched and will be retried',
-  photo_refresh_failed: 'Photo metadata could not be refreshed',
-  history_fetch_failed: 'Activity history could not be fetched',
-  persistence_failed: 'The server could not save the update',
-  internal_error: 'The server could not finish processing',
+  rate_limited: message('status.reason.rateLimited'),
+  time_budget: message('status.reason.timeBudget'),
+  credentials_unavailable: message('status.scheduling.blocked'),
+  unauthorized: message('status.reason.unauthorized'),
+  upstream_error: message('status.reason.upstreamError'),
+  invalid_response: message('status.reason.invalidResponse'),
+  detail_failures: message('status.reason.detailFailures'),
+  photo_refresh_failed: message('status.reason.photoRefreshFailed'),
+  history_fetch_failed: message('status.reason.historyFetchFailed'),
+  persistence_failed: message('status.reason.persistenceFailed'),
+  internal_error: message('status.reason.internalError'),
 };
 export type CoverageRow = {
   title: string;
@@ -48,7 +46,10 @@ export type CoverageRow = {
   outcome: IngestionRunOutcomeDTO | null;
 };
 
-export function coverageRows(status: IngestionStatusDTO): CoverageRow[] {
+export function coverageRows(
+  status: IngestionStatusDTO,
+  locale?: string,
+): CoverageRow[] {
   const { history: h, details: d, streams: s, photos: p } = status;
   const row = (
     title: string,
@@ -65,41 +66,95 @@ export function coverageRows(status: IngestionStatusDTO): CoverageRow[] {
   });
   return [
     row(
-      'Activity history',
+      message('status.pipeline.history', undefined, locale),
       h,
       h.totalActivityCount === null
-        ? `${h.knownActivityCount} activities imported · Strava total not yet known`
-        : `${h.knownActivityCount} activities imported · full history discovered`,
+        ? message(
+            'status.historyUnknown',
+            { count: h.knownActivityCount },
+            locale,
+          )
+        : message(
+            'status.historyComplete',
+            { count: h.knownActivityCount },
+            locale,
+          ),
     ),
     row(
-      'Activity details',
+      message('status.pipeline.details', undefined, locale),
       d,
-      `${d.detailed} fetched · ${d.neverFetched} awaiting first fetch · ${d.invalidated} awaiting refresh · ${d.retryWaiting} of these waiting to retry`,
+      message(
+        'status.detailsCounts',
+        {
+          fetched: d.detailed,
+          awaiting: d.neverFetched,
+          invalidated: d.invalidated,
+          retrying: d.retryWaiting,
+        },
+        locale,
+      ),
     ),
     {
       ...row(
-        'Streams & charts',
+        message('status.pipeline.streams', undefined, locale),
         s,
-        `${s.withData} with data · ${s.withoutData} with no sensor data · ${s.runnable} queued · ${s.waiting} waiting · ${s.blocked} blocked · ${s.failed} failed. ${s.chartSummaries} chart summaries available.`,
+        message(
+          'status.streamsCounts',
+          {
+            withData: s.withData,
+            withoutData: s.withoutData,
+            queued: s.runnable,
+            waiting: s.waiting,
+            blocked: s.blocked,
+            failed: s.failed,
+            summaries: s.chartSummaries,
+          },
+          locale,
+        ),
       ),
-      coverage: s.failed > 0 ? 'Needs attention' : progress[s.progress],
+      coverage:
+        s.failed > 0
+          ? message('status.compact.needsAttention', undefined, locale)
+          : progress[s.progress],
     },
     row(
-      'Photo metadata',
+      message('status.pipeline.photos', undefined, locale),
       p,
-      `${p.current} of ${p.activitiesWithPhotos} activities with photos checked · ${p.refreshRequired} awaiting refresh · ${p.unknown} not checked. ${p.photoCount} photo records; image downloads are separate.`,
+      message(
+        'status.photosCounts',
+        {
+          current: p.current,
+          total: p.activitiesWithPhotos,
+          refresh: p.refreshRequired,
+          unknown: p.unknown,
+          photos: p.photoCount,
+        },
+        locale,
+      ),
     ),
   ];
 }
-export function outcomeText(outcome: IngestionRunOutcomeDTO): string {
+export function outcomeText(
+  outcome: IngestionRunOutcomeDTO,
+  locale?: string,
+): string {
   const labels = {
-    succeeded: 'Last run succeeded',
-    partial: 'Last run partly succeeded',
-    deferred: 'Last run deferred',
-    failed: 'Last run failed',
-    blocked: 'Last run blocked',
+    succeeded: message('status.outcome.succeeded', undefined, locale),
+    partial: message('status.outcome.partial', undefined, locale),
+    deferred: message('status.outcome.deferred', undefined, locale),
+    failed: message('status.outcome.failed', undefined, locale),
+    blocked: message('status.outcome.blocked', undefined, locale),
   };
-  return `${labels[outcome.outcome]}${outcome.reason ? `: ${reasons[outcome.reason]}` : ''}`;
+  return outcome.reason
+    ? message(
+        'status.outcome.withReason',
+        {
+          outcome: labels[outcome.outcome],
+          reason: reasons[outcome.reason],
+        },
+        locale,
+      )
+    : labels[outcome.outcome];
 }
 export const snapshotIsStale = (observedAt: string, now: number) =>
   now - Date.parse(observedAt) >= 120_000;
@@ -116,65 +171,99 @@ type PipelineState = IngestionStatusDTO[
 
 /** What a pipeline's scheduler is doing, as one or two words. */
 export function schedulingLabel(state: PipelineState) {
-  if (state.scheduling === 'blocked') return 'Reconnect';
-  if (state.scheduling === 'disabled') return 'Paused';
-  if (state.scheduling === 'stalled') return 'Needs attention';
-  if (state.scheduling === 'unknown') return 'Schedule unknown';
-  if (state.scheduling === 'waiting') return 'Waiting';
-  if (state.scheduling === 'not_scheduled') return 'Refresh pending';
+  if (state.scheduling === 'blocked')
+    return message('status.compact.reconnect');
+  if (state.scheduling === 'disabled') return message('status.compact.paused');
+  if (state.scheduling === 'stalled')
+    return message('status.compact.needsAttention');
+  if (state.scheduling === 'unknown')
+    return message('status.compact.scheduleUnknown');
+  if (state.scheduling === 'waiting') return message('status.compact.waiting');
+  if (state.scheduling === 'not_scheduled')
+    return message('status.compact.refreshPending');
   if (
     state.scheduling === 'scheduled' &&
     'lastOutcome' in state &&
     state.lastOutcome?.outcome === 'deferred' &&
     state.lastOutcome.reason === 'rate_limited'
   )
-    return 'Waiting';
+    return message('status.compact.waiting');
   if (state.scheduling === 'scheduled')
     return state.progress === 'complete'
-      ? 'Checking'
+      ? message('status.compact.checking')
       : state.progress === 'not_started'
-        ? 'Queued'
-        : 'Importing';
+        ? message('status.compact.queued')
+        : message('status.compact.importing');
   return state.progress === 'complete'
-    ? 'Ready'
+    ? message('status.compact.ready')
     : state.progress === 'unknown'
-      ? 'Unknown'
-      : 'Not started';
+      ? message('status.progress.unknown')
+      : message('status.progress.notStarted');
 }
 
 /** Short summaries for the main screen; the full read model stays in disclosures. */
-export function coverageSummaries(status: IngestionStatusDTO) {
+export function coverageSummaries(status: IngestionStatusDTO, locale?: string) {
   const { history: h, details: d, streams: s, photos: p } = status;
   return [
     {
-      title: 'History',
-      count: `${h.knownActivityCount.toLocaleString()} imported${h.totalActivityCount === null ? ' · total unknown' : ''}`,
+      title: message('status.summary.history', undefined, locale),
+      count: message(
+        h.totalActivityCount === null
+          ? 'status.historySummaryUnknown'
+          : 'status.historySummary',
+        { count: h.knownActivityCount },
+        locale,
+      ),
       status: schedulingLabel(h),
       progress: null,
     },
     {
-      title: 'Details',
-      count: `${d.detailed.toLocaleString()} of ${h.knownActivityCount.toLocaleString()} ready`,
+      title: message('status.summary.details', undefined, locale),
+      count: message(
+        'status.detailsSummary',
+        {
+          count: d.detailed,
+          total: h.knownActivityCount,
+        },
+        locale,
+      ),
       status: schedulingLabel(d),
       progress: coverageProgress(d.detailed, h.knownActivityCount),
     },
     {
-      title: 'Streams',
-      count: `${(s.withData + s.withoutData).toLocaleString()} of ${h.knownActivityCount.toLocaleString()} checked`,
-      status: s.failed > 0 ? 'Needs attention' : schedulingLabel(s),
+      title: message('status.summary.streams', undefined, locale),
+      count: message(
+        'status.streamsSummary',
+        {
+          count: s.withData + s.withoutData,
+          total: h.knownActivityCount,
+        },
+        locale,
+      ),
+      status:
+        s.failed > 0
+          ? message('status.compact.needsAttention', undefined, locale)
+          : schedulingLabel(s),
       progress: coverageProgress(
         s.withData + s.withoutData,
         h.knownActivityCount,
       ),
     },
     {
-      title: 'Photos',
+      title: message('status.summary.photos', undefined, locale),
       count:
         p.activitiesWithPhotos === 0
-          ? 'No photos reported'
+          ? message('status.noPhotos', undefined, locale)
           : p.activitiesWithStoredPhotos === undefined
-            ? 'Photo availability not reported by this server'
-            : `${p.activitiesWithStoredPhotos.toLocaleString()} of ${p.activitiesWithPhotos.toLocaleString()} activities have photos available`,
+            ? message('status.photosUnknown', undefined, locale)
+            : message(
+                'status.photosSummary',
+                {
+                  count: p.activitiesWithStoredPhotos,
+                  total: p.activitiesWithPhotos,
+                },
+                locale,
+              ),
       status: schedulingLabel(p),
       progress: coverageProgress(
         p.activitiesWithStoredPhotos,

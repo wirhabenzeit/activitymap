@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import type { Activity, Photo } from '~/server/db/schema.ts';
 import { toActivityDTO } from '~/contracts/v1/activity.ts';
 import { toPhotoDTO } from '~/contracts/v1/photo.ts';
+import type { Activity, Photo } from '~/server/db/schema.ts';
+
 import {
   activityStreamMetadata,
   dtoToActivity,
@@ -89,29 +91,48 @@ const basePhoto: Photo = {
   resource_state: 3,
 };
 
-const omitBridgedFields = (activity: Activity): Omit<Activity, 'public_id' | 'is_complete'> =>
+const presentationFields = (activity: object) =>
   Object.fromEntries(
-    Object.entries(activity).filter(([key]) => key !== 'public_id' && key !== 'is_complete'),
-  ) as Omit<Activity, 'public_id' | 'is_complete'>;
+    Object.entries(activity).filter(
+      ([key]) =>
+        ![
+          'public_id',
+          'is_complete',
+          'last_updated',
+          'lastSummarySeenAt',
+          'lastDetailedFetchedAt',
+        ].includes(key),
+    ),
+  );
 
-void test('dtoToActivity round-trips every field toActivityDTO carries', () => {
-  const dto = toActivityDTO(baseActivity);
-  const restored = dtoToActivity(dto);
-
-  assert.deepEqual(omitBridgedFields(restored), omitBridgedFields(baseActivity));
-
-  // The two fields the v1 DTO has no equivalent for are documented bridge
-  // values, not silently-dropped data — assert their documented behavior
-  // explicitly rather than skipping them.
-  assert.equal(restored.public_id, baseActivity.id, 'public_id bridges to the numeric activity id');
-  assert.equal(restored.is_complete, true, 'is_complete bridges to geometry_state === "detailed"');
+void test('dtoToActivity projects display fields without persistence-only compatibility data', () => {
+  const restored = dtoToActivity(toActivityDTO(baseActivity));
+  assert.deepEqual(restored, presentationFields(baseActivity));
+  for (const key of [
+    'public_id',
+    'is_complete',
+    'last_updated',
+    'lastSummarySeenAt',
+    'lastDetailedFetchedAt',
+  ]) {
+    assert.equal(
+      key in restored,
+      false,
+      `${key} must not escape the persistence boundary`,
+    );
+  }
 });
 
-void test('dtoToActivity derives the temporary in-memory flag from component freshness', () => {
-  const dto = toActivityDTO({ ...baseActivity, geometryState: 'summary', is_complete: true });
-  const restored = dtoToActivity(dto);
-  assert.equal(dto.geometry_state, 'summary');
-  assert.equal(restored.is_complete, false);
+void test('dtoToActivity preserves authoritative component freshness independently of legacy flags', () => {
+  const restored = dtoToActivity(
+    toActivityDTO({
+      ...baseActivity,
+      geometryState: 'summary',
+      is_complete: true,
+    }),
+  );
+  assert.equal(restored.geometryState, 'summary');
+  assert.equal('is_complete' in restored, false);
 });
 
 void test('dtoToActivity keeps stream generation metadata for summary invalidation', () => {
@@ -120,9 +141,7 @@ void test('dtoToActivity keeps stream generation metadata for summary invalidati
     revision: '4',
     state: 'current' as const,
     fetch_status: 'succeeded' as const,
-    available_types: ['distance', 'altitude'] as Array<
-      'distance' | 'altitude'
-    >,
+    available_types: ['distance', 'altitude'] as Array<'distance' | 'altitude'>,
     fetched_at: '2026-09-26T12:00:00.000Z',
     expires_at: null,
   };
@@ -130,7 +149,7 @@ void test('dtoToActivity keeps stream generation metadata for summary invalidati
   const restored = dtoToActivity(dto);
 
   assert.deepEqual(activityStreamMetadata(restored), streams);
-  assert.deepEqual(toActivityDTO(restored).streams, streams);
+  assert.deepEqual(restored.streamsMetadata, streams);
 });
 
 void test('dtoToPhoto round-trips every field exactly (PhotoDTO has no bridged fields)', () => {
@@ -145,7 +164,10 @@ void test('dtoToActivity/dtoToPhoto decode string ids and ISO timestamps back to
   const restored = dtoToActivity(dto);
   assert.equal(typeof restored.id, 'number');
   assert.ok(restored.start_date instanceof Date);
-  assert.equal(restored.start_date.getTime(), baseActivity.start_date.getTime());
+  assert.equal(
+    restored.start_date.getTime(),
+    baseActivity.start_date.getTime(),
+  );
 
   const photoDto = toPhotoDTO(basePhoto);
   assert.equal(typeof photoDto.activity_id, 'string');

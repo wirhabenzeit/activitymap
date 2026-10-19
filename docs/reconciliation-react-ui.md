@@ -11,7 +11,6 @@ This inventory records shared product owners and intentional variants introduced
 | Settings                              | Sections; fixed tab strip; each active tab is a slotted scroll body; 480px preferred height; wider in short landscape | Tabs, sync/import status, sign-out/deletion state and dismissal guards            |
 | Edit activity                         | Sections; form body scrolls independently of Save footer                                                              | Validation, dirty/pending state, server action and cache refresh                  |
 | Share create/created/empty and manage | Sections; fixed actions; share metadata list scrolls within body                                                      | Selection, privacy/expiry options, once-only token display, copy/revoke mutations |
-| Legacy share (disabled feature flag)  | Whole-content scrolling                                                                                               | Retired flow remains disabled; no visibility/eligibility changes                  |
 | Signed-out connection                 | Glass; whole-content scrolling; no automatic close button                                                             | Required non-dismissible connection policy and official Strava artwork            |
 | First summary fetch                   | Glass; whole-content scrolling; no automatic close button                                                             | Pending dismissal guards, retry timing and explicit Close/Continue actions        |
 

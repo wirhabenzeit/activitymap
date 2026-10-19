@@ -2,19 +2,18 @@
 // numbers come from tile-data.ts, which the shared fixtures pin; these
 // helpers only shape the same activities into points to draw, following the
 // date rules in shared/stats-rules.md.
-
-import { type StatsMetric } from '~/settings/stats-tiles.generated';
+import type { Activity } from '~/lib/activity';
 import { aliasMap } from '~/settings/category';
-import { type Activity } from '~/server/db/schema';
+import { type StatsMetric } from '~/settings/stats-tiles.generated';
 
 import {
-  dayOf,
-  sameDateLastYear,
-  metricValue,
-  mondayOf,
-  sportOrder,
   type Sport,
   type StatsActivity,
+  dayOf,
+  metricValue,
+  mondayOf,
+  sameDateLastYear,
+  sportOrder,
 } from './tile-data';
 
 const millisecondsPerDay = 86_400_000;

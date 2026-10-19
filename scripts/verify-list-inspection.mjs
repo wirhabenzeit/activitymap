@@ -197,7 +197,7 @@ try {
 
   await page.setViewportSize({ width: 1440, height: 1000 });
   await loaded('?dense=1');
-  const widthLabels = ['Fit to width', 'Scroll, name pinned', 'Scroll freely'];
+  const widthLabels = ['Fit width', 'Pinned columns', 'Free scrolling'];
   const widthButton = (label) =>
     page.locator('#table-main thead').getByRole('button', {
       name: new RegExp(`^${label}\\. Switch to:`),
@@ -222,7 +222,7 @@ try {
       scroller.scrollLeft = 0;
       return result;
     });
-    if (label === 'Fit to width') {
+    if (label === 'Fit width') {
       assert.equal(geometry.overflowX, 'hidden');
       await page
         .locator('#table-main')
@@ -237,7 +237,7 @@ try {
         geometry.scrollLeft > 0,
         'Scrolling modes expose overflowing columns',
       );
-      if (label === 'Scroll, name pinned') {
+      if (label === 'Pinned columns') {
         assert.equal(geometry.namePosition, 'sticky');
         assert(
           Math.abs(geometry.moved) < 1,
@@ -333,21 +333,21 @@ try {
   assert.equal(
     await page
       .getByRole('menuitemradio', {
-        name: 'Fit to width',
+        name: 'Fit width',
         exact: true,
       })
       .getAttribute('aria-checked'),
     'true',
   );
   const scrollFreelyOption = page.getByRole('menuitemradio', {
-    name: 'Scroll freely',
+    name: 'Free scrolling',
     exact: true,
   });
   await enterSubmenu('Scrolling', scrollFreelyOption);
   await scrollFreelyOption.click();
   await page.waitForFunction(() => !document.querySelector('[role="menu"]'));
   assert.equal(id(), '205', 'Changing the width mode leaves detail open');
-  await assertWidthBehavior('Scroll freely');
+  await assertWidthBehavior('Free scrolling');
   await page
     .getByRole('button', {
       name: 'Close activity detail',
@@ -355,13 +355,13 @@ try {
     })
     .click();
   await waitID(null);
-  await widthButton('Scroll freely').click(); // Restore Fit for the remaining checks.
-  await widthButton('Fit to width').waitFor();
+  await widthButton('Free scrolling').click(); // Restore Fit for the remaining checks.
+  await widthButton('Fit width').waitFor();
   console.log(
     'PASS Fit/Pin/Scroll survive opening, resize and closing; header and menu changes take effect',
   );
 
-  await widthButton('Fit to width').click();
+  await widthButton('Fit width').click();
   await page
     .getByRole('button', { name: 'Combine selections', exact: true })
     .click();
@@ -406,9 +406,9 @@ try {
     .getByRole('button', { name: 'Close activity detail', exact: true })
     .click();
   await waitID(null);
-  await widthButton('Scroll, name pinned').click();
-  await widthButton('Scroll freely').click();
-  await widthButton('Fit to width').waitFor();
+  await widthButton('Pinned columns').click();
+  await widthButton('Free scrolling').click();
+  await widthButton('Fit width').waitFor();
   console.log(
     'PASS pinned header, inspected and selected cells cover scrolled content in light/dark themes',
   );
@@ -601,7 +601,7 @@ try {
   await page.keyboard.press('Enter');
   await assertMode('panel');
   await page
-    .getByRole('button', { name: 'More route actions', exact: true })
+    .getByRole('button', { name: 'More activity actions', exact: true })
     .click();
   await page.keyboard.press('ArrowDown');
   assert.equal(id(), '205');
@@ -613,7 +613,7 @@ try {
     'Escape in the actions menu only dismisses the menu',
   );
   await page
-    .getByRole('button', { name: 'More route actions', exact: true })
+    .getByRole('button', { name: 'More activity actions', exact: true })
     .click();
   await page.getByRole('menuitem', { name: 'Edit', exact: true }).focus();
   await page.keyboard.press('Enter');
@@ -626,11 +626,11 @@ try {
   await page.waitForFunction(
     () =>
       document.activeElement?.getAttribute('aria-label') ===
-      'More route actions',
+      'More activity actions',
   );
   assert.equal(
     await page
-      .getByRole('button', { name: 'More route actions', exact: true })
+      .getByRole('button', { name: 'More activity actions', exact: true })
       .evaluate((element) => element === document.activeElement),
     true,
     'Edit restores its menu trigger, not the removed Edit menu item',

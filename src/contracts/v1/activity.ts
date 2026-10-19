@@ -1,7 +1,9 @@
-import { streamMetadataSchema, type StreamMetadata } from './activity-streams';
 import { z } from 'zod';
+
+import { sportTypes } from '~/contracts/sport';
 import type { Activity } from '~/server/db/schema';
-import { sportTypes } from '~/server/db/schema';
+
+import { type StreamMetadata, streamMetadataSchema } from './activity-streams';
 import { idString, isoDateTime, toIdString, toIsoDateTime } from './primitives';
 
 /**
@@ -28,7 +30,11 @@ import { idString, isoDateTime, toIdString, toIsoDateTime } from './primitives';
  * state for every activity, so the DTO no longer infers freshness from the
  * legacy flag.
  */
-export const geometryStateSchema = z.enum(['summary', 'detailed', 'refresh_required']);
+export const geometryStateSchema = z.enum([
+  'summary',
+  'detailed',
+  'refresh_required',
+]);
 export type GeometryState = z.infer<typeof geometryStateSchema>;
 
 export const photosStateSchema = z.enum(['current', 'refresh_required']);
@@ -98,7 +104,9 @@ export type ActivityDTO = z.infer<typeof activityDTOSchema>;
 /** Maps a Drizzle `Activity` row to the v1 wire contract. Validates its own
  * output, so a future schema.ts change that breaks the contract fails loud
  * here instead of silently changing the wire shape. */
-export function toActivityDTO(activity: Activity & { streamsMetadata?: StreamMetadata }): ActivityDTO {
+export function toActivityDTO(
+  activity: Activity & { streamsMetadata?: StreamMetadata },
+): ActivityDTO {
   return activityDTOSchema.parse({
     ...(activity.streamsMetadata ? { streams: activity.streamsMetadata } : {}),
     id: toIdString(activity.id),
@@ -131,7 +139,8 @@ export function toActivityDTO(activity: Activity & { streamsMetadata?: StreamMet
     private: activity.private,
     flagged: activity.flagged,
     workout_type: activity.workout_type,
-    upload_id: activity.upload_id === null ? null : toIdString(activity.upload_id),
+    upload_id:
+      activity.upload_id === null ? null : toIdString(activity.upload_id),
     average_speed: activity.average_speed,
     max_speed: activity.max_speed,
     calories: activity.calories,
@@ -151,7 +160,9 @@ export function toActivityDTO(activity: Activity & { streamsMetadata?: StreamMet
     max_watts: activity.max_watts,
     weighted_average_watts: activity.weighted_average_watts,
     kilojoules: activity.kilojoules,
-    last_updated: activity.last_updated ? toIsoDateTime(activity.last_updated) : null,
+    last_updated: activity.last_updated
+      ? toIsoDateTime(activity.last_updated)
+      : null,
     geometry_state: activity.geometryState,
     photos_state: activity.photosState,
     last_summary_seen_at: activity.lastSummarySeenAt

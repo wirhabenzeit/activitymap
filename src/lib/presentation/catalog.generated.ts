@@ -163,6 +163,62 @@ export const presentation = {
       "intent": "Export route data: browser downloads a file; iOS presents the system share sheet.",
       "colorToken": "foreground",
       "iosMessage": "action.exportGPXNative"
+    },
+    "edit": {
+      "message": "action.edit",
+      "webGlyph": "Pencil",
+      "iosGlyph": "pencil",
+      "mirrorsInRTL": false,
+      "intent": "Edit the current activity; disabled when editing is unavailable.",
+      "colorToken": "foreground"
+    },
+    "shareActivity": {
+      "message": "action.shareActivity",
+      "webGlyph": "Share2",
+      "iosGlyph": "square.and.arrow.up",
+      "mirrorsInRTL": false,
+      "intent": "Create an expiring activity map link; independent from exporting GPX.",
+      "colorToken": "foreground"
+    },
+    "openInStrava": {
+      "message": "action.openInStrava",
+      "webGlyph": "ExternalLink",
+      "iosGlyph": "arrow.up.right.square",
+      "mirrorsInRTL": false,
+      "intent": "Open the original activity in Strava.",
+      "colorToken": "foreground"
+    },
+    "refresh": {
+      "message": "action.refresh",
+      "webGlyph": "RefreshCw",
+      "iosGlyph": "arrow.clockwise",
+      "mirrorsInRTL": false,
+      "intent": "Reload committed activity details and photos from Strava.",
+      "colorToken": "foreground"
+    },
+    "clearSelection": {
+      "message": "action.clearSelection",
+      "webGlyph": "X",
+      "iosGlyph": "xmark",
+      "mirrorsInRTL": false,
+      "intent": "Clear activity membership; distinct from dismissing the detail.",
+      "colorToken": "foreground"
+    },
+    "previousActivity": {
+      "message": "action.previousActivity",
+      "webGlyph": "ChevronUp",
+      "iosGlyph": "chevron.up",
+      "mirrorsInRTL": false,
+      "intent": "Inspect the previous activity in the current visible order.",
+      "colorToken": "foreground"
+    },
+    "nextActivity": {
+      "message": "action.nextActivity",
+      "webGlyph": "ChevronDown",
+      "iosGlyph": "chevron.down",
+      "mirrorsInRTL": false,
+      "intent": "Inspect the next activity in the current visible order.",
+      "colorToken": "foreground"
     }
   },
   "metrics": {
@@ -636,6 +692,2467 @@ export const presentation = {
       "source": "Selected. Active on map",
       "context": "Accessibility value for a selected activity that is also the active map route.",
       "arguments": {}
+    },
+    "activity.edit.title": {
+      "source": "Edit activity",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.name": {
+      "source": "Name",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.description": {
+      "source": "Description",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.sport": {
+      "source": "Sport",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.save": {
+      "source": "Save changes",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.saving": {
+      "source": "Saving to Strava…",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.cancel": {
+      "source": "Cancel",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.discard": {
+      "source": "Discard changes",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.keepEditing": {
+      "source": "Keep editing",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.discardQuestion": {
+      "source": "Discard your changes?",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.close": {
+      "source": "Close Edit activity",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.namePlaceholder": {
+      "source": "Activity name",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.chooseSport": {
+      "source": "Choose a sport",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.findSport": {
+      "source": "Find a sport",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.footer": {
+      "source": "Changes are saved to Strava",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.savedAnnouncement": {
+      "source": "Activity saved to Strava",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.savingAnnouncement": {
+      "source": "Saving to Strava",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.subtitle": {
+      "source": "Change name, sport or description",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.validationName": {
+      "source": "Enter an activity name.",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.validationDescription": {
+      "source": "The description is too long.",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.validationSport": {
+      "source": "Choose a valid sport.",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.details.title": {
+      "source": "Activity details",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.photos": {
+      "source": "Activity photos",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.group.timeSpeed": {
+      "source": "Time & speed",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.group.timePace": {
+      "source": "Time & pace",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.group.elevation": {
+      "source": "Elevation",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.group.power": {
+      "source": "Power",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.group.heartRate": {
+      "source": "Heart rate",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.group.energy": {
+      "source": "Energy",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.group.social": {
+      "source": "Social",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.group.activity": {
+      "source": "Activity",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "metric.short.minimum": {
+      "source": "Minimum",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "metric.short.maximum": {
+      "source": "Maximum",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "metric.short.average": {
+      "source": "Average",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "metric.short.weightedAverage": {
+      "source": "Weighted average",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "metric.short.calories": {
+      "source": "Calories",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "actions.more": {
+      "source": "More activity actions",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.edit": {
+      "source": "Edit",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.shareActivity": {
+      "source": "Share activity",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.openInStrava": {
+      "source": "Open in Strava",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.openingStrava": {
+      "source": "Opening Strava…",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.refresh": {
+      "source": "Refresh from Strava",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.clearSelection": {
+      "source": "Clear selection",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.collapse": {
+      "source": "Collapse activity details",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.previousActivity": {
+      "source": "Previous activity",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.nextActivity": {
+      "source": "Next activity",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.ok": {
+      "source": "OK",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.done": {
+      "source": "Done",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.continue": {
+      "source": "Continue",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.retry": {
+      "source": "Retry",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "action.clearFilters": {
+      "source": "Clear filters",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.action.showOnMapHint": {
+      "source": "Select this activity and frame its route",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.action.noRoute": {
+      "source": "This activity has no GPS route",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.action.shareHint": {
+      "source": "Create an expiring link to its map",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.action.stravaHint": {
+      "source": "View the original activity",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.action.openFailed": {
+      "source": "Couldn’t open Strava",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.action.shareGPXFailed": {
+      "source": "Couldn’t share GPX",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.success.title": {
+      "source": "Activity saved",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.success.description": {
+      "source": "Your changes have been saved to Strava.",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.refresh.title": {
+      "source": "Activity refreshed",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.refresh.description": {
+      "source": "Activity details and photos are up to date.",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.partial.title": {
+      "source": "Activity refreshed; photos pending",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.partial.description": {
+      "source": "Activity details were saved. Photos could not be refreshed; try refreshing again later.",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.cacheFailure.title": {
+      "source": "Saved to Strava; local update pending",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.cacheFailure.description": {
+      "source": "The remote change succeeded. Your local library could not be updated; sync again to load the saved activity.",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.error.title": {
+      "source": "Couldn’t save activity",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.error.description": {
+      "source": "Your changes could not be saved. Try again.",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.map": {
+      "source": "Map",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.list": {
+      "source": "List",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.stats": {
+      "source": "Stats",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.account": {
+      "source": "Account",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.filters": {
+      "source": "Filters",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.settings": {
+      "source": "Settings",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.categories": {
+      "source": "Categories",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.view": {
+      "source": "View",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.expanded": {
+      "source": "Expanded",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.collapsed": {
+      "source": "Collapsed",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "value.notRecorded": {
+      "source": "Not recorded",
+      "arguments": {},
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.requestID": {
+      "source": "Request ID: {requestID}",
+      "arguments": {
+        "requestID": "string"
+      },
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "mutation.retryAfter": {
+      "source": "Try again after {time}.",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.metric.accessibility": {
+      "source": "{group}, {metric}",
+      "arguments": {
+        "group": "string",
+        "metric": "string"
+      },
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.position": {
+      "source": "{position} of {count}",
+      "arguments": {
+        "position": "number",
+        "count": "number"
+      },
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.currentView": {
+      "source": "View: {view}",
+      "arguments": {
+        "view": "string"
+      },
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "navigation.activeFilters": {
+      "source": "Filters, {count} active",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.nameLength": {
+      "source": "Use no more than {maximum} characters for the activity name.",
+      "arguments": {
+        "maximum": "number"
+      },
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "activity.edit.descriptionLength": {
+      "source": "Use no more than {maximum} characters for the description.",
+      "arguments": {
+        "maximum": "number"
+      },
+      "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
+    },
+    "status.progress.notStarted": {
+      "source": "Not started",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.progress.inProgress": {
+      "source": "Partially available",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.progress.complete": {
+      "source": "Covered",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.progress.unknown": {
+      "source": "Unknown",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.scheduling.idle": {
+      "source": "No work pending",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.scheduling.scheduled": {
+      "source": "Automatic processing scheduled",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.scheduling.waiting": {
+      "source": "Waiting to retry",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.scheduling.blocked": {
+      "source": "Reconnect Strava to continue",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.scheduling.disabled": {
+      "source": "Background processing is disabled on the server",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.scheduling.stalled": {
+      "source": "Background processing has stopped reporting; contact support if this continues",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.scheduling.notScheduled": {
+      "source": "No automatic refresh is scheduled",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.scheduling.unknown": {
+      "source": "No background run has been recorded",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.rateLimited": {
+      "source": "Strava request limit reached; processing will resume on a later run",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.timeBudget": {
+      "source": "More work remains for the next scheduled run",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.credentialsUnavailable": {
+      "source": "Reconnect Strava to continue",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.unauthorized": {
+      "source": "Strava rejected the connection; reconnect Strava",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.upstreamError": {
+      "source": "Strava could not be reached",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.invalidResponse": {
+      "source": "Strava returned data that could not be read",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.detailFailures": {
+      "source": "Some activity details could not be fetched and will be retried",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.photoRefreshFailed": {
+      "source": "Photo metadata could not be refreshed",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.historyFetchFailed": {
+      "source": "Activity history could not be fetched",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.persistenceFailed": {
+      "source": "The server could not save the update",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.reason.internalError": {
+      "source": "The server could not finish processing",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.outcome.succeeded": {
+      "source": "Last run succeeded",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.outcome.partial": {
+      "source": "Last run partly succeeded",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.outcome.deferred": {
+      "source": "Last run deferred",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.outcome.failed": {
+      "source": "Last run failed",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.outcome.blocked": {
+      "source": "Last run blocked",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.pipeline.history": {
+      "source": "Activity history",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.pipeline.details": {
+      "source": "Activity details",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.pipeline.streams": {
+      "source": "Streams & charts",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.pipeline.photos": {
+      "source": "Photo metadata",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.summary.history": {
+      "source": "History",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.summary.details": {
+      "source": "Details",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.summary.streams": {
+      "source": "Streams",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.summary.photos": {
+      "source": "Photos",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.reconnect": {
+      "source": "Reconnect",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.paused": {
+      "source": "Paused",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.needsAttention": {
+      "source": "Needs attention",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.scheduleUnknown": {
+      "source": "Schedule unknown",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.waiting": {
+      "source": "Waiting",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.refreshPending": {
+      "source": "Refresh pending",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.checking": {
+      "source": "Checking",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.queued": {
+      "source": "Queued",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.importing": {
+      "source": "Importing",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.ready": {
+      "source": "Ready",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.unknown": {
+      "source": "Unknown",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.compact.notStarted": {
+      "source": "Not started",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.outcome.withReason": {
+      "source": "{outcome}: {reason}",
+      "arguments": {
+        "outcome": "string",
+        "reason": "string"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.historyUnknown": {
+      "source": "{count} activities imported · Strava total not yet known",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} activity imported · Strava total not yet known",
+        "other": "{count} activities imported · Strava total not yet known"
+      }
+    },
+    "status.historyComplete": {
+      "source": "{count} activities imported · full history discovered",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} activity imported · full history discovered",
+        "other": "{count} activities imported · full history discovered"
+      }
+    },
+    "status.detailsCounts": {
+      "source": "{fetched} fetched · {awaiting} awaiting first fetch · {invalidated} awaiting refresh · {retrying} of these waiting to retry",
+      "arguments": {
+        "fetched": "number",
+        "awaiting": "number",
+        "invalidated": "number",
+        "retrying": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.streamsCounts": {
+      "source": "{withData} with data · {withoutData} with no sensor data · {queued} queued · {waiting} waiting · {blocked} blocked · {failed} failed. {summaries} chart summaries available.",
+      "arguments": {
+        "withData": "number",
+        "withoutData": "number",
+        "queued": "number",
+        "waiting": "number",
+        "blocked": "number",
+        "failed": "number",
+        "summaries": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.photosCounts": {
+      "source": "{current} of {total} activities with photos checked · {refresh} awaiting refresh · {unknown} not checked. {photos} photo records; image downloads are separate.",
+      "arguments": {
+        "current": "number",
+        "total": "number",
+        "refresh": "number",
+        "unknown": "number",
+        "photos": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.historySummary": {
+      "source": "{count} imported",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.historySummaryUnknown": {
+      "source": "{count} imported · total unknown",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.detailsSummary": {
+      "source": "{count} of {total} ready",
+      "arguments": {
+        "count": "number",
+        "total": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.streamsSummary": {
+      "source": "{count} of {total} checked",
+      "arguments": {
+        "count": "number",
+        "total": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.photosSummary": {
+      "source": "{count} of {total} activities have photos available",
+      "arguments": {
+        "count": "number",
+        "total": "number"
+      },
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.noPhotos": {
+      "source": "No photos reported",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "status.photosUnknown": {
+      "source": "Photo availability not reported by this server",
+      "arguments": {},
+      "context": "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability."
+    },
+    "navigation.home": {
+      "source": "ActivityMap home",
+      "arguments": {},
+      "context": "Accessible name of the app mark which navigates to the Map."
+    },
+    "metric.kudos": {
+      "source": "Kudos",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.comments": {
+      "source": "Comments",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.achievements": {
+      "source": "Achievements",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.photos": {
+      "source": "Photos",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.commute": {
+      "source": "Commute",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.private": {
+      "source": "Private",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.indoor": {
+      "source": "Indoor",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.manual": {
+      "source": "Manual",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.flagged": {
+      "source": "Flagged",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "metric.geometryStatus": {
+      "source": "Geometry status",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "geometry.summary": {
+      "source": "Summary",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "geometry.detailed": {
+      "source": "Detailed",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "geometry.refreshRequired": {
+      "source": "Refresh required",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "value.yes": {
+      "source": "Yes",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "value.no": {
+      "source": "No",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "activity.summary": {
+      "source": "Activity summary",
+      "arguments": {},
+      "context": "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false."
+    },
+    "activity.action.named": {
+      "source": "{action}: {name}",
+      "arguments": {
+        "action": "string",
+        "name": "string"
+      },
+      "context": "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments."
+    },
+    "activity.action.unavailable": {
+      "source": "{action}: {name}. {reason}",
+      "arguments": {
+        "action": "string",
+        "name": "string",
+        "reason": "string"
+      },
+      "context": "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments."
+    },
+    "action.activeOnMap": {
+      "source": "Active on map",
+      "arguments": {},
+      "context": "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments."
+    },
+    "mutation.refreshError.title": {
+      "source": "Couldn’t refresh activity",
+      "arguments": {},
+      "context": "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments."
+    },
+    "mutation.refreshError.description": {
+      "source": "Activity details could not be refreshed from Strava. Try again.",
+      "arguments": {},
+      "context": "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments."
+    },
+    "status.browsing.pauseSync": {
+      "source": "Pause sync",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.theseActivitiesHaveNoGPSRoutes": {
+      "source": "These activities have no GPS routes",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.clearFilters": {
+      "source": "Clear filters",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.couldnTLoadActivities": {
+      "source": "Couldn’t load activities",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.loadingWasPausedRetryToFinishDownloadingYourLibrary": {
+      "source": "Loading was paused. Retry to finish downloading your library.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.syncFailedSavedActivitiesAvailable": {
+      "source": "Sync failed · saved activities available",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.readingYourSavedSessionAndActivities": {
+      "source": "Reading your saved session and activities.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.connectingToStrava": {
+      "source": "Connecting to Strava…",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.noActivitiesInYourLibrary": {
+      "source": "No activities in your library",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.stravaIsDisconnected": {
+      "source": "Strava is disconnected",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.activitySyncPaused": {
+      "source": "Activity sync paused",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.viewActivitiesInList": {
+      "source": "View activities in List",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.yourLibraryIsStillSavedClearFiltersOrChange": {
+      "source": "Your library is still saved. Clear filters or change a restriction to see activities.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.syncingSavedActivitiesAvailable": {
+      "source": "Syncing · saved activities available",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.connectWithStrava": {
+      "source": "Connect with Strava",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.activitySyncComplete": {
+      "source": "Activity sync complete",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.offlineNoCompletedActivityCache": {
+      "source": "Offline · no completed activity cache",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.lastSyncAndStravaReconciliationAreSeparateChecks": {
+      "source": "Last sync and Strava reconciliation are separate checks.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.connectToTheInternetAndRetryToFinishLoading": {
+      "source": "Connect to the internet and retry to finish loading your library.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.syncDidNotCompleteRetryOrReviewSyncDetails": {
+      "source": "Sync did not complete. Retry, or review Sync Details for the error.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.retryIsAvailableAfterTheServerSRequestedWait": {
+      "source": "Retry is available after the server’s requested wait. Sync Details shows the exact time.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.noActivitiesMatchYourFilters": {
+      "source": "No activities match your filters",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.yourSavedActivityDataRemainsAvailableReconnectToSync": {
+      "source": "Your saved activity data remains available. Reconnect to sync changes.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.yourSavedLibraryIsStillReadableRetryToLoad": {
+      "source": "Your saved library is still readable. Retry to load changes.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.keepBrowsingWhileChangesAreDownloaded": {
+      "source": "Keep browsing while changes are downloaded.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.yourSignInHasExpired": {
+      "source": "Your sign-in has expired",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.connectWithStravaAgainToRestoreAccessToYour": {
+      "source": "Connect with Strava again to restore access to your activities.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.syncWaitingForTheServer": {
+      "source": "Sync waiting for the server",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.approveOrCancelInTheStravaSheetToContinue": {
+      "source": "Approve or cancel in the Strava sheet to continue.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.preparingActivityData": {
+      "source": "Preparing activity data",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.theFirstSyncDownloadsActivityAndPhotoMetadataYou": {
+      "source": "The first sync downloads activity and photo metadata. You can pause and retry.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.yourSavedLibraryIsStillReadableRetryWhenYou": {
+      "source": "Your saved library is still readable. Retry when you’re ready.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.theCompletedSyncContainsNoActivitiesRecordAnActivity": {
+      "source": "The completed sync contains no activities. Record an activity in Strava, then sync again.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.loadingYourActivityLibrary": {
+      "source": "Loading your activity library",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.offlineBrowsingSavedActivities": {
+      "source": "Offline · browsing saved activities",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.connectWithStravaAgainToLoadYourActivities": {
+      "source": "Connect with Strava again to load your activities.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.connectStravaToSeeYourActivities": {
+      "source": "Connect Strava to see your activities",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.syncWaitingSavedActivitiesAvailable": {
+      "source": "Sync waiting · saved activities available",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.retrySync": {
+      "source": "Retry sync",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.noRoutesMessage": {
+      "source": "{count} filtered activities remain available in the list, including their measurements and known photo metadata.",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Map empty-state explanation. The activities remain inspectable in List when they have no route.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} filtered activity remains available in the list, including their measurements and known photo metadata.",
+        "other": "{count} filtered activities remain available in the list, including their measurements and known photo metadata."
+      }
+    },
+    "status.browsing.separateSyncAndReconciliationTimes": {
+      "source": "Sync and reconciliation times",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.stravaReconciliation": {
+      "source": "Strava reconciliation",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.lastSuccessfulSync": {
+      "source": "Last successful sync",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.activityData": {
+      "source": "Activity data",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.retryAvailableAfter": {
+      "source": "Retry available after",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.savedPhotoInformationDoesNotMeanThePhotoItself": {
+      "source": "Saved photo information does not mean the photo itself is downloaded. Opening a photo may require a connection.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.aSuccessfulSyncCopiesServerChangesStravaReconciliationSays": {
+      "source": "A successful sync copies server changes. Strava reconciliation says when the server last checked Strava. Older or unreported dates do not expire a valid sign-in or remove saved activities.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.noCompletedSync": {
+      "source": "No completed sync",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.notReportedByServer": {
+      "source": "Not reported by server",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.noPhotos": {
+      "source": "No photos",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.signInAgainFromAccountToCheckStatus": {
+      "source": "Sign in again from Account to check status.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.fetchFromStrava": {
+      "source": "Fetch from Strava",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.stravaImportStatus": {
+      "source": "Strava import status",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.importStatusUnavailablePleaseTryAgainLater": {
+      "source": "Import status unavailable. Please try again later.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.checkingYourImport": {
+      "source": "Checking your import…",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.fetchingFromStrava": {
+      "source": "Fetching from Strava",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.fetchedForImportedActivitiesPhotosCountOnlyActivitiesWith": {
+      "source": "Fetched for imported activities. Photos count only activities with photos.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.fetchRecentActivitiesMissingDetailsAndPhotosAndMore": {
+      "source": "Fetch recent activities, missing details and photos, and more history in the background.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.allActivitiesImported": {
+      "source": "All activities imported",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.reconnectStravaFromAccountToContinueImporting": {
+      "source": "Reconnect Strava from Account to continue importing.",
+      "arguments": {},
+      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
+    },
+    "status.browsing.knownPhotos": {
+      "source": "{count} known photos",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Complete import status message with date/count supplied by the platform.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} known photo",
+        "other": "{count} known photos"
+      }
+    },
+    "status.browsing.lastKnown": {
+      "source": "Last known status · {time}",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "Complete import status message with date/count supplied by the platform."
+    },
+    "status.browsing.offlineLastKnown": {
+      "source": "Offline. Last known status · {time}",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "Complete import status message with date/count supplied by the platform."
+    },
+    "stats.group.now": {
+      "source": "Now",
+      "arguments": {},
+      "context": "Stats dashboard section heading."
+    },
+    "stats.group.thisYear": {
+      "source": "This year",
+      "arguments": {},
+      "context": "Stats dashboard section heading."
+    },
+    "stats.group.patterns": {
+      "source": "Patterns",
+      "arguments": {},
+      "context": "Stats dashboard section heading."
+    },
+    "stats.metric.count": {
+      "source": "Activities",
+      "arguments": {},
+      "context": "Stats aggregate metric label; stored values remain SI and unit preference is independent."
+    },
+    "stats.metric.distance": {
+      "source": "Distance",
+      "arguments": {},
+      "context": "Stats aggregate metric label; stored values remain SI and unit preference is independent."
+    },
+    "stats.metric.elevation": {
+      "source": "Elevation",
+      "arguments": {},
+      "context": "Stats aggregate metric label; stored values remain SI and unit preference is independent."
+    },
+    "stats.metric.time": {
+      "source": "Moving time",
+      "arguments": {},
+      "context": "Stats aggregate metric label; stored values remain SI and unit preference is independent."
+    },
+    "stats.tile.thisWeek": {
+      "source": "This week",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.thisWeek": {
+      "source": "Metric",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.monthVsLastMonth": {
+      "source": "This month",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.monthVsLastMonth": {
+      "source": "Metric",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.weeklyVolume": {
+      "source": "Training volume",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.weeklyVolume": {
+      "source": "Metric",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.yearToDate": {
+      "source": "Year to date",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.yearToDate": {
+      "source": "Metric",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.yearPace": {
+      "source": "Year-end projection",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.yearPace": {
+      "source": "Metric",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.records": {
+      "source": "Records",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.tile.totals": {
+      "source": "Totals",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.totals": {
+      "source": "Metric",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.activityCalendar": {
+      "source": "Activity calendar",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.activityCalendar": {
+      "source": "Colour by",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.consistency": {
+      "source": "Consistency",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.consistency": {
+      "source": "Range",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.sportMix": {
+      "source": "Sport mix",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.sportMix": {
+      "source": "Range",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.distanceVsElevation": {
+      "source": "Hilliness",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.tile.typicalWeek": {
+      "source": "Typical week",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.tile.best30Days": {
+      "source": "Best 30 days",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.best30Days": {
+      "source": "Metric",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.tile.restDays": {
+      "source": "Rest days",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.tile.speedTrend": {
+      "source": "Speed trend",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
+    "stats.toggle.speedTrend": {
+      "source": "Range",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "list.pageSelection": {
+      "source": "Select this page",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.averageSpeedPace": {
+      "source": "Average speed / pace",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.thisPage": {
+      "source": "This page",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.filtered": {
+      "source": "Filtered activities",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.selected": {
+      "source": "Selected activities",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.unrecorded": {
+      "source": "* = unrecorded values",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.width.fit": {
+      "source": "Fit width",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.width.pinned": {
+      "source": "Pinned columns",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.width.free": {
+      "source": "Free scrolling",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "activity.action.connectStrava": {
+      "source": "Connect Strava to change this activity",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "metric.localDateTime": {
+      "source": "Local date & time",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.activityID": {
+      "source": "Activity ID",
+      "arguments": {},
+      "context": "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable."
+    },
+    "list.recordedValues": {
+      "source": "{known} of {total} activities with a recorded value",
+      "arguments": {
+        "known": "number",
+        "total": "number"
+      },
+      "context": "Complete list summary/accessibility sentence. Counts are interpolated once by the platform locale."
+    },
+    "list.summaryAccessible": {
+      "source": "{summary}; {known} of {total} recorded",
+      "arguments": {
+        "summary": "string",
+        "known": "number",
+        "total": "number"
+      },
+      "context": "Complete list summary/accessibility sentence. Counts are interpolated once by the platform locale."
+    },
+    "list.width.switch": {
+      "source": "{current}. Switch to: {next}",
+      "arguments": {
+        "current": "string",
+        "next": "string"
+      },
+      "context": "Complete list summary/accessibility sentence. Counts are interpolated once by the platform locale."
+    },
+    "list.hidden": {
+      "source": "{count} hidden by filters",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Complete list summary/accessibility sentence. Counts are interpolated once by the platform locale.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} hidden by filters",
+        "other": "{count} hidden by filters"
+      }
+    },
+    "stats.expandTile": {
+      "source": "Expand {title}",
+      "arguments": {
+        "title": "string"
+      },
+      "context": "Accessible action name. Expanded/collapsed state is semantic, independent of displayed title."
+    },
+    "stats.collapseTile": {
+      "source": "Collapse {title}",
+      "arguments": {
+        "title": "string"
+      },
+      "context": "Accessible action name. Expanded/collapsed state is semantic, independent of displayed title."
+    },
+    "navigation.closeFilters": {
+      "source": "Close filters",
+      "arguments": {},
+      "context": "Accessible action name. Expanded/collapsed state is semantic, independent of displayed title."
+    },
+    "navigation.toggleFilters": {
+      "source": "Toggle filters",
+      "arguments": {},
+      "context": "Accessible action name. Expanded/collapsed state is semantic, independent of displayed title."
+    },
+    "activity.gpx.noRoute": {
+      "source": "No GPS route",
+      "arguments": {},
+      "context": "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure."
+    },
+    "activity.gpx.withElevation": {
+      "source": "Route with elevation",
+      "arguments": {},
+      "context": "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure."
+    },
+    "activity.gpx.routeOnly": {
+      "source": "Route only",
+      "arguments": {},
+      "context": "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure."
+    },
+    "activity.gpx.shareHint": {
+      "source": "Share the saved route as a GPX file",
+      "arguments": {},
+      "context": "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure."
+    },
+    "activity.gpx.unavailableHint": {
+      "source": "This activity has no GPS route to export",
+      "arguments": {},
+      "context": "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure."
+    },
+    "activity.gpx.exportFailed": {
+      "source": "Couldn’t export GPX",
+      "arguments": {},
+      "context": "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure."
+    },
+    "activity.gpx.createFailed": {
+      "source": "The GPX file couldn’t be created. Please try again.",
+      "arguments": {},
+      "context": "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure."
+    },
+    "settings.close": {
+      "source": "Close Settings",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.description": {
+      "source": "Web sync, Strava import status and display preferences.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.sections": {
+      "source": "Settings sections",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.syncData": {
+      "source": "Sync & data",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.display": {
+      "source": "Display",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.about": {
+      "source": "About",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.signInToSync": {
+      "source": "Sign in to sync your activities.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.offlineSync": {
+      "source": "Offline. Sync will resume when you’re back online.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.syncing": {
+      "source": "Syncing…",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.syncError": {
+      "source": "Couldn’t sync. Please try again.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.lastWebSync": {
+      "source": "Last web sync",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.notSynced": {
+      "source": "Not yet synced",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.syncNow": {
+      "source": "Sync now",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.signInStatus": {
+      "source": "Sign in to see your import status.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.goToAccount": {
+      "source": "Go to Account",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.importError": {
+      "source": "Couldn’t start the import. Please try again.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.coverageExplanation": {
+      "source": "Fetched for imported activities. Photos count only activities with photos.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.progressName": {
+      "source": "{category} fetched",
+      "arguments": {
+        "category": "string"
+      },
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.retryAfter": {
+      "source": "Try again after {time}.",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.tagline": {
+      "source": "Your activities, on a map and beyond.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.deleted": {
+      "source": "Your ActivityMap account has been deleted.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.cleanupFailed": {
+      "source": "Couldn’t clear this browser’s offline data. Retry to finish.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.clearing": {
+      "source": "Clearing local data…",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.finishClearing": {
+      "source": "Finish clearing local data",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.yourAccount": {
+      "source": "Your account",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.connectToSee": {
+      "source": "Connect Strava to see your activities.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.stravaDisconnected": {
+      "source": "Strava not connected",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.stravaLimited": {
+      "source": "Strava connected with limited access",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.stravaConnected": {
+      "source": "Strava connected",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.reconnect": {
+      "source": "Connect with Strava again to restore access to your activities.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.signingOut": {
+      "source": "Signing out…",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.signOut": {
+      "source": "Sign out of ActivityMap",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.signOutFailed": {
+      "source": "Couldn’t sign out. Please try again.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.stravaStaysConnected": {
+      "source": "Strava stays connected.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.delete": {
+      "source": "Delete account and data",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.deleteExplanation": {
+      "source": "Permanently delete your ActivityMap account, imported activities, photos and share links. Your original Strava activities stay on Strava. Signing in again creates a new account and starts a fresh import.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.deleteQuestion": {
+      "source": "Delete your account and all ActivityMap data? This can’t be undone.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.deleting": {
+      "source": "Deleting account…",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.confirmDelete": {
+      "source": "Permanently delete my account",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.onlineToDelete": {
+      "source": "Go online to delete your account.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "account.deleteFailed": {
+      "source": "Couldn’t confirm account deletion. Please try again.",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.appearance": {
+      "source": "Appearance",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.system": {
+      "source": "System",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.light": {
+      "source": "Light",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.dark": {
+      "source": "Dark",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.units": {
+      "source": "Units",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.metric": {
+      "source": "Metric",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.imperial": {
+      "source": "Imperial",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.dateFormat": {
+      "source": "Date format",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.dayFirst": {
+      "source": "Day first (31.12.2026)",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.monthFirst": {
+      "source": "Month first (12/31/2026)",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "display.iso": {
+      "source": "ISO (2026-12-31)",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "error.edit.connectWithStravaAgainInSettingsAndAllow": {
+      "source": "Connect with Strava again in Settings and allow ActivityMap to edit activities.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.keepTheNameWithinCharacters": {
+      "source": "Keep the name within 255 characters.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.connectStravaAgainToEditThisActivity": {
+      "source": "Connect Strava again to edit this activity.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.savingWasInterruptedCheckStravaAndSyncBefore": {
+      "source": "Saving was interrupted. Check Strava and sync before trying again.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.keepTheDescriptionWithinCharacters": {
+      "source": "Keep the description within 10,000 characters.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.theSaveCouldNotBeConfirmedYourDraft": {
+      "source": "The save could not be confirmed. Your draft is kept. Check Strava and sync before trying again.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.theServerIsUnavailableYourDraftIsKept": {
+      "source": "The server is unavailable. Your draft is kept.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.stravaAcceptedYourChangesButThisDeviceCould": {
+      "source": "Strava accepted your changes, but this device could not apply them. Close this editor and sync before editing again.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.stravaIsBusyYourDraftIsKeptTry": {
+      "source": "Strava is busy. Your draft is kept; try again after the time below.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.theSaveCouldNotBeConfirmedCloseThis": {
+      "source": "The save could not be confirmed. Close this editor and sync before editing again.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.signInAgainToEditThisActivity": {
+      "source": "Sign in again to edit this activity.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.signInToEditThisActivity": {
+      "source": "Sign in to edit this activity.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.reconnectAndSyncBeforeSavingToStravaYour": {
+      "source": "Reconnect and sync before saving to Strava. Your draft stays here.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.enterAnActivityName": {
+      "source": "Enter an activity name.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.sharing.aLinkCanShareUpToActivitiesChoose": {
+      "source": "A link can share up to 200 activities. Choose a smaller selection.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.sharing.selectAtLeastOneActivityToShare": {
+      "source": "Select at least one activity to share.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.sharing.tooManyRequestsTryAgainAfterTheTime": {
+      "source": "Too many requests. Try again after the time below.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.sharing.creationCouldNotBeConfirmedCheckYourLinks": {
+      "source": "Creation could not be confirmed. Check Your links before creating another link.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.sharing.theServerReturnedAnInvalidShareLink": {
+      "source": "The server returned an invalid share link.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.sharing.signInToShareActivities": {
+      "source": "Sign in to share activities.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.sharing.reconnectAndSyncBeforeSharingActivities": {
+      "source": "Reconnect and sync before sharing activities.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.importStatus.serverImportStatusIsNotAvailableShowingThe": {
+      "source": "Server import status is not available. Showing the last known snapshot when available.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.importStatus.offlineOrSessionNotVerifiedShowingTheLast": {
+      "source": "Offline or session not verified. Showing the last known server status when available.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.importStatus.signInAgainToCheckServerImportStatus": {
+      "source": "Sign in again to check server import status.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.stravaImport.fetchingPausedWhileTheServiceIsBusyPlease": {
+      "source": "Fetching paused while the service is busy. Please try again when available.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.stravaImport.reconnectStravaFromAccountToContinueFetching": {
+      "source": "Reconnect Strava from Account to continue fetching.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.stravaImport.couldNotCheckTheStravaFetchPleaseTry": {
+      "source": "Could not check the Strava fetch. Please try again later.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.stravaImport.signInAgainToFetchFromStrava": {
+      "source": "Sign in again to fetch from Strava.",
+      "arguments": {},
+      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
+    },
+    "error.edit.serverReconciliation": {
+      "source": "{reason} Close this editor and sync before editing again.",
+      "arguments": {
+        "reason": "string"
+      },
+      "context": "Server error plus a complete local recovery instruction. Server reason is verbatim; do not retry an uncertain write."
+    },
+    "status.stravaImport.running": {
+      "source": "Fetching from Strava in the background… Summaries fetched: {summaries} · Activities updated: {details} · Photos fetched: {photos}.",
+      "arguments": {
+        "summaries": "number",
+        "details": "number",
+        "photos": "number"
+      },
+      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
+    },
+    "status.stravaImport.interrupted": {
+      "source": "The fetch was interrupted. Saved progress is kept; try again when available. Summaries fetched: {summaries} · Activities updated: {details} · Photos fetched: {photos}.",
+      "arguments": {
+        "summaries": "number",
+        "details": "number",
+        "photos": "number"
+      },
+      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
+    },
+    "status.stravaImport.rateLimited": {
+      "source": "Strava’s request limit was reached. Summaries fetched: {summaries} · Activities updated: {details} · Photos fetched: {photos}.",
+      "arguments": {
+        "summaries": "number",
+        "details": "number",
+        "photos": "number"
+      },
+      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
+    },
+    "status.stravaImport.failed": {
+      "source": "Could not finish fetching. Saved progress is kept. Summaries fetched: {summaries} · Activities updated: {details} · Photos fetched: {photos}.",
+      "arguments": {
+        "summaries": "number",
+        "details": "number",
+        "photos": "number"
+      },
+      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
+    },
+    "status.stravaImport.deferred": {
+      "source": "This fetch has paused. You can continue with another fetch when available. Summaries fetched: {summaries} · Activities updated: {details} · Photos fetched: {photos}.",
+      "arguments": {
+        "summaries": "number",
+        "details": "number",
+        "photos": "number"
+      },
+      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
+    },
+    "status.stravaImport.finished": {
+      "source": "Fetch finished. Summaries fetched: {summaries} · Activities updated: {details} · Photos fetched: {photos}.",
+      "arguments": {
+        "summaries": "number",
+        "details": "number",
+        "photos": "number"
+      },
+      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
+    },
+    "activity.edit.saveNative": {
+      "source": "Save",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.stravaImport.checkFailed": {
+      "source": "Could not check the Strava fetch. Please try again later.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.stravaImport.waitCheck": {
+      "source": "Please wait before checking again.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.stravaImport.waitStart": {
+      "source": "Please wait before trying again.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.firstSummary.connection": {
+      "source": "Could not connect to ActivityMap. Check your connection and try again.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.firstSummary.invalidResponse": {
+      "source": "The server returned an invalid activity import response. Please try again.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.firstSummary.download": {
+      "source": "Your activities were saved, but could not be downloaded. Check your connection and retry.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.importStatus.notSupported": {
+      "source": "Server import status is not available on this server yet.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.importStatus.signIn": {
+      "source": "Sign in again to check server import status.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.importStatus.failed": {
+      "source": "Could not check server import status. Your last known status is shown when available.",
+      "arguments": {},
+      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
+    },
+    "error.firstSummary.http": {
+      "source": "Activity import failed (HTTP {status}).",
+      "arguments": {
+        "status": "number"
+      },
+      "context": "Complete activity import error/recovery with a verbatim server reason. HTTP status is diagnostic context."
+    },
+    "error.firstSummary.reconnect": {
+      "source": "{reason} Connect with Strava again in Settings.",
+      "arguments": {
+        "reason": "string"
+      },
+      "context": "Complete activity import error/recovery with a verbatim server reason. HTTP status is diagnostic context."
+    },
+    "error.firstSummary.signIn": {
+      "source": "{reason} Sign in again to continue.",
+      "arguments": {
+        "reason": "string"
+      },
+      "context": "Complete activity import error/recovery with a verbatim server reason. HTTP status is diagnostic context."
+    },
+    "account.native.couldnTSyncPleaseTryAgainLater": {
+      "source": "Couldn’t sync. Please try again later.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.deleteYourAccountAndAllActivityMapData": {
+      "source": "Delete your account and all ActivityMap data?",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.signInAgainFromAccountToSyncYour": {
+      "source": "Sign in again from Account to sync your activities.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.tryAgain": {
+      "source": "Try again",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.aboutActivityMap": {
+      "source": "About ActivityMap",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.signingIn": {
+      "source": "Signing in…",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.couldnTConfirmAccountDeletionCheckYourConnection": {
+      "source": "Couldn’t confirm account deletion. Check your connection and try again.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.version": {
+      "source": "Version",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.thisCanTBeUndoneYourOriginalStrava": {
+      "source": "This can’t be undone. Your original Strava activities stay on Strava. Signing in again creates a new account and starts a fresh import.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.signOutFailed": {
+      "source": "Sign-out failed",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.yourAccountWasDeletedButLocalDataCould": {
+      "source": "Your account was deleted, but local data could not be cleared. Retry to finish.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.permanentlyDeleteYourActivityMapAccountImportedActivitiesPhotos": {
+      "source": "Permanently delete your ActivityMap account, imported activities, photos and share links. Your original Strava activities stay on Strava.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.syncPausedTapSyncNowToResume": {
+      "source": "Sync paused. Tap Sync now to resume.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.build": {
+      "source": "Build",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.lastDeviceSync": {
+      "source": "Last device sync",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.checkingYourSession": {
+      "source": "Checking your session…",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.exploreYourActivitiesOnAMapInA": {
+      "source": "Explore your activities on a map, in a list, and through meaningful summaries.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "account.native.reconnectStravaFromAccountToSyncYourActivities": {
+      "source": "Reconnect Strava from Account to sync your activities.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.routeElevationProfileNameSportDateAndTime": {
+      "source": "Route, elevation profile, name, sport, date and time, distance, moving time, elevation gain and average speed.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.shownToRecipients": {
+      "source": "Shown to recipients",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.shareOrCopyItNowTheFullLink": {
+      "source": "Share or copy it now. The full link is only available until you close this sheet.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.createLink": {
+      "source": "Create link",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.creating": {
+      "source": "Creating…",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.shareOnlyTheActivityWhoseDetailsAreOpen": {
+      "source": "Share only the activity whose details are open",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.theFirstAndLastMOfEachRoute": {
+      "source": "The first and last 200 m of each route and elevation profile are hidden unless you choose to show them.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.expires": {
+      "source": "Expires",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.shareTheSelectedGroupIncludingActivitiesHiddenBy": {
+      "source": "Share the selected group, including activities hidden by filters",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.couldnTLoadYourLinksCheckYourConnection": {
+      "source": "Couldn’t load your links. Check your connection and try again.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.loadingLinks": {
+      "source": "Loading links…",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.heartRatePowerCaloriesSocialInformationDescriptionsAnd": {
+      "source": "Heart rate, power, calories, social information, descriptions and photos are excluded.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.linkCreated": {
+      "source": "Link created",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.showStartAndFinish": {
+      "source": "Show start and finish",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.revokeLink": {
+      "source": "Revoke link",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.shareActivities": {
+      "source": "Share activities",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.anyoneWithThisLinkWillLoseAccessImmediately": {
+      "source": "Anyone with this link will lose access immediately.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.yourLinks": {
+      "source": "Your links",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.revocationCouldNotBeConfirmedRefreshYourLinks": {
+      "source": "Revocation could not be confirmed. Refresh your links and try again.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.expiresAfter": {
+      "source": "Expires after",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.shareLink": {
+      "source": "Share link",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.shareSelectedActivities": {
+      "source": "Share selected activities",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.revokeThisLink": {
+      "source": "Revoke this link?",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.youHaveNoShareLinks": {
+      "source": "You have no share links.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "sharing.onlyTheseActivitiesAreIncludedAnyoneWithThe": {
+      "source": "Only these activities are included. Anyone with the link can view them until it expires or you revoke it. Activities marked private in Strava are omitted from the shared map.",
+      "arguments": {},
+      "context": "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim."
+    },
+    "display.metricExplanation": {
+      "source": "Distance, elevation and speed use kilometres, metres and km/h. Preferences are saved on this device.",
+      "arguments": {},
+      "context": "Complete explanation of a saved display-unit choice, independent of locale and SI storage."
+    },
+    "display.imperialExplanation": {
+      "source": "Distance, elevation and speed use miles, feet and mph. Preferences are saved on this device.",
+      "arguments": {},
+      "context": "Complete explanation of a saved display-unit choice, independent of locale and SI storage."
+    },
+    "sharing.expiryHours": {
+      "source": "{count} hours",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Complete sharing duration or accessibility hint with a grammatical zero/one/many count.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} hour",
+        "other": "{count} hours"
+      }
+    },
+    "sharing.expiryDays": {
+      "source": "{count} days",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Complete sharing duration or accessibility hint with a grammatical zero/one/many count.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} day",
+        "other": "{count} days"
+      }
+    },
+    "sharing.selectionHint": {
+      "source": "Review all {count} selected activities, including those hidden by filters",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Complete sharing duration or accessibility hint with a grammatical zero/one/many count.",
+      "plural": {
+        "argument": "count",
+        "one": "Review the {count} selected activity, including it if hidden by filters",
+        "other": "Review all {count} selected activities, including those hidden by filters"
+      }
+    },
+    "activity.row.subtitle": {
+      "source": "{sport} · {date}",
+      "arguments": {
+        "sport": "string",
+        "date": "string"
+      },
+      "context": "Complete activity identification subtitle/accessibility value. Sport name and activity-local formatted wall time are supplied verbatim. Active route state stays distinct from selection."
+    },
+    "activity.row.accessible": {
+      "source": "{sport}, {date}.",
+      "arguments": {
+        "sport": "string",
+        "date": "string"
+      },
+      "context": "Complete activity identification subtitle/accessibility value. Sport name and activity-local formatted wall time are supplied verbatim. Active route state stays distinct from selection."
+    },
+    "activity.row.activeAccessible": {
+      "source": "{sport}, {date}. Active on map.",
+      "arguments": {
+        "sport": "string",
+        "date": "string"
+      },
+      "context": "Complete activity identification subtitle/accessibility value. Sport name and activity-local formatted wall time are supplied verbatim. Active route state stays distinct from selection."
+    },
+    "error.activity.invalidResponse": {
+      "source": "Strava may have accepted this request, but the saved activity response could not be read. Refresh from Strava before saving again.",
+      "arguments": {},
+      "context": "An uncertain mutation response must be reconciled before another write; preserve the difference between request failure and remote success with unreadable response."
+    },
+    "error.activity.requestFailed": {
+      "source": "The activity request could not be completed.",
+      "arguments": {},
+      "context": "An uncertain mutation response must be reconciled before another write; preserve the difference between request failure and remote success with unreadable response."
+    },
+    "mutation.unconfirmed.title": {
+      "source": "Couldn’t confirm the saved activity",
+      "arguments": {},
+      "context": "Successful HTTP response had invalid activity data. The remote write may have succeeded; refresh before resubmitting."
+    },
+    "status.firstSummary.loading": {
+      "source": "Loading your recent activities…",
+      "arguments": {},
+      "context": "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim."
+    },
+    "status.firstSummary.failed": {
+      "source": "Could not load your recent activities",
+      "arguments": {},
+      "context": "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim."
+    },
+    "status.firstSummary.empty": {
+      "source": "No activities found in Strava",
+      "arguments": {},
+      "context": "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim."
+    },
+    "status.firstSummary.ready": {
+      "source": "Your recent activities are ready",
+      "arguments": {},
+      "context": "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim."
+    },
+    "status.firstSummary.emptyMessage": {
+      "source": "New activities will appear here after you record them in Strava.",
+      "arguments": {},
+      "context": "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim."
+    },
+    "status.activitiesSyncing": {
+      "source": "Syncing activities",
+      "arguments": {},
+      "context": "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim."
+    },
+    "activity.gpx.noGeometry": {
+      "source": "This activity has no GPS route to export.",
+      "arguments": {},
+      "context": "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim."
+    },
+    "activity.gpx.invalidCoordinate": {
+      "source": "The saved route contains invalid coordinates. Sync the activity and try again.",
+      "arguments": {},
+      "context": "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim."
+    },
+    "status.firstSummary.count": {
+      "source": "{count} activities fetched. Older history, details and photos continue in the background.",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Complete initial-summary import result. Zero has its own empty-library explanation. History, details and photos continue independently.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} activity fetched. Older history, details and photos continue in the background.",
+        "other": "{count} activities fetched. Older history, details and photos continue in the background."
+      }
     }
   }
 } as const;
@@ -711,4 +3228,459 @@ export type MessageArguments = {
   "state.activeRoute": Record<never, never>;
   "state.inactiveRoute": Record<never, never>;
   "state.selectedActiveRoute": Record<never, never>;
+  "activity.edit.title": Record<never, never>;
+  "activity.edit.name": Record<never, never>;
+  "activity.edit.description": Record<never, never>;
+  "activity.edit.sport": Record<never, never>;
+  "activity.edit.save": Record<never, never>;
+  "activity.edit.saving": Record<never, never>;
+  "activity.edit.cancel": Record<never, never>;
+  "activity.edit.discard": Record<never, never>;
+  "activity.edit.keepEditing": Record<never, never>;
+  "activity.edit.discardQuestion": Record<never, never>;
+  "activity.edit.close": Record<never, never>;
+  "activity.edit.namePlaceholder": Record<never, never>;
+  "activity.edit.chooseSport": Record<never, never>;
+  "activity.edit.findSport": Record<never, never>;
+  "activity.edit.footer": Record<never, never>;
+  "activity.edit.savedAnnouncement": Record<never, never>;
+  "activity.edit.savingAnnouncement": Record<never, never>;
+  "activity.edit.subtitle": Record<never, never>;
+  "activity.edit.validationName": Record<never, never>;
+  "activity.edit.validationDescription": Record<never, never>;
+  "activity.edit.validationSport": Record<never, never>;
+  "activity.details.title": Record<never, never>;
+  "activity.photos": Record<never, never>;
+  "activity.group.timeSpeed": Record<never, never>;
+  "activity.group.timePace": Record<never, never>;
+  "activity.group.elevation": Record<never, never>;
+  "activity.group.power": Record<never, never>;
+  "activity.group.heartRate": Record<never, never>;
+  "activity.group.energy": Record<never, never>;
+  "activity.group.social": Record<never, never>;
+  "activity.group.activity": Record<never, never>;
+  "metric.short.minimum": Record<never, never>;
+  "metric.short.maximum": Record<never, never>;
+  "metric.short.average": Record<never, never>;
+  "metric.short.weightedAverage": Record<never, never>;
+  "metric.short.calories": Record<never, never>;
+  "actions.more": Record<never, never>;
+  "action.edit": Record<never, never>;
+  "action.shareActivity": Record<never, never>;
+  "action.openInStrava": Record<never, never>;
+  "action.openingStrava": Record<never, never>;
+  "action.refresh": Record<never, never>;
+  "action.clearSelection": Record<never, never>;
+  "action.collapse": Record<never, never>;
+  "action.previousActivity": Record<never, never>;
+  "action.nextActivity": Record<never, never>;
+  "action.ok": Record<never, never>;
+  "action.done": Record<never, never>;
+  "action.continue": Record<never, never>;
+  "action.retry": Record<never, never>;
+  "action.clearFilters": Record<never, never>;
+  "activity.action.showOnMapHint": Record<never, never>;
+  "activity.action.noRoute": Record<never, never>;
+  "activity.action.shareHint": Record<never, never>;
+  "activity.action.stravaHint": Record<never, never>;
+  "activity.action.openFailed": Record<never, never>;
+  "activity.action.shareGPXFailed": Record<never, never>;
+  "mutation.success.title": Record<never, never>;
+  "mutation.success.description": Record<never, never>;
+  "mutation.refresh.title": Record<never, never>;
+  "mutation.refresh.description": Record<never, never>;
+  "mutation.partial.title": Record<never, never>;
+  "mutation.partial.description": Record<never, never>;
+  "mutation.cacheFailure.title": Record<never, never>;
+  "mutation.cacheFailure.description": Record<never, never>;
+  "mutation.error.title": Record<never, never>;
+  "mutation.error.description": Record<never, never>;
+  "navigation.map": Record<never, never>;
+  "navigation.list": Record<never, never>;
+  "navigation.stats": Record<never, never>;
+  "navigation.account": Record<never, never>;
+  "navigation.filters": Record<never, never>;
+  "navigation.settings": Record<never, never>;
+  "navigation.categories": Record<never, never>;
+  "navigation.view": Record<never, never>;
+  "navigation.expanded": Record<never, never>;
+  "navigation.collapsed": Record<never, never>;
+  "value.notRecorded": Record<never, never>;
+  "mutation.requestID": { requestID: string };
+  "mutation.retryAfter": { time: string };
+  "activity.metric.accessibility": { group: string; metric: string };
+  "activity.position": { position: number; count: number };
+  "navigation.currentView": { view: string };
+  "navigation.activeFilters": { count: number };
+  "activity.edit.nameLength": { maximum: number };
+  "activity.edit.descriptionLength": { maximum: number };
+  "status.progress.notStarted": Record<never, never>;
+  "status.progress.inProgress": Record<never, never>;
+  "status.progress.complete": Record<never, never>;
+  "status.progress.unknown": Record<never, never>;
+  "status.scheduling.idle": Record<never, never>;
+  "status.scheduling.scheduled": Record<never, never>;
+  "status.scheduling.waiting": Record<never, never>;
+  "status.scheduling.blocked": Record<never, never>;
+  "status.scheduling.disabled": Record<never, never>;
+  "status.scheduling.stalled": Record<never, never>;
+  "status.scheduling.notScheduled": Record<never, never>;
+  "status.scheduling.unknown": Record<never, never>;
+  "status.reason.rateLimited": Record<never, never>;
+  "status.reason.timeBudget": Record<never, never>;
+  "status.reason.credentialsUnavailable": Record<never, never>;
+  "status.reason.unauthorized": Record<never, never>;
+  "status.reason.upstreamError": Record<never, never>;
+  "status.reason.invalidResponse": Record<never, never>;
+  "status.reason.detailFailures": Record<never, never>;
+  "status.reason.photoRefreshFailed": Record<never, never>;
+  "status.reason.historyFetchFailed": Record<never, never>;
+  "status.reason.persistenceFailed": Record<never, never>;
+  "status.reason.internalError": Record<never, never>;
+  "status.outcome.succeeded": Record<never, never>;
+  "status.outcome.partial": Record<never, never>;
+  "status.outcome.deferred": Record<never, never>;
+  "status.outcome.failed": Record<never, never>;
+  "status.outcome.blocked": Record<never, never>;
+  "status.pipeline.history": Record<never, never>;
+  "status.pipeline.details": Record<never, never>;
+  "status.pipeline.streams": Record<never, never>;
+  "status.pipeline.photos": Record<never, never>;
+  "status.summary.history": Record<never, never>;
+  "status.summary.details": Record<never, never>;
+  "status.summary.streams": Record<never, never>;
+  "status.summary.photos": Record<never, never>;
+  "status.compact.reconnect": Record<never, never>;
+  "status.compact.paused": Record<never, never>;
+  "status.compact.needsAttention": Record<never, never>;
+  "status.compact.scheduleUnknown": Record<never, never>;
+  "status.compact.waiting": Record<never, never>;
+  "status.compact.refreshPending": Record<never, never>;
+  "status.compact.checking": Record<never, never>;
+  "status.compact.queued": Record<never, never>;
+  "status.compact.importing": Record<never, never>;
+  "status.compact.ready": Record<never, never>;
+  "status.compact.unknown": Record<never, never>;
+  "status.compact.notStarted": Record<never, never>;
+  "status.outcome.withReason": { outcome: string; reason: string };
+  "status.historyUnknown": { count: number };
+  "status.historyComplete": { count: number };
+  "status.detailsCounts": { fetched: number; awaiting: number; invalidated: number; retrying: number };
+  "status.streamsCounts": { withData: number; withoutData: number; queued: number; waiting: number; blocked: number; failed: number; summaries: number };
+  "status.photosCounts": { current: number; total: number; refresh: number; unknown: number; photos: number };
+  "status.historySummary": { count: number };
+  "status.historySummaryUnknown": { count: number };
+  "status.detailsSummary": { count: number; total: number };
+  "status.streamsSummary": { count: number; total: number };
+  "status.photosSummary": { count: number; total: number };
+  "status.noPhotos": Record<never, never>;
+  "status.photosUnknown": Record<never, never>;
+  "navigation.home": Record<never, never>;
+  "metric.kudos": Record<never, never>;
+  "metric.comments": Record<never, never>;
+  "metric.achievements": Record<never, never>;
+  "metric.photos": Record<never, never>;
+  "metric.commute": Record<never, never>;
+  "metric.private": Record<never, never>;
+  "metric.indoor": Record<never, never>;
+  "metric.manual": Record<never, never>;
+  "metric.flagged": Record<never, never>;
+  "metric.geometryStatus": Record<never, never>;
+  "geometry.summary": Record<never, never>;
+  "geometry.detailed": Record<never, never>;
+  "geometry.refreshRequired": Record<never, never>;
+  "value.yes": Record<never, never>;
+  "value.no": Record<never, never>;
+  "activity.summary": Record<never, never>;
+  "activity.action.named": { action: string; name: string };
+  "activity.action.unavailable": { action: string; name: string; reason: string };
+  "action.activeOnMap": Record<never, never>;
+  "mutation.refreshError.title": Record<never, never>;
+  "mutation.refreshError.description": Record<never, never>;
+  "status.browsing.pauseSync": Record<never, never>;
+  "status.browsing.theseActivitiesHaveNoGPSRoutes": Record<never, never>;
+  "status.browsing.clearFilters": Record<never, never>;
+  "status.browsing.couldnTLoadActivities": Record<never, never>;
+  "status.browsing.loadingWasPausedRetryToFinishDownloadingYourLibrary": Record<never, never>;
+  "status.browsing.syncFailedSavedActivitiesAvailable": Record<never, never>;
+  "status.browsing.readingYourSavedSessionAndActivities": Record<never, never>;
+  "status.browsing.connectingToStrava": Record<never, never>;
+  "status.browsing.noActivitiesInYourLibrary": Record<never, never>;
+  "status.browsing.stravaIsDisconnected": Record<never, never>;
+  "status.browsing.activitySyncPaused": Record<never, never>;
+  "status.browsing.viewActivitiesInList": Record<never, never>;
+  "status.browsing.yourLibraryIsStillSavedClearFiltersOrChange": Record<never, never>;
+  "status.browsing.syncingSavedActivitiesAvailable": Record<never, never>;
+  "status.browsing.connectWithStrava": Record<never, never>;
+  "status.browsing.activitySyncComplete": Record<never, never>;
+  "status.browsing.offlineNoCompletedActivityCache": Record<never, never>;
+  "status.browsing.lastSyncAndStravaReconciliationAreSeparateChecks": Record<never, never>;
+  "status.browsing.connectToTheInternetAndRetryToFinishLoading": Record<never, never>;
+  "status.browsing.syncDidNotCompleteRetryOrReviewSyncDetails": Record<never, never>;
+  "status.browsing.retryIsAvailableAfterTheServerSRequestedWait": Record<never, never>;
+  "status.browsing.noActivitiesMatchYourFilters": Record<never, never>;
+  "status.browsing.yourSavedActivityDataRemainsAvailableReconnectToSync": Record<never, never>;
+  "status.browsing.yourSavedLibraryIsStillReadableRetryToLoad": Record<never, never>;
+  "status.browsing.keepBrowsingWhileChangesAreDownloaded": Record<never, never>;
+  "status.browsing.yourSignInHasExpired": Record<never, never>;
+  "status.browsing.connectWithStravaAgainToRestoreAccessToYour": Record<never, never>;
+  "status.browsing.syncWaitingForTheServer": Record<never, never>;
+  "status.browsing.approveOrCancelInTheStravaSheetToContinue": Record<never, never>;
+  "status.browsing.preparingActivityData": Record<never, never>;
+  "status.browsing.theFirstSyncDownloadsActivityAndPhotoMetadataYou": Record<never, never>;
+  "status.browsing.yourSavedLibraryIsStillReadableRetryWhenYou": Record<never, never>;
+  "status.browsing.theCompletedSyncContainsNoActivitiesRecordAnActivity": Record<never, never>;
+  "status.browsing.loadingYourActivityLibrary": Record<never, never>;
+  "status.browsing.offlineBrowsingSavedActivities": Record<never, never>;
+  "status.browsing.connectWithStravaAgainToLoadYourActivities": Record<never, never>;
+  "status.browsing.connectStravaToSeeYourActivities": Record<never, never>;
+  "status.browsing.syncWaitingSavedActivitiesAvailable": Record<never, never>;
+  "status.browsing.retrySync": Record<never, never>;
+  "status.browsing.noRoutesMessage": { count: number };
+  "status.browsing.separateSyncAndReconciliationTimes": Record<never, never>;
+  "status.browsing.stravaReconciliation": Record<never, never>;
+  "status.browsing.lastSuccessfulSync": Record<never, never>;
+  "status.browsing.activityData": Record<never, never>;
+  "status.browsing.retryAvailableAfter": Record<never, never>;
+  "status.browsing.savedPhotoInformationDoesNotMeanThePhotoItself": Record<never, never>;
+  "status.browsing.aSuccessfulSyncCopiesServerChangesStravaReconciliationSays": Record<never, never>;
+  "status.browsing.noCompletedSync": Record<never, never>;
+  "status.browsing.notReportedByServer": Record<never, never>;
+  "status.browsing.noPhotos": Record<never, never>;
+  "status.browsing.signInAgainFromAccountToCheckStatus": Record<never, never>;
+  "status.browsing.fetchFromStrava": Record<never, never>;
+  "status.browsing.stravaImportStatus": Record<never, never>;
+  "status.browsing.importStatusUnavailablePleaseTryAgainLater": Record<never, never>;
+  "status.browsing.checkingYourImport": Record<never, never>;
+  "status.browsing.fetchingFromStrava": Record<never, never>;
+  "status.browsing.fetchedForImportedActivitiesPhotosCountOnlyActivitiesWith": Record<never, never>;
+  "status.browsing.fetchRecentActivitiesMissingDetailsAndPhotosAndMore": Record<never, never>;
+  "status.browsing.allActivitiesImported": Record<never, never>;
+  "status.browsing.reconnectStravaFromAccountToContinueImporting": Record<never, never>;
+  "status.browsing.knownPhotos": { count: number };
+  "status.browsing.lastKnown": { time: string };
+  "status.browsing.offlineLastKnown": { time: string };
+  "stats.group.now": Record<never, never>;
+  "stats.group.thisYear": Record<never, never>;
+  "stats.group.patterns": Record<never, never>;
+  "stats.metric.count": Record<never, never>;
+  "stats.metric.distance": Record<never, never>;
+  "stats.metric.elevation": Record<never, never>;
+  "stats.metric.time": Record<never, never>;
+  "stats.tile.thisWeek": Record<never, never>;
+  "stats.toggle.thisWeek": Record<never, never>;
+  "stats.tile.monthVsLastMonth": Record<never, never>;
+  "stats.toggle.monthVsLastMonth": Record<never, never>;
+  "stats.tile.weeklyVolume": Record<never, never>;
+  "stats.toggle.weeklyVolume": Record<never, never>;
+  "stats.tile.yearToDate": Record<never, never>;
+  "stats.toggle.yearToDate": Record<never, never>;
+  "stats.tile.yearPace": Record<never, never>;
+  "stats.toggle.yearPace": Record<never, never>;
+  "stats.tile.records": Record<never, never>;
+  "stats.tile.totals": Record<never, never>;
+  "stats.toggle.totals": Record<never, never>;
+  "stats.tile.activityCalendar": Record<never, never>;
+  "stats.toggle.activityCalendar": Record<never, never>;
+  "stats.tile.consistency": Record<never, never>;
+  "stats.toggle.consistency": Record<never, never>;
+  "stats.tile.sportMix": Record<never, never>;
+  "stats.toggle.sportMix": Record<never, never>;
+  "stats.tile.distanceVsElevation": Record<never, never>;
+  "stats.tile.typicalWeek": Record<never, never>;
+  "stats.tile.best30Days": Record<never, never>;
+  "stats.toggle.best30Days": Record<never, never>;
+  "stats.tile.restDays": Record<never, never>;
+  "stats.tile.speedTrend": Record<never, never>;
+  "stats.toggle.speedTrend": Record<never, never>;
+  "list.pageSelection": Record<never, never>;
+  "list.averageSpeedPace": Record<never, never>;
+  "list.thisPage": Record<never, never>;
+  "list.filtered": Record<never, never>;
+  "list.selected": Record<never, never>;
+  "list.unrecorded": Record<never, never>;
+  "list.width.fit": Record<never, never>;
+  "list.width.pinned": Record<never, never>;
+  "list.width.free": Record<never, never>;
+  "activity.action.connectStrava": Record<never, never>;
+  "metric.localDateTime": Record<never, never>;
+  "list.activityID": Record<never, never>;
+  "list.recordedValues": { known: number; total: number };
+  "list.summaryAccessible": { summary: string; known: number; total: number };
+  "list.width.switch": { current: string; next: string };
+  "list.hidden": { count: number };
+  "stats.expandTile": { title: string };
+  "stats.collapseTile": { title: string };
+  "navigation.closeFilters": Record<never, never>;
+  "navigation.toggleFilters": Record<never, never>;
+  "activity.gpx.noRoute": Record<never, never>;
+  "activity.gpx.withElevation": Record<never, never>;
+  "activity.gpx.routeOnly": Record<never, never>;
+  "activity.gpx.shareHint": Record<never, never>;
+  "activity.gpx.unavailableHint": Record<never, never>;
+  "activity.gpx.exportFailed": Record<never, never>;
+  "activity.gpx.createFailed": Record<never, never>;
+  "settings.close": Record<never, never>;
+  "settings.description": Record<never, never>;
+  "settings.sections": Record<never, never>;
+  "settings.syncData": Record<never, never>;
+  "settings.display": Record<never, never>;
+  "settings.about": Record<never, never>;
+  "settings.signInToSync": Record<never, never>;
+  "settings.offlineSync": Record<never, never>;
+  "settings.syncing": Record<never, never>;
+  "settings.syncError": Record<never, never>;
+  "settings.lastWebSync": Record<never, never>;
+  "settings.notSynced": Record<never, never>;
+  "settings.syncNow": Record<never, never>;
+  "settings.signInStatus": Record<never, never>;
+  "settings.goToAccount": Record<never, never>;
+  "settings.importError": Record<never, never>;
+  "settings.coverageExplanation": Record<never, never>;
+  "settings.progressName": { category: string };
+  "settings.retryAfter": { time: string };
+  "settings.tagline": Record<never, never>;
+  "account.deleted": Record<never, never>;
+  "account.cleanupFailed": Record<never, never>;
+  "account.clearing": Record<never, never>;
+  "account.finishClearing": Record<never, never>;
+  "account.yourAccount": Record<never, never>;
+  "account.connectToSee": Record<never, never>;
+  "account.stravaDisconnected": Record<never, never>;
+  "account.stravaLimited": Record<never, never>;
+  "account.stravaConnected": Record<never, never>;
+  "account.reconnect": Record<never, never>;
+  "account.signingOut": Record<never, never>;
+  "account.signOut": Record<never, never>;
+  "account.signOutFailed": Record<never, never>;
+  "account.stravaStaysConnected": Record<never, never>;
+  "account.delete": Record<never, never>;
+  "account.deleteExplanation": Record<never, never>;
+  "account.deleteQuestion": Record<never, never>;
+  "account.deleting": Record<never, never>;
+  "account.confirmDelete": Record<never, never>;
+  "account.onlineToDelete": Record<never, never>;
+  "account.deleteFailed": Record<never, never>;
+  "display.appearance": Record<never, never>;
+  "display.system": Record<never, never>;
+  "display.light": Record<never, never>;
+  "display.dark": Record<never, never>;
+  "display.units": Record<never, never>;
+  "display.metric": Record<never, never>;
+  "display.imperial": Record<never, never>;
+  "display.dateFormat": Record<never, never>;
+  "display.dayFirst": Record<never, never>;
+  "display.monthFirst": Record<never, never>;
+  "display.iso": Record<never, never>;
+  "error.edit.connectWithStravaAgainInSettingsAndAllow": Record<never, never>;
+  "error.edit.keepTheNameWithinCharacters": Record<never, never>;
+  "error.edit.connectStravaAgainToEditThisActivity": Record<never, never>;
+  "error.edit.savingWasInterruptedCheckStravaAndSyncBefore": Record<never, never>;
+  "error.edit.keepTheDescriptionWithinCharacters": Record<never, never>;
+  "error.edit.theSaveCouldNotBeConfirmedYourDraft": Record<never, never>;
+  "error.edit.theServerIsUnavailableYourDraftIsKept": Record<never, never>;
+  "error.edit.stravaAcceptedYourChangesButThisDeviceCould": Record<never, never>;
+  "error.edit.stravaIsBusyYourDraftIsKeptTry": Record<never, never>;
+  "error.edit.theSaveCouldNotBeConfirmedCloseThis": Record<never, never>;
+  "error.edit.signInAgainToEditThisActivity": Record<never, never>;
+  "error.edit.signInToEditThisActivity": Record<never, never>;
+  "error.edit.reconnectAndSyncBeforeSavingToStravaYour": Record<never, never>;
+  "error.edit.enterAnActivityName": Record<never, never>;
+  "error.sharing.aLinkCanShareUpToActivitiesChoose": Record<never, never>;
+  "error.sharing.selectAtLeastOneActivityToShare": Record<never, never>;
+  "error.sharing.tooManyRequestsTryAgainAfterTheTime": Record<never, never>;
+  "error.sharing.creationCouldNotBeConfirmedCheckYourLinks": Record<never, never>;
+  "error.sharing.theServerReturnedAnInvalidShareLink": Record<never, never>;
+  "error.sharing.signInToShareActivities": Record<never, never>;
+  "error.sharing.reconnectAndSyncBeforeSharingActivities": Record<never, never>;
+  "error.importStatus.serverImportStatusIsNotAvailableShowingThe": Record<never, never>;
+  "error.importStatus.offlineOrSessionNotVerifiedShowingTheLast": Record<never, never>;
+  "error.importStatus.signInAgainToCheckServerImportStatus": Record<never, never>;
+  "error.stravaImport.fetchingPausedWhileTheServiceIsBusyPlease": Record<never, never>;
+  "error.stravaImport.reconnectStravaFromAccountToContinueFetching": Record<never, never>;
+  "error.stravaImport.couldNotCheckTheStravaFetchPleaseTry": Record<never, never>;
+  "error.stravaImport.signInAgainToFetchFromStrava": Record<never, never>;
+  "error.edit.serverReconciliation": { reason: string };
+  "status.stravaImport.running": { summaries: number; details: number; photos: number };
+  "status.stravaImport.interrupted": { summaries: number; details: number; photos: number };
+  "status.stravaImport.rateLimited": { summaries: number; details: number; photos: number };
+  "status.stravaImport.failed": { summaries: number; details: number; photos: number };
+  "status.stravaImport.deferred": { summaries: number; details: number; photos: number };
+  "status.stravaImport.finished": { summaries: number; details: number; photos: number };
+  "activity.edit.saveNative": Record<never, never>;
+  "error.stravaImport.checkFailed": Record<never, never>;
+  "error.stravaImport.waitCheck": Record<never, never>;
+  "error.stravaImport.waitStart": Record<never, never>;
+  "error.firstSummary.connection": Record<never, never>;
+  "error.firstSummary.invalidResponse": Record<never, never>;
+  "error.firstSummary.download": Record<never, never>;
+  "error.importStatus.notSupported": Record<never, never>;
+  "error.importStatus.signIn": Record<never, never>;
+  "error.importStatus.failed": Record<never, never>;
+  "error.firstSummary.http": { status: number };
+  "error.firstSummary.reconnect": { reason: string };
+  "error.firstSummary.signIn": { reason: string };
+  "account.native.couldnTSyncPleaseTryAgainLater": Record<never, never>;
+  "account.native.deleteYourAccountAndAllActivityMapData": Record<never, never>;
+  "account.native.signInAgainFromAccountToSyncYour": Record<never, never>;
+  "account.native.tryAgain": Record<never, never>;
+  "account.native.aboutActivityMap": Record<never, never>;
+  "account.native.signingIn": Record<never, never>;
+  "account.native.couldnTConfirmAccountDeletionCheckYourConnection": Record<never, never>;
+  "account.native.version": Record<never, never>;
+  "account.native.thisCanTBeUndoneYourOriginalStrava": Record<never, never>;
+  "account.native.signOutFailed": Record<never, never>;
+  "account.native.yourAccountWasDeletedButLocalDataCould": Record<never, never>;
+  "account.native.permanentlyDeleteYourActivityMapAccountImportedActivitiesPhotos": Record<never, never>;
+  "account.native.syncPausedTapSyncNowToResume": Record<never, never>;
+  "account.native.build": Record<never, never>;
+  "account.native.lastDeviceSync": Record<never, never>;
+  "account.native.checkingYourSession": Record<never, never>;
+  "account.native.exploreYourActivitiesOnAMapInA": Record<never, never>;
+  "account.native.reconnectStravaFromAccountToSyncYourActivities": Record<never, never>;
+  "sharing.routeElevationProfileNameSportDateAndTime": Record<never, never>;
+  "sharing.shownToRecipients": Record<never, never>;
+  "sharing.shareOrCopyItNowTheFullLink": Record<never, never>;
+  "sharing.createLink": Record<never, never>;
+  "sharing.creating": Record<never, never>;
+  "sharing.shareOnlyTheActivityWhoseDetailsAreOpen": Record<never, never>;
+  "sharing.theFirstAndLastMOfEachRoute": Record<never, never>;
+  "sharing.expires": Record<never, never>;
+  "sharing.shareTheSelectedGroupIncludingActivitiesHiddenBy": Record<never, never>;
+  "sharing.couldnTLoadYourLinksCheckYourConnection": Record<never, never>;
+  "sharing.loadingLinks": Record<never, never>;
+  "sharing.heartRatePowerCaloriesSocialInformationDescriptionsAnd": Record<never, never>;
+  "sharing.linkCreated": Record<never, never>;
+  "sharing.showStartAndFinish": Record<never, never>;
+  "sharing.revokeLink": Record<never, never>;
+  "sharing.shareActivities": Record<never, never>;
+  "sharing.anyoneWithThisLinkWillLoseAccessImmediately": Record<never, never>;
+  "sharing.yourLinks": Record<never, never>;
+  "sharing.revocationCouldNotBeConfirmedRefreshYourLinks": Record<never, never>;
+  "sharing.expiresAfter": Record<never, never>;
+  "sharing.shareLink": Record<never, never>;
+  "sharing.shareSelectedActivities": Record<never, never>;
+  "sharing.revokeThisLink": Record<never, never>;
+  "sharing.youHaveNoShareLinks": Record<never, never>;
+  "sharing.onlyTheseActivitiesAreIncludedAnyoneWithThe": Record<never, never>;
+  "display.metricExplanation": Record<never, never>;
+  "display.imperialExplanation": Record<never, never>;
+  "sharing.expiryHours": { count: number };
+  "sharing.expiryDays": { count: number };
+  "sharing.selectionHint": { count: number };
+  "activity.row.subtitle": { sport: string; date: string };
+  "activity.row.accessible": { sport: string; date: string };
+  "activity.row.activeAccessible": { sport: string; date: string };
+  "error.activity.invalidResponse": Record<never, never>;
+  "error.activity.requestFailed": Record<never, never>;
+  "mutation.unconfirmed.title": Record<never, never>;
+  "status.firstSummary.loading": Record<never, never>;
+  "status.firstSummary.failed": Record<never, never>;
+  "status.firstSummary.empty": Record<never, never>;
+  "status.firstSummary.ready": Record<never, never>;
+  "status.firstSummary.emptyMessage": Record<never, never>;
+  "status.activitiesSyncing": Record<never, never>;
+  "activity.gpx.noGeometry": Record<never, never>;
+  "activity.gpx.invalidCoordinate": Record<never, never>;
+  "status.firstSummary.count": { count: number };
 };

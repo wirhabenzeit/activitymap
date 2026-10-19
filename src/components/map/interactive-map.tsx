@@ -46,6 +46,7 @@ import { useActivityGeoJsonFromActivities } from '~/hooks/use-activities';
 import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
 import { usePhotos } from '~/hooks/use-photos';
+import type { Activity } from '~/lib/activity';
 import { sortActivities } from '~/lib/activity-presentation';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { observeMapResize } from '~/lib/map-resize';
@@ -58,7 +59,6 @@ import {
 } from '~/lib/route-framing';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { cn, groupBy } from '~/lib/utils';
-import type { Activity } from '~/server/db/schema';
 import { activityFields } from '~/settings/activity';
 import { categorySettings } from '~/settings/category';
 import {
@@ -955,7 +955,7 @@ export default function InteractiveMap() {
               renderDetails={(row) => (
                 <ActivityCardContent
                   key={row.id}
-                  row={row}
+                  activity={row.original}
                   stickyHeader
                   showMapButton={false}
                 />

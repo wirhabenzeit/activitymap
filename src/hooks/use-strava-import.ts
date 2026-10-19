@@ -13,6 +13,7 @@ import {
   type StravaImportDTO,
   stravaImportDTOSchema,
 } from '~/contracts/v1/strava-import';
+import { message } from '~/lib/presentation/messages';
 import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
 import { requestLibrarySync } from '~/lib/sync/library-sync';
 import { retryDeadline } from '~/lib/sync/retry-deadline';
@@ -57,7 +58,7 @@ export async function requestStravaImport(
     throw new StravaImportRequestError(
       failure.success
         ? failure.data.error.message
-        : 'Could not check the Strava fetch. Please try again later.',
+        : message('error.stravaImport.checkFailed'),
       retryDeadline(response.headers),
     );
   }
@@ -75,7 +76,7 @@ export function useStravaImport(userId: string | undefined, visible: boolean) {
       const retry = cooldown(client, userId!);
       if (retry > Date.now())
         throw new StravaImportRequestError(
-          'Please wait before checking again.',
+          message('error.stravaImport.waitCheck'),
           retry,
         );
       try {
@@ -114,7 +115,7 @@ export function useStravaImport(userId: string | undefined, visible: boolean) {
       const retry = cooldown(client, owner);
       if (retry > Date.now())
         throw new StravaImportRequestError(
-          'Please wait before trying again.',
+          message('error.stravaImport.waitStart'),
           retry,
         );
       controller.current?.abort();

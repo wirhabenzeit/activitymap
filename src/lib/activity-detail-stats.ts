@@ -1,11 +1,14 @@
+import type { Activity } from '~/lib/activity';
+
+import { numberFormatter } from './presentation/formatters';
+import { message } from './presentation/messages';
 import {
   formatSpeed,
   paceSeconds,
   speedDisplayForSport,
   speedLabel,
 } from './speed-display';
-import { measurementScale, measurementUnit, type UnitSystem } from './units';
-import type { Activity } from '~/server/db/schema';
+import { type UnitSystem, measurementScale, measurementUnit } from './units';
 
 export type DetailStat = { id: string; label: string; value: string };
 export type DetailStatGroup = {
@@ -30,11 +33,17 @@ export function activityDetailStats(
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
+    const part = (value: number, unit: string) =>
+      numberFormatter(locale, {
+        style: 'unit',
+        unit,
+        unitDisplay: 'narrow',
+      }).format(value);
     return days
-      ? `${days}d ${hours}h`
+      ? `${part(days, 'day')} ${part(hours, 'hour')}`
       : hours
-        ? `${hours}h ${minutes}m`
-        : `${minutes}m`;
+        ? `${part(hours, 'hour')} ${part(minutes, 'minute')}`
+        : part(minutes, 'minute');
   };
   const speed = (value: number | null | undefined) =>
     number(
@@ -48,7 +57,11 @@ export function activityDetailStats(
       measurementUnit('elevation', units),
     );
   const flag = (value: boolean | null | undefined) =>
-    value == null ? undefined : value ? 'Yes' : 'No';
+    value == null
+      ? undefined
+      : value
+        ? message('value.yes')
+        : message('value.no');
   const stat = (
     id: string,
     label: string,
@@ -59,7 +72,7 @@ export function activityDetailStats(
   const headline = [
     stat(
       'distance',
-      'Distance',
+      message('metric.distance'),
       number(
         activity.distance == null
           ? activity.distance
@@ -68,12 +81,18 @@ export function activityDetailStats(
         1,
       ),
     ),
-    stat('movingTime', 'Moving time', duration(activity.moving_time)),
+    stat(
+      'movingTime',
+      message('metric.moving_time'),
+      duration(activity.moving_time),
+    ),
     stat(
       hasPace ? 'averagePace' : 'elevationGain',
-      hasPace ? 'Average pace' : 'Elevation gain',
       hasPace
-        ? formatSpeed(activity.average_speed, display, units)
+        ? message('metric.average_pace')
+        : message('metric.total_elevation_gain'),
+      hasPace
+        ? formatSpeed(activity.average_speed, display, units, locale)
         : elevation(activity.total_elevation_gain),
     ),
   ];
@@ -88,76 +107,122 @@ export function activityDetailStats(
     );
     if (stats.length) groups.push({ id, title, stats });
   };
-  group('time-speed', hasPace ? 'Time & pace' : 'Time & speed', [
-    ...(hasPace
-      ? [
-          [
-            'bestPace',
-            speedLabel(display, true),
-            paceSeconds(activity.max_speed, display, units) == null
-              ? undefined
-              : formatSpeed(activity.max_speed, display, units),
-          ] as [string, string, string | undefined],
-        ]
-      : []),
-    ['elapsedTime', 'Elapsed time', duration(activity.elapsed_time)],
-    ['averageSpeed', 'Average speed', speed(activity.average_speed)],
-    ['maxSpeed', 'Maximum speed', speed(activity.max_speed)],
-  ]);
-  group('elevation', 'Elevation', [
+  group(
+    'time-speed',
+    hasPace
+      ? message('activity.group.timePace')
+      : message('activity.group.timeSpeed'),
+    [
+      ...(hasPace
+        ? [
+            [
+              'bestPace',
+              speedLabel(display, true),
+              paceSeconds(activity.max_speed, display, units) == null
+                ? undefined
+                : formatSpeed(activity.max_speed, display, units, locale),
+            ] as [string, string, string | undefined],
+          ]
+        : []),
+      [
+        'elapsedTime',
+        message('metric.elapsed_time'),
+        duration(activity.elapsed_time),
+      ],
+      [
+        'averageSpeed',
+        message('metric.average_speed'),
+        speed(activity.average_speed),
+      ],
+      ['maxSpeed', message('metric.max_speed'), speed(activity.max_speed)],
+    ],
+  );
+  group('elevation', message('activity.group.elevation'), [
     ...(hasPace
       ? [
           [
             'elevationGain',
-            'Elevation gain',
+            message('metric.total_elevation_gain'),
             elevation(activity.total_elevation_gain),
           ] as [string, string, string | undefined],
         ]
       : []),
-    ['elevLow', 'Minimum', elevation(activity.elev_low)],
-    ['elevHigh', 'Maximum', elevation(activity.elev_high)],
+    ['elevLow', message('metric.short.minimum'), elevation(activity.elev_low)],
+    [
+      'elevHigh',
+      message('metric.short.maximum'),
+      elevation(activity.elev_high),
+    ],
   ]);
-  group('power', 'Power', [
-    ['averageWatts', 'Average', number(activity.average_watts, 'W')],
-    ['maxWatts', 'Maximum', number(activity.max_watts, 'W')],
+  group('power', message('activity.group.power'), [
+    [
+      'averageWatts',
+      message('metric.short.average'),
+      number(activity.average_watts, 'W'),
+    ],
+    [
+      'maxWatts',
+      message('metric.short.maximum'),
+      number(activity.max_watts, 'W'),
+    ],
     [
       'weightedAverageWatts',
-      'Weighted average',
+      message('metric.short.weightedAverage'),
       number(activity.weighted_average_watts, 'W'),
     ],
-    ['kilojoules', 'Work', number(activity.kilojoules, 'kJ')],
+    [
+      'kilojoules',
+      message('metric.kilojoules'),
+      number(activity.kilojoules, 'kJ'),
+    ],
   ]);
-  group('heart-rate', 'Heart rate', [
-    ['averageHeartrate', 'Average', number(activity.average_heartrate, 'bpm')],
-    ['maxHeartrate', 'Maximum', number(activity.max_heartrate, 'bpm')],
+  group('heart-rate', message('activity.group.heartRate'), [
+    [
+      'averageHeartrate',
+      message('metric.short.average'),
+      number(activity.average_heartrate, 'bpm'),
+    ],
+    [
+      'maxHeartrate',
+      message('metric.short.maximum'),
+      number(activity.max_heartrate, 'bpm'),
+    ],
   ]);
-  group('energy', 'Energy', [
-    ['calories', 'Calories', number(activity.calories, 'kcal')],
+  group('energy', message('activity.group.energy'), [
+    [
+      'calories',
+      message('metric.short.calories'),
+      number(activity.calories, 'kcal'),
+    ],
   ]);
-  group('social', 'Social', [
-    ['kudos', 'Kudos', number(activity.kudos_count)],
-    ['achievements', 'Achievements', number(activity.achievement_count)],
-    ['comments', 'Comments', number(activity.comment_count)],
+  group('social', message('activity.group.social'), [
+    ['kudos', message('metric.kudos'), number(activity.kudos_count)],
+    [
+      'achievements',
+      message('metric.achievements'),
+      number(activity.achievement_count),
+    ],
+    ['comments', message('metric.comments'), number(activity.comment_count)],
     [
       'photos',
-      'Photos',
+      message('metric.photos'),
       number(activity.total_photo_count ?? activity.photo_count),
     ],
   ]);
   const geometry = {
-    summary: 'Summary',
-    detailed: 'Detailed',
-    refresh_required: 'Refresh required',
+    summary: message('geometry.summary'),
+    detailed: message('geometry.detailed'),
+    refresh_required: message('geometry.refreshRequired'),
   };
-  group('activity', 'Activity', [
-    ['commute', 'Commute', flag(activity.commute)],
-    ['privacy', 'Private', flag(activity.private)],
-    ['trainer', 'Indoor', flag(activity.trainer)],
-    ['manual', 'Manual', flag(activity.manual)],
-    ['flagged', 'Flagged', flag(activity.flagged)],
+  group('activity', message('activity.group.activity'), [
+    ['commute', message('metric.commute'), flag(activity.commute)],
+    ['privacy', message('metric.private'), flag(activity.private)],
+    ['trainer', message('metric.indoor'), flag(activity.trainer)],
+    ['manual', message('metric.manual'), flag(activity.manual)],
+    ['flagged', message('metric.flagged'), flag(activity.flagged)],
     [
       'geometry',
-      'Geometry status',
+      message('metric.geometryStatus'),
       activity.geometryState ? geometry[activity.geometryState] : undefined,
     ],
   ]);

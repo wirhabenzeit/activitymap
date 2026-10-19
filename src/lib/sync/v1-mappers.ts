@@ -1,44 +1,15 @@
-/**
- * Maps v1 sync DTOs (`~/contracts/v1/activity.ts`/`photo.ts` — decimal-string
- * ids, ISO-string timestamps) to the in-memory `Activity`/`Photo` shape the
- * rest of the web app already renders (`~/server/db/schema`'s Drizzle
- * `$inferSelect` types — numeric ids, `Date` fields).
- *
- * This is the one place in the client-side sync path that is allowed to
- * know about both shapes. It exists so the sync/persistence *transport*
- * (issue #126's scope) can move fully onto the v1 contract without also
- * forcing every list/map/chart component in the app to be rewritten around
- * string ids in the same change — those components keep consuming
- * `Activity`/`Photo` exactly as before; only where that value comes from
- * changes.
- *
- * Two `Activity` fields have no v1 DTO equivalent, by design:
- *  - `public_id`: the v1 DTO deliberately excludes it (see
- *    `~/contracts/v1/activity.ts`'s doc comment — it is the legacy sharing
- *    capability token issue #132 is retiring). Legacy sharing is disabled
- *    (`~/lib/legacy-sharing.ts`'s `LEGACY_SHARING_ENABLED`), so nothing
- *    reads this field for a sync-sourced activity; we fill it with the
- *    numeric activity id, which is unique and stable but must not be
- *    treated as a real public id if legacy sharing is ever re-enabled.
- *  - `is_complete`: superseded by `geometry_state`/`photos_state` (see the
- *    same doc comment). The app reads component freshness directly; this
- *    derived value exists only while the in-memory type still mirrors the
- *    database row ahead of the final contract migration.
- */
-
-import type { Activity, Photo } from '~/server/db/schema';
 import type { ActivityDTO } from '~/contracts/v1/activity';
-import type { PhotoDTO } from '~/contracts/v1/photo';
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
+import type { PhotoDTO } from '~/contracts/v1/photo';
+import type { Activity } from '~/lib/activity';
+import type { Photo } from '~/server/db/schema';
 
-export type ActivityWithStreams = Activity & {
-  streamsMetadata?: StreamMetadata;
-};
+// Compatibility alias for callers adopting the explicit frontend projection.
+export type ActivityWithStreams = Activity;
 
 export const activityStreamMetadata = (
   activity: Activity,
-): StreamMetadata | undefined =>
-  (activity as ActivityWithStreams).streamsMetadata;
+): StreamMetadata | undefined => activity.streamsMetadata;
 
 const toDate = (iso: string): Date => new Date(iso);
 const toNullableDate = (iso: string | null): Date | null =>
@@ -48,7 +19,6 @@ export function dtoToActivity(dto: ActivityDTO): ActivityWithStreams {
   return {
     ...(dto.streams ? { streamsMetadata: dto.streams } : {}),
     id: Number(dto.id),
-    public_id: Number(dto.id),
     athlete: Number(dto.athlete),
     name: dto.name,
     description: dto.description,
@@ -98,12 +68,8 @@ export function dtoToActivity(dto: ActivityDTO): ActivityWithStreams {
     max_watts: dto.max_watts,
     weighted_average_watts: dto.weighted_average_watts,
     kilojoules: dto.kilojoules,
-    last_updated: toNullableDate(dto.last_updated),
     geometryState: dto.geometry_state,
     photosState: dto.photos_state,
-    lastSummarySeenAt: toNullableDate(dto.last_summary_seen_at),
-    lastDetailedFetchedAt: toNullableDate(dto.last_detailed_fetched_at),
-    is_complete: dto.geometry_state === 'detailed',
   };
 }
 

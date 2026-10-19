@@ -22,6 +22,7 @@ import {
   prepareBrowserFixture,
 } from './browser-fixtures.mjs';
 import {
+  browserSuites,
   fixtureEnvironment,
   prepareFixtureWorkspace,
   runBrowserHarness,
@@ -119,11 +120,7 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'tsconfig.json',
     'next.config.js',
     'postcss.config.js',
-    'scripts/verify-list-inspection.mjs',
-    'scripts/verify-stats-focus.mjs',
-    'scripts/verify-account-deletion.mjs',
-    'scripts/verify-presentation.mjs',
-    'scripts/verify-react-ui-reconciliation.mjs',
+    ...Object.values(browserSuites).map((script) => `scripts/${script}`),
     'scripts/fixtures/react-ui-reconciliation.tsx',
     'scripts/quality/browser-support.mjs',
     'scripts/quality/browser-fixtures.mjs',

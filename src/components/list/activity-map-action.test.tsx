@@ -32,7 +32,7 @@ void test('both action densities disable empty/invalid geometry and accept point
       );
       assert.equal(html.includes(' disabled=""'), !enabled);
       assert.match(html, /aria-label="Show on map: Morning ride/);
-      if (!enabled) assert.match(html, /No GPS route recorded/);
+      if (!enabled) assert.match(html, /This activity has no GPS route/);
     }
   }
 });

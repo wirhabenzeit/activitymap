@@ -4,6 +4,11 @@ import { join } from 'node:path';
 
 // Shared by standalone proofs and the owned harness: source is identical in both.
 export const browserFixtures = {
+  accessibility: {
+    route: 'accessibility-review-test',
+    source:
+      "export { default } from '../../../scripts/fixtures/accessibility-review';\n",
+  },
   reconciliation: {
     route: 'react-ui-reconciliation-test',
     source:
@@ -27,7 +32,7 @@ export default function Review() { return <Suspense><Connection /></Suspense>; }
     route: 'list-inspection-test',
     source: `
 'use client';
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ActivityListView } from '~/components/list/activity-list';
@@ -38,9 +43,11 @@ import { useFilteredActivities } from '~/hooks/use-filtered-activities';
 import { useSelectionReconciliation } from '~/hooks/use-selection-reconciliation';
 import { activityDTOSchema } from '~/contracts/v1/activity';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
+import { store } from '~/store';
 import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
 const defaults = Object.fromEntries(Object.keys(activityDTOSchema.shape).filter(key => key !== 'streams').map(key => [key, null]));
 function FixtureList() {
+  useEffect(() => { store.getState().initializeAuth({ currentUser: { id: 'list-review', name: 'List review', email: null, image: null, athleteId: 42, stravaConnected: true, stravaPermissions: null } }); }, []);
   const dense = useSearchParams().has('dense');
   const activities = useMemo(() => {
     const raw = dense ? Array.from({length:205}, (_, index) => ({...fixture.activities[0], id:String(index+1), name:'Activity '+String(index+1).padStart(3,'0')})) : fixture.activities;

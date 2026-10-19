@@ -1,0 +1,30 @@
+{
+  "startedAt": "2026-10-19T20:10:04.183Z",
+  "suites": [
+    {
+      "name": "list",
+      "passed": true,
+      "durationMs": 82657
+    },
+    {
+      "name": "presentation",
+      "passed": true,
+      "durationMs": 7086
+    }
+  ],
+  "compilation": [
+    {
+      "name": "list",
+      "passed": true,
+      "durationMs": 72302
+    },
+    {
+      "name": "presentation",
+      "passed": true,
+      "durationMs": 11111
+    }
+  ],
+  "workspace": "/Users/dominik/Documents/github/activitymap/.quality/browser-qC0oY6",
+  "passed": true,
+  "finishedAt": "2026-10-19T20:13:03.693Z"
+}

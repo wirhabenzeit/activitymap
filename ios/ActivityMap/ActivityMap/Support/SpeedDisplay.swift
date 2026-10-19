@@ -36,11 +36,10 @@ enum SpeedDisplay: Equatable {
         return seconds.isFinite && seconds <= 9_007_199_254_740_991 ? seconds : nil
     }
 
-    func format(_ speed: Double?, units: UnitSystem? = nil) -> String {
-        let units = units ?? DisplayPreferences.shared.units
-        guard self != .speed else { return Formatters.speed(speed, units: units) }
+    func format(_ speed: Double?, units: UnitSystem = .metric, locale: Locale = .current) -> String {
+        guard self != .speed else { return Formatters.speed(speed, locale: locale, units: units) }
         guard let seconds = paceSeconds(speed, units: units) else { return Formatters.unknown }
         let rounded = Int(seconds.rounded())
-        return "\(rounded / 60):\(String(format: "%02d", rounded % 60)) \(unit(units))"
+        return "\((rounded / 60).formatted(.number.grouping(.never).locale(locale))):\((rounded % 60).formatted(.number.precision(.integerLength(2)).grouping(.never).locale(locale))) \(unit(units))"
     }
 }

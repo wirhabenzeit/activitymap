@@ -2,6 +2,8 @@ import SwiftUI
 
 /// Persistent adaptive results surface; the map owns its position and footprint.
 struct RoutePickerSheet: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
     @Environment(\.locale) private var locale
     @Bindable var picker: RoutePicker
     @Bindable var store: ActivityStore
@@ -153,9 +155,9 @@ struct RoutePickerSheet: View {
                 VStack(alignment: .leading, spacing: 4) {
                     BrowseActivityHeading(activity: activity)
                     ActivityMetricFlow(spacing: 8, rowSpacing: 4, stacked: typeSize.isAccessibilitySize) {
-                        BrowseInlineMetric(title: "Distance", value: Formatters.distance(activity.distance), systemImage: "ruler")
-                        BrowseInlineMetric(title: "Elapsed time", value: Formatters.duration(activity.elapsedTime), systemImage: "clock")
-                        BrowseInlineMetric(title: "Elevation gain", value: Formatters.elevation(activity.totalElevationGain), systemImage: "mountain.2")
+                        BrowseInlineMetric(title: AppMessages.metricDistance(locale: locale), value: Formatters.distance(activity.distance, locale: locale, units: units), systemImage: "ruler")
+                        BrowseInlineMetric(title: AppMessages.metricElapsedTime(locale: locale), value: Formatters.duration(activity.elapsedTime, locale: locale), systemImage: "stopwatch")
+                        BrowseInlineMetric(title: AppMessages.metricTotalElevationGain(locale: locale), value: Formatters.elevation(activity.totalElevationGain, locale: locale, units: units), systemImage: "mountain.2")
                     }
                     .foregroundStyle(AppTheme.secondaryText)
                     if activity.coordinates.isEmpty {

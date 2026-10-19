@@ -5,13 +5,14 @@ import Foundation
 struct BrowsingPresentation: Equatable {
     enum Recovery: Equatable {
         case clearFilters, retry, account, showList, cancelSync
-        var title: String {
+        var title: String { title() }
+        func title(locale: Locale = .current) -> String {
             switch self {
-            case .clearFilters: "Clear Filters"
-            case .retry: "Retry Sync"
-            case .account: "Connect with Strava"
-            case .showList: "View Activities in List"
-            case .cancelSync: "Pause Sync"
+            case .clearFilters: String(localized: AppMessages.statusBrowsingClearFilters(locale: locale))
+            case .retry: String(localized: AppMessages.statusBrowsingRetrySync(locale: locale))
+            case .account: String(localized: AppMessages.statusBrowsingConnectWithStrava(locale: locale))
+            case .showList: String(localized: AppMessages.statusBrowsingViewActivitiesInList(locale: locale))
+            case .cancelSync: String(localized: AppMessages.statusBrowsingPauseSync(locale: locale))
             }
         }
     }
@@ -38,7 +39,7 @@ struct BrowsingPresentation: Equatable {
     let photoMetadataCount: Int
     let isSyncing: Bool
 
-    init(store: ActivityStore, sync: SyncController?, isSigningIn: Bool = false) {
+    init(store: ActivityStore, sync: SyncController?, isSigningIn: Bool = false, locale: Locale = .current) {
         let filtered = store.browsingActivities
         self.init(tab: store.selectedTab, activityCount: store.activities.count,
                   filteredCount: filtered.count,
@@ -46,13 +47,13 @@ struct BrowsingPresentation: Equatable {
                   status: sync?.status, hasCompletedCache: sync?.hasCompletedCache ?? !store.activities.isEmpty,
                   canRetry: sync?.canRefresh ?? false, isSigningIn: isSigningIn,
                   lastSync: sync?.lastSyncAt, reconciliation: sync?.lastReconciliationAt,
-                  retryAfter: sync?.retryNotBefore, photoMetadataCount: sync?.photos.count ?? 0)
+                  retryAfter: sync?.retryNotBefore, photoMetadataCount: sync?.photos.count ?? 0, locale: locale)
     }
 
     init(tab: AppTab, activityCount: Int, filteredCount: Int, routeCount: Int,
          status: SyncController.Status?, hasCompletedCache: Bool, canRetry: Bool,
          isSigningIn: Bool = false, lastSync: Date? = nil, reconciliation: Date? = nil,
-         retryAfter: Date? = nil, photoMetadataCount: Int = 0) {
+         retryAfter: Date? = nil, photoMetadataCount: Int = 0, locale: Locale = .current) {
         self.lastSync = lastSync
         self.reconciliation = reconciliation
         self.retryAfter = retryAfter
@@ -65,59 +66,59 @@ struct BrowsingPresentation: Equatable {
         let message: String
         let recovery: Recovery?
         if isSigningIn {
-            title = "Connecting to Strava…"
-            message = "Approve or cancel in the Strava sheet to continue."
+            title = String(localized: AppMessages.statusBrowsingConnectingToStrava(locale: locale))
+            message = String(localized: AppMessages.statusBrowsingApproveOrCancelInTheStravaSheetToContinue(locale: locale))
             recovery = nil
             blocking = EmptyState(kind: .signingIn, title: title, message: message, symbol: "person.crop.circle", progress: true)
         } else {
             switch status {
             case nil:
-                title = "Preparing activity data"
-                message = "Reading your saved session and activities."
+                title = String(localized: AppMessages.statusBrowsingPreparingActivityData(locale: locale))
+                message = String(localized: AppMessages.statusBrowsingReadingYourSavedSessionAndActivities(locale: locale))
                 recovery = nil
                 if activityCount == 0 { blocking = EmptyState(kind: .preparing, title: title, message: message, symbol: "tray", progress: true) }
             case .signedOut:
-                title = "Connect Strava to see your activities"
+                title = String(localized: AppMessages.statusBrowsingConnectStravaToSeeYourActivities(locale: locale))
                 message = StravaConnectCopy.purpose
                 recovery = .account
                 blocking = EmptyState(kind: .signedOut, title: title, message: message, symbol: "person.crop.circle", recovery: recovery)
             case .expired:
-                title = "Your sign-in has expired"
-                message = "Connect with Strava again to restore access to your activities."
+                title = String(localized: AppMessages.statusBrowsingYourSignInHasExpired(locale: locale))
+                message = String(localized: AppMessages.statusBrowsingConnectWithStravaAgainToRestoreAccessToYour(locale: locale))
                 recovery = .account
                 blocking = EmptyState(kind: .expired, title: title, message: message, symbol: "lock", recovery: recovery)
             case .disconnected:
-                title = "Strava is disconnected"
-                message = "Connect with Strava again to load your activities."
+                title = String(localized: AppMessages.statusBrowsingStravaIsDisconnected(locale: locale))
+                message = String(localized: AppMessages.statusBrowsingConnectWithStravaAgainToLoadYourActivities(locale: locale))
                 recovery = .account
                 blocking = EmptyState(kind: .disconnected, title: title, message: message, symbol: "link", recovery: recovery)
             case .syncing:
-                title = cached ? "Syncing · saved activities available" : "Loading your activity library"
-                message = cached ? "Keep browsing while changes are downloaded." : "The first sync downloads activity and photo metadata. You can pause and retry."
+                title = cached ? String(localized: AppMessages.statusBrowsingSyncingSavedActivitiesAvailable(locale: locale)) : String(localized: AppMessages.statusBrowsingLoadingYourActivityLibrary(locale: locale))
+                message = cached ? String(localized: AppMessages.statusBrowsingKeepBrowsingWhileChangesAreDownloaded(locale: locale)) : String(localized: AppMessages.statusBrowsingTheFirstSyncDownloadsActivityAndPhotoMetadataYou(locale: locale))
                 recovery = .cancelSync
                 if !cached { blocking = EmptyState(kind: .firstSync, title: title, message: message, symbol: "arrow.trianglehead.2.clockwise", recovery: recovery, progress: true) }
             case .ready:
-                title = "Activity sync complete"
-                message = "Last sync and Strava reconciliation are separate checks."
+                title = String(localized: AppMessages.statusBrowsingActivitySyncComplete(locale: locale))
+                message = String(localized: AppMessages.statusBrowsingLastSyncAndStravaReconciliationAreSeparateChecks(locale: locale))
                 recovery = nil
             case .offline:
-                title = cached ? "Offline · browsing saved activities" : "Offline · no completed activity cache"
-                message = cached ? "Your saved activity data remains available. Reconnect to sync changes." : "Connect to the internet and retry to finish loading your library."
+                title = cached ? String(localized: AppMessages.statusBrowsingOfflineBrowsingSavedActivities(locale: locale)) : String(localized: AppMessages.statusBrowsingOfflineNoCompletedActivityCache(locale: locale))
+                message = cached ? String(localized: AppMessages.statusBrowsingYourSavedActivityDataRemainsAvailableReconnectToSync(locale: locale)) : String(localized: AppMessages.statusBrowsingConnectToTheInternetAndRetryToFinishLoading(locale: locale))
                 recovery = retry
                 if !cached { blocking = EmptyState(kind: .offline, title: title, message: message, symbol: "wifi.slash", recovery: recovery) }
             case .failed:
-                title = cached ? "Sync failed · saved activities available" : "Couldn’t load activities"
-                message = cached ? "Your saved library is still readable. Retry to load changes." : "Sync did not complete. Retry, or review Sync Details for the error."
+                title = cached ? String(localized: AppMessages.statusBrowsingSyncFailedSavedActivitiesAvailable(locale: locale)) : String(localized: AppMessages.statusBrowsingCouldnTLoadActivities(locale: locale))
+                message = cached ? String(localized: AppMessages.statusBrowsingYourSavedLibraryIsStillReadableRetryToLoad(locale: locale)) : String(localized: AppMessages.statusBrowsingSyncDidNotCompleteRetryOrReviewSyncDetails(locale: locale))
                 recovery = retry
                 if !cached { blocking = EmptyState(kind: .failed, title: title, message: message, symbol: "exclamationmark.arrow.trianglehead.2.clockwise.rotate.90", recovery: recovery) }
             case .paused:
-                title = "Activity sync paused"
-                message = cached ? "Your saved library is still readable. Retry when you’re ready." : "Loading was paused. Retry to finish downloading your library."
+                title = String(localized: AppMessages.statusBrowsingActivitySyncPaused(locale: locale))
+                message = cached ? String(localized: AppMessages.statusBrowsingYourSavedLibraryIsStillReadableRetryWhenYou(locale: locale)) : String(localized: AppMessages.statusBrowsingLoadingWasPausedRetryToFinishDownloadingYourLibrary(locale: locale))
                 recovery = retry
                 if !cached { blocking = EmptyState(kind: .paused, title: title, message: message, symbol: "pause.circle", recovery: recovery) }
             case .rateLimited, .retryAfter:
-                title = cached ? "Sync waiting · saved activities available" : "Sync waiting for the server"
-                message = "Retry is available after the server’s requested wait. Sync Details shows the exact time."
+                title = cached ? String(localized: AppMessages.statusBrowsingSyncWaitingSavedActivitiesAvailable(locale: locale)) : String(localized: AppMessages.statusBrowsingSyncWaitingForTheServer(locale: locale))
+                message = String(localized: AppMessages.statusBrowsingRetryIsAvailableAfterTheServerSRequestedWait(locale: locale))
                 recovery = retry
                 if !cached { blocking = EmptyState(kind: .waiting, title: title, message: message, symbol: "clock", recovery: recovery) }
             }
@@ -126,22 +127,22 @@ struct BrowsingPresentation: Equatable {
         statusMessage = message
         self.recovery = recovery
         empty = blocking ?? Self.resultEmpty(tab: tab, activityCount: activityCount,
-                                              filteredCount: filteredCount, routeCount: routeCount, retry: retry)
+                                              filteredCount: filteredCount, routeCount: routeCount, retry: retry, locale: locale)
     }
 
     /// Evaluate only after session/completeness guards. A completed offline or
     /// stale cache still has ordinary empty-library / no-matching-result states.
     static func resultEmpty(tab: AppTab, activityCount: Int, filteredCount: Int,
-                            routeCount: Int = 0, retry: Recovery? = nil) -> EmptyState? {
+                            routeCount: Int = 0, retry: Recovery? = nil, locale: Locale = .current) -> EmptyState? {
         if activityCount == 0 {
-            return EmptyState(kind: .emptyLibrary, title: "No activities in your library",
-                              message: "The completed sync contains no activities. Record an activity in Strava, then sync again.", symbol: "tray", recovery: retry)
+            return EmptyState(kind: .emptyLibrary, title: String(localized: AppMessages.statusBrowsingNoActivitiesInYourLibrary(locale: locale)),
+                              message: String(localized: AppMessages.statusBrowsingTheCompletedSyncContainsNoActivitiesRecordAnActivity(locale: locale)), symbol: "tray", recovery: retry)
         } else if filteredCount == 0 {
-            return EmptyState(kind: .noMatches, title: "No activities match your filters",
-                              message: "Your library is still saved. Clear filters or change a restriction to see activities.", symbol: "line.3.horizontal.decrease", recovery: .clearFilters)
+            return EmptyState(kind: .noMatches, title: String(localized: AppMessages.statusBrowsingNoActivitiesMatchYourFilters(locale: locale)),
+                              message: String(localized: AppMessages.statusBrowsingYourLibraryIsStillSavedClearFiltersOrChange(locale: locale)), symbol: "line.3.horizontal.decrease", recovery: .clearFilters)
         } else if tab == .map && routeCount == 0 {
-            return EmptyState(kind: .noRoutes, title: "These activities have no GPS routes",
-                              message: "\(filteredCount) filtered activities remain available in the list, including their measurements and known photo metadata.", symbol: "map", recovery: .showList)
+            return EmptyState(kind: .noRoutes, title: String(localized: AppMessages.statusBrowsingTheseActivitiesHaveNoGPSRoutes(locale: locale)),
+                              message: String(localized: AppMessages.statusBrowsingNoRoutesMessage(filteredCount, locale: locale)), symbol: "map", recovery: .showList)
         }
         return nil
     }

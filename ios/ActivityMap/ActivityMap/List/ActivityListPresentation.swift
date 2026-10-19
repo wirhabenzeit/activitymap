@@ -16,47 +16,48 @@ enum ActivitySortField: String, CaseIterable, Codable, Identifiable {
     case achievements = "achievement_count", comments = "comment_count"
 
     var id: String { rawValue }
-    var title: String {
+    var title: String { title(locale: .current) }
+    func title(locale: Locale) -> String {
         switch self {
         case .selection: "Selection state"
-        case .id: "Activity ID"
+        case .id: String(localized: AppMessages.listActivityID(locale: locale))
         case .name: "Name"
         case .description: "Description"
-        case .localDate: "Local date & time"
+        case .localDate: String(localized: AppMessages.metricLocalDateTime(locale: locale))
         case .sport: "Sport"
-        case .distance: "Distance"
-        case .movingTime: "Moving time"
-        case .elapsedTime: "Elapsed time"
-        case .averageSpeed: "Average speed"
-        case .maxSpeed: "Maximum speed"
-        case .elevationGain: "Elevation gain"
-        case .elevationHigh: "Maximum elevation"
-        case .elevationLow: "Minimum elevation"
-        case .averageHeartRate: "Average heart rate"
-        case .maxHeartRate: "Maximum heart rate"
-        case .averagePower: "Average power"
-        case .weightedPower: "Weighted average power"
-        case .maxPower: "Maximum power"
-        case .kudos: "Kudos"
-        case .photos: "Photos"
-        case .geometry: "Geometry status"
-        case .calories: "Energy"
-        case .kilojoules: "Work"
-        case .commute: "Commute"
-        case .privacy: "Private"
-        case .flagged: "Flagged"
-        case .trainer: "Indoor"
-        case .manual: "Manual"
-        case .achievements: "Achievements"
-        case .comments: "Comments"
+        case .distance: String(localized: AppMessages.metricDistance(locale: locale))
+        case .movingTime: String(localized: AppMessages.metricMovingTime(locale: locale))
+        case .elapsedTime: String(localized: AppMessages.metricElapsedTime(locale: locale))
+        case .averageSpeed: String(localized: AppMessages.metricAverageSpeed(locale: locale))
+        case .maxSpeed: String(localized: AppMessages.metricMaxSpeed(locale: locale))
+        case .elevationGain: String(localized: AppMessages.metricTotalElevationGain(locale: locale))
+        case .elevationHigh: String(localized: AppMessages.metricElevHigh(locale: locale))
+        case .elevationLow: String(localized: AppMessages.metricElevLow(locale: locale))
+        case .averageHeartRate: String(localized: AppMessages.metricAverageHeartrate(locale: locale))
+        case .maxHeartRate: String(localized: AppMessages.metricMaxHeartrate(locale: locale))
+        case .averagePower: String(localized: AppMessages.metricAverageWatts(locale: locale))
+        case .weightedPower: String(localized: AppMessages.metricWeightedAverageWatts(locale: locale))
+        case .maxPower: String(localized: AppMessages.metricMaxWatts(locale: locale))
+        case .kudos: String(localized: AppMessages.metricKudos(locale: locale))
+        case .photos: String(localized: AppMessages.metricPhotos(locale: locale))
+        case .geometry: String(localized: AppMessages.metricGeometryStatus(locale: locale))
+        case .calories: String(localized: AppMessages.metricCalories(locale: locale))
+        case .kilojoules: String(localized: AppMessages.metricKilojoules(locale: locale))
+        case .commute: String(localized: AppMessages.metricCommute(locale: locale))
+        case .privacy: String(localized: AppMessages.metricPrivate(locale: locale))
+        case .flagged: String(localized: AppMessages.metricFlagged(locale: locale))
+        case .trainer: String(localized: AppMessages.metricIndoor(locale: locale))
+        case .manual: String(localized: AppMessages.metricManual(locale: locale))
+        case .achievements: String(localized: AppMessages.metricAchievements(locale: locale))
+        case .comments: String(localized: AppMessages.metricComments(locale: locale))
         }
     }
 
-    func title(speedDisplay: SpeedDisplay) -> String {
+    func title(speedDisplay: SpeedDisplay, locale: Locale = .current) -> String {
         switch self {
-        case .averageSpeed: speedDisplay.label()
-        case .maxSpeed: speedDisplay.label(maximum: true)
-        default: title
+        case .averageSpeed: speedDisplay == .speed ? title(locale: locale) : String(localized: AppMessages.metricAveragePace(locale: locale))
+        case .maxSpeed: speedDisplay == .speed ? title(locale: locale) : String(localized: AppMessages.metricBestPace(locale: locale))
+        default: title(locale: locale)
         }
     }
 }
@@ -194,40 +195,40 @@ enum ActivityListMetric: String, CaseIterable, Codable, Identifiable {
         }
     }
     var title: String { field.title }
-    func title(speedDisplay: SpeedDisplay) -> String { field.title(speedDisplay: speedDisplay) }
-    func value(for activity: Activity, speedDisplay: SpeedDisplay = .speed) -> String {
+    func title(speedDisplay: SpeedDisplay, locale: Locale = .current) -> String { field.title(speedDisplay: speedDisplay, locale: locale) }
+    func value(for activity: Activity, speedDisplay: SpeedDisplay = .speed, units: UnitSystem = .metric, locale: Locale = .current) -> String {
         switch self {
-        case .distance: Formatters.distance(activity.distance)
-        case .elapsedTime: Formatters.duration(activity.elapsedTime)
-        case .elevationGain: Formatters.elevation(activity.totalElevationGain)
-        case .movingTime: Formatters.duration(activity.movingTime)
-        case .averageSpeed: speedDisplay.format(activity.averageSpeed)
-        case .maxSpeed: speedDisplay.format(activity.maxSpeed)
-        case .elevationHigh: Formatters.elevation(activity.elevHigh)
-        case .elevationLow: Formatters.elevation(activity.elevLow)
-        case .averageHeartRate: Formatters.heartrate(activity.averageHeartrate)
-        case .maxHeartRate: Formatters.heartrate(activity.maxHeartrate)
-        case .averagePower: Formatters.watts(activity.averageWatts)
-        case .weightedPower: Formatters.watts(activity.weightedAverageWatts)
-        case .maxPower: Formatters.watts(activity.maxWatts)
-        case .calories: Formatters.number(activity.calories, decimals: 0, unit: "kcal")
-        case .kilojoules: Formatters.number(activity.kilojoules, decimals: 0, unit: "kJ")
-        case .kudos: activity.kudosCount.map(String.init) ?? Formatters.unknown
-        case .photos: (activity.totalPhotoCount ?? activity.photoCount).map(String.init) ?? Formatters.unknown
+        case .distance: Formatters.distance(activity.distance, locale: locale, units: units)
+        case .elapsedTime: Formatters.duration(activity.elapsedTime, locale: locale)
+        case .elevationGain: Formatters.elevation(activity.totalElevationGain, locale: locale, units: units)
+        case .movingTime: Formatters.duration(activity.movingTime, locale: locale)
+        case .averageSpeed: speedDisplay.format(activity.averageSpeed, units: units, locale: locale)
+        case .maxSpeed: speedDisplay.format(activity.maxSpeed, units: units, locale: locale)
+        case .elevationHigh: Formatters.elevation(activity.elevHigh, locale: locale, units: units)
+        case .elevationLow: Formatters.elevation(activity.elevLow, locale: locale, units: units)
+        case .averageHeartRate: Formatters.heartrate(activity.averageHeartrate, locale: locale)
+        case .maxHeartRate: Formatters.heartrate(activity.maxHeartrate, locale: locale)
+        case .averagePower: Formatters.watts(activity.averageWatts, locale: locale)
+        case .weightedPower: Formatters.watts(activity.weightedAverageWatts, locale: locale)
+        case .maxPower: Formatters.watts(activity.maxWatts, locale: locale)
+        case .calories: Formatters.number(activity.calories, decimals: 0, unit: "kcal", locale: locale)
+        case .kilojoules: Formatters.number(activity.kilojoules, decimals: 0, unit: "kJ", locale: locale)
+        case .kudos: activity.kudosCount.map { $0.formatted(.number.locale(locale)) } ?? Formatters.unknown
+        case .photos: (activity.totalPhotoCount ?? activity.photoCount).map { $0.formatted(.number.locale(locale)) } ?? Formatters.unknown
         case .geometry:
-            switch activity.geometryState { case .summary: "Summary"; case .detailed: "Detailed"; case .refreshRequired: "Refresh required" }
+            switch activity.geometryState { case .summary: String(localized: AppMessages.geometrySummary(locale: locale)); case .detailed: String(localized: AppMessages.geometryDetailed(locale: locale)); case .refreshRequired: String(localized: AppMessages.geometryRefreshRequired(locale: locale)) }
         case .id: String(activity.id)
         case .description: activity.description ?? Formatters.unknown
-        case .commute: Self.flag(activity.commute)
-        case .privacy: Self.flag(activity.isPrivate)
-        case .flagged: Self.flag(activity.flagged)
-        case .trainer: Self.flag(activity.trainer)
-        case .manual: Self.flag(activity.manual)
-        case .achievements: activity.achievementCount.map(String.init) ?? Formatters.unknown
-        case .comments: activity.commentCount.map(String.init) ?? Formatters.unknown
+        case .commute: Self.flag(activity.commute, locale: locale)
+        case .privacy: Self.flag(activity.isPrivate, locale: locale)
+        case .flagged: Self.flag(activity.flagged, locale: locale)
+        case .trainer: Self.flag(activity.trainer, locale: locale)
+        case .manual: Self.flag(activity.manual, locale: locale)
+        case .achievements: activity.achievementCount.map { $0.formatted(.number.locale(locale)) } ?? Formatters.unknown
+        case .comments: activity.commentCount.map { $0.formatted(.number.locale(locale)) } ?? Formatters.unknown
         }
     }
-    private static func flag(_ value: Bool?) -> String { value.map { $0 ? "Yes" : "No" } ?? Formatters.unknown }
+    private static func flag(_ value: Bool?, locale: Locale) -> String { value.map { String(localized: $0 ? AppMessages.valueYes(locale: locale) : AppMessages.valueNo(locale: locale)) } ?? Formatters.unknown }
 }
 
 enum ActivityListDensity: String, CaseIterable, Codable, Identifiable {

@@ -26,24 +26,24 @@ struct ActivityRowContextMenu: ViewModifier {
                 }
             }
             .background(ActivityGPXSharePresenter(file: $workflow.file) { error in
-                workflow.report(title: "Couldn’t share GPX", message: error.localizedDescription)
+                workflow.report(title: String(localized: AppMessages.activityActionShareGPXFailed(locale: locale)), message: error.localizedDescription)
             })
             .alert(item: $workflow.failure) { failure in
-                Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text("OK")))
+                Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text(AppMessages.actionOk(locale: locale))))
             }
             .onDisappear { workflow.cancel() }
     }
 
     private var actions: some View {
         Group {
-            Button("Edit", systemImage: "pencil") { showsEditor = true }
+            Button { showsEditor = true } label: { BrowseActionLabel(.edit) }
                 .disabled(store.activityEditing == nil)
             Button { workflow.export(source: source, current: { source }) } label: {
                 Label { Text(workflow.isExporting ? AppMessages.actionPreparingGPX(locale: locale) : AppMessages.actionExportGPXNative(locale: locale)) }
                       icon: { BrowseActionIcon(.exportGPX) }
             }
                 .disabled(!availability.canExport || workflow.isExporting || workflow.file != nil)
-                .accessibilityHint(availability.hint)
+                .accessibilityHint(Text(availability.hintResource(locale: locale)))
             if showsMapAction {
                 Button { store.showOnMap(activity.id) } label: { BrowseActionLabel(.showOnMap) }
                     .disabled(!store.canShowOnMap(activity.id))

@@ -8,6 +8,10 @@ type Registration = {
   active: boolean;
   requested: number;
   completed: number;
+  commits: Array<{
+    version: number;
+    apply: (signal: AbortSignal) => Promise<void>;
+  }>;
   running?: Promise<void>;
   run: (signal: AbortSignal) => Promise<void>;
 };
@@ -53,6 +57,7 @@ export function registerLibrarySync(
     active: true,
     requested: 0,
     completed: 0,
+    commits: [],
     run,
   };
   registry.scopes.set(scope, registration);
@@ -78,6 +83,7 @@ export function registerLibrarySync(
 export function requestLibrarySync(
   client: QueryClient,
   scope: string,
+  commit?: (signal: AbortSignal) => Promise<void>,
 ): Promise<void> {
   const registry = registryFor(client);
   const registration = registry.scopes.get(scope);
@@ -86,6 +92,7 @@ export function requestLibrarySync(
       new Error('The signed-in library is not ready to sync.'),
     );
   const requested = ++registration.requested;
+  if (commit) registration.commits.push({ version: requested, apply: commit });
   const current = () => {
     registration.controller.signal.throwIfAborted();
     if (!registration.active || registry.scopes.get(scope) !== registration)
@@ -104,6 +111,16 @@ export function requestLibrarySync(
             current();
             while (registration.completed < registration.requested) {
               const version = registration.requested;
+              // Mutation responses use the same serialized writer as downloads.
+              // A queued response cannot race an older bootstrap/delta commit.
+              while (
+                registration.commits[0] &&
+                registration.commits[0].version <= version
+              ) {
+                const next = registration.commits.shift()!;
+                await next.apply(registration.controller.signal);
+                current();
+              }
               await registration.run(registration.controller.signal);
               current();
               registration.completed = version;

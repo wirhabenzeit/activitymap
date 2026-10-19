@@ -1,8 +1,22 @@
 'use client';
 
 import { useSyncExternalStore } from 'react';
+
 import { type DateFormat, dateFormatOptions } from '~/lib/date-preferences';
+import { formattingLocale } from '~/lib/presentation/messages';
 import { type UnitSystem } from '~/lib/units';
+
+const subscribeLocale = (listener: () => void) => {
+  window.addEventListener('languagechange', listener);
+  return () => window.removeEventListener('languagechange', listener);
+};
+export function useFormattingLocale(): string {
+  return useSyncExternalStore(
+    subscribeLocale,
+    () => formattingLocale(navigator.language),
+    () => 'en',
+  );
+}
 
 const key = 'activitymap.units';
 const event = 'activitymap-units-change';

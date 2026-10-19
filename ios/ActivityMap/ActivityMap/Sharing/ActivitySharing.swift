@@ -9,17 +9,17 @@ final class ActivitySharingService {
 
     var unavailableReason: String? {
         guard let session = session(), session.user.authentication.sessionExpiresAt > .now else {
-            return "Sign in to share activities."
+            return String(localized: AppMessages.errorSharingSignInToShareActivities())
         }
         guard session.verified, session.user.stravaConnected else {
-            return "Reconnect and sync before sharing activities."
+            return String(localized: AppMessages.errorSharingReconnectAndSyncBeforeSharingActivities())
         }
         return nil
     }
 
     func perform<T>(_ operation: (any ShareLinksSource, URL) async throws -> T) async throws -> T {
         guard unavailableReason == nil, let captured = session() else {
-            throw SharingError.unavailable(unavailableReason ?? "Sign in to share activities.")
+            throw SharingError.unavailable(unavailableReason ?? String(localized: AppMessages.errorSharingSignInToShareActivities()))
         }
         let result = try await operation(source(captured), captured.deployment)
         try Task.checkCancellation()
@@ -55,7 +55,9 @@ final class ActivityShareModel {
     var showRouteEnds = false
     var step = Step.configure
     private(set) var isBusy = false
-    private(set) var errorMessage: String?
+    private(set) var errorText: PresentationText?
+    var errorMessage: String? { errorMessage(locale: .current) }
+    func errorMessage(locale: Locale) -> String? { errorText?.string(locale: locale) }
     private(set) var retryAt: Date?
     private(set) var created: ActivityMapAPI.CreatedShareLink?
     private(set) var url: URL?
@@ -63,15 +65,15 @@ final class ActivityShareModel {
     init(activities: [Activity]) { self.activities = activities }
 
     var scopeError: String? {
-        guard !activities.isEmpty else { return "Select at least one activity to share." }
-        guard activities.count <= 200 else { return "A link can share up to 200 activities. Choose a smaller selection." }
+        guard !activities.isEmpty else { return String(localized: AppMessages.errorSharingSelectAtLeastOneActivityToShare()) }
+        guard activities.count <= 200 else { return String(localized: AppMessages.errorSharingALinkCanShareUpToActivitiesChoose()) }
         return nil
     }
 
     func create(using service: ActivitySharingService) async {
         guard step == .configure, !isBusy, scopeError == nil,
               retryAt.map({ $0 <= .now }) ?? true else { return }
-        isBusy = true; errorMessage = nil; retryAt = nil
+        isBusy = true; errorText = nil; retryAt = nil
         defer { isBusy = false }
         let request = ActivityMapAPI.CreateShareLinkRequest(activityIds: activities.map { String($0.id) },
             expiresInMs: expiresInHours * 3_600_000, fields: .init(showRouteEnds: showRouteEnds))
@@ -81,22 +83,24 @@ final class ActivityShareModel {
             }
             // Tokens stay in memory only; the saved link list never contains them.
             guard link.token.allSatisfy({ $0.isASCII && ($0.isLetter || $0.isNumber || $0 == "-" || $0 == "_") }),
-                  !link.token.isEmpty else { throw SharingError.unavailable("The server returned an invalid share link.") }
+                  !link.token.isEmpty else { throw SharingError.unavailable(String(localized: AppMessages.errorSharingTheServerReturnedAnInvalidShareLink())) }
             created = link
             url = deployment.appending(path: "share").appending(path: link.token)
             step = .created
         } catch is CancellationError { }
         catch let error as APIClient.RequestError {
+            let facts = error.facts
             switch error {
-            case .rateLimited(let delay, _):
-                retryAt = .now.addingTimeInterval(delay)
-                errorMessage = "Too many requests. Try again after the time below."
-            case .server(_, let message, _, _, _, let delay):
-                retryAt = delay.map { .now.addingTimeInterval($0) }; errorMessage = message
+            case .rateLimited:
+                retryAt = facts.retryAfter.map { .now.addingTimeInterval($0) }
+                errorText = .localized(AppMessages.errorSharingTooManyRequestsTryAgainAfterTheTime())
+            case .server(_, let message, _, _, _, _):
+                retryAt = facts.retryAfter.map { .now.addingTimeInterval($0) }
+                errorText = .verbatim(message)
             case .transport, .decoding:
-                errorMessage = "Creation could not be confirmed. Check Your links before creating another link."
-            default: errorMessage = error.description
+                errorText = .localized(AppMessages.errorSharingCreationCouldNotBeConfirmedCheckYourLinks())
+            default: errorText = .verbatim(error.description)
             }
-        } catch { errorMessage = error.localizedDescription }
+        } catch { errorText = .verbatim(error.localizedDescription) }
     }
 }

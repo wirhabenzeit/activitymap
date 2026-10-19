@@ -1,5 +1,6 @@
 import { sql } from 'drizzle-orm';
 import {
+  bigint,
   boolean,
   doublePrecision,
   index,
@@ -7,23 +8,26 @@ import {
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
-  varchar,
-  bigint,
-  primaryKey,
   uniqueIndex,
+  varchar,
 } from 'drizzle-orm/pg-core';
 
-import { sportTypes } from '~/server/strava/types';
-import type { SportType } from '~/server/strava/types';
-import type { WebhookRequest } from '~/types/strava';
-import type { StoredShareLinkFieldOptions } from '~/lib/sharing/fields';
-import type {
-  ActivityStreamType, RawActivityStreams, StreamFetchFailure,
-} from '~/server/strava/streams';
-import type { StoredStreamSummary } from '~/lib/streams/compact-summary';
+import { sportTypes } from '~/contracts/sport';
+import type { SportType } from '~/contracts/sport';
+import type { StravaImportDTO } from '~/contracts/v1/strava-import';
 import type { JobRunSummary } from '~/lib/admin/job-run-summary';
+import type { StoredShareLinkFieldOptions } from '~/lib/sharing/fields';
+import type { StoredStreamSummary } from '~/lib/streams/compact-summary';
+import type { ActivityImportCursor } from '~/server/strava/activity-import-policy';
+import type {
+  ActivityStreamType,
+  RawActivityStreams,
+  StreamFetchFailure,
+} from '~/server/strava/streams';
+import type { WebhookRequest } from '~/types/strava';
 
 export const sportTypeEnum = pgEnum('sport_type', sportTypes);
 
@@ -67,7 +71,9 @@ export const users = pgTable('user', {
 export const accounts = pgTable(
   'account',
   {
-    id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()), // Better Auth requires id
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()), // Better Auth requires id
     userId: text('userId')
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
@@ -114,7 +120,9 @@ export const accounts = pgTable(
 );
 
 export const sessions = pgTable('session', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()), // Better Auth uses id
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()), // Better Auth uses id
   sessionToken: text('sessionToken').unique(), // Keep for backward compat
   token: text('token').notNull().unique(), // Better Auth uses token
   userId: text('userId')
@@ -130,14 +138,15 @@ export const sessions = pgTable('session', {
 });
 
 export const verification = pgTable('verification', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
   identifier: text('identifier').notNull(),
   value: text('value').notNull(),
   expiresAt: timestamp('expiresAt', { mode: 'date' }).notNull(),
   createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
   updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
 });
-
 
 // The legacy `webhook` table (superseded by `stravaWebhooks`/
 // `stravaWebhookEvents` from issue #124's durable webhook inbox) was dropped
@@ -225,17 +234,27 @@ export const activities = pgTable(
 // Kept separate so activity lists, maps and sync DTOs never load samples.
 // JSONB retains each independently sampled stream and its upstream metadata.
 export const activityStreams = pgTable('activity_streams', {
-  activityId: bigint('activity_id', { mode: 'bigint' }).primaryKey()
+  activityId: bigint('activity_id', { mode: 'bigint' })
+    .primaryKey()
     .references(() => activities.id, { onDelete: 'cascade' }),
   generation: text('generation').notNull(),
   attemptId: text('attempt_id'),
-  requestedTypes: text('requested_types').array().$type<ActivityStreamType[]>().notNull(),
+  requestedTypes: text('requested_types')
+    .array()
+    .$type<ActivityStreamType[]>()
+    .notNull(),
   payload: jsonb('payload').$type<RawActivityStreams>(),
   // Downsampled copy of `payload`, written with it. Serve it instead of the
   // raw samples wherever a chart or preview is enough.
   summary: jsonb('summary').$type<StoredStreamSummary>(),
-  availableTypes: text('available_types').array().$type<ActivityStreamType[]>().notNull().default(sql`'{}'::text[]`),
-  revision: bigint('revision', { mode: 'bigint' }).notNull().default(sql`0`),
+  availableTypes: text('available_types')
+    .array()
+    .$type<ActivityStreamType[]>()
+    .notNull()
+    .default(sql`'{}'::text[]`),
+  revision: bigint('revision', { mode: 'bigint' })
+    .notNull()
+    .default(sql`0`),
   sourceVersion: text('source_version'),
   fetchedAt: timestamp('fetched_at', { mode: 'date' }),
   lastAttemptAt: timestamp('last_attempt_at', { mode: 'date' }).notNull(),
@@ -328,7 +347,9 @@ export const activityDeletions = pgTable(
   {
     athlete_id: bigint('athlete_id', { mode: 'number' }).notNull(),
     activity_id: bigint('activity_id', { mode: 'number' }).notNull(),
-    deleted_at: timestamp('deleted_at', { mode: 'date' }).notNull().defaultNow(),
+    deleted_at: timestamp('deleted_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     primaryKey({
@@ -347,7 +368,9 @@ export const photoDeletions = pgTable(
     athlete_id: bigint('athlete_id', { mode: 'number' }).notNull(),
     photo_id: varchar('photo_id').notNull(),
     activity_id: bigint('activity_id', { mode: 'number' }),
-    deleted_at: timestamp('deleted_at', { mode: 'date' }).notNull().defaultNow(),
+    deleted_at: timestamp('deleted_at', { mode: 'date' })
+      .notNull()
+      .defaultNow(),
   },
   (table) => [
     primaryKey({
@@ -408,7 +431,10 @@ export type PhotoDeletion = typeof photoDeletions.$inferSelect;
 export const stravaWebhooks = pgTable(
   'strava_webhooks',
   {
-    id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text('id')
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     subscriptionId: bigint('subscription_id', { mode: 'number' }),
     verifyToken: text('verify_token').notNull(),
     callbackUrl: text('callback_url').notNull().unique(),
@@ -443,7 +469,10 @@ export const webhookEventStatusEnum = pgEnum('webhook_event_status', [
 export const stravaWebhookEvents = pgTable(
   'strava_webhook_events',
   {
-    id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text('id')
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     subscriptionId: bigint('subscription_id', { mode: 'number' }).notNull(),
     // `objectType`/`aspectType` are Strava's own small closed vocabularies
     // (`WebhookRequest`'s `object_type`/`aspect_type` unions), but are kept
@@ -503,7 +532,10 @@ export type StravaWebhookEventRow = typeof stravaWebhookEvents.$inferSelect;
 export const mobileLoginCodes = pgTable(
   'mobile_login_codes',
   {
-    id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text('id')
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     codeHash: text('code_hash').notNull(),
     state: text('state').notNull(),
     pkceChallenge: text('pkce_challenge').notNull(),
@@ -628,7 +660,10 @@ export type SyncOperation = (typeof syncOperationEnum.enumValues)[number];
 export const shareLinks = pgTable(
   'share_links',
   {
-    id: text('id').notNull().primaryKey().$defaultFn(() => crypto.randomUUID()),
+    id: text('id')
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
     athleteId: bigint('athlete_id', { mode: 'number' })
       .notNull()
       .references(() => users.athlete_id, { onDelete: 'cascade' }),
@@ -736,7 +771,9 @@ export const streamBackfillRuns = pgTable('stream_backfill_run', {
 
 // Round-robin accounts, alternating newest/oldest work within each account.
 export const streamBackfillAccounts = pgTable('stream_backfill_account', {
-  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
   lastSelectedAt: timestamp('last_selected_at', { mode: 'date' }).notNull(),
   selectOldest: boolean('select_oldest').notNull().default(true),
   // Credential fingerprint Strava last rejected; skipped until it changes.
@@ -838,9 +875,7 @@ export const scheduledJobLog = pgTable(
     summary: jsonb('summary').$type<JobRunSummary>(),
     error: text('error'),
   },
-  (table) => [
-    index('scheduled_job_log_started_at_idx').on(table.startedAt),
-  ],
+  (table) => [index('scheduled_job_log_started_at_idx').on(table.startedAt)],
 );
 
 export type ScheduledJobLogEntry = typeof scheduledJobLog.$inferSelect;
@@ -848,7 +883,8 @@ export type ScheduledJobLogEntry = typeof scheduledJobLog.$inferSelect;
 // Scheduling metadata is separate from stream data: retries/checkpoints must
 // not publish activity change-feed entries or load large JSON payloads.
 export const streamBackfillAttempts = pgTable('stream_backfill_attempt', {
-  activityId: bigint('activity_id', { mode: 'bigint' }).primaryKey()
+  activityId: bigint('activity_id', { mode: 'bigint' })
+    .primaryKey()
     .references(() => activities.id, { onDelete: 'cascade' }),
   generation: text('generation'),
   attemptCount: integer('attempt_count').notNull(),
@@ -863,7 +899,8 @@ export const streamBackfillAttempts = pgTable('stream_backfill_attempt', {
 // Independent photo retries: legacy stored rows stay usable while this queue
 // verifies them. No migration guesses freshness from matching counts.
 export const photoFetchAttempts = pgTable('photo_fetch_attempt', {
-  activityId: bigint('activity_id', { mode: 'number' }).primaryKey()
+  activityId: bigint('activity_id', { mode: 'number' })
+    .primaryKey()
     .references(() => activities.id, { onDelete: 'cascade' }),
   attemptCount: integer('attempt_count').notNull().default(0),
   nextAttemptAt: timestamp('next_attempt_at', { mode: 'date' }).notNull(),
@@ -883,7 +920,8 @@ export const photoBackfillRuns = pgTable('photo_backfill_run', {
 
 // A rejected grant blocks all photo work until refresh/reconnect changes it.
 export const photoBackfillAccounts = pgTable('photo_backfill_account', {
-  accountId: text('account_id').primaryKey()
+  accountId: text('account_id')
+    .primaryKey()
     .references(() => accounts.id, { onDelete: 'cascade' }),
   blockedCredentials: text('blocked_credentials').notNull(),
   reason: text('reason').notNull(),
@@ -892,11 +930,17 @@ export const photoBackfillAccounts = pgTable('photo_backfill_account', {
 // Account-scoped manual import status, lease and older-history checkpoint.
 // Deleting the account/user also deletes its operational metadata.
 export const stravaImportRuns = pgTable('strava_import_run', {
-  userId: text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
-  accountId: text('account_id').notNull().references(() => accounts.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  accountId: text('account_id')
+    .notNull()
+    .references(() => accounts.id, { onDelete: 'cascade' }),
   runId: text('run_id').notNull(),
-  status: text('status', { enum: ['running', 'succeeded', 'deferred', 'failed', 'blocked'] }).notNull(),
-  reason: text('reason').$type<import('~/contracts/v1/strava-import').StravaImportDTO['reason']>(),
+  status: text('status', {
+    enum: ['running', 'succeeded', 'deferred', 'failed', 'blocked'],
+  }).notNull(),
+  reason: text('reason').$type<StravaImportDTO['reason']>(),
   startedAt: timestamp('started_at', { mode: 'date' }).notNull(),
   finishedAt: timestamp('finished_at', { mode: 'date' }),
   leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }).notNull(),
@@ -905,5 +949,5 @@ export const stravaImportRuns = pgTable('strava_import_run', {
   details: integer('details').notNull().default(0),
   photos: integer('photos').notNull().default(0),
   requests: integer('requests').notNull().default(0),
-  historyCursor: jsonb('history_cursor').$type<import('~/server/strava/activity-import-policy').ActivityImportCursor>(),
+  historyCursor: jsonb('history_cursor').$type<ActivityImportCursor>(),
 });

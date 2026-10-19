@@ -17,15 +17,24 @@ enum BrowseText {
 /// Presentation primitives only. Callers own values, availability and actions.
 /// These components never filter, select, fetch, format or calculate activity data.
 struct BrowseSectionHeading: View {
-    let title: String
+    let title: BrowseText
+    init(title: BrowseText, isStatsGroup: Bool = false) {
+        self.title = title; self.isStatsGroup = isStatsGroup
+    }
+    init(title: String, isStatsGroup: Bool = false) {
+        self.title = .verbatim(title); self.isStatsGroup = isStatsGroup
+    }
+    init(title: LocalizedStringResource, isStatsGroup: Bool = false) {
+        self.title = .localized(title); self.isStatsGroup = isStatsGroup
+    }
     var isStatsGroup = false
 
     var body: some View {
-        Text(isStatsGroup ? title.uppercased() : title)
+        title.text.textCase(isStatsGroup ? .uppercase : nil)
             .font(isStatsGroup ? AppTheme.Typography.caption.weight(.semibold) : AppTheme.Typography.heading)
             .foregroundStyle(isStatsGroup ? Color.secondary : Color.primary)
             .fixedSize(horizontal: false, vertical: true)
-            .accessibilityLabel(title)
+            .accessibilityLabel(title.text)
             .accessibilityAddTraits(.isHeader)
     }
 }
@@ -99,11 +108,13 @@ struct BrowseIconLabel: View {
 }
 
 struct BrowseBadge: View {
-    let title: String
+    let title: BrowseText
+    init(title: String, systemImage: String) { self.title = .verbatim(title); self.systemImage = systemImage }
+    init(title: LocalizedStringResource, systemImage: String) { self.title = .localized(title); self.systemImage = systemImage }
     let systemImage: String
 
     var body: some View {
-        Label(title, systemImage: systemImage)
+        Label { title.text } icon: { Image(systemName: systemImage) }
             .font(AppTheme.Typography.caption)
             .foregroundStyle(AppTheme.secondaryText)
             .fixedSize(horizontal: false, vertical: true)
@@ -111,7 +122,13 @@ struct BrowseBadge: View {
 }
 
 struct BrowseSelectionButton: View {
-    let title: String
+    let title: BrowseText
+    init(title: String, isSelected: Bool, isMixed: Bool = false, action: @escaping () -> Void) {
+        self.title = .verbatim(title); self.isSelected = isSelected; self.isMixed = isMixed; self.action = action
+    }
+    init(title: LocalizedStringResource, isSelected: Bool, isMixed: Bool = false, action: @escaping () -> Void) {
+        self.title = .localized(title); self.isSelected = isSelected; self.isMixed = isMixed; self.action = action
+    }
     let isSelected: Bool
     var isMixed = false
     let action: () -> Void
@@ -125,7 +142,7 @@ struct BrowseSelectionButton: View {
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(title)
+        .accessibilityLabel(title.text)
         .accessibilityValue(Text(isMixed ? AppMessages.selectionMixed() : isSelected ? AppMessages.selectionSelected() : AppMessages.selectionNotSelected()))
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
@@ -134,7 +151,13 @@ struct BrowseSelectionButton: View {
 /// Repeated List metrics use units and compact symbols instead of three
 /// stacked label/value blocks. VoiceOver still receives their full names.
 struct BrowseInlineMetric: View {
-    let title: String
+    let title: BrowseText
+    init(title: String, value: String, systemImage: String) {
+        self.title = .verbatim(title); self.value = value; self.systemImage = systemImage
+    }
+    init(title: LocalizedStringResource, value: String, systemImage: String) {
+        self.title = .localized(title); self.value = value; self.systemImage = systemImage
+    }
     let value: String
     let systemImage: String
 
@@ -146,8 +169,8 @@ struct BrowseInlineMetric: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(value == Formatters.unknown ? "Not recorded" : value)
+        .accessibilityLabel(title.text)
+        .accessibilityValue(value == Formatters.unknown ? String(localized: AppMessages.valueNotRecorded()) : value)
     }
 }
 
@@ -155,7 +178,13 @@ struct BrowseInlineMetric: View {
 /// particular, an unavailable measurement must not be converted to zero.
 struct BrowseMetricValue: View {
     enum Emphasis { case compact, detail, headline }
-    let title: String
+    let title: BrowseText
+    init(title: String, value: String, emphasis: Emphasis = .compact, context: String? = nil, valueFirst: Bool = false) {
+        self.title = .verbatim(title); self.value = value; self.emphasis = emphasis; self.context = context; self.valueFirst = valueFirst
+    }
+    init(title: LocalizedStringResource, value: String, emphasis: Emphasis = .compact, context: String? = nil, valueFirst: Bool = false) {
+        self.title = .localized(title); self.value = value; self.emphasis = emphasis; self.context = context; self.valueFirst = valueFirst
+    }
     let value: String
     var emphasis: Emphasis = .compact
     var context: String? = nil
@@ -172,7 +201,7 @@ struct BrowseMetricValue: View {
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
             if valueFirst { Text(value).font(valueFont).monospacedDigit() }
-            Text(title).font(AppTheme.Typography.caption).foregroundStyle(AppTheme.secondaryText)
+            title.text.font(AppTheme.Typography.caption).foregroundStyle(AppTheme.secondaryText)
             if !valueFirst { Text(value).font(valueFont).monospacedDigit() }
             if let context {
                 Text(context).font(valueFirst ? .caption2 : AppTheme.Typography.caption).foregroundStyle(AppTheme.secondaryText)
@@ -181,8 +210,8 @@ struct BrowseMetricValue: View {
         .fixedSize(horizontal: false, vertical: true)
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(([value == Formatters.unknown ? "Not recorded" : value, context]
+        .accessibilityLabel(title.text)
+        .accessibilityValue(([value == Formatters.unknown ? String(localized: AppMessages.valueNotRecorded()) : value, context]
             .compactMap { $0 }).joined(separator: ". "))
     }
 }
@@ -202,9 +231,17 @@ struct BrowseSurface: ViewModifier {
 /// A short status with one recovery owner. Detailed account/sync explanations
 /// remain in their existing destination, rather than becoming another toolbar.
 struct BrowseStatusLine: View {
-    let title: String
+    let title: BrowseText
+    init(title: String, systemImage: String, actionTitle: String? = nil, action: (() -> Void)? = nil) {
+        self.title = .verbatim(title); self.systemImage = systemImage
+        self.actionTitle = actionTitle.map(BrowseText.verbatim); self.action = action
+    }
+    init(title: LocalizedStringResource, systemImage: String, actionTitle: LocalizedStringResource? = nil, action: (() -> Void)? = nil) {
+        self.title = .localized(title); self.systemImage = systemImage
+        self.actionTitle = actionTitle.map(BrowseText.localized); self.action = action
+    }
     let systemImage: String
-    var actionTitle: String? = nil
+    var actionTitle: BrowseText? = nil
     var action: (() -> Void)? = nil
     @Environment(\.dynamicTypeSize) private var typeSize
 
@@ -213,11 +250,11 @@ struct BrowseStatusLine: View {
             ? AnyLayout(VStackLayout(alignment: .leading, spacing: AppTheme.Spacing.tight))
             : AnyLayout(HStackLayout(spacing: AppTheme.Spacing.small))
         layout {
-            Label(title, systemImage: systemImage)
+            Label { title.text } icon: { Image(systemName: systemImage) }
                 .font(AppTheme.Typography.caption).foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             if let actionTitle, let action {
-                Button(actionTitle, action: action)
+                Button(action: action) { actionTitle.text }
                     .font(AppTheme.Typography.caption)
                     .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
             }
@@ -228,6 +265,7 @@ struct BrowseStatusLine: View {
 /// Shared identification for List rows and map results. Compact rows keep the
 /// local date beside the title; accessibility sizes retain full sport/time text.
 struct BrowseActivityHeading: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
     @Environment(\.locale) private var locale
     let activity: Activity
     var isActive = false
@@ -249,16 +287,16 @@ struct BrowseActivityHeading: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             if typeSize.isAccessibilitySize {
-                Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
+                Text(AppMessages.activityRowSubtitle(activity.sportType.editingTitle, Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system), locale: locale))
                     .font(.caption).foregroundStyle(AppTheme.secondaryText)
             } else {
-                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
+                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system))
                     .font(.caption2).foregroundStyle(AppTheme.secondaryText).fixedSize()
             }
         }
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(activity.name)
-        .accessibilityValue("\(activity.sportType.rawValue), \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))\(isActive ? ", \(String(localized: ActiveRoutePresentation.state(true, locale: locale)))" : "")")
+        .accessibilityLabel(Text(verbatim: activity.name))
+        .accessibilityValue(Text(isActive ? AppMessages.activityRowActiveAccessible(activity.sportType.editingTitle, Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system), locale: locale) : AppMessages.activityRowAccessible(activity.sportType.editingTitle, Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system), locale: locale)))
     }
 }

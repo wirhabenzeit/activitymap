@@ -205,6 +205,9 @@ nonisolated struct ElevationStatus {
 }
 
 struct ElevationPlot: View {
+    @Environment(\.locale) private var locale
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
     let profile: ElevationProfile
     var compact = false
     @Binding var selectedX: Double?
@@ -213,7 +216,6 @@ struct ElevationPlot: View {
     @State private var accessibleSampleID: Int?
     @ScaledMetric(relativeTo: .caption) private var chartHeight = 160.0
     @ScaledMetric(relativeTo: .caption) private var reservedHeight = 200.0
-    private var units: UnitSystem { DisplayPreferences.shared.units }
     private var selected: ElevationProfile.Point? {
         guard let selectedX else { return nil }
         if let accessibleSampleID, let point = profile.points.first(where: { $0.id == accessibleSampleID }),
@@ -234,7 +236,7 @@ struct ElevationPlot: View {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("Elevation (\(units.elevationUnit))").foregroundStyle(AppTheme.secondaryText)
                 Spacer(minLength: 0)
-                Text(selected.map { profile.selectionLabel($0, units: units) } ?? " ")
+                Text(selected.map { profile.selectionLabel($0, units: units, locale: locale) } ?? " ")
                     .fontWeight(.medium).monospacedDigit()
                     .foregroundStyle(.primary)
                     .padding(.horizontal, 6).padding(.vertical, 3)
@@ -285,8 +287,8 @@ struct ElevationPlot: View {
             }
             .frame(height: compact ? reservedHeight * 0.75 - 32 : chartHeight)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Elevation profile, \(profile.accessibilityDescription(units: units))")
-            .accessibilityValue(selected.map { profile.valueLabel($0, units: units) } ?? "No sample selected")
+            .accessibilityLabel("Elevation profile, \(profile.accessibilityDescription(units: units, locale: locale))")
+            .accessibilityValue(selected.map { profile.valueLabel($0, units: units, locale: locale) } ?? "No sample selected")
             .accessibilityHint("Swipe up or down to move through recorded samples.")
             .accessibilityAdjustableAction { direction in
                 let index = selected?.id ?? 0

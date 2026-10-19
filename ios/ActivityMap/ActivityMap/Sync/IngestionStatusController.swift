@@ -11,7 +11,10 @@ final class IngestionStatusController {
     }
     private(set) var scope: StoreScope?
     private(set) var snapshot: ActivityMapAPI.IngestionStatus?
-    private(set) var message: String?
+    private(set) var messageText: PresentationText?
+    var message: String? { message(locale: .current) }
+    func message(locale: Locale) -> String? { messageText?.string(locale: locale) }
+    private(set) var requiresSignIn = false
     private(set) var isLoading = false
     private(set) var nextCheck = Date.distantPast
     private var generation = 0
@@ -34,7 +37,8 @@ final class IngestionStatusController {
             .flatMap { try? ActivityMapAPI.makeDecoder().decode(Cache.self, from: $0) }
         snapshot = cache?.status
         nextCheck = cache?.nextCheck ?? .distantPast
-        message = nil
+        messageText = nil
+        requiresSignIn = false
         isLoading = false
     }
 
@@ -42,7 +46,7 @@ final class IngestionStatusController {
         activate(session)
         let current = generation
         guard session.verified else {
-            message = "Offline or session not verified. Showing the last known server status when available."
+            messageText = .localized(AppMessages.errorImportStatusOfflineOrSessionNotVerifiedShowingTheLast())
             return
         }
         while !Task.isCancelled && current == generation {
@@ -64,22 +68,20 @@ final class IngestionStatusController {
             try Task.checkCancellation()
             guard current == generation, scope == session.scope else { return }
             snapshot = status
-            message = nil
+            requiresSignIn = false
+            messageText = nil
             save(session.scope)
         } catch {
             guard !Task.isCancelled, current == generation, scope == session.scope else { return }
-            message = "Server import status is not available. Showing the last known snapshot when available."
-            if let failure = error as? APIClient.RequestError {
-                switch failure {
-                case .rateLimited(let delay, _), .serviceUnavailable(let delay?, _),
-                     .server(_, _, _, _, _, let delay?):
-                    nextCheck = max(nextCheck, Date().addingTimeInterval(delay))
-                default: break
-                }
-                if AuthController.isExplicitlyUnauthenticated(failure) {
-                    snapshot = nil
-                    message = "Sign in again to check server import status."
-                }
+            messageText = .localized(AppMessages.errorImportStatusServerImportStatusIsNotAvailableShowingThe())
+            let facts = APIClient.errorFacts(for: error)
+            if let delay = facts.retryAfter {
+                nextCheck = max(nextCheck, Date().addingTimeInterval(delay))
+            }
+            requiresSignIn = facts.authenticationRejected
+            if requiresSignIn {
+                snapshot = nil
+                messageText = .localized(AppMessages.errorImportStatusSignInAgainToCheckServerImportStatus())
             }
             save(session.scope)
         }

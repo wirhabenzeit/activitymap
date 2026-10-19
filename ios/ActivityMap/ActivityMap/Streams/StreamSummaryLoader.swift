@@ -336,20 +336,18 @@ final class StreamSummaryLoader {
 
     private func failure(_ error: Error) -> SummaryFailure {
         var retryable = false
-        var delay: TimeInterval?
-        var requestID: String?
+        let facts = APIClient.errorFacts(for: error)
         var isOffline = false
         switch error as? APIClient.RequestError {
-        case .rateLimited(let seconds, let id): retryable = true; delay = seconds; requestID = id
-        case .server(_, _, _, let id, let retry, let seconds): retryable = retry; delay = seconds; requestID = id
-        case .serviceUnavailable(let seconds, let id): retryable = true; delay = seconds; requestID = id
+        case .rateLimited, .serviceUnavailable: retryable = true
+        case .server: retryable = facts.serverRetryable == true
         case .transport(_, let code):
             retryable = true
             isOffline = code == URLError.notConnectedToInternet.rawValue || code == URLError.dataNotAllowed.rawValue
         default: break
         }
         return .init(message: String(describing: error), retryable: retryable,
-                     retryAt: delay.map { now().addingTimeInterval(max(1, $0)) }, requestID: requestID, isOffline: isOffline)
+                     retryAt: facts.retryAfter.map { now().addingTimeInterval(max(1, $0)) }, requestID: facts.requestID, isOffline: isOffline)
     }
 
     private func committed(_ change: SummaryStoreChange, epoch current: Int) async {

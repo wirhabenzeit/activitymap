@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct FilterPanel: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
     @Bindable var store: ActivityStore
     var scope: FilterScope = .browsing
     /// One part alone, as the iPad filter rail's popovers show it; nil is the whole panel.
@@ -214,13 +216,13 @@ struct FilterPanel: View {
     private func metricsSection(_ metrics: [FilterPart]) -> some View {
         Section {
             if metrics.contains(.distance) {
-                NumericFilterRow(title: "Distance", icon: "ruler", unit: DisplayPreferences.shared.units.distanceUnit, scale: DisplayPreferences.shared.units.distanceScale, filter: $store.distanceFilter, suggestedMaximum: max(100, (store.activities.compactMap(\.distance).max() ?? 0) / DisplayPreferences.shared.units.distanceScale))
+                NumericFilterRow(title: "Distance", icon: "ruler", unit: units.distanceUnit, scale: units.distanceScale, filter: $store.distanceFilter, suggestedMaximum: max(100, (store.activities.compactMap(\.distance).max() ?? 0) / units.distanceScale))
             }
             if metrics.contains(.duration) {
                 NumericFilterRow(title: "Duration", icon: "stopwatch", unit: "h", scale: 3_600, filter: $store.durationFilter, suggestedMaximum: max(12, Double(store.activities.compactMap(\.elapsedTime).max() ?? 0) / 3600), step: 0.25)
             }
             if metrics.contains(.elevation) {
-                NumericFilterRow(title: "Elevation", icon: "mountain.2", unit: DisplayPreferences.shared.units.elevationUnit, scale: DisplayPreferences.shared.units.elevationScale, filter: $store.elevationFilter, suggestedMaximum: max(3000, store.activities.compactMap(\.totalElevationGain).max() ?? 0) / DisplayPreferences.shared.units.elevationScale, step: 50)
+                NumericFilterRow(title: "Elevation", icon: "mountain.2", unit: units.elevationUnit, scale: units.elevationScale, filter: $store.elevationFilter, suggestedMaximum: max(3000, store.activities.compactMap(\.totalElevationGain).max() ?? 0) / units.elevationScale, step: 50)
             }
         } header: {
             if part == nil { Text("Measurements") }

@@ -1,4 +1,6 @@
-import { formatMeasurement, METRES_PER_MILE, type UnitSystem } from './units';
+import { numberFormatter } from './presentation/formatters';
+import { message } from './presentation/messages';
+import { METRES_PER_MILE, type UnitSystem, formatMeasurement } from './units';
 
 export type SpeedDisplay = 'speed' | 'run' | 'swim';
 
@@ -55,6 +57,7 @@ export function formatPaceSeconds(
   seconds: number | null,
   display: SpeedDisplay,
   units: UnitSystem,
+  locale = 'en',
 ): string {
   if (
     seconds == null ||
@@ -64,25 +67,31 @@ export function formatPaceSeconds(
   )
     return '—';
   const rounded = Math.round(seconds);
-  return `${Math.floor(rounded / 60)}:${String(rounded % 60).padStart(2, '0')} ${paceUnit(display, units)}`;
+  return `${numberFormatter(locale, { useGrouping: false }).format(Math.floor(rounded / 60))}:${numberFormatter(locale, { minimumIntegerDigits: 2, useGrouping: false }).format(rounded % 60)} ${paceUnit(display, units)}`;
 }
 
 export function formatSpeed(
   speed: number | null | undefined,
   display: SpeedDisplay,
   units: UnitSystem,
+  locale = 'en',
 ): string {
   return display === 'speed'
-    ? formatMeasurement(speed, 'speed', units)
-    : formatPaceSeconds(paceSeconds(speed, display, units), display, units);
+    ? formatMeasurement(speed, 'speed', units, locale)
+    : formatPaceSeconds(
+        paceSeconds(speed, display, units),
+        display,
+        units,
+        locale,
+      );
 }
 
 export function speedLabel(display: SpeedDisplay, maximum = false): string {
   return display === 'speed'
     ? maximum
-      ? 'Maximum speed'
-      : 'Average speed'
+      ? message('metric.max_speed')
+      : message('metric.average_speed')
     : maximum
-      ? 'Best pace'
-      : 'Average pace';
+      ? message('metric.best_pace')
+      : message('metric.average_pace');
 }
