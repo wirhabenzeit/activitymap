@@ -39,6 +39,14 @@
                BlueprintName = "ActivityMapTests"
                ReferencedContainer = "container:ActivityMap.xcodeproj"/>
          </TestableReference>
+         <TestableReference skipped = "NO" parallelizable = "NO">
+            <BuildableReference
+               BuildableIdentifier = "primary"
+               BlueprintIdentifier = "C0DE00000000000000000104"
+               BuildableName = "ActivityMapUITests.xctest"
+               BlueprintName = "ActivityMapUITests"
+               ReferencedContainer = "container:ActivityMap.xcodeproj"/>
+         </TestableReference>
       </Testables>
    </TestAction>
    <LaunchAction
