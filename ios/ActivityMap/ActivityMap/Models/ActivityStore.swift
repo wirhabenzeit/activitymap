@@ -418,14 +418,17 @@ final class ActivityStore {
 
     func dismissInspection() { selection.dismissInspection() }
 
+    /// The renderer's valid two-vertex route capability is shared by every map action.
+    func canShowOnMap(_ activityID: Int) -> Bool { routableActivityIDs.contains(activityID) }
+
     /// Selects and activates the activity, then switches to the map.
     /// GPS-less and filter-hidden activities leave all state unchanged.
     @discardableResult
     func showOnMap(_ activityID: Int) -> SelectionState.ShowOnMapOutcome {
-        guard let activity = activity(id: activityID) else {
+        guard activity(id: activityID) != nil else {
             return .notFound
         }
-        let hasGeometry = RouteExtent(coordinates: activity.coordinates) != nil
+        let hasGeometry = canShowOnMap(activityID)
         let outcome = selection.showOnMap(activityID, hasGeometry: hasGeometry)
         if outcome == .shown {
             mapContext.hiddenTargetID = nil
@@ -439,8 +442,7 @@ final class ActivityStore {
 
     func clearFiltersAndShowOnMap(_ activityID: Int) {
         mapContext.hiddenTargetID = nil
-        guard let activity = activity(id: activityID),
-              RouteExtent(coordinates: activity.coordinates) != nil else { return }
+        guard canShowOnMap(activityID) else { return }
         resetFilters()
         showOnMap(activityID)
     }

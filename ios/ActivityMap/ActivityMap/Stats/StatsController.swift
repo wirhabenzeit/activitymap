@@ -30,6 +30,7 @@ struct StatsPresentation: Equatable {
     let historyComplete: Bool
     let message: String?
     let retryAllowed: Bool
+    let empty: BrowsingPresentation.EmptyState?
 
     /// Offline fixture/preview hosts have no sync controller. Production waits
     /// for its controller instead of flashing an empty completed library.
@@ -39,22 +40,46 @@ struct StatsPresentation: Equatable {
         hasContent = !preparing && store.stats.matchingActivityCount(for: store) > 0
         state = preparing ? .loading : store.activities.isEmpty ? .noHistory : hasContent ? .ready : .noMatches
         message = preparing ? "Loading activity history…" : state == .noHistory ? "No activity history" : state == .noMatches ? "No matching activities" : nil
+        empty = preparing ? nil : BrowsingPresentation.resultEmpty(tab: .stats, activityCount: store.activities.count,
+                                                                  filteredCount: store.stats.matchingActivityCount(for: store))
     }
 
     init(store: ActivityStore, sync: SyncController) {
-        let content = !store.activities.isEmpty
-        let filtered = store.stats.matchingActivityCount(for: store) > 0
-        historyComplete = sync.hasCompletedCache
-        retryAllowed = sync.canRefresh
-        switch sync.status {
+        self.init(activityCount: store.activities.count, matchingCount: store.stats.matchingActivityCount(for: store),
+                  status: sync.status, hasCompletedCache: sync.hasCompletedCache, canRetry: sync.canRefresh)
+    }
+
+    init(activityCount: Int, matchingCount: Int, status: SyncController.Status,
+         hasCompletedCache: Bool, canRetry: Bool) {
+        let content = activityCount > 0
+        let filtered = matchingCount > 0
+        historyComplete = hasCompletedCache
+        retryAllowed = canRetry
+        // Account/sync blocking messages remain in Settings. Empty cached results
+        // still explain filters, independent of the latest transport outcome.
+        let canBrowse: Bool
+        switch status {
+        case .signedOut, .expired, .disconnected: canBrowse = false
+        default: canBrowse = true
+        }
+        empty = hasCompletedCache && canBrowse
+            ? BrowsingPresentation.resultEmpty(tab: .stats, activityCount: activityCount, filteredCount: matchingCount)
+            : nil
+        if let empty {
+            state = empty.kind == .emptyLibrary ? .noHistory : .noMatches
+            hasContent = false
+            message = empty.title
+            return
+        }
+        switch status {
         case .signedOut, .expired, .disconnected:
-            state = .unavailable; hasContent = false; message = sync.status.title
+            state = .unavailable; hasContent = false; message = status.title
         case .syncing, .paused:
             state = content ? .incomplete : .loading; hasContent = filtered
             message = content ? "History is still loading. Comparisons may be incomplete." : "Loading activity history…"
         case .offline, .rateLimited, .retryAfter:
-            state = sync.hasCompletedCache ? .cached : .error; hasContent = filtered
-            message = sync.status.title
+            state = hasCompletedCache ? .cached : .error; hasContent = filtered
+            message = status.title
         case .failed(let error):
             state = .error; hasContent = filtered; message = error
         case .ready:

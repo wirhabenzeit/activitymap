@@ -228,6 +228,7 @@ struct BrowseStatusLine: View {
 /// Shared identification for List rows and map results. Compact rows keep the
 /// local date beside the title; accessibility sizes retain full sport/time text.
 struct BrowseActivityHeading: View {
+    @Environment(\.locale) private var locale
     let activity: Activity
     var isActive = false
     var comfortable = true
@@ -243,7 +244,7 @@ struct BrowseActivityHeading: View {
                     .font(.subheadline.weight(.semibold))
                     .lineLimit(typeSize.isAccessibilitySize ? nil : comfortable ? 2 : 1)
                 if isActive {
-                    Image(systemName: "location.fill").font(.caption2).foregroundStyle(AppTheme.accent)
+                    Image(systemName: ActiveRoutePresentation.glyph(active: true, variant: .badge)).font(.caption2).foregroundStyle(AppTheme.accent)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -258,6 +259,6 @@ struct BrowseActivityHeading: View {
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(activity.name)
-        .accessibilityValue("\(activity.sportType.rawValue), \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))\(isActive ? ", active on map" : "")")
+        .accessibilityValue("\(activity.sportType.rawValue), \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))\(isActive ? ", \(String(localized: ActiveRoutePresentation.state(true, locale: locale)))" : "")")
     }
 }

@@ -130,7 +130,7 @@ struct AppToolbarBackButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "chevron.left")
+            BrowseActionIcon(.back)
                 .font(.system(size: 20, weight: .medium))
                 .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
                 .contentShape(Rectangle())

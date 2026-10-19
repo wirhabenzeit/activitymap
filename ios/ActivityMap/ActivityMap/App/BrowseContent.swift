@@ -76,7 +76,7 @@ struct BrowseContent: View {
             set: { if !$0 { store.mapContext.hiddenTargetID = nil } }
         ), titleVisibility: .visible) {
             if let id = store.mapContext.hiddenTargetID {
-                Button("Clear filters and show on map") { store.clearFiltersAndShowOnMap(id) }
+                Button { store.clearFiltersAndShowOnMap(id) } label: { BrowseActionLabel(.clearFiltersAndShowOnMap) }
             }
             Button("Cancel", role: .cancel) { store.mapContext.hiddenTargetID = nil }
         }
@@ -159,10 +159,14 @@ enum BrowsePaneLayout {
     static let filterWidth: CGFloat = 320
     static let minimumDetailWidth: CGFloat = 760
 
+    static func supportsDetail(width: CGFloat, regular: Bool, accessibilityText: Bool) -> Bool {
+        regular && width >= minimumDetailWidth && !accessibilityText
+    }
+
     /// Wide regular windows keep the filter rail beside the content; narrower
     /// ones and accessibility text use the phone's filter sheet.
     static func filtersUseSidebar(width: CGFloat, regular: Bool, accessibilityText: Bool) -> Bool {
-        regular && width >= minimumDetailWidth && !accessibilityText
+        supportsDetail(width: width, regular: regular, accessibilityText: accessibilityText)
     }
 
     /// The full panel leaves no room for List and its adjacent detail, but the

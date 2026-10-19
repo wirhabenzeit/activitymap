@@ -43,7 +43,7 @@ extension RenderedRoutePickingTests {
 
         let row = try #require(host.accessibilityElement(label: label, includingSheets: true))
         let actionNames = Set(row.accessibilityCustomActions?.map(\.name) ?? [])
-        #expect(actionNames.contains("Edit") && actionNames.contains("Share GPX"))
+        #expect(actionNames.contains("Edit") && actionNames.contains("Export GPX"))
         #expect(!actionNames.contains("Details"))
         #expect(actionNames.contains("Show on map") == !overMap)
         let edit = try #require(row.accessibilityCustomActions?.first { $0.name == "Edit" })
@@ -66,7 +66,7 @@ extension RenderedRoutePickingTests {
         }
         let before = try exportDirectories()
         let freshRow = try #require(host.accessibilityElement(label: label, includingSheets: true))
-        let share = try #require(freshRow.accessibilityCustomActions?.first { $0.name == "Share GPX" })
+        let share = try #require(freshRow.accessibilityCustomActions?.first { $0.name == "Export GPX" })
         #expect(share.actionHandler?(share) == true)
         try await listWait { panel.presentedViewController is UIActivityViewController }
         let shareController = try #require(panel.presentedViewController as? UIActivityViewController)

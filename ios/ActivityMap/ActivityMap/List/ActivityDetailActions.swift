@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ActivityDetailActions: View {
+    @Environment(\.locale) private var locale
     let activity: Activity
     var summaries: StreamSummaryLoader? = nil
     @Environment(\.activityDetailOverMap) private var overMap
@@ -22,13 +23,13 @@ struct ActivityDetailActions: View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(spacing: 0) {
                 ActivityShareButton(activities: { [activity] }) {
-                    row(title: "Share activity", subtitle: "Create an expiring link to its map", icon: "square.and.arrow.up",
+                    row(title: Text("Share activity"), subtitle: "Create an expiring link to its map", icon: "square.and.arrow.up",
                         trailing: "chevron.right", busy: false)
                 }
                 .accessibilityIdentifier("activity-share")
                 Divider().padding(.leading, 44)
                 Button(action: openStrava) {
-                    row(title: openingStrava ? "Opening Strava…" : "Open in Strava",
+                    row(title: openingStrava ? Text("Opening Strava…") : Text("Open in Strava"),
                         subtitle: "View the original activity", icon: "arrow.up.right.square",
                         trailing: "arrow.up.right", busy: openingStrava)
                 }
@@ -36,8 +37,8 @@ struct ActivityDetailActions: View {
                 .accessibilityIdentifier("activity-open-in-strava")
                 Divider().padding(.leading, 44)
                 Button(action: { workflow.export(source: source, current: { source }) }) {
-                    row(title: !workflow.isExporting ? "Export GPX" : "Preparing GPX…",
-                        subtitle: availability.subtitle, icon: "doc.badge.arrow.up",
+                    row(title: Text(workflow.isExporting ? AppMessages.actionPreparingGPX(locale: locale) : AppMessages.actionExportGPXNative(locale: locale)),
+                        subtitle: availability.subtitle, icon: ActionPresentation.glyph(.exportGPX),
                         trailing: "square.and.arrow.up", busy: workflow.isExporting)
                 }
                 .disabled(!availability.canExport || workflow.isExporting || workflow.file != nil)
@@ -65,12 +66,12 @@ struct ActivityDetailActions: View {
         }
     }
 
-    private func row(title: String, subtitle: String, icon: String, trailing: String, busy: Bool) -> some View {
+    private func row(title: Text, subtitle: String, icon: String, trailing: String, busy: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(AppTheme.Typography.icon).foregroundStyle(AppTheme.accent).frame(width: 22)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                Text(title).font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+                title.font(.subheadline.weight(.medium)).foregroundStyle(.primary)
                 Text(subtitle).font(.caption).foregroundStyle(AppTheme.secondaryText)
             }
             .fixedSize(horizontal: false, vertical: true)

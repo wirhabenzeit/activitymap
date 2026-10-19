@@ -177,6 +177,7 @@ struct ActivityDetailIdentity: View {
 /// An activity's title row. The route action sits beside the title rather
 /// than in a footer row. Edit is a direct button beside the title.
 struct ActivityDetailHeading: View {
+    @Environment(\.locale) private var locale
     let activity: Activity
     var trailingInset: CGFloat = 0
     var titleLineLimit: Int? = nil
@@ -194,8 +195,8 @@ struct ActivityDetailHeading: View {
     static let labelledWidth: CGFloat = 520
     private var labelled: Bool { width >= Self.labelledWidth && !typeSize.isAccessibilitySize }
     // Map sheets own their contextual Fit button in the persistent group header.
-    private var title: String { overMap ? "Fit route" : "Show on map" }
-    private let icon = "map"
+    private var title: LocalizedStringResource { AppMessages.actionShowOnMap(locale: locale) }
+    private var icon: String { ActionPresentation.glyph(.showOnMap) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
@@ -207,7 +208,7 @@ struct ActivityDetailHeading: View {
                 if let showOnMap, !overMap {
                     Button { showOnMap(activity.id) } label: {
                         if labelled {
-                            Label(title, systemImage: icon)
+                            Label { Text(title) } icon: { BrowseActionIcon(.showOnMap) }
                                 .font(.subheadline.weight(.semibold))
                                 .padding(.horizontal, 14)
                                 .frame(minHeight: 36)
@@ -227,7 +228,7 @@ struct ActivityDetailHeading: View {
                     .contentShape(Rectangle())
                     .disabled(!hasRoute)
                     .opacity(hasRoute ? 1 : 0.4)
-                    .accessibilityLabel(title)
+                    .accessibilityLabel(Text(title))
                     .accessibilityIdentifier("activity-show-on-map")
                     .accessibilityHint(hasRoute ? (overMap ? "Frame this route while keeping its elevation profile visible" : "Select this activity and frame its route") : "This activity has no GPS route")
                 }

@@ -2,6 +2,7 @@ import SwiftUI
 
 /// Persistent adaptive results surface; the map owns its position and footprint.
 struct RoutePickerSheet: View {
+    @Environment(\.locale) private var locale
     @Bindable var picker: RoutePicker
     @Bindable var store: ActivityStore
     let isSidePanel: Bool
@@ -111,7 +112,7 @@ struct RoutePickerSheet: View {
             SelectionBar(store: store, showsClear: false, expandsCount: true)
             if detail != nil {
                 Button { picker.showResults() } label: {
-                    Image(systemName: "chevron.backward").frame(width: 44, height: 44).contentShape(Rectangle())
+                    BrowseActionIcon(.back).frame(width: 44, height: 44).contentShape(Rectangle())
                 }
                 .accessibilityLabel("Back to selected activities")
                 .accessibilityIdentifier("map-results-back")
@@ -167,23 +168,21 @@ struct RoutePickerSheet: View {
                 .padding(.leading, 8)
                 .padding(.trailing, 4)
                 .accessibilityLabel("Details for \(activity.name)")
-                .accessibilityValue(isActive ? "Selected. Active on map" : "Selected")
+                .accessibilityValue(Text(isActive ? AppMessages.stateSelectedActiveRoute(locale: locale) : AppMessages.selectionSelected(locale: locale)))
                 .accessibilityHint("Activates this activity and opens its details without changing selection")
                 .accessibilityIdentifier("map-result-open-\(activity.id)")
                 .modifier(ActivityRowContextMenu(activity: activity, store: store))
             Button { store.toggleActive(activity.id) } label: {
-                Image(systemName: "point.bottomleft.forward.to.point.topright.scurvepath")
+                Image(systemName: ActiveRoutePresentation.glyph(active: isActive, variant: .toggle))
                     .font(.system(size: 18, weight: isActive ? .semibold : .regular))
                     .foregroundStyle(isActive ? AppTheme.accent : AppTheme.secondaryText)
                     .frame(width: 44, height: 44)
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .accessibilityLabel(isActive ? "Deactivate: \(activity.name)" : "Make active: \(activity.name)")
-            .accessibilityValue(isActive ? "Active on map" : "Not active")
-            .accessibilityHint(isActive
-                ? "Clears the active route without changing selection"
-                : "Makes this activity active without opening details or changing selection")
+            .accessibilityLabel(Text(isActive ? AppMessages.actionDeactivateActivity(activity.name, locale: locale) : AppMessages.actionActivateActivity(activity.name, locale: locale)))
+            .accessibilityValue(Text(ActiveRoutePresentation.state(isActive, locale: locale)))
+            .accessibilityHint(Text(isActive ? AppMessages.actionDeactivateHint(locale: locale) : AppMessages.actionActivateHint(locale: locale)))
             .accessibilityAddTraits(isActive ? .isSelected : [])
             .accessibilityIdentifier("map-result-activate-\(activity.id)")
         }

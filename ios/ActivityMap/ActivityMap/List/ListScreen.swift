@@ -4,7 +4,6 @@ struct ListScreen: View {
     @Bindable var store: ActivityStore
     var emptyState: BrowsingPresentation.EmptyState? = nil
     var recover: (BrowsingPresentation.Recovery) -> Void = { _ in }
-    @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.browsePaneWidth) private var paneWidth
     @Environment(\.listShellNavigation) private var shellNavigation
@@ -18,51 +17,23 @@ struct ListScreen: View {
             else { localPushedDetail = newValue }
         }
     }
-    /// Inspection started while the shell collapses its filter panel; the
-    /// adjacent detail appears once the wider layout arrives.
-    @State private var awaitingWidth = false
     @Environment(\.filtersCollapseForDetail) private var filtersCollapseForDetail
     // iPhone landscape: the shell bar carries the status/options row (#315).
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
-        GeometryReader { geometry in
-            let width = paneWidth ?? geometry.size.width
-            // Filters overlay the List or are pinned only where detail still
-            // fits beside it, so this width never changes while inspecting (#354).
-            let sideBySide = sizeClass == .regular && width >= BrowsePaneLayout.minimumDetailWidth && !typeSize.isAccessibilitySize
-            let showsDetail = sideBySide && store.inspectedActivityID != nil && !hasPushedDetail
-            let detailWidth = min(420, max(340, width * 0.42))
-            let listWidth = showsDetail ? width - detailWidth - 1 : width
-            HStack(spacing: 0) {
-                activityList(width: listWidth, inspectedID: showsDetail ? store.inspectedActivityID : nil)
-                    .frame(width: listWidth)
-                if showsDetail {
-                    // Flush with the status bar, which extends under the home indicator.
-                    Divider().ignoresSafeArea(edges: .bottom)
-                    detailColumn
-                        .frame(width: detailWidth)
-                        .frame(maxHeight: .infinity)
-                }
-            }
-            .modifier(ListRootChrome(toolbar: shellToolbar, header: shellHeader,
-                                     visible: store.selectedTab == .list && (!sideBySide || hasPushedDetail)))
-            // Inspecting is ordinary navigation. Back only clears inspection;
-            // the retained list and selection/camera owners remain unchanged.
-            .navigationDestination(item: inspectionID(sideBySide: sideBySide || awaitingWidth)) { id in
-                ActivityDetailView(store: store, activityID: id)
-            }
-            .onChange(of: store.inspectedActivityID, initial: true) { _, id in
-                if id == nil { hasPushedDetail = false; awaitingWidth = false }
-                else if !sideBySide && filtersCollapseForDetail { awaitingWidth = true }
-                else if !sideBySide { hasPushedDetail = true }
-            }
-            .onChange(of: sideBySide) { _, wide in
-                if wide { awaitingWidth = false }
-                // A hidden List can narrow while Map or Stats has the filter
-                // panel beside it; that must not turn its detail into a page.
-                else if store.inspectedActivityID != nil, store.selectedTab == .list { hasPushedDetail = true }
-            }
+        AdaptiveActivityInspection(selection: Binding(get: { store.inspectedActivityID }, set: { id in
+            if id == nil { store.dismissInspection() }
+        }), externalPushed: Binding(get: { hasPushedDetail }, set: { hasPushedDetail = $0 }),
+            active: store.selectedTab == .list, retainsPresentationWhenInactive: true,
+            waitsForWidth: filtersCollapseForDetail,
+            widthOverride: paneWidth, dividerIgnoresBottom: true, rootToolbar: shellToolbar, rootHeader: shellHeader,
+            closeIdentifier: "list-activity-close", panelIdentifier: "list-activity-panel") { layout in
+            activityList(width: layout.contentWidth, inspectedID: layout.showsPanel ? store.inspectedActivityID : nil)
+        } panel: { id in
+            ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: AppTheme.minimumTarget)
+        } destination: { id in
+            ActivityDetailView(store: store, activityID: id)
         }
     }
 
@@ -107,50 +78,6 @@ struct ListScreen: View {
         .modifier(ListOptionsSheets(presentation: store.listPresentation, availableWidth: width, speedDisplay: speedDisplay))
     }
 
-    @ViewBuilder private var detailColumn: some View {
-        if let id = store.inspectedActivityID {
-            ActivityDetailPanel(store: store, activityID: id, headerTrailingInset: 44)
-                .overlay(alignment: .topTrailing) {
-                    Button { store.dismissInspection() } label: {
-                        Image(systemName: "xmark")
-                            .frame(width: 44, height: 44)
-                            // A plain button only hits drawn pixels; keep the full target.
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.trailing, AppTheme.Spacing.large)
-                    .padding(.top, AppTheme.Spacing.small)
-                    .accessibilityLabel("Close activity details")
-                }
-        }
-    }
-
-    private func inspectionID(sideBySide: Bool) -> Binding<Int?> {
-        Binding(
-            get: { (!sideBySide || hasPushedDetail) && store.selectedTab == .list ? store.inspectedActivityID : nil },
-            set: { id in
-                // Keep an already-pushed detail open through width changes.
-                // Tab changes retain inspection; native Back clears it in List.
-                if id == nil, (!sideBySide || hasPushedDetail), store.selectedTab == .list {
-                    store.dismissInspection()
-                    hasPushedDetail = false
-                }
-            }
-        )
-    }
-}
-
-private struct ListRootChrome: ViewModifier {
-    let toolbar: AppToolbar?
-    let header: AppToolbar?
-    let visible: Bool
-    @ViewBuilder func body(content: Content) -> some View {
-        if let header {
-            content.appNavigationBar(header)
-        } else if let toolbar {
-            content.appNavigationBar(toolbar, visible: visible)
-        } else { content }
-    }
 }
 
 /// Hosted outside the owning navigation stack, including the outer Stats shell.

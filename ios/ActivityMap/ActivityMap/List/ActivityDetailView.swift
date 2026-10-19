@@ -3,6 +3,7 @@ import UIKit
 
 /// Native List navigation destination. Wide List and Map host the same panel.
 struct ActivityDetailView: View {
+    @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     let activityID: Int
     var backLabel = "Back to activities"
@@ -42,7 +43,7 @@ struct ActivityDetailView: View {
                     showActivityOnMapFromDetail(activityID, store: store, navigationController: navigationReference.controller)
                     onMapShown?()
                 } label: {
-                    Image(systemName: "map")
+                    BrowseActionIcon(.showOnMap)
                         .font(.body.weight(.semibold))
                         .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
                         .background(.white.opacity(0.18), in: Circle())
@@ -50,11 +51,11 @@ struct ActivityDetailView: View {
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
-                .disabled(!store.routableActivityIDs.contains(activityID))
-                .opacity(store.routableActivityIDs.contains(activityID) ? 1 : 0.4)
-                .accessibilityLabel("Show on map")
+                .disabled(!store.canShowOnMap(activityID))
+                .opacity(store.canShowOnMap(activityID) ? 1 : 0.4)
+                .accessibilityLabel(Text(AppMessages.actionShowOnMap(locale: locale)))
                 .accessibilityIdentifier("activity-show-on-map")
-                .accessibilityHint(store.routableActivityIDs.contains(activityID)
+                .accessibilityHint(store.canShowOnMap(activityID)
                     ? "Select this activity and frame its route" : "This activity has no GPS route")
             }))
     }
@@ -101,7 +102,7 @@ struct ActivityDetailPanel: View {
                 if let mapExpansion {
                     MapActivityDetailReveal(store: store, activity: activity, expansion: mapExpansion, compactProfile: compactMapProfile,
                                             bottomContentInset: mapBottomContentInset,
-                                            trailingInset: headerTrailingInset, hasRoute: store.routableActivityIDs.contains(activityID)) { id in
+                                            trailingInset: headerTrailingInset, hasRoute: store.canShowOnMap(activityID)) { id in
                         if let showOnMap { showOnMap(id) }
                         else if overMap { store.mapContext.request(.fitActivity(id)) }
                         else { store.showOnMap(id) }
@@ -110,7 +111,7 @@ struct ActivityDetailPanel: View {
                     ScrollView {
                         ActivityDetailContent(activity: activity, headerTrailingInset: headerTrailingInset,
                                               showsHeading: showsHeading,
-                                              hasRoute: store.routableActivityIDs.contains(activityID),
+                                              hasRoute: store.canShowOnMap(activityID),
                                               showOnMap: { id in
                             if let showOnMap { showOnMap(id) }
                             else if overMap { store.mapContext.request(.fitActivity(id)) }

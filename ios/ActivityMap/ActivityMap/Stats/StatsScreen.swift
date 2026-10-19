@@ -90,9 +90,10 @@ struct StatsScreen: View {
                                     }
                                 }
                             }
-                        } else if presentation.state == .noHistory || presentation.state == .noMatches {
-                            ContentUnavailableView(store.activities.isEmpty ? "No activity history" : "No matching activities",
-                                                   systemImage: "chart.bar")
+                        } else if let empty = presentation.empty {
+                            BrowsingEmptyView(state: empty, recover: { recovery in
+                                if recovery == .clearFilters { store.resetStatsActivityFilters() }
+                            }, scrolls: false)
                         }
                     }
                     .padding(12)

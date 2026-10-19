@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ActivityRowView: View {
+    @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     let activity: Activity
     var availableWidth: CGFloat = 390
@@ -11,7 +12,7 @@ struct ActivityRowView: View {
 
     private var isSelected: Bool { store.selectedActivityIDs.contains(activity.id) }
     private var isActive: Bool { store.activeActivityID == activity.id }
-    private var hasGeometry: Bool { !activity.coordinates.isEmpty }
+    private var hasGeometry: Bool { store.canShowOnMap(activity.id) }
     private var settings: ActivityListSettings { store.listPresentation.settings }
 
     private var usesTable: Bool { ActivityTableLayout.supports(settings, typeSize: typeSize, availableWidth: availableWidth) }
@@ -44,7 +45,7 @@ struct ActivityRowView: View {
         .swipeActions(edge: .leading, allowsFullSwipe: false) {
             if hasGeometry {
                 Button { store.showOnMap(activity.id) } label: {
-                    Label("Show on map", systemImage: "map")
+                    BrowseActionLabel(.showOnMap)
                 }.tint(AppTheme.accent)
             }
         }
@@ -59,7 +60,7 @@ struct ActivityRowView: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(settings.density == .compact ? 1 : 2)
                     if isActive {
-                        Image(systemName: "location.fill").font(.caption2).foregroundStyle(AppTheme.accent)
+                        Image(systemName: ActiveRoutePresentation.glyph(active: true, variant: .badge)).font(.caption2).foregroundStyle(AppTheme.accent)
                     }
                 }
                 if !ActivityTableLayout.showsDate(settings, availableWidth: availableWidth) {
@@ -106,7 +107,7 @@ struct ActivityRowView: View {
                 let value = metric.value(for: activity, speedDisplay: speedDisplay)
                 return "\(metric.title(speedDisplay: speedDisplay)): \(value == Formatters.unknown ? "Not recorded" : value)"
             } + [isInspected ? "Inspected" : "Not inspected", isSelected ? "Selected" : "Not selected"]
-            + (isActive ? ["Active on map"] : [])).joined(separator: ". ")
+            + (isActive ? [String(localized: ActiveRoutePresentation.state(true, locale: locale))] : [])).joined(separator: ". ")
     }
 
     private func inspect() {
