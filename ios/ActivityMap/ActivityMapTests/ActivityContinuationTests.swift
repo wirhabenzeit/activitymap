@@ -4,136 +4,170 @@ import Testing
 
 @MainActor
 struct ActivityContinuationTests {
-    private let identity = ActivityContinuationPull.Identity(currentID: 1, nextID: 2)
-    private func geometry(_ distance: CGFloat, width: CGFloat = 390, height: CGFloat = 600) -> ActivityContinuationPull.Geometry {
-        .init(offset: 1000 - height + distance, contentHeight: 1000, width: width, height: height)
+    private let identity = ActivityContinuationPull.Identity(currentID: 2, previousID: 3, nextID: 1)
+    private func geometry(_ direction: ActivityContinuationDirection, _ distance: CGFloat,
+                          width: CGFloat = 390, height: CGFloat = 600) -> ActivityContinuationPull.Geometry {
+        .init(offset: direction == .previous ? -distance : 1000 - height + distance,
+              contentHeight: 1000, width: width, height: height)
     }
-    private func begin(_ pull: inout ActivityContinuationPull) {
+    private func begin(_ pull: inout ActivityContinuationPull, at direction: ActivityContinuationDirection) {
         pull.configure(identity)
-        let didAdvance1 = pull.changePhase(to: .tracking, geometry: geometry(0))
-        #expect(!didAdvance1)
-        let didAdvance2 = pull.changePhase(to: .interacting, geometry: geometry(0))
-        #expect(!didAdvance2)
+        let tracking = pull.changePhase(to: .tracking, geometry: geometry(direction, 0))
+        let interacting = pull.changePhase(to: .interacting, geometry: geometry(direction, 0))
+        #expect(tracking == nil && interacting == nil)
     }
 
-    @Test func deliberatePullArmsAndCommitsOnlyOnRelease() {
+    @Test(arguments: ActivityContinuationDirection.allCases)
+    func deliberatePullArmsAndCommitsOnlyOnRelease(direction: ActivityContinuationDirection) {
         var pull = ActivityContinuationPull()
-        begin(&pull)
-        pull.updateGeometry(geometry(40))
-        #expect(pull.progress > 0 && !pull.isArmed)
-        pull.updateGeometry(geometry(70))
+        begin(&pull, at: direction)
+        #expect(pull.distance == 0 && pull.direction == nil, "Resting content has no indicator")
+        pull.updateGeometry(geometry(direction, 40))
+        #expect(pull.direction == direction && pull.progress > 0 && !pull.isArmed)
+        pull.updateGeometry(geometry(direction, 70))
         #expect(pull.isArmed && pull.hapticGeneration == 1)
-        let didAdvance3 = pull.changePhase(to: .decelerating, geometry: geometry(70))
-        #expect(didAdvance3)
-        pull.updateGeometry(geometry(100))
-        let didAdvance4 = pull.changePhase(to: .idle, geometry: geometry(0))
-        #expect(!didAdvance4, "One drag must never advance twice")
-        #expect(!pull.isArmed && pull.progress == 0)
+        let released = pull.changePhase(to: .decelerating, geometry: geometry(direction, 70))
+        #expect(released == direction)
+        pull.updateGeometry(geometry(direction, 100))
+        let settled = pull.changePhase(to: .idle, geometry: geometry(direction, 0))
+        #expect(settled == nil, "One drag must never navigate twice")
+        #expect(pull.direction == nil && pull.distance == 0, "Settling must remove the indicator")
     }
 
-    @Test func pullBackCancelsAndRearmingDoesNotRepeatHaptic() {
+    @Test(arguments: ActivityContinuationDirection.allCases)
+    func reversingCancelsAndRearmingDoesNotRepeatHaptic(direction: ActivityContinuationDirection) {
         var pull = ActivityContinuationPull()
-        begin(&pull)
-        pull.updateGeometry(geometry(80))
-        pull.updateGeometry(geometry(30))
+        begin(&pull, at: direction)
+        pull.updateGeometry(geometry(direction, 80))
+        pull.updateGeometry(geometry(direction, 30))
         #expect(!pull.isArmed)
-        let didAdvance5 = pull.changePhase(to: .idle, geometry: geometry(30))
-        #expect(!didAdvance5)
-        begin(&pull)
-        pull.updateGeometry(geometry(80))
-        pull.updateGeometry(geometry(30))
-        pull.updateGeometry(geometry(80))
+        let cancelled = pull.changePhase(to: .idle, geometry: geometry(direction, 30))
+        #expect(cancelled == nil)
+        begin(&pull, at: direction)
+        pull.updateGeometry(geometry(direction, 80))
+        pull.updateGeometry(geometry(direction, 30))
+        pull.updateGeometry(geometry(direction, 80))
         #expect(pull.hapticGeneration == 2, "At most one threshold haptic per drag")
-        let didAdvance6 = pull.changePhase(to: .idle, geometry: geometry(80))
-        #expect(didAdvance6)
+        let released = pull.changePhase(to: .idle, geometry: geometry(direction, 80))
+        #expect(released == direction)
     }
 
-    @Test func momentumAndProgrammaticScrollingCannotAdvance() {
+    @Test(arguments: ActivityContinuationDirection.allCases)
+    func aSinglePullCannotChangeDirection(direction: ActivityContinuationDirection) {
+        let opposite: ActivityContinuationDirection = direction == .previous ? .next : .previous
         var pull = ActivityContinuationPull()
-        begin(&pull)
-        let didAdvance7 = pull.changePhase(to: .decelerating, geometry: geometry(-30))
-        #expect(!didAdvance7)
-        pull.updateGeometry(geometry(120))
-        #expect(!pull.isArmed && pull.hapticGeneration == 0)
-        let didAdvance8 = pull.changePhase(to: .idle, geometry: geometry(0))
-        #expect(!didAdvance8)
-        let didAdvance9 = pull.changePhase(to: .animating, geometry: geometry(0))
-        #expect(!didAdvance9)
-        pull.updateGeometry(geometry(100))
-        let didAdvance10 = pull.changePhase(to: .idle, geometry: geometry(100))
-        #expect(!didAdvance10)
+        begin(&pull, at: direction)
+        pull.updateGeometry(geometry(direction, 20))
+        pull.updateGeometry(geometry(opposite, 100))
+        #expect(pull.direction == direction && pull.distance == 0)
+        let released = pull.changePhase(to: .idle, geometry: geometry(opposite, 100))
+        #expect(released == nil)
     }
 
-    @Test func changingTargetOrDisablingCancelsTheCurrentDrag() {
-        for replacement in [ActivityContinuationPull.Identity(currentID: 2, nextID: 3), nil] {
+    @Test(arguments: ActivityContinuationDirection.allCases)
+    func momentumAndProgrammaticScrollingCannotNavigate(direction: ActivityContinuationDirection) {
+        var pull = ActivityContinuationPull()
+        begin(&pull, at: direction)
+        let flung = pull.changePhase(to: .decelerating, geometry: geometry(direction, -30))
+        pull.updateGeometry(geometry(direction, 120))
+        #expect(flung == nil && pull.direction == nil && pull.hapticGeneration == 0)
+        let settled = pull.changePhase(to: .idle, geometry: geometry(direction, 0))
+        let animated = pull.changePhase(to: .animating, geometry: geometry(direction, 0))
+        pull.updateGeometry(geometry(direction, 100))
+        let finished = pull.changePhase(to: .idle, geometry: geometry(direction, 100))
+        #expect(settled == nil && animated == nil && finished == nil)
+        #expect(pull.distance == 0, "Inertial overscroll must not display a gesture cue")
+    }
+
+    @Test(arguments: ActivityContinuationDirection.allCases)
+    func missingNeighbourNeverArmsOrWraps(direction: ActivityContinuationDirection) {
+        var pull = ActivityContinuationPull()
+        pull.configure(.init(currentID: 2, previousID: direction == .previous ? nil : 3,
+                             nextID: direction == .next ? nil : 1))
+        _ = pull.changePhase(to: .tracking, geometry: geometry(direction, 0))
+        _ = pull.changePhase(to: .interacting, geometry: geometry(direction, 0))
+        pull.updateGeometry(geometry(direction, 120))
+        #expect(pull.distance == 0 && !pull.isArmed && pull.hapticGeneration == 0)
+        let released = pull.changePhase(to: .idle, geometry: geometry(direction, 120))
+        #expect(released == nil)
+    }
+
+    @Test func changingEitherNeighbourOrDisablingCancelsTheCurrentDrag() {
+        let changes: [ActivityContinuationPull.Identity?] = [
+            .init(currentID: 2, previousID: 4, nextID: 1),
+            .init(currentID: 2, previousID: 3, nextID: 5),
+            .init(currentID: 1, previousID: 2, nextID: nil), nil,
+        ]
+        for replacement in changes {
             var pull = ActivityContinuationPull()
-            begin(&pull)
-            pull.updateGeometry(geometry(80))
+            begin(&pull, at: .previous)
+            pull.updateGeometry(geometry(.previous, 80))
             pull.configure(replacement)
-            pull.updateGeometry(geometry(120))
-            let didAdvance11 = pull.changePhase(to: .idle, geometry: geometry(120))
-            #expect(!didAdvance11)
+            pull.updateGeometry(geometry(.previous, 120))
+            let released = pull.changePhase(to: .idle, geometry: geometry(.previous, 120))
+            #expect(released == nil && pull.direction == nil)
         }
     }
 
-    @Test func resizingOrContentReflowCancelsTheCurrentDrag() {
+    @Test(arguments: ActivityContinuationDirection.allCases)
+    func resizingCancelsUntilANewTouch(direction: ActivityContinuationDirection) {
         var pull = ActivityContinuationPull()
-        begin(&pull)
-        pull.updateGeometry(geometry(80))
-        pull.updateGeometry(geometry(80, width: 700, height: 320))
-        let didAdvance12 = pull.changePhase(to: .idle, geometry: geometry(100, width: 700, height: 320))
-        #expect(!didAdvance12)
-        begin(&pull)
-        pull.updateGeometry(geometry(80))
-        pull.updateGeometry(.init(offset: 500, contentHeight: 1100))
-        let didAdvance13 = pull.changePhase(to: .idle, geometry: .init(offset: 650, contentHeight: 1100))
-        #expect(!didAdvance13)
+        begin(&pull, at: direction)
+        pull.updateGeometry(geometry(direction, 80))
+        pull.updateGeometry(geometry(direction, 80, width: 700, height: 320))
+        let cancelled = pull.changePhase(to: .idle, geometry: geometry(direction, 100, width: 700, height: 320))
+        #expect(cancelled == nil)
+        begin(&pull, at: direction)
+        pull.updateGeometry(geometry(direction, 80))
+        let released = pull.changePhase(to: .idle, geometry: geometry(direction, 80))
+        #expect(released == direction)
     }
 
-    @Test func catchingAnExistingBounceRequiresAnAdditionalPull() {
+    @Test(arguments: ActivityContinuationDirection.allCases)
+    func catchingAnExistingBounceRequiresAnAdditionalPull(direction: ActivityContinuationDirection) {
         var pull = ActivityContinuationPull()
         pull.configure(identity)
-        let didAdvance14 = pull.changePhase(to: .tracking, geometry: geometry(90))
-        #expect(!didAdvance14)
-        let didAdvance15 = pull.changePhase(to: .interacting, geometry: geometry(92))
-        #expect(!didAdvance15)
-        let didAdvance16 = pull.changePhase(to: .idle, geometry: geometry(92))
-        #expect(!didAdvance16)
+        _ = pull.changePhase(to: .tracking, geometry: geometry(direction, 90))
+        _ = pull.changePhase(to: .interacting, geometry: geometry(direction, 92))
+        let released = pull.changePhase(to: .idle, geometry: geometry(direction, 92))
+        #expect(released == nil && pull.hapticGeneration == 0)
     }
 
-    @Test func boundaryUsesSwiftUIViewportWithoutCountingSafeAreasTwice() {
-        // Recorded on iPhone: UIKit viewport is 874pt, while SwiftUI reports
-        // 724pt after its 116pt top and 34pt bottom insets. Both offsets share
-        // the native origin, so the resting bottom is 568 2/3pt.
+    @Test func boundariesUseTheInsetAdjustedViewportAndClampShortContent() {
+        // The recorded iPhone's native viewport is 874pt; SwiftUI reports 724pt
+        // after its 116pt top and 34pt bottom insets, retaining native offsets.
         let phoneRest = ActivityContinuationPull.Geometry(offset: 568 + 2.0 / 3,
             contentHeight: 1408 + 2.0 / 3, height: 724, topInset: 116, bottomInset: 34)
-        #expect(abs(phoneRest.overscroll) < 0.01)
+        #expect(abs(phoneRest.overscroll(for: .next)) < 0.01)
         let phonePull = ActivityContinuationPull.Geometry(offset: 675,
             contentHeight: 1408 + 2.0 / 3, height: 724, topInset: 116, bottomInset: 34)
-        #expect(abs(phonePull.overscroll - (106 + 1.0 / 3)) < 0.01)
-        // The iPad's 1290pt native viewport similarly becomes 1270pt with its
-        // bottom inset. Map's inset-free hosting keeps the ordinary formula.
+        #expect(abs(phonePull.overscroll(for: .next) - (106 + 1.0 / 3)) < 0.01)
+        let phoneTop = ActivityContinuationPull.Geometry(offset: -196,
+            contentHeight: 1408 + 2.0 / 3, height: 724, topInset: 116, bottomInset: 34)
+        #expect(phoneTop.overscroll(for: .previous) == 80)
         let pad = ActivityContinuationPull.Geometry(offset: 335.5,
             contentHeight: 1525.5, width: 411, height: 1270, bottomInset: 20)
-        #expect(pad.overscroll == 80)
+        #expect(pad.overscroll(for: .next) == 80)
         let map = ActivityContinuationPull.Geometry(offset: 480, contentHeight: 1000, height: 600)
-        #expect(map.overscroll == 80)
-        let short = ActivityContinuationPull.Geometry(offset: -10, contentHeight: 300, topInset: 20)
-        #expect(short.overscroll == 10)
+        #expect(map.overscroll(for: .next) == 80)
+        let shortRest = ActivityContinuationPull.Geometry(offset: -20, contentHeight: 300, topInset: 20)
+        #expect(shortRest.overscroll(for: .previous) == 0 && shortRest.overscroll(for: .next) == 0)
     }
 
-    @Test func nativeInsetListPullArmsAndReleases() {
+    @Test(arguments: ActivityContinuationDirection.allCases)
+    func insetListPullArmsAndReleases(direction: ActivityContinuationDirection) {
         var pull = ActivityContinuationPull()
         pull.configure(identity)
-        let bottom = ActivityContinuationPull.Geometry(offset: 568 + 2.0 / 3,
+        let restingOffset: CGFloat = direction == .previous ? -116 : 568 + 2.0 / 3
+        let resting = ActivityContinuationPull.Geometry(offset: restingOffset,
             contentHeight: 1408 + 2.0 / 3, height: 724, topInset: 116, bottomInset: 34)
-        _ = pull.changePhase(to: .tracking, geometry: bottom)
-        _ = pull.changePhase(to: .interacting, geometry: bottom)
-        let released = ActivityContinuationPull.Geometry(offset: 675,
+        _ = pull.changePhase(to: .tracking, geometry: resting)
+        _ = pull.changePhase(to: .interacting, geometry: resting)
+        let released = ActivityContinuationPull.Geometry(offset: restingOffset + (direction == .previous ? -80 : 80),
             contentHeight: 1408 + 2.0 / 3, height: 724, topInset: 116, bottomInset: 34)
         pull.updateGeometry(released)
         #expect(pull.isArmed && pull.hapticGeneration == 1)
-        let advanced = pull.changePhase(to: .decelerating, geometry: released)
-        #expect(advanced)
+        let destination = pull.changePhase(to: .decelerating, geometry: released)
+        #expect(destination == direction)
     }
 }

@@ -1,5 +1,6 @@
 import Charts
 import SwiftUI
+import UIKit
 
 struct ElevationProfileView: View {
     let store: ActivityStore
@@ -209,7 +210,6 @@ struct ElevationPlot: View {
     @Binding var selectedX: Double?
     var onSelection: (ElevationProfile.Point?) -> Void = { _ in }
     var onDrag: (Bool) -> Void = { _ in }
-    @GestureState private var isDragging = false
     @State private var accessibleSampleID: Int?
     @ScaledMetric(relativeTo: .caption) private var chartHeight = 160.0
     @ScaledMetric(relativeTo: .caption) private var reservedHeight = 200.0
@@ -220,6 +220,14 @@ struct ElevationPlot: View {
            point.distance / profile.distanceDivisor(units: units) == selectedX { return point }
         return profile.nearest(to: selectedX * profile.distanceDivisor(units: units))
     }
+
+    private var gestureSelection: Binding<Double?> {
+        Binding(get: { selectedX }, set: { value in
+            accessibleSampleID = nil
+            selectedX = value
+        })
+    }
+    private var hasGestureSelection: Bool { selectedX != nil && accessibleSampleID == nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -261,15 +269,19 @@ struct ElevationPlot: View {
             .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
             .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) }
             .chartXAxisLabel("Distance (\(profile.distanceUnit(units: units)))", alignment: .center)
-            .chartXSelection(value: $selectedX)
-            .chartGesture { proxy in
-                DragGesture(minimumDistance: 0)
-                    .updating($isDragging) { _, dragging, _ in dragging = true }
-                    .onChanged { value in
-                        accessibleSampleID = nil
-                        proxy.selectXValue(at: value.location.x)
-                    }
-                    .onEnded { _ in selectedX = nil }
+            .chartOverlay { proxy in
+                GeometryReader { geometry in
+                    Color.clear.contentShape(Rectangle())
+                        .gesture(ElevationScrubGesture { location in
+                            guard let location, let plotFrame = proxy.plotFrame else {
+                                gestureSelection.wrappedValue = nil
+                                return
+                            }
+                            let frame = geometry[plotFrame]
+                            let x = min(max(0, location.x - frame.minX), frame.width)
+                            gestureSelection.wrappedValue = proxy.value(atX: x, as: Double.self)
+                        })
+                }
             }
             .frame(height: compact ? reservedHeight * 0.75 - 32 : chartHeight)
             .accessibilityElement(children: .ignore)
@@ -289,14 +301,43 @@ struct ElevationPlot: View {
         .frame(minHeight: compact ? reservedHeight * 0.75 : reservedHeight, alignment: .top)
         .onChange(of: units) { _, _ in select(nil) }
         .onChange(of: selected?.id) { _, _ in onSelection(selected) }
-        .onChange(of: isDragging) { _, dragging in
-            onDrag(dragging)
-            if !dragging { select(nil) }
-        }
+        .onChange(of: hasGestureSelection) { _, selecting in onDrag(selecting) }
         .onDisappear { select(nil); onSelection(nil); onDrag(false) }
     }
     private func select(_ point: ElevationProfile.Point?) {
         accessibleSampleID = point?.id
         selectedX = point.map { $0.distance / profile.distanceDivisor(units: units) }
+    }
+}
+
+/// Reject vertical movement before recognition so the enclosing scroll view
+/// keeps native scrolling and overscroll, including when a pull starts on a chart.
+private struct ElevationScrubGesture: UIGestureRecognizerRepresentable {
+    let select: (CGPoint?) -> Void
+
+    func makeCoordinator(converter: CoordinateSpaceConverter) -> Coordinator { Coordinator() }
+    func makeUIGestureRecognizer(context: Context) -> UIPanGestureRecognizer {
+        let pan = UIPanGestureRecognizer()
+        pan.maximumNumberOfTouches = 1
+        pan.delegate = context.coordinator
+        return pan
+    }
+    func handleUIGestureRecognizerAction(_ pan: UIPanGestureRecognizer, context: Context) {
+        switch pan.state {
+        case .began, .changed: select(context.converter.localLocation)
+        case .ended, .cancelled, .failed: select(nil)
+        default: break
+        }
+    }
+    final class Coordinator: NSObject, UIGestureRecognizerDelegate {
+        func gestureRecognizerShouldBegin(_ recognizer: UIGestureRecognizer) -> Bool {
+            guard let pan = recognizer as? UIPanGestureRecognizer else { return false }
+            let velocity = pan.velocity(in: pan.view)
+            return abs(velocity.x) > abs(velocity.y)
+        }
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer,
+                               shouldBeRequiredToFailBy otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            otherGestureRecognizer.view is UIScrollView
+        }
     }
 }

@@ -8,6 +8,11 @@ import UIKit
 struct MapRotationUITestFixture: View {
     @State private var store: ActivityStore
     @State private var picker: RoutePicker
+    @State private var profileSetupStarted = false
+    @State private var profileSetupError: String?
+    private var includesProfiles: Bool {
+        ProcessInfo.processInfo.arguments.contains("--activity-continuation-profile")
+    }
 
     init(expanded: Bool = false) {
         MapboxOptions.accessToken = "pk.offline-test"
@@ -60,9 +65,77 @@ struct MapRotationUITestFixture: View {
         AppShell(store: store, mapPicker: picker)
             .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##))
             .overlay(alignment: .topLeading) {
-                MapRotationPresentationProbe(store: store, picker: picker)
+                MapRotationPresentationProbe(store: store, picker: picker,
+                    includesProfiles: includesProfiles, profileSetupError: profileSetupError)
                     .frame(width: 74, height: 10).padding(4).allowsHitTesting(false)
             }
+            .task {
+                guard includesProfiles, !profileSetupStarted else { return }
+                profileSetupStarted = true
+                do {
+                    store.streamSummaries = try await ContinuationProfileFixture.makeLoader(activities: store.activities)
+                } catch {
+                    profileSetupError = String(describing: error)
+                }
+            }
+    }
+}
+
+/// Seed the real cache and decoder without a backend or a production-only hook.
+/// The loader owns this in-memory store after setup and is explicitly offline.
+@MainActor private enum ContinuationProfileFixture {
+    static func makeLoader(activities: [Activity]) async throws -> StreamSummaryLoader {
+        let session = SyncSession(user: .init(id: "continuation-fixture", name: "Continuation fixture",
+            email: nil, image: nil, athleteID: "42", stravaConnected: true, stravaPermissions: nil,
+            authentication: .init(method: .bearer, sessionExpiresAt: .now.addingTimeInterval(86400))),
+            token: "offline-ui-fixture", deployment: URL(string: "https://example.invalid")!, verified: false)
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let mutations = try activities.map { activity -> StoreMutation in
+            // Only the persisted identity and source fields are needed by the
+            // summary cache; the shell keeps its existing realistic activities.
+            let fields: [String: Any] = [
+                "id": String(activity.id), "athlete": "42", "name": activity.name,
+                "sport_type": activity.sportType.rawValue, "timezone": activity.timezone,
+                "start_date": activity.startDate.ISO8601Format(),
+                "start_date_local": activity.startDateLocal.ISO8601Format(),
+                "geometry_state": "detailed",
+            ]
+            let dto = try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.Activity.self,
+                from: JSONSerialization.data(withJSONObject: fields))
+            return .upsertActivity(dto)
+        }
+        try await storage.apply(mutations, scope: session.scope)
+        let metadata = ActivityMapAPI.StreamMetadata(generation: "ui-profile", revision: "1", state: .current,
+            fetchStatus: .succeeded, availableTypes: [.distance, .altitude, .latlng], fetchedAt: .now, expiresAt: nil)
+        let distances: [Double] = [0, 125, 250, 375, 500, 625, 750, 875, 1000]
+        let altitudes: [Double] = [680, 760, 880, 1100, 1420, 1260, 970, 820, 720]
+        let summary = ActivityMapAPI.StreamSummary(version: 1, basis: .distance,
+            time: distances.map { $0 * 0.6 }, distance: distances,
+            latlng: distances.map { [46 + $0 / 100000, 8 + $0 / 100000] },
+            altitude: altitudes, watts: nil, heartrate: nil)
+        let encoded = try CompactStreamCodec.encode(summary)
+        let fence = await storage.streamFence()
+        for activity in activities {
+            try await storage.saveStreamSummary(.init(activityID: String(activity.id), metadata: metadata,
+                summary: encoded, lastError: nil, nextRetryAt: nil), scope: session.scope, fence: fence)
+        }
+        let loader = StreamSummaryLoader(source: { _ in OfflineSummarySource() })
+        await loader.configure(session, storage: storage)
+        for activity in activities {
+            await loader.load(activityID: String(activity.id))
+            guard let cached = loader.currentSummary(for: String(activity.id)), ElevationProfile.decode(cached) != nil else {
+                throw FixtureError.profileUnavailable(activity.id)
+            }
+        }
+        return loader
+    }
+
+    nonisolated private enum FixtureError: Error { case profileUnavailable(Int), unexpectedNetworkRequest }
+    nonisolated private struct OfflineSummarySource: CompactSummarySource {
+        func summary(activityID: String, mode: StreamFetchMode) async throws
+            -> APIClient.Response<ActivityMapAPI.ActivityCompactStreamSummary> {
+            throw FixtureError.unexpectedNetworkRequest
+        }
     }
 }
 
@@ -75,13 +148,22 @@ struct MapRotationUITestFixture: View {
 private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
     let store: ActivityStore
     let picker: RoutePicker
-    func makeUIViewController(context: Context) -> Controller { Controller(store: store, picker: picker) }
-    func updateUIViewController(_ controller: Controller, context: Context) { controller.start() }
+    let includesProfiles: Bool
+    let profileSetupError: String?
+    func makeUIViewController(context: Context) -> Controller {
+        Controller(store: store, picker: picker, includesProfiles: includesProfiles)
+    }
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.profileSetupError = profileSetupError
+        controller.start()
+    }
     static func dismantleUIViewController(_ controller: Controller, coordinator: ()) { controller.stop() }
 
     final class Controller: UIViewController {
         let store: ActivityStore
         let picker: RoutePicker
+        let includesProfiles: Bool
+        var profileSetupError: String?
         private var sampling: Task<Void, Never>?
         private let label = UILabel()
         private weak var resultsScroll: UIScrollView?
@@ -89,9 +171,10 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
         private var priorGeometry = ""
         private var stableSamples = 0
 
-        init(store: ActivityStore, picker: RoutePicker) {
+        init(store: ActivityStore, picker: RoutePicker, includesProfiles: Bool) {
             self.store = store
             self.picker = picker
+            self.includesProfiles = includesProfiles
             super.init(nibName: nil, bundle: nil)
         }
         @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
@@ -176,8 +259,15 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
                 && detailScroll?.isDragging != true && detailScroll?.isDecelerating != true
                 ? stableSamples + 1 : 0
             priorGeometry = geometry
+            let profilesReady = !includesProfiles || store.activities.allSatisfy {
+                store.streamSummaries?.currentSummary(for: String($0.id)) != nil
+            }
             var values: [String: Any] = [
-                "ready": (store.selectedTab == .list || (panel != nil && (scroll != nil || detailScroll != nil))) && stableSamples >= 10,
+                "ready": profilesReady && (store.selectedTab == .list || (panel != nil && (scroll != nil || detailScroll != nil))) && stableSamples >= 10,
+                "profileReady": profilesReady,
+                "profileSetupError": profileSetupError ?? "",
+                "profileScrubbing": store.elevationScrubOwner != nil,
+                "profileSelectedSampleID": store.elevationCursor?.point.id ?? -1,
                 "orientation": orientation,
                 "selectedTab": store.selectedTab.title.lowercased(),
                 "selection": store.selectedActivityIDs.sorted(),
@@ -189,6 +279,8 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
                 "detailOffset": detailOffset,
                 "detailMaximumOffset": detailMaximum,
                 "detailTopOffset": -(detailScroll?.adjustedContentInset.top ?? 0),
+                "detailRefreshAttached": detailScroll?.refreshControl != nil,
+                "detailRefreshing": detailScroll?.refreshControl?.isRefreshing == true,
                 "detailFrame": rectangle(detailScroll.map { $0.convert($0.bounds, to: window) } ?? .zero),
                 "detailContentFrame": rectangle(detailScroll.map {
                     $0.convert($0.bounds.inset(by: $0.adjustedContentInset), to: window)

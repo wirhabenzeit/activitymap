@@ -172,18 +172,24 @@ private struct MapActivityDetailDestination: View {
         canGoNext: { id in ActivityDetailSequence(ids: picker.candidateIDs, currentID: id).nextID != nil && !picker.isPaging })
     }
     private var continuation: ActivityDetailContinuation? {
-        guard let nextID = sequence.nextID, let next = store.activity(id: nextID) else { return nil }
+        let previous = sequence.previousID.flatMap { store.activity(id: $0) }
+            .map { ActivityDetailContinuation.Destination(id: $0.id, name: $0.name) }
+        let next = sequence.nextID.flatMap { store.activity(id: $0) }
+            .map { ActivityDetailContinuation.Destination(id: $0.id, name: $0.name) }
+        guard previous != nil || next != nil else { return nil }
         let currentID = state.activityID
-        return ActivityDetailContinuation(currentID: currentID, nextID: nextID, nextName: next.name,
+        return ActivityDetailContinuation(currentID: currentID, previous: previous, next: next,
             // The ordinary opening sheet is already a usable scroll surface.
             // Reuse its visibility state instead of requiring a larger detent.
-            isEnabled: state.expansion.progress > 0.8 && picker.detailID == currentID && !picker.isPaging) {
+            isEnabled: store.selectedTab == .map && state.expansion.progress > 0.8 && picker.detailID == currentID && !picker.isPaging) { direction in
                 // Recheck live order/selection after the pull; it may have
                 // changed while the person was reading or dragging.
-                guard state.expansion.progress > 0.8, picker.detailID == currentID,
-                      ActivityDetailSequence(ids: picker.candidateIDs, currentID: currentID).nextID == nextID,
-                      !picker.isPaging else { return }
-                picker.showDetail(nextID, store: store)
+                let target = direction == .previous ? previous : next
+                let liveSequence = ActivityDetailSequence(ids: picker.candidateIDs, currentID: currentID)
+                let liveID = direction == .previous ? liveSequence.previousID : liveSequence.nextID
+                guard let target, liveID == target.id, store.selectedTab == .map, state.expansion.progress > 0.8,
+                      picker.detailID == currentID, !picker.isPaging else { return }
+                picker.showDetail(target.id, store: store, motion: direction == .previous ? .backward : .forward)
             }
     }
     private var activityTransition: AnyTransition {

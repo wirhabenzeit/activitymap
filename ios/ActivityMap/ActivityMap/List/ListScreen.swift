@@ -201,13 +201,19 @@ private struct ListActivityContinuation: ViewModifier {
     }
 
     private var continuation: ActivityDetailContinuation? {
-        guard let nextID = sequence.nextID, let next = store.activity(id: nextID) else { return nil }
-        return ActivityDetailContinuation(currentID: activityID, nextID: nextID, nextName: next.name,
-            isEnabled: store.selectedTab == .list) {
+        let previous = sequence.previousID.flatMap { store.activity(id: $0) }
+            .map { ActivityDetailContinuation.Destination(id: $0.id, name: $0.name) }
+        let next = sequence.nextID.flatMap { store.activity(id: $0) }
+            .map { ActivityDetailContinuation.Destination(id: $0.id, name: $0.name) }
+        guard previous != nil || next != nil else { return nil }
+        return ActivityDetailContinuation(currentID: activityID, previous: previous, next: next,
+            isEnabled: store.selectedTab == .list) { direction in
                 // Resolve again on release: a filter or sort change must never
                 // continue to an activity from a stale sequence.
-                guard sequence.nextID == nextID else { return }
-                inspect(nextID)
+                let target = direction == .previous ? previous : next
+                let liveID = direction == .previous ? sequence.previousID : sequence.nextID
+                guard let target, liveID == target.id else { return }
+                inspect(target.id)
             }
     }
 

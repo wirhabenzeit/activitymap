@@ -1,21 +1,35 @@
 import SwiftUI
+import UIKit
 
-/// The host owns the activity order and whether detail can accept navigation.
-/// A missing successor means the sequence ends; the scroll view never wraps it.
+enum ActivityContinuationDirection: CaseIterable, Equatable, Sendable {
+    case previous, next
+}
+
+/// The host owns the order and availability. Missing neighbours are boundaries;
+/// neither gesture wraps around to the other end of the sequence.
 struct ActivityDetailContinuation {
+    struct Destination {
+        let id: Int
+        let name: String
+    }
     let currentID: Int
-    let nextID: Int
-    let nextName: String
+    let previous: Destination?
+    let next: Destination?
     let isEnabled: Bool
-    let advance: () -> Void
+    let navigate: (ActivityContinuationDirection) -> Void
+
+    func destination(for direction: ActivityContinuationDirection) -> Destination? {
+        let destination = direction == .previous ? previous : next
+        return destination?.id == currentID ? nil : destination
+    }
 }
 
 extension EnvironmentValues {
     @Entry var activityDetailContinuation: ActivityDetailContinuation? = nil
 }
 
-/// A shared detail scroll surface. UIKit keeps ownership of bouncing, sheet
-/// expansion, and gesture arbitration; we only observe its scroll lifecycle.
+/// UIKit owns bouncing, sheet resizing, and gesture arbitration. Indicators
+/// occupy only the rubber-band gap; they add no rows or scrollable height.
 struct ActivityContinuationScrollView<Content: View>: View {
     let activityID: Int
     var bottomContentInset: CGFloat = 0
@@ -24,26 +38,31 @@ struct ActivityContinuationScrollView<Content: View>: View {
     @State private var pull = ActivityContinuationPull()
     @State private var position = ScrollPosition(edge: .top)
 
-    private var successor: ActivityDetailContinuation? {
-        guard let continuation, continuation.currentID == activityID,
-              continuation.nextID != activityID else { return nil }
+    private var navigation: ActivityDetailContinuation? {
+        guard let continuation, continuation.currentID == activityID else { return nil }
         return continuation
     }
     private var identity: ActivityContinuationPull.Identity? {
-        guard let successor, successor.isEnabled else { return nil }
-        return .init(currentID: activityID, nextID: successor.nextID)
+        guard let navigation, navigation.isEnabled else { return nil }
+        let next = navigation.destination(for: .next)?.id
+        guard next != nil else { return nil }
+        return .init(currentID: activityID, previousID: nil, nextID: next)
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 0) {
-                content()
-                if let successor { cue(successor) }
-            }
-            .padding(.bottom, bottomContentInset)
+            VStack(spacing: 0) { content() }
+                .padding(.bottom, bottomContentInset)
+                .background(ActivityPreviousRefresh(currentID: activityID, destination: navigation?.isEnabled == true ? navigation?.destination(for: .previous) : nil) {
+                    guard let navigation, navigation.isEnabled, navigation.destination(for: .previous) != nil else { return }
+                    navigation.navigate(.previous)
+                })
         }
         .scrollPosition($position)
-        .scrollBounceBehavior(successor == nil ? .basedOnSize : .always, axes: .vertical)
+        .scrollBounceBehavior(navigation?.isEnabled == true ? .always : .basedOnSize, axes: .vertical)
+        .overlay(alignment: .bottom) {
+            indicator.padding(.bottom, bottomContentInset)
+        }
         .onScrollGeometryChange(for: ActivityContinuationPull.Geometry.self) {
             .init($0)
         } action: { _, geometry in
@@ -52,10 +71,9 @@ struct ActivityContinuationScrollView<Content: View>: View {
         }
         .onScrollPhaseChange { _, phase, context in
             pull.configure(identity)
-            let geometry = ActivityContinuationPull.Geometry(context.geometry)
-            let advance = pull.changePhase(to: phase, geometry: geometry)
-            if advance, let successor, successor.isEnabled, successor.currentID == activityID {
-                successor.advance()
+            if let direction = pull.changePhase(to: phase, geometry: .init(context.geometry)), direction == .next,
+               let navigation, navigation.isEnabled, navigation.destination(for: direction) != nil {
+                navigation.navigate(direction)
             }
         }
         .onChange(of: identity) { _, identity in pull.configure(identity) }
@@ -69,8 +87,20 @@ struct ActivityContinuationScrollView<Content: View>: View {
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pull.hapticGeneration)
     }
 
-    private func cue(_ successor: ActivityDetailContinuation) -> some View {
-        HStack(spacing: 12) {
+    @ViewBuilder private var indicator: some View {
+        if identity != nil, pull.direction == .next, pull.distance > 0,
+           let destination = navigation?.destination(for: .next) {
+            cue(destination: destination)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(height: pull.distance, alignment: .top)
+                .clipped()
+                .opacity(min(1, pull.distance / 24))
+                .allowsHitTesting(false)
+        }
+    }
+
+    private func cue(destination: ActivityDetailContinuation.Destination) -> some View {
+        return HStack(spacing: 12) {
             ZStack {
                 Circle().stroke(.secondary.opacity(0.2), lineWidth: 2)
                 Circle().trim(from: 0, to: pull.progress)
@@ -83,41 +113,140 @@ struct ActivityContinuationScrollView<Content: View>: View {
             .foregroundStyle(pull.isArmed ? AppTheme.accent : .secondary)
             .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 3) {
-                // All states occupy the same height, so arming cannot move the
-                // bottom boundary and accidentally disarm its own gesture.
                 ZStack(alignment: .leading) {
-                    Text("Pull up for next activity").opacity(pull.isArmed ? 0 : 1)
-                    Text("Release for next activity").opacity(pull.isArmed ? 1 : 0)
+                    Text("Pull up for next activity")
+                        .opacity(pull.isArmed ? 0 : 1)
+                    Text("Release for next activity")
+                        .opacity(pull.isArmed ? 1 : 0)
                 }
                 .font(.caption.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
-                Text(successor.nextName).font(.caption).foregroundStyle(.secondary)
-                    .lineLimit(2)
+                Text(destination.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(.horizontal, AppTheme.Spacing.large)
-        .padding(.vertical, 16)
-        .opacity(successor.isEnabled ? 1 : 0.5)
+        .padding(.vertical, 12)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text("Next activity: \(successor.nextName)"))
-        .accessibilityValue(successor.isEnabled
-            ? (pull.isArmed ? Text("Release to open") : Text("Pull up to continue"))
-            : Text("Unavailable"))
-        .accessibilityHint("Pull past the bottom and release, or use Next activity")
+        .accessibilityLabel(Text("Next activity: \(destination.name)"))
+        .accessibilityValue(pull.isArmed ? Text("Release to open") : Text("Keep pulling"))
         .accessibilityIdentifier("activity-continuation-cue")
-        .accessibilityActions {
-            if successor.isEnabled { Button("Next activity", action: successor.advance) }
+    }
+}
+
+/// A real refresh control reserves top pulls for scrolling inside native sheets.
+/// Its progress appears only in the bounce; the same 64pt threshold as the
+/// bottom action applies before a completed native pan can navigate.
+private struct ActivityPreviousRefresh: UIViewRepresentable {
+    let currentID: Int
+    let destination: ActivityDetailContinuation.Destination?
+    let action: () -> Void
+
+    func makeUIView(context: Context) -> Attachment { Attachment() }
+    func updateUIView(_ view: Attachment, context: Context) {
+        view.currentID = currentID
+        view.destination = destination
+        view.action = action
+        view.attach()
+    }
+    static func dismantleUIView(_ view: Attachment, coordinator: ()) { view.detach() }
+
+    final class Attachment: UIView {
+        var currentID = 0
+        var destination: ActivityDetailContinuation.Destination?
+        var action: (() -> Void)?
+        private let control = UIRefreshControl()
+        private weak var scroll: UIScrollView?
+        private var startingInset: CGFloat = 0
+        private var pull = ActivityContinuationPull()
+        private var identity: ActivityContinuationPull.Identity? {
+            destination.map { .init(currentID: currentID, previousID: $0.id, nextID: nil) }
+        }
+
+        init() {
+            super.init(frame: .zero)
+            isUserInteractionEnabled = false
+        }
+        @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+        override func didMoveToWindow() { super.didMoveToWindow(); attach() }
+        override func layoutSubviews() { super.layoutSubviews(); attach() }
+
+        func attach() {
+            pull.configure(identity)
+            var ancestor = superview
+            while let view = ancestor, !(view is UIScrollView) { ancestor = view.superview }
+            guard let parent = ancestor as? UIScrollView else { return }
+            if scroll !== parent {
+                detach()
+                scroll = parent
+                parent.panGestureRecognizer.addTarget(self, action: #selector(panChanged))
+            }
+            if let destination {
+                control.accessibilityLabel = String(localized: "Previous activity: \(destination.name)")
+                if parent.refreshControl !== control { parent.refreshControl = control }
+            } else if parent.refreshControl === control {
+                control.endRefreshing()
+                parent.refreshControl = nil
+            }
+        }
+        func detach() {
+            pull.cancel()
+            control.endRefreshing()
+            scroll?.panGestureRecognizer.removeTarget(self, action: #selector(panChanged))
+            if scroll?.refreshControl === control { scroll?.refreshControl = nil }
+            scroll = nil
+        }
+        @objc private func panChanged(_ pan: UIPanGestureRecognizer) {
+            guard let scroll else { return }
+            if pan.state == .began { startingInset = scroll.adjustedContentInset.top }
+            // Refresh can insert its own inset after arming. Keep the touch's
+            // original origin, so that system animation does not change progress.
+            let geometry = ActivityContinuationPull.Geometry(offset: scroll.contentOffset.y,
+                contentHeight: scroll.contentSize.height, width: scroll.bounds.width,
+                height: scroll.bounds.height, topInset: startingInset)
+            pull.configure(identity)
+            switch pan.state {
+            case .began:
+                _ = pull.changePhase(to: .tracking, geometry: geometry)
+            case .changed:
+                let feedback = pull.hapticGeneration
+                _ = pull.changePhase(to: .interacting, geometry: geometry)
+                if pull.hapticGeneration != feedback {
+                    UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.6)
+                }
+                control.attributedTitle = pull.isArmed
+                    ? NSAttributedString(string: String(localized: "Release for previous activity")) : nil
+            case .ended, .cancelled, .failed:
+                let expected = identity
+                let navigate = pan.state == .ended
+                    && pull.changePhase(to: .idle, geometry: geometry) == .previous
+                pull.cancel()
+                // Finish UIKit's touch dispatch before replacing content. A
+                // sheet must not take over while the finger is still down.
+                DispatchQueue.main.async { [weak self] in
+                    guard let self else { return }
+                    self.control.endRefreshing()
+                    self.control.attributedTitle = nil
+                    if navigate, self.identity == expected { self.action?() }
+                }
+            default: break
+            }
         }
     }
 }
 
-/// Release intent is independent of animation frames. A fling that bounces
-/// past the boundary cannot arm this state machine after the finger lifts.
+/// A pull locks to one edge until the finger lifts. Inertia can never arm it,
+/// and resizing or changing the activity sequence cancels the entire gesture.
 struct ActivityContinuationPull {
     struct Identity: Equatable {
         let currentID: Int
-        let nextID: Int
+        let previousID: Int?
+        let nextID: Int?
+
+        func supports(_ direction: ActivityContinuationDirection) -> Bool {
+            let destination = direction == .previous ? previousID : nextID
+            return destination != nil && destination != currentID
+        }
     }
 
     struct Geometry: Equatable {
@@ -144,10 +273,11 @@ struct ActivityContinuationPull {
             self.bottomInset = bottomInset
         }
 
-        var overscroll: CGFloat {
-            // SwiftUI reports the drawable viewport after subtracting its
-            // content insets, but keeps the native content-offset origin.
-            // Adding bottomInset here would count that safe area twice.
+        func overscroll(for direction: ActivityContinuationDirection) -> CGFloat {
+            if direction == .previous { return max(0, -topInset - offset) }
+            // SwiftUI's drawable viewport already excludes content insets,
+            // while its content offset keeps the native coordinate origin.
+            // Clamp short content to that origin rather than a mid-page edge.
             let bottom = max(-topInset, contentSize.height - containerSize.height - topInset)
             return max(0, offset - bottom)
         }
@@ -165,14 +295,15 @@ struct ActivityContinuationPull {
     private(set) var hapticGeneration = 0
     private(set) var distance: CGFloat = 0
     private(set) var phase = ScrollPhase.idle
+    private(set) var direction: ActivityContinuationDirection?
     private var identity: Identity?
     private var geometry: Geometry?
+    private var startingGeometry: Geometry?
     private var eligibleDrag = false
-    private var startingOverscroll: CGFloat = 0
     private var gaveFeedback = false
 
     var progress: CGFloat { min(1, max(0, distance / Self.threshold)) }
-    var isArmed: Bool { eligibleDrag && distance >= Self.threshold }
+    var isArmed: Bool { eligibleDrag && direction != nil && distance >= Self.threshold }
 
     mutating func configure(_ identity: Identity?) {
         guard self.identity != identity else { return }
@@ -183,40 +314,47 @@ struct ActivityContinuationPull {
     mutating func cancel() {
         eligibleDrag = false
         distance = 0
+        direction = nil
     }
 
     mutating func updateGeometry(_ next: Geometry) {
         if let geometry, !geometry.sameLayout(as: next) { cancel() }
         geometry = next
         guard phase == .interacting, eligibleDrag else { distance = 0; return }
-        distance = max(0, next.overscroll - startingOverscroll)
+        if direction == nil {
+            direction = ActivityContinuationDirection.allCases.first {
+                next.overscroll(for: $0) - (startingGeometry?.overscroll(for: $0) ?? 0) > 2
+            }
+        }
+        guard let direction, identity?.supports(direction) == true else { distance = 0; return }
+        distance = max(0, next.overscroll(for: direction) - (startingGeometry?.overscroll(for: direction) ?? 0))
         if isArmed && !gaveFeedback {
             hapticGeneration += 1
             gaveFeedback = true
         }
     }
 
-    /// Returns true at most once, on finger release. Layout or target changes
-    /// cancel the whole drag and require a new touch before it can arm again.
-    mutating func changePhase(to next: ScrollPhase, geometry nextGeometry: Geometry) -> Bool {
+    /// Returns one direction on release, never during settling or animation.
+    mutating func changePhase(to next: ScrollPhase, geometry nextGeometry: Geometry) -> ActivityContinuationDirection? {
         let previous = phase
         if next == .tracking || (next == .interacting && previous != .tracking && previous != .interacting) {
             eligibleDrag = identity != nil
             gaveFeedback = false
-            startingOverscroll = nextGeometry.overscroll
+            startingGeometry = nextGeometry
             geometry = nextGeometry
             distance = 0
+            direction = nil
         }
         if next == .interacting {
             phase = next
             updateGeometry(nextGeometry)
-            return false
+            return nil
         }
         let released = previous == .interacting && (next == .idle || next == .decelerating)
         if released { updateGeometry(nextGeometry) }
-        let advance = released && isArmed
+        let destination = released && isArmed ? direction : nil
         phase = next
         if next != .tracking { cancel() }
-        return advance
+        return destination
     }
 }

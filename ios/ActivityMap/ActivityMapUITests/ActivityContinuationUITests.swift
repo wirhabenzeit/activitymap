@@ -56,6 +56,22 @@ final class ActivityContinuationUITests: XCTestCase {
         try await continuationJourney(list: false, expanded: false)
     }
 
+    func testMapMediumTopPullOpensPreviousWithoutResizing() async throws {
+        try await previousJourney(list: false)
+    }
+
+    func testListTopPullOpensPrevious() async throws {
+        try await previousJourney(list: true)
+    }
+
+    func testListTopPullFromElevationChart() async throws {
+        try await previousJourney(list: true, profile: true)
+    }
+
+    func testMapMediumTopPullFromElevationChartAndNativeGrabber() async throws {
+        try await previousJourney(list: false, profile: true, verifyGrabber: true)
+    }
+
     func testListLongTitleAndFooterActions() async throws {
         let app = launch(list: true)
         defer { app.terminate() }
@@ -155,15 +171,13 @@ final class ActivityContinuationUITests: XCTestCase {
         let flung = try await state(in: app) { $0.ready }
         XCTAssertEqual(flung.currentID(list: list), first, "Momentum must never select another activity")
         let bottom = try await scrollToBottom(app, expectedID: first, list: list)
-        let cue = app.descendants(matching: .any).matching(identifier: "activity-continuation-cue").firstMatch
-        XCTAssertTrue(cue.isHittable, app.debugDescription)
-        XCTAssertEqual(cue.value as? String, "Pull up to continue",
-                       "The progress-ring cue must be enabled at the normal opening height")
+        assertNoIdleCues(in: app)
         if !list { XCTAssertEqual(bottom.detent, initial.detent, "Scrolling must keep the chosen sheet height") }
-        capture(app, name: "\(list ? "List" : (expanded ? "Expanded Map" : "Medium Map")) pull cue at bottom")
+        capture(app, name: "\(list ? "List" : (expanded ? "Expanded Map" : "Medium Map")) idle bottom without cue")
         pull(app, frame: rect(bottom.detailContentFrame), distance: 45)
         let short = try await state(in: app) { $0.ready }
         XCTAssertEqual(short.currentID(list: list), first, "A small rubber-band bounce must cancel")
+        assertNoIdleCues(in: app)
         pull(app, frame: rect(short.detailContentFrame), distance: 230)
         let advanced = try await state(in: app) { $0.ready && $0.currentID(list: list) == next }
         XCTAssertEqual(advanced.selection, initial.selection)
@@ -177,7 +191,8 @@ final class ActivityContinuationUITests: XCTestCase {
             XCTAssertEqual(rect(advanced.sheetFrame).height, rect(bottom.sheetFrame).height, accuracy: 2,
                            "Compare detail to detail: results and details may have different medium heights")
         }
-        capture(app, name: "\(list ? "List" : "Map") next activity at top")
+        assertNoIdleCues(in: app)
+        capture(app, name: "\(list ? "List" : "Map") next activity at top without cue")
         // Settling the new page must not fire another continuation.
         try await Task.sleep(for: .milliseconds(500))
         let settled = try await state(in: app) { $0.ready }
@@ -200,7 +215,98 @@ final class ActivityContinuationUITests: XCTestCase {
         }
     }
 
-    private func launch(list: Bool = false, expanded: Bool = true) -> XCUIApplication {
+    private func previousJourney(list: Bool, profile: Bool = false, verifyGrabber: Bool = false) async throws {
+        let app = launch(list: list, expanded: false, profile: profile)
+        defer { app.terminate() }
+        let initial = try await state(in: app) { $0.ready }
+        let ids = list ? initial.listedIDs : initial.candidates
+        let previous = try XCTUnwrap(ids.first)
+        let middle = try XCTUnwrap(ids.dropFirst().first)
+        try await open(middle, app: app, list: list)
+        var opened = try await state(in: app) { $0.ready && $0.currentID(list: list) == middle }
+        if profile {
+            XCTAssertEqual(opened.profileReady, true, opened.profileSetupError ?? "Profile fixture not ready")
+            let chart = try await elevationChart(in: app)
+            XCTAssertEqual(chart.value as? String, "No sample selected")
+            // XCTest's native held drag is synchronous. Keep a visible hold in
+            // the runner recording for inspection of the active cursor, then
+            // assert native release clears it without navigating or scrolling.
+            scrubHorizontally(app, chart: chart)
+            opened = try await state(in: app) { $0.ready && $0.currentID(list: list) == middle }
+            XCTAssertEqual(opened.profileScrubbing, false, "Releasing a horizontal scrub must restore scrolling")
+            XCTAssertEqual(opened.profileSelectedSampleID, -1, "Native chart selection must clear on release")
+            XCTAssertEqual(chart.value as? String, "No sample selected")
+            capture(app, name: "\(list ? "List" : "Medium Map") horizontal chart scrub released")
+        }
+        XCTAssertEqual(opened.detailOffset, opened.detailTopOffset, accuracy: 2)
+        if !list { XCTAssertEqual(opened.detent, 1, "Exercise the normal Map opening height") }
+        assertNoIdleCues(in: app)
+        capture(app, name: "\(list ? "List" : "Medium Map") idle top\(profile ? " with real elevation chart" : "") without cue")
+
+        let shortStart = profile ? try await elevationChart(in: app).frame.upperPlotPoint : nil
+        pullDown(app, frame: rect(opened.detailContentFrame), distance: 45, startingAt: shortStart)
+        let short = try await state(in: app) { $0.ready }
+        XCTAssertEqual(short.currentID(list: list), middle, "A short top bounce must cancel")
+        XCTAssertEqual(short.detailOffset, short.detailTopOffset, accuracy: 2)
+        assertNoIdleCues(in: app)
+        // Native XCTest's held drag is visible in the runner's recording. The
+        // hold gives reviewable evidence of the transient ring before release.
+        let longStart = profile ? try await elevationChart(in: app).frame.upperPlotPoint : nil
+        pullDown(app, frame: rect(short.detailContentFrame), distance: 230, startingAt: longStart)
+        let advanced = try await state(in: app) { $0.ready && $0.currentID(list: list) == previous }
+        XCTAssertEqual(advanced.detailOffset, advanced.detailTopOffset, accuracy: 2,
+                       "The previous activity must begin at its top")
+        XCTAssertEqual(advanced.selection, initial.selection)
+        if profile {
+            _ = try await elevationChart(in: app)
+            XCTAssertEqual(advanced.profileScrubbing, false, "A vertical chart pull must not leave scrubbing active")
+            XCTAssertEqual(advanced.profileSelectedSampleID, -1, "Navigation must clear the old chart selection")
+        }
+        if !list {
+            XCTAssertEqual(advanced.controllerID, opened.controllerID)
+            XCTAssertEqual(advanced.navigationDepth, 2, "Previous replaces the current detail in the native stack")
+            XCTAssertEqual(advanced.detent, opened.detent)
+            XCTAssertEqual(advanced.nativeDetent, opened.nativeDetent)
+            XCTAssertEqual(rect(advanced.sheetFrame).height, rect(opened.sheetFrame).height, accuracy: 2)
+        }
+        assertNoIdleCues(in: app)
+        capture(app, name: "\(list ? "List" : "Medium Map") previous activity at top without cue")
+        try await Task.sleep(for: .milliseconds(500))
+        let settled = try await state(in: app) { $0.ready }
+        XCTAssertEqual(settled.currentID(list: list), previous, "One top pull must navigate only once")
+        if verifyGrabber {
+            let sheet = rect(settled.sheetFrame)
+            let start = coordinate(app, x: sheet.midX, y: sheet.minY + 10)
+            start.press(forDuration: 0.05,
+                        thenDragTo: coordinate(app, x: sheet.midX, y: min(app.frame.maxY - 40, sheet.minY + 270)),
+                        withVelocity: .slow, thenHoldForDuration: 0.25)
+            let collapsed = try await state(in: app) { $0.ready && $0.detent == 0 }
+            XCTAssertEqual(collapsed.detailID, previous)
+            XCTAssertEqual(collapsed.controllerID, opened.controllerID)
+            XCTAssertEqual(collapsed.selection, initial.selection)
+            XCTAssertLessThan(rect(collapsed.sheetFrame).height, sheet.height,
+                              "Preserving content overscroll must leave the native grabber free to resize the sheet")
+            capture(app, name: "Native grabber collapses after top pull from chart")
+            return
+        }
+
+        let boundaryStart = profile ? try await elevationChart(in: app).frame.upperPlotPoint : nil
+        pullDown(app, frame: rect(settled.detailContentFrame), distance: 230, startingAt: boundaryStart)
+        let boundary = try await state(in: app) { $0.ready }
+        XCTAssertEqual(boundary.currentID(list: list), previous, "Top overscroll at the first activity must not wrap")
+        XCTAssertEqual(boundary.selection, initial.selection)
+        assertNoIdleCues(in: app)
+        capture(app, name: "\(list ? "List" : "Medium Map") first activity remains first")
+    }
+
+    private func assertNoIdleCues(in app: XCUIApplication, file: StaticString = #filePath, line: UInt = #line) {
+        for identifier in ["activity-continuation-cue", "activity-continuation-previous-cue"] {
+            XCTAssertFalse(app.descendants(matching: .any).matching(identifier: identifier).firstMatch.exists,
+                           "Continuation indicators must disappear when scrolling settles", file: file, line: line)
+        }
+    }
+
+    private func launch(list: Bool = false, expanded: Bool = true, profile: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
@@ -208,6 +314,7 @@ final class ActivityContinuationUITests: XCTestCase {
                                "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
             + (expanded ? ["--map-rotation-expanded"] : [])
             + (list ? ["--activity-continuation-list"] : [])
+            + (profile ? ["--activity-continuation-profile"] : [])
         app.launch()
         return app
     }
@@ -250,7 +357,39 @@ final class ActivityContinuationUITests: XCTestCase {
         let endY = max(app.frame.minY + 80, startY - distance)
         start.press(forDuration: 0.05,
                     thenDragTo: coordinate(app, x: viewport.midX, y: endY),
-                    withVelocity: .slow, thenHoldForDuration: 0.25)
+                    withVelocity: .slow, thenHoldForDuration: 0.6)
+    }
+
+    private func pullDown(_ app: XCUIApplication, frame: CGRect, distance: CGFloat, startingAt: CGPoint? = nil) {
+        let viewport = frame.intersection(app.frame)
+        // Start in scrolling content rather than the pinned title or grabber.
+        // Preserve native pan ownership if the finger leaves a short pane.
+        let start = startingAt ?? CGPoint(x: viewport.midX, y: viewport.minY + viewport.height * 0.25)
+        let endY = min(app.frame.maxY - 40, start.y + distance)
+        coordinate(app, x: start.x, y: start.y).press(forDuration: 0.05,
+                    thenDragTo: coordinate(app, x: start.x, y: endY),
+                    withVelocity: .slow, thenHoldForDuration: 0.6)
+    }
+
+    private func scrubHorizontally(_ app: XCUIApplication, chart: XCUIElement) {
+        let frame = chart.frame.intersection(app.frame)
+        let y = frame.minY + min(20, frame.height * 0.15)
+        coordinate(app, x: frame.minX + frame.width * 0.25, y: y).press(forDuration: 0.05,
+                    thenDragTo: coordinate(app, x: frame.minX + frame.width * 0.75, y: y),
+                    withVelocity: .slow, thenHoldForDuration: 1)
+    }
+
+    private func elevationChart(in app: XCUIApplication) async throws -> XCUIElement {
+        // This label is emitted by the actual Swift Charts plot only. The
+        // unavailable/loading placeholder has a different accessibility label.
+        let charts = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", "Elevation profile,"))
+        let deadline = Date().addingTimeInterval(10)
+        repeat {
+            if let chart = charts.allElementsBoundByIndex.first(where: \.isHittable) { return chart }
+            try await Task.sleep(for: .milliseconds(100))
+        } while Date() < deadline
+        XCTFail("A loaded elevation plot must be visible: \(app.debugDescription)")
+        throw NSError(domain: "ActivityContinuationUITests", code: 2)
     }
 
     private func recognizedText(in element: XCUIElement) throws -> String {
@@ -289,6 +428,10 @@ final class ActivityContinuationUITests: XCTestCase {
         let selectedTab: String
         let detent: Int
         let nativeDetent: String
+        let profileReady: Bool?
+        let profileSetupError: String?
+        let profileScrubbing: Bool?
+        let profileSelectedSampleID: Int?
         let selection: [Int]
         let candidates: [Int]
         let listedIDs: [Int]
@@ -336,4 +479,10 @@ final class ActivityContinuationUITests: XCTestCase {
         diagnostic.lifetime = .keepAlways
         add(diagnostic)
     }
+}
+
+private extension CGRect {
+    // Leave enough screen below the touch for a deliberate 230pt downward
+    // pull while still hitting the actual plot, not its readout or padding.
+    var upperPlotPoint: CGPoint { CGPoint(x: midX, y: minY + min(20, height * 0.15)) }
 }
