@@ -5,6 +5,7 @@ import { mkdir, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 import { fileURLToPath } from 'node:url';
+
 import { chromium } from 'playwright-core';
 
 const root = resolve(import.meta.dirname, '..');

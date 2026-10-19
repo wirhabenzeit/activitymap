@@ -30,15 +30,15 @@ On web, keep the chart, description and headline row visible when a table row op
 
 Groups have one small neutral icon beside the group title. Substats have no icons. Every substat uses the same compact value-over-label treatment, with two columns in a narrow panel and a single column at accessibility text sizes. Web can put whole groups side by side in a wide card. Group headings and subtle separators establish hierarchy; there are no nested cards or repeated measurements.
 
-| Group | Icon meaning | Fields, in order |
-| --- | --- | --- |
-| Time & speed (Time & pace for runs/swims) | Speedometer | Best pace for runs/swims, Elapsed time, Average speed, Maximum speed |
-| Elevation | Mountain | Minimum, Maximum |
-| Power | Bolt | Average, Maximum, Weighted average, Work |
-| Heart rate | Heart | Average, Maximum |
-| Energy | Flame | Calories |
-| Social | People | Kudos, Achievements, Comments, Photos |
-| Activity | Information | Commute, Private, Indoor, Manual, Flagged, Geometry status |
+| Group                                     | Icon meaning | Fields, in order                                                     |
+| ----------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| Time & speed (Time & pace for runs/swims) | Speedometer  | Best pace for runs/swims, Elapsed time, Average speed, Maximum speed |
+| Elevation                                 | Mountain     | Minimum, Maximum                                                     |
+| Power                                     | Bolt         | Average, Maximum, Weighted average, Work                             |
+| Heart rate                                | Heart        | Average, Maximum                                                     |
+| Energy                                    | Flame        | Calories                                                             |
+| Social                                    | People       | Kudos, Achievements, Comments, Photos                                |
+| Activity                                  | Information  | Commute, Private, Indoor, Manual, Flagged, Geometry status           |
 
 Short labels are scoped by their visible group heading. Accessibility combines the group and label where necessary. “Weighted average” refers to the recorded `weighted_average_watts`; do not relabel it “Normalized power” or calculate a replacement.
 

@@ -1,15 +1,15 @@
 'use client';
 
 /** Ordered, page-atomic v1 synchronization for one account/deployment scope. */
+import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import {
+  type FetchLike,
+  SyncRebootstrapRequiredError,
   drainSyncBootstrap,
   drainSyncChanges,
-  SyncRebootstrapRequiredError,
-  type FetchLike,
 } from '~/lib/sync/v1-client';
 import * as v1Store from '~/lib/sync/v1-store';
-import type { V1SyncState, V1SyncMutation } from '~/lib/sync/v1-store';
-import type { StreamMetadata } from '~/contracts/v1/activity-streams';
+import type { V1SyncMutation, V1SyncState } from '~/lib/sync/v1-store';
 
 export type V1SyncStoreDeps = Pick<
   typeof v1Store,

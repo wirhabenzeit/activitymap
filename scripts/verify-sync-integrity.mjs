@@ -5,6 +5,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const require = createRequire(root + '/package.json');
 const { chromium } = require('playwright-core');

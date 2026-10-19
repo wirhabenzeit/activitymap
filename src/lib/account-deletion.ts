@@ -1,8 +1,8 @@
 'use client';
 
-import { clearV1Scope, deleteLegacyOfflineDatabase } from '~/lib/sync/v1-store';
-import { responseEnvelope } from '~/contracts/v1/envelope';
 import { deleteAccountResultSchema } from '~/contracts/v1/account-deletion';
+import { responseEnvelope } from '~/contracts/v1/envelope';
+import { clearV1Scope, deleteLegacyOfflineDatabase } from '~/lib/sync/v1-store';
 
 export const ACCOUNT_DELETED_STORAGE_KEY = 'activitymap:account-deleted';
 let cleanup: ((userId: string) => Promise<void>) | undefined;

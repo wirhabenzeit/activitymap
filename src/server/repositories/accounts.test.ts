@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import { PgDialect } from 'drizzle-orm/pg-core';
+
 import type { SQL } from 'drizzle-orm';
-import type { Account } from '~/server/db/schema';
-import { accounts, users } from '~/server/db/schema';
+import { PgDialect } from 'drizzle-orm/pg-core';
+import test from 'node:test';
+
 import {
   buildAccountTokenColumnUpdate,
   resolveAccountTokens,
 } from '~/server/db/account-token-normalization';
+import type { Account } from '~/server/db/schema';
+import { accounts, users } from '~/server/db/schema';
+
 import { accountCredentialVersion, createAccountsRepository } from './accounts';
 
 const NOW = new Date('2030-01-01');

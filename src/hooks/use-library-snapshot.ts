@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from 'react';
+
+import { useBrowserSyncStatus } from '~/lib/sync/browser-status';
 import {
   authenticatedLibraryScope,
   getLibraryOwner,
 } from '~/lib/sync/library-owner';
-import { useBrowserSyncStatus } from '~/lib/sync/browser-status';
 import { requestLibrarySync } from '~/lib/sync/library-sync';
 import { useShallowStore } from '~/store';
 

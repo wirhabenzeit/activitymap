@@ -92,10 +92,10 @@ Run `node --import tsx scripts/benchmark-summary-sync.ts` to regenerate
 [`summary-sync-payload-budget.json`](summary-sync-payload-budget.json). The script
 validates 5,000 synthetic compact DTOs with the production schema:
 
-| Scenario | Encoded DTO total | Largest 100-entry batch |
-| --- | ---: | ---: |
-| Mixed existing corpus | 14,529,893 bytes (13.9 MiB) | 290,735 bytes |
-| Largest corpus fixture repeated | 23,893,893 bytes (22.8 MiB) | 478,015 bytes |
+| Scenario                        |           Encoded DTO total | Largest 100-entry batch |
+| ------------------------------- | --------------------------: | ----------------------: |
+| Mixed existing corpus           | 14,529,893 bytes (13.9 MiB) |           290,735 bytes |
+| Largest corpus fixture repeated | 23,893,893 bytes (22.8 MiB) |           478,015 bytes |
 
 A fully uncached 5,000-entry library takes 50 batch requests. Subsequent passes
 skip current persisted summaries. These figures describe JSON payloads, excluding

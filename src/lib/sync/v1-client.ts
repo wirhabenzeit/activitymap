@@ -11,17 +11,17 @@
  * (`~/server/db/schema`) and is not itself responsible for persisting
  * anything into IndexedDB; callers apply the pages it returns.
  */
-
-import { retryDeadline } from './retry-deadline';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
 import {
-  syncBootstrapPageDTOSchema,
-  syncChangesPageDTOSchema,
   type SyncBootstrapPageDTO,
   type SyncChangesPageDTO,
   type SyncResource,
+  syncBootstrapPageDTOSchema,
+  syncChangesPageDTOSchema,
 } from '~/contracts/v1/sync';
+
+import { retryDeadline } from './retry-deadline';
 
 /** Injectable so tests never touch the real network or `globalThis.fetch`. */
 export type FetchLike = (

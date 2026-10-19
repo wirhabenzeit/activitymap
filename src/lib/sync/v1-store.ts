@@ -19,13 +19,12 @@
  * switched the hooks over to this store; phase 3 removed the legacy one
  * entirely (this is now the only client-side activity/photo cache).
  */
-
 import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { PhotoDTO } from '~/contracts/v1/photo';
 import type { SyncChangeItemDTO } from '~/contracts/v1/sync';
 import {
-  canReuseCachedStreamSummary,
   type CachedStreamSummary,
+  canReuseCachedStreamSummary,
 } from '~/lib/streams/summary-cache-record';
 
 const DB_NAME = 'activitymap-sync-v1';

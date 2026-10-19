@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import { onlineManager, QueryClient } from '@tanstack/react-query';
 
-import { errorEnvelope } from '~/contracts/v1/error';
+import { QueryClient, onlineManager } from '@tanstack/react-query';
+import test from 'node:test';
+
 import { makeEnvelope } from '~/contracts/v1/envelope';
-import { registerLibrarySync } from '~/lib/sync/library-sync';
+import { errorEnvelope } from '~/contracts/v1/error';
 import { libraryQueryKeys } from '~/lib/sync/library-owner';
+import { registerLibrarySync } from '~/lib/sync/library-sync';
+
 import {
   FirstSummaryFetchError,
   firstSummaryFetchOptions,

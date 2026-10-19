@@ -1,21 +1,22 @@
 'use client';
-import { useEffect, useRef } from 'react';
 import {
+  type QueryClient,
   useMutation,
   useQuery,
   useQueryClient,
-  type QueryClient,
 } from '@tanstack/react-query';
-import {
-  stravaImportDTOSchema,
-  type StravaImportDTO,
-} from '~/contracts/v1/strava-import';
+import { useEffect, useRef } from 'react';
+
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
-import { retryDeadline } from '~/lib/sync/retry-deadline';
-import { useShallowStore } from '~/store';
+import {
+  type StravaImportDTO,
+  stravaImportDTOSchema,
+} from '~/contracts/v1/strava-import';
 import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
 import { requestLibrarySync } from '~/lib/sync/library-sync';
+import { retryDeadline } from '~/lib/sync/retry-deadline';
+import { useShallowStore } from '~/store';
 
 const cooldowns = new WeakMap<QueryClient, Map<string, number>>();
 function cooldown(client: QueryClient, owner: string) {

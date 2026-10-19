@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderCircle } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
 import {
   DialogDescription,
   DialogOverlay,
@@ -11,15 +12,15 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog';
 import { useActivities } from '~/hooks/use-activities';
-import { useShallowStore } from '~/store';
-import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
-import { requestLibrarySync } from '~/lib/sync/library-sync';
-import { useBrowserSyncStatus } from '~/lib/sync/browser-status';
 import {
   FirstSummaryFetchError,
   firstSummaryFetchOptions,
   shouldFetchFirstSummaries,
 } from '~/lib/first-summary-fetch';
+import { useBrowserSyncStatus } from '~/lib/sync/browser-status';
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
+import { useShallowStore } from '~/store';
 
 export function FirstSummaryFetch() {
   const client = useQueryClient();

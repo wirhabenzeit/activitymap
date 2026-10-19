@@ -1,13 +1,14 @@
 /** Browser verification through the production sync client and IndexedDB adapter. */
+import type { ActivityDTO } from '~/contracts/v1/activity';
+import type { StreamMetadata } from '~/contracts/v1/activity-streams';
+import type { PhotoDTO } from '~/contracts/v1/photo';
+import { encodeStreamSummary } from '~/lib/streams/compact-summary';
+
+import { compactStreamCorpus } from '../../../scripts/fixtures/compact-stream-corpus';
 import fixtures from '../../../shared/sync-integrity-fixtures.v1.json';
-import { runV1Sync } from './v1-sync';
 import * as store from './v1-store';
 import type { V1SyncMutation, V1SyncState } from './v1-store';
-import type { ActivityDTO } from '~/contracts/v1/activity';
-import type { PhotoDTO } from '~/contracts/v1/photo';
-import { compactStreamCorpus } from '../../../scripts/fixtures/compact-stream-corpus';
-import { encodeStreamSummary } from '~/lib/streams/compact-summary';
-import type { StreamMetadata } from '~/contracts/v1/activity-streams';
+import { runV1Sync } from './v1-sync';
 
 function check(value: unknown, expected: unknown, message: string) {
   if (JSON.stringify(value) !== JSON.stringify(expected)) {

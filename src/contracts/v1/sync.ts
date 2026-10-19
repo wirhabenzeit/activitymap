@@ -1,7 +1,8 @@
 import { z } from 'zod';
+
 import { activityDTOSchema } from './activity';
-import { photoDTOSchema } from './photo';
 import { DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE } from './pagination';
+import { photoDTOSchema } from './photo';
 import { idString, isoDateTime } from './primitives';
 
 /**

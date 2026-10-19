@@ -1,10 +1,11 @@
 import 'server-only';
-import type { Account } from '~/server/db/schema';
+
 import {
+  type ResolvedAccountTokens,
   accountTokenColumnsNeedNormalization,
   resolveAccountTokens,
-  type ResolvedAccountTokens,
 } from '~/server/db/account-token-normalization';
+import type { Account } from '~/server/db/schema';
 import type {
   AccountIdentity,
   AccountsRepository,

@@ -1,12 +1,12 @@
-import { queryOptions, type QueryClient } from '@tanstack/react-query';
+import { type QueryClient, queryOptions } from '@tanstack/react-query';
 
 import { activitySummaryFetchResultSchema } from '~/contracts/v1/activity-mutations';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
-import { retryDeadline } from '~/lib/sync/retry-deadline';
+import type { BrowserSyncStatus } from '~/lib/sync/browser-status';
 import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
 import { requestLibrarySync } from '~/lib/sync/library-sync';
-import type { BrowserSyncStatus } from '~/lib/sync/browser-status';
+import { retryDeadline } from '~/lib/sync/retry-deadline';
 
 export class FirstSummaryFetchError extends Error {
   constructor(

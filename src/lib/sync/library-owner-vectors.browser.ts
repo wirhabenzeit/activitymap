@@ -1,15 +1,16 @@
 /** Real IndexedDB seed/inspection helpers for the composed browser proof. */
-import fixtures from '../../../shared/sync-integrity-fixtures.v1.json';
 import { activityDTOSchema } from '~/contracts/v1/activity';
 import { photoDTOSchema } from '~/contracts/v1/photo';
+
+import fixtures from '../../../shared/sync-integrity-fixtures.v1.json';
 import {
+  type V1SyncMutation,
   applyV1SyncPage,
   clearV1Scope,
   getCachedActivityDTOs,
   getCachedPhotoDTOs,
   getV1SyncState,
   subscribeV1LibraryCommits,
-  type V1SyncMutation,
 } from './v1-store';
 
 export const libraryActivity = (id: string, name: string) =>

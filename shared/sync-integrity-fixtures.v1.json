@@ -177,12 +177,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "old",
             "complete": true,
             "success": true,
@@ -230,12 +226,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "advanced",
             "complete": true,
             "success": true,
@@ -533,13 +525,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1",
-              "2"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1", "2"],
+            "photos": ["photo:1"],
             "cursor": "recreated",
             "complete": true,
             "success": true,
@@ -639,9 +626,7 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
+            "activities": ["1"],
             "photos": [],
             "cursor": null,
             "complete": false,
@@ -735,12 +720,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "old",
             "complete": true,
             "success": true,
@@ -862,12 +843,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "old",
             "complete": true,
             "success": true,
@@ -989,12 +966,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "old",
             "complete": true,
             "success": true,
@@ -1126,9 +1099,7 @@
             }
           ],
           "expected": {
-            "activities": [
-              "2"
-            ],
+            "activities": ["2"],
             "photos": [],
             "cursor": "snapshot",
             "complete": true,
@@ -1232,12 +1203,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "old",
             "complete": true,
             "success": true,
@@ -1369,12 +1336,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "old",
             "complete": true,
             "success": true,
@@ -1496,12 +1459,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "old",
             "complete": true,
             "success": true,
@@ -1673,12 +1632,8 @@
             }
           ],
           "expected": {
-            "activities": [
-              "1"
-            ],
-            "photos": [
-              "photo:1"
-            ],
+            "activities": ["1"],
+            "photos": ["photo:1"],
             "cursor": "recreated",
             "complete": true,
             "success": true,

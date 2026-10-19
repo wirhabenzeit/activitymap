@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
+
 import type * as ReactQuery from '@tanstack/react-query';
+import test from 'node:test';
+
 import {
   registerLibrarySync,
   requestLibrarySync,

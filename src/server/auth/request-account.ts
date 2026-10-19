@@ -1,5 +1,7 @@
 import 'server-only';
+
 import { headers } from 'next/headers';
+
 import { auth } from '~/lib/auth';
 import { getAccountInternal, getUserInternal } from '~/server/db/internal';
 

@@ -1,19 +1,20 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
+import type { Actor } from '~/server/auth/actor';
+import { EXTERNAL_EFFECTS_DISABLED_MESSAGE } from '~/server/config/external-effects';
 import type { Account, Activity, Photo } from '~/server/db/schema';
 import type { ActivitiesRepository } from '~/server/repositories/activities';
 import type { PhotosRepository } from '~/server/repositories/photos';
-import type { Actor } from '~/server/auth/actor';
 import { StravaApiError } from '~/server/strava/client';
 import { StravaBudgetExceededError } from '~/server/strava/request-budget';
+import type { StravaActivity } from '~/server/strava/types';
+
 import {
   AccountCredentialsUnavailableError,
   AccountPersistenceError,
 } from './account-credentials';
-import type { StravaActivity } from '~/server/strava/types';
-import { EXTERNAL_EFFECTS_DISABLED_MESSAGE } from '~/server/config/external-effects';
-
 import {
   ActivityMutationError,
   deleteActivitiesForActor,

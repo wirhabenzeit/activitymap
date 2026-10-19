@@ -447,6 +447,7 @@ Swift Charts chooses round distance ticks automatically. Native chart selection 
 ## Bounded runtime regression command
 
 Run `pnpm test:ios` (or `node scripts/quality/native-harness.mjs` without web dependencies) from the repository root with Xcode 27. It owns a fresh simulator, executes six selected suites, requires nonzero passing results with no skipped tests, and saves logs plus an xcresult bundle. See [Quality checks](../../docs/quality-checks.md) for suite boundaries, timeouts, artifacts, and explicit existing-simulator reuse. Broader rendered and physical-device acceptance remains separate.
+
 ## Photo request and decode pipeline
 
 `PhotoImageCache` coalesces gallery demand and adjacent-page prefetch for the same

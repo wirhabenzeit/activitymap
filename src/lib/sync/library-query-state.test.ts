@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
-import { libraryQueryState } from './library-query-state';
-import { emptyBrowserStatus } from './browser-status';
+
 import { isActivityLoadBusy } from '~/lib/activity-loading';
+
+import { emptyBrowserStatus } from './browser-status';
+import { libraryQueryState } from './library-query-state';
 
 void test('hydration, partial empty and completed empty are distinct', () => {
   const pending = libraryQueryState(null, undefined, 0);

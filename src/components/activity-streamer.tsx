@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+
 import { useActivities } from '~/hooks/use-activities';
 import { useShallowStore } from '~/store';
 

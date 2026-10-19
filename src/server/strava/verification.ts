@@ -2,129 +2,136 @@
 
 import { getAuthenticatedAccountInternal } from '~/server/auth/request-account';
 import { logger } from '~/server/logging/logger';
+
 import { fetchStravaActivities } from './service';
 
 export async function syncYear(year: number) {
-    try {
-        const account = await getAuthenticatedAccountInternal();
-        if (!account?.access_token) throw new Error('Unauthorized');
-        const athleteId = parseInt(account.accountId);
+  try {
+    const account = await getAuthenticatedAccountInternal();
+    if (!account?.access_token) throw new Error('Unauthorized');
+    const athleteId = parseInt(account.accountId);
 
-        const startOfYear = new Date(year, 0, 1).getTime() / 1000;
-        const endOfYear = new Date(year + 1, 0, 1).getTime() / 1000;
+    const startOfYear = new Date(year, 0, 1).getTime() / 1000;
+    const endOfYear = new Date(year + 1, 0, 1).getTime() / 1000;
 
-        logger.info(`[SyncYear] Starting sync for ${year}`, { startOfYear, endOfYear, year });
+    logger.info(`[SyncYear] Starting sync for ${year}`, {
+      startOfYear,
+      endOfYear,
+      year,
+    });
 
-        let page = 1;
-        const per_page = 200; // Max per page
-        const stravaIds: number[] = [];
+    let page = 1;
+    const per_page = 200; // Max per page
+    const stravaIds: number[] = [];
 
-        // Loop through all pages and upsert summary activities
-        // This effectively "Syncs" the year's summary data
-        while (true) {
-            logger.info(`[SyncYear] Fetching page ${page}`);
-            const result = await fetchStravaActivities({
-                accessToken: account.access_token,
-                athleteId,
-                after: startOfYear,
-                before: endOfYear,
-                page,
-                per_page,
-            });
+    // Loop through all pages and upsert summary activities
+    // This effectively "Syncs" the year's summary data
+    while (true) {
+      logger.info(`[SyncYear] Fetching page ${page}`);
+      const result = await fetchStravaActivities({
+        accessToken: account.access_token,
+        athleteId,
+        after: startOfYear,
+        before: endOfYear,
+        page,
+        per_page,
+      });
 
-            logger.info(`[SyncYear] Page ${page} returned ${result.activities.length} activities`);
-            if (result.activities.length === 0) break;
+      logger.info(
+        `[SyncYear] Page ${page} returned ${result.activities.length} activities`,
+      );
+      if (result.activities.length === 0) break;
 
-            stravaIds.push(...result.activities.map((a) => a.id));
+      stravaIds.push(...result.activities.map((a) => a.id));
 
-            if (result.activities.length < per_page) break;
-            page++;
-        }
-
-        logger.info(`[SyncYear] Finished sync. Total ids: ${stravaIds.length}`);
-
-        return {
-            year,
-            stravaIds,
-            success: true,
-        };
-    } catch (error) {
-        logger.error(`Failed to sync year ${year}:`, error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Sync failed',
-        };
+      if (result.activities.length < per_page) break;
+      page++;
     }
+
+    logger.info(`[SyncYear] Finished sync. Total ids: ${stravaIds.length}`);
+
+    return {
+      year,
+      stravaIds,
+      success: true,
+    };
+  } catch (error) {
+    logger.error(`Failed to sync year ${year}:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Sync failed',
+    };
+  }
 }
 
 export async function repairYear(year: number, idsToRepair: number[]) {
-    try {
-        const account = await getAuthenticatedAccountInternal();
-        if (!account?.access_token) throw new Error('Unauthorized');
-        const athleteId = parseInt(account.accountId);
+  try {
+    const account = await getAuthenticatedAccountInternal();
+    if (!account?.access_token) throw new Error('Unauthorized');
+    const athleteId = parseInt(account.accountId);
 
-        if (idsToRepair.length === 0) {
-            return {
-                success: true,
-                count: 0,
-                message: 'No activities to repair',
-                remaining: false
-            };
-        }
-
-        // Process in chunks of 50
-        const chunk = idsToRepair.slice(0, 50);
-        const remainingIds = idsToRepair.slice(50);
-
-        const result = await fetchStravaActivities({
-            accessToken: account.access_token,
-            athleteId,
-            activityIds: chunk,
-            includePhotos: true,
-        });
-
-        // Report every per-activity outcome the service returned instead of
-        // collapsing a partial repair into a plain success (issue #296).
-        const failedIds = result.failedIds ?? [];
-        const photoRefreshFailedIds = result.photoRefreshFailedIds ?? [];
-        return {
-            success: true,
-            count: result.activities.length,
-            remaining: remainingIds.length > 0,
-            failedIds,
-            notFoundIds: result.notFoundIds,
-            photoRefreshFailedIds,
-            partial:
-                failedIds.length > 0 ||
-                result.notFoundIds.length > 0 ||
-                photoRefreshFailedIds.length > 0,
-        };
-    } catch (error) {
-        logger.error(`Failed to repair year ${year}:`, error);
-        return {
-            success: false,
-            error: error instanceof Error ? error.message : 'Repair failed',
-        };
+    if (idsToRepair.length === 0) {
+      return {
+        success: true,
+        count: 0,
+        message: 'No activities to repair',
+        remaining: false,
+      };
     }
+
+    // Process in chunks of 50
+    const chunk = idsToRepair.slice(0, 50);
+    const remainingIds = idsToRepair.slice(50);
+
+    const result = await fetchStravaActivities({
+      accessToken: account.access_token,
+      athleteId,
+      activityIds: chunk,
+      includePhotos: true,
+    });
+
+    // Report every per-activity outcome the service returned instead of
+    // collapsing a partial repair into a plain success (issue #296).
+    const failedIds = result.failedIds ?? [];
+    const photoRefreshFailedIds = result.photoRefreshFailedIds ?? [];
+    return {
+      success: true,
+      count: result.activities.length,
+      remaining: remainingIds.length > 0,
+      failedIds,
+      notFoundIds: result.notFoundIds,
+      photoRefreshFailedIds,
+      partial:
+        failedIds.length > 0 ||
+        result.notFoundIds.length > 0 ||
+        photoRefreshFailedIds.length > 0,
+    };
+  } catch (error) {
+    logger.error(`Failed to repair year ${year}:`, error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Repair failed',
+    };
+  }
 }
 
 export async function syncActivities(ids: number[]) {
-    try {
-        const account = await getAuthenticatedAccountInternal();
-        if (!account?.access_token) throw new Error('Unauthorized');
+  try {
+    const account = await getAuthenticatedAccountInternal();
+    if (!account?.access_token) throw new Error('Unauthorized');
 
-        if (ids.length === 0) return { success: true, count: 0 };
+    if (ids.length === 0) return { success: true, count: 0 };
 
-        const result = await fetchStravaActivities({
-            accessToken: account.access_token,
-            athleteId: parseInt(account.accountId),
-            activityIds: ids,
-            includePhotos: true,
-        });
+    const result = await fetchStravaActivities({
+      accessToken: account.access_token,
+      athleteId: parseInt(account.accountId),
+      activityIds: ids,
+      includePhotos: true,
+    });
 
-        return { success: true, count: result.activities.length };
-    } catch (error) {
-        logger.error('Failed to sync activities:', error);
-        return { success: false, error: 'Sync failed' };
-    }
+    return { success: true, count: result.activities.length };
+  } catch (error) {
+    logger.error('Failed to sync activities:', error);
+    return { success: false, error: 'Sync failed' };
+  }
 }

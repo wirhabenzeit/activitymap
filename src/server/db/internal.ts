@@ -1,12 +1,13 @@
 import 'server-only';
 
-import { db } from './index';
-import { StravaClient } from '~/server/strava/client';
-import {
-  createAccountsRepository,
-  type AccountIdentity,
-} from '~/server/repositories/accounts';
 import { createAccountCredentialsService } from '~/server/application/account-credentials';
+import {
+  type AccountIdentity,
+  createAccountsRepository,
+} from '~/server/repositories/accounts';
+import { StravaClient } from '~/server/strava/client';
+
+import { db } from './index';
 
 /** Missing local user is distinct from an infrastructure/query failure. */
 export class UserNotFoundError extends Error {

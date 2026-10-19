@@ -1,26 +1,28 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
-import test from 'node:test';
 import { pathToFileURL } from 'node:url';
-import type * as ReactQuery from '@tanstack/react-query';
 
-import gallery from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
+import type * as ReactQuery from '@tanstack/react-query';
+import test from 'node:test';
+
 import { activityDTOSchema } from '~/contracts/v1/activity';
 import { photoDTOSchema } from '~/contracts/v1/photo';
+
+import gallery from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
 import {
+  LibraryOwner,
+  type LibraryOwnerStore,
   authenticatedLibraryScope,
   disposeLibraryScope,
   getLibraryOwner,
-  LibraryOwner,
   libraryQueryKeys,
-  type LibraryOwnerStore,
 } from './library-owner';
 import {
-  readV1LibrarySnapshot,
   type V1LibraryCommit,
   type V1LibrarySnapshot,
   type V1SyncState,
+  readV1LibrarySnapshot,
 } from './v1-store';
 
 // Keep these owner tests framework-neutral under the react-server test condition.

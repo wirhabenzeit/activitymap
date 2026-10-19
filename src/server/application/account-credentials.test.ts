@@ -1,13 +1,16 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
-import type { Account } from '~/server/db/schema';
+
 import {
   buildAccountTokenColumnUpdate,
   resolveAccountTokens,
 } from '~/server/db/account-token-normalization';
+import type { Account } from '~/server/db/schema';
 import type { AccountsRepository } from '~/server/repositories/accounts';
 import { StravaApiError, type StravaTokens } from '~/server/strava/client';
 import { StravaBudgetExceededError } from '~/server/strava/request-budget';
+
 import {
   AccountCredentialsUnavailableError,
   AccountPersistenceError,

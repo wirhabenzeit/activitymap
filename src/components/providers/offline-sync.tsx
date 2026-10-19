@@ -1,24 +1,28 @@
 'use client';
 
-import { useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import {
-  clearBrowserSyncStatus,
-  updateBrowserSyncStatus,
-  useBrowserSyncStatus,
-} from '~/lib/sync/browser-status';
-import { SyncApiError } from '~/lib/sync/v1-client';
+import { useCallback, useEffect, useRef } from 'react';
+
 import {
   ACCOUNT_DELETED_STORAGE_KEY,
   clearDeletedAccountData,
   registerAccountDeletionCleanup,
 } from '~/lib/account-deletion';
 import {
-  clearV1Scope,
-  deleteLegacyOfflineDatabase,
-  OfflineCacheUpgradeBlockedError,
-} from '~/lib/sync/v1-store';
-import { runV1Sync } from '~/lib/sync/v1-sync';
+  StreamSummaryBatchError,
+  type StreamSummaryResult,
+  mergeStoredStreamSummaryResult,
+  reconcileStreamSummaryMetadata,
+  reloadStreamSummaryScope,
+  removeStreamSummaryActivity,
+  removeStreamSummaryScope,
+  streamSummaryQueryKey,
+} from '~/lib/activity-stream-summary';
+import {
+  clearBrowserSyncStatus,
+  updateBrowserSyncStatus,
+  useBrowserSyncStatus,
+} from '~/lib/sync/browser-status';
 import {
   authenticatedLibraryScope,
   disposeLibraryScope,
@@ -33,17 +37,14 @@ import {
   clearStreamSummarySyncAttempts,
   syncStoredStreamSummaries,
 } from '~/lib/sync/stream-summary-sync';
-import { useShallowStore } from '~/store';
+import { SyncApiError } from '~/lib/sync/v1-client';
 import {
-  reconcileStreamSummaryMetadata,
-  reloadStreamSummaryScope,
-  removeStreamSummaryActivity,
-  removeStreamSummaryScope,
-  StreamSummaryBatchError,
-  streamSummaryQueryKey,
-  type StreamSummaryResult,
-  mergeStoredStreamSummaryResult,
-} from '~/lib/activity-stream-summary';
+  OfflineCacheUpgradeBlockedError,
+  clearV1Scope,
+  deleteLegacyOfflineDatabase,
+} from '~/lib/sync/v1-store';
+import { runV1Sync } from '~/lib/sync/v1-sync';
+import { useShallowStore } from '~/store';
 
 /** Owns authenticated network writes. Views observe committed library snapshots. */
 export function OfflineSyncProvider() {

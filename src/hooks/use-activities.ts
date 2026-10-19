@@ -6,22 +6,24 @@ import {
   useQuery,
   useQueryClient,
 } from '@tanstack/react-query';
+import type { FeatureCollection } from 'geojson';
+import { useEffect, useMemo } from 'react';
+
+import { toActivityDTO } from '~/contracts/v1/activity';
+import { createFeature } from '~/lib/activity-utils';
+import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+import { libraryQueryState } from '~/lib/sync/library-query-state';
+import { fetchAndPersistPage } from '~/lib/sync/persisted-page';
+import { type ActivityWithStreams, dtoToActivity } from '~/lib/sync/v1-mappers';
+import { getCachedActivityDTOs, upsertActivityDTOs } from '~/lib/sync/v1-store';
 import {
   getPublicActivities,
   getPublicUserActivities,
 } from '~/server/db/actions';
-import { createFeature } from '~/lib/activity-utils';
-import { useEffect, useMemo } from 'react';
-import type { FeatureCollection } from 'geojson';
-import { useShallowStore } from '~/store';
 import type { Activity } from '~/server/db/schema';
-import { toActivityDTO } from '~/contracts/v1/activity';
-import { getCachedActivityDTOs, upsertActivityDTOs } from '~/lib/sync/v1-store';
-import { dtoToActivity, type ActivityWithStreams } from '~/lib/sync/v1-mappers';
-import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
-import { fetchAndPersistPage } from '~/lib/sync/persisted-page';
+import { useShallowStore } from '~/store';
+
 import { useLibrarySnapshot } from './use-library-snapshot';
-import { libraryQueryState } from '~/lib/sync/library-query-state';
 
 // Legacy guest reads remain separate from the authenticated owner. In
 // particular, this adapter can never create an auth:* persistence scope.

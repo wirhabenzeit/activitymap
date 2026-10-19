@@ -1,19 +1,21 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import type { Actor } from '~/server/auth/actor.ts';
-import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
 import { createSyncBootstrapHandler } from '~/app/api/v1/sync/bootstrap/handler.ts';
 import { createSyncChangesHandler } from '~/app/api/v1/sync/changes/handler.ts';
+import type { Actor } from '~/server/auth/actor.ts';
+import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
 import { encodeSyncCursor } from '~/server/sync/cursor.ts';
+
 import {
+  type FetchLike,
+  SyncApiError,
+  SyncRebootstrapRequiredError,
   drainSyncBootstrap,
   drainSyncChanges,
   fetchSyncBootstrapPage,
   fetchSyncChangesPage,
-  SyncApiError,
-  SyncRebootstrapRequiredError,
-  type FetchLike,
 } from './v1-client.ts';
 
 /**
@@ -27,10 +29,16 @@ import {
  * envelope parsing, pagination, and error handling under test are real.
  */
 
-const ACTOR: Actor = { userId: 'user-1', athleteId: 42, authentication: 'cookie' };
+const ACTOR: Actor = {
+  userId: 'user-1',
+  athleteId: 42,
+  authentication: 'cookie',
+};
 const NOW = new Date('2026-09-20T12:00:00.000Z');
 
-function buildActivity(overrides: Partial<Activity> & { id: number }): Activity {
+function buildActivity(
+  overrides: Partial<Activity> & { id: number },
+): Activity {
   return {
     athlete: ACTOR.athleteId,
     public_id: overrides.id * 7,
@@ -98,24 +106,42 @@ class FakeServer {
   changes: SyncChange[] = [];
   private nextSequence = 1;
 
-  private recordChange(entry: Omit<SyncChange, 'sequence' | 'athleteId' | 'changedAt'>) {
-    this.changes.push({ sequence: this.nextSequence++, athleteId: ACTOR.athleteId, changedAt: NOW, ...entry });
+  private recordChange(
+    entry: Omit<SyncChange, 'sequence' | 'athleteId' | 'changedAt'>,
+  ) {
+    this.changes.push({
+      sequence: this.nextSequence++,
+      athleteId: ACTOR.athleteId,
+      changedAt: NOW,
+      ...entry,
+    });
   }
 
   upsertActivity(activity: Activity) {
     this.activities.set(activity.id, activity);
-    this.recordChange({ entityType: 'activity', entityId: String(activity.id), operation: 'upsert' });
+    this.recordChange({
+      entityType: 'activity',
+      entityId: String(activity.id),
+      operation: 'upsert',
+    });
   }
 
   deleteActivity(id: number) {
     // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory fake, not a drizzle table
     this.activities.delete(id);
-    this.recordChange({ entityType: 'activity', entityId: String(id), operation: 'delete' });
+    this.recordChange({
+      entityType: 'activity',
+      entityId: String(id),
+      operation: 'delete',
+    });
   }
 
   activitiesRepo() {
     return {
-      findPageByAthlete: async (athleteId: number, { afterId = 0, limit }: { afterId?: number; limit: number }) =>
+      findPageByAthlete: async (
+        athleteId: number,
+        { afterId = 0, limit }: { afterId?: number; limit: number },
+      ) =>
         [...this.activities.values()]
           .filter((a) => a.athlete === athleteId && a.id > afterId)
           .sort((a, b) => a.id - b.id)
@@ -147,16 +173,25 @@ class FakeServer {
   changesRepo() {
     return {
       latestSequence: async () => this.changes.at(-1)?.sequence ?? 0,
-      findAfter: async (athleteId: number, afterSequence: number, { limit = 500 }: { limit?: number } = {}) =>
+      findAfter: async (
+        athleteId: number,
+        afterSequence: number,
+        { limit = 500 }: { limit?: number } = {},
+      ) =>
         this.changes
-          .filter((c) => c.athleteId === athleteId && c.sequence > afterSequence)
+          .filter(
+            (c) => c.athleteId === athleteId && c.sequence > afterSequence,
+          )
           .sort((a, b) => a.sequence - b.sequence)
           .slice(0, limit),
     };
   }
 }
 
-function buildFetchImpl(server: FakeServer, actor: Actor | null = ACTOR): FetchLike {
+function buildFetchImpl(
+  server: FakeServer,
+  actor: Actor | null = ACTOR,
+): FetchLike {
   const deps = {
     now: () => NOW,
     resolveActor: async () => actor,
@@ -188,7 +223,10 @@ void test('fetchSyncBootstrapPage parses a real bootstrap page into its DTO', as
 
   assert.equal(page.resource, 'activities');
   assert.equal(page.items.length, 2);
-  assert.ok(page.snapshotCursor, 'first activities page must carry a snapshotCursor');
+  assert.ok(
+    page.snapshotCursor,
+    'first activities page must carry a snapshotCursor',
+  );
 });
 
 void test('fetchSyncBootstrapPage throws SyncApiError for 401 not_authenticated', async () => {
@@ -211,7 +249,13 @@ void test('fetchSyncChangesPage throws SyncRebootstrapRequiredError on 409 sync_
 
   await assert.rejects(
     fetchSyncChangesPage(
-      { cursor: encodeSyncCursor({ sequence: 999, athleteId: ACTOR.athleteId, issuedAt: NOW }) },
+      {
+        cursor: encodeSyncCursor({
+          sequence: 999,
+          athleteId: ACTOR.athleteId,
+          issuedAt: NOW,
+        }),
+      },
       { fetchImpl: buildFetchImpl(server) },
     ),
     (error: unknown) => {
@@ -225,7 +269,8 @@ void test('fetchSyncChangesPage throws SyncRebootstrapRequiredError on 409 sync_
 
 void test('drainSyncBootstrap pages through activities to exhaustion and captures snapshotCursor', async () => {
   const server = new FakeServer();
-  for (let id = 1; id <= 5; id += 1) server.upsertActivity(buildActivity({ id }));
+  for (let id = 1; id <= 5; id += 1)
+    server.upsertActivity(buildActivity({ id }));
 
   const applied: string[] = [];
   const { snapshotCursor } = await drainSyncBootstrap(
@@ -244,9 +289,13 @@ void test('drainSyncBootstrap pages through activities to exhaustion and capture
 
 void test('drainSyncBootstrap for resource=photos never captures a snapshotCursor', async () => {
   const server = new FakeServer();
-  const { snapshotCursor } = await drainSyncBootstrap('photos', () => undefined, {
-    fetchImpl: buildFetchImpl(server),
-  });
+  const { snapshotCursor } = await drainSyncBootstrap(
+    'photos',
+    () => undefined,
+    {
+      fetchImpl: buildFetchImpl(server),
+    },
+  );
   assert.equal(snapshotCursor, null);
 });
 
@@ -254,7 +303,11 @@ void test('drainSyncChanges stops at an empty non-advancing page, returning the 
   const server = new FakeServer();
   server.upsertActivity(buildActivity({ id: 1 }));
 
-  const startCursor = encodeSyncCursor({ sequence: 0, athleteId: ACTOR.athleteId, issuedAt: NOW });
+  const startCursor = encodeSyncCursor({
+    sequence: 0,
+    athleteId: ACTOR.athleteId,
+    issuedAt: NOW,
+  });
   const pages: number[] = [];
   const { nextCursor, pagesApplied } = await drainSyncChanges(
     startCursor,
@@ -270,9 +323,13 @@ void test('drainSyncChanges stops at an empty non-advancing page, returning the 
 
   // Calling again from the new cursor with nothing new must yield zero
   // applied pages, not an infinite loop.
-  const second = await drainSyncChanges(nextCursor, (page) => {
-    assert.deepEqual(page.items, []);
-  }, { fetchImpl: buildFetchImpl(server) });
+  const second = await drainSyncChanges(
+    nextCursor,
+    (page) => {
+      assert.deepEqual(page.items, []);
+    },
+    { fetchImpl: buildFetchImpl(server) },
+  );
   assert.equal(second.pagesApplied, 0);
   assert.equal(second.nextCursor, nextCursor);
 });

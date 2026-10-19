@@ -1,13 +1,16 @@
 import 'server-only';
+
 import { createHash } from 'node:crypto';
+
 import { and, eq } from 'drizzle-orm';
+
 import { db as defaultDb } from '~/server/db';
-import { accounts, users, type Account } from '~/server/db/schema';
 import {
+  type ResolvedAccountTokens,
   buildAccountTokenColumnUpdate,
   resolveAccountTokens,
-  type ResolvedAccountTokens,
 } from '~/server/db/account-token-normalization';
+import { type Account, accounts, users } from '~/server/db/schema';
 
 export type AccountIdentity =
   | { userId: string; accountId?: string }

@@ -1,14 +1,23 @@
 'use client';
 
-import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
-import { requestLibrarySync } from '~/lib/sync/library-sync';
-
 import { zodResolver } from '@hookform/resolvers/zod';
+import { useQueryClient } from '@tanstack/react-query';
+import { type Row } from '@tanstack/react-table';
+import { Edit } from 'lucide-react';
+import { type ComponentType } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
-import { type ComponentType } from 'react';
 
 import { Button } from '~/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '~/components/ui/dialog';
 import {
   Form,
   FormControl,
@@ -18,30 +27,25 @@ import {
   FormMessage,
 } from '~/components/ui/form';
 import { Input } from '~/components/ui/input';
-
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '~/components/ui/dialog';
-import { Edit } from 'lucide-react';
-import { type Row } from '@tanstack/react-table';
-import { type Features } from './table-extensions';
-import { sportTypeEnum, type Activity } from '~/server/db/schema';
-import { type SportType } from '~/server/strava/types';
-import { type UpdateActivityInput } from '~/server/strava/validators';
-import { Select } from '../ui/select';
 import {
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '~/components/ui/select';
+import { useToast } from '~/hooks/use-toast';
+import { reloadStreamSummaryActivity } from '~/lib/activity-stream-summary';
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { requestLibrarySync } from '~/lib/sync/library-sync';
+import { type Activity, sportTypeEnum } from '~/server/db/schema';
+import { updateActivity } from '~/server/strava/actions';
+import { type SportType } from '~/server/strava/types';
+import { type UpdateActivityInput } from '~/server/strava/validators';
 import { aliasMap, colorMap, iconMap } from '~/settings/category';
 import { useShallowStore } from '~/store';
+
+import { Select } from '../ui/select';
+import { type Features } from './table-extensions';
 
 const formSchema = z.object({
   name: z.string().min(2, {
@@ -59,12 +63,6 @@ type ActivityTypeInfo = {
   color: string;
   group: string;
 };
-
-import { updateActivity } from '~/server/strava/actions';
-import { useQueryClient } from '@tanstack/react-query';
-import { useToast } from '~/hooks/use-toast';
-import { useState } from 'react';
-import { reloadStreamSummaryActivity } from '~/lib/activity-stream-summary';
 
 export function ProfileForm({
   row,

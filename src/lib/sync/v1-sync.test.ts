@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import type { Actor } from '~/server/auth/actor.ts';
-import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
 import { createSyncBootstrapHandler } from '~/app/api/v1/sync/bootstrap/handler.ts';
 import { createSyncChangesHandler } from '~/app/api/v1/sync/changes/handler.ts';
-import { encodeSyncCursor } from '~/server/sync/cursor.ts';
 import type { ActivityDTO } from '~/contracts/v1/activity.ts';
 import type { PhotoDTO } from '~/contracts/v1/photo.ts';
-import { runV1Sync, type V1SyncStoreDeps } from './v1-sync.ts';
+import type { Actor } from '~/server/auth/actor.ts';
+import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
+import { encodeSyncCursor } from '~/server/sync/cursor.ts';
+
 import type { FetchLike } from './v1-client.ts';
 import type { V1SyncState } from './v1-store.ts';
+import { type V1SyncStoreDeps, runV1Sync } from './v1-sync.ts';
 
 /**
  * `runV1Sync` end to end: real bootstrap/changes handler logic (same as
