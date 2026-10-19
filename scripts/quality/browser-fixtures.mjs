@@ -4,6 +4,20 @@ import { join } from 'node:path';
 
 // Shared by standalone proofs and the owned harness: source is identical in both.
 export const browserFixtures = {
+  presentation: {
+    route: 'presentation-test',
+    source: `
+'use client';
+import { Suspense, useEffect } from 'react';
+import { StravaConnectProvider, SignedOutConnectPanel } from '~/components/auth/strava-connect';
+import { useShallowStore } from '~/store';
+function Connection() {
+  useEffect(() => { useShallowStore.setState({ isInitialized: true, user: null, isGuest: false }); }, []);
+  return <StravaConnectProvider><SignedOutConnectPanel /></StravaConnectProvider>;
+}
+export default function Review() { return <Suspense><Connection /></Suspense>; }
+`,
+  },
   list: {
     route: 'list-inspection-test',
     source: `

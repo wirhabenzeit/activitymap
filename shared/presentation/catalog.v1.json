@@ -1,0 +1,575 @@
+{
+  "version": 1,
+  "sourceLocale": "en",
+  "categories": [
+    {
+      "id": "bcXcSki",
+      "message": "category.bcXcSki",
+      "color": "#1982C4",
+      "artwork": "Sport-bcXcSki",
+      "sports": ["BackcountrySki", "NordicSki", "RollerSki"]
+    },
+    {
+      "id": "trailHike",
+      "message": "category.trailHike",
+      "color": "#FF595E",
+      "artwork": "Sport-trailHike",
+      "sports": ["Hike", "TrailRun", "RockClimbing", "Snowshoe"]
+    },
+    {
+      "id": "run",
+      "message": "category.run",
+      "color": "#FFCA3A",
+      "artwork": "Sport-run",
+      "sports": ["Run", "VirtualRun"]
+    },
+    {
+      "id": "ride",
+      "message": "category.ride",
+      "color": "#8AC926",
+      "artwork": "Sport-ride",
+      "sports": [
+        "Ride",
+        "VirtualRide",
+        "GravelRide",
+        "MountainBikeRide",
+        "EBikeRide",
+        "EMountainBikeRide",
+        "Handcycle",
+        "Velomobile"
+      ]
+    },
+    {
+      "id": "misc",
+      "message": "category.misc",
+      "color": "#6A4C93",
+      "artwork": "Sport-misc",
+      "sports": [
+        "AlpineSki",
+        "Badminton",
+        "Canoeing",
+        "Crossfit",
+        "Elliptical",
+        "Golf",
+        "HighIntensityIntervalTraining",
+        "IceSkate",
+        "InlineSkate",
+        "Kayaking",
+        "Kitesurf",
+        "Pickleball",
+        "Pilates",
+        "Racquetball",
+        "Rowing",
+        "Sail",
+        "Skateboard",
+        "Snowboard",
+        "Soccer",
+        "Squash",
+        "StairStepper",
+        "StandUpPaddling",
+        "Surfing",
+        "Swim",
+        "TableTennis",
+        "Tennis",
+        "VirtualRow",
+        "Walk",
+        "WeightTraining",
+        "Wheelchair",
+        "Windsurf",
+        "Workout",
+        "Yoga"
+      ]
+    }
+  ],
+  "actions": {
+    "back": {
+      "message": "action.back",
+      "webGlyph": "ArrowLeft",
+      "iosGlyph": "chevron.backward",
+      "mirrorsInRTL": true,
+      "intent": "Return to the preceding screen; does not dismiss a modal.",
+      "colorToken": "foreground"
+    },
+    "close": {
+      "message": "action.close",
+      "webGlyph": "X",
+      "iosGlyph": "xmark",
+      "mirrorsInRTL": false,
+      "intent": "Dismiss the current presentation.",
+      "colorToken": "foreground"
+    },
+    "fit": {
+      "message": "action.fit",
+      "webGlyph": "Expand",
+      "iosGlyph": "arrow.up.left.and.arrow.down.right",
+      "mirrorsInRTL": false,
+      "intent": "Fit available activity routes in the map viewport.",
+      "colorToken": "foreground"
+    },
+    "showOnMap": {
+      "message": "action.showOnMap",
+      "webGlyph": "MapPin",
+      "iosGlyph": "mappin",
+      "mirrorsInRTL": false,
+      "intent": "Activate an activity and show its route; selection is independent.",
+      "colorToken": "foreground"
+    },
+    "clearFiltersAndShowOnMap": {
+      "message": "action.clearFiltersAndShowOnMap",
+      "webGlyph": "MapPin",
+      "iosGlyph": "mappin",
+      "mirrorsInRTL": false,
+      "intent": "Clear incompatible filters before activating an activity.",
+      "colorToken": "foreground"
+    },
+    "select": {
+      "message": "action.select",
+      "webGlyph": "Square",
+      "iosGlyph": "square",
+      "mirrorsInRTL": false,
+      "intent": "Add to the selection set, independent of map activation.",
+      "colorToken": "foreground"
+    },
+    "activate": {
+      "message": "action.activate",
+      "webGlyph": "Locate",
+      "iosGlyph": "location",
+      "mirrorsInRTL": false,
+      "intent": "Make this activity the active map route without changing selection.",
+      "colorToken": "foreground"
+    },
+    "exportGPX": {
+      "message": "action.exportGPX",
+      "webGlyph": "Download",
+      "iosGlyph": "square.and.arrow.up",
+      "mirrorsInRTL": false,
+      "intent": "Export route data: browser downloads a file; iOS presents the system share sheet.",
+      "colorToken": "foreground",
+      "iosMessage": "action.shareGPX"
+    }
+  },
+  "metrics": {
+    "distance": {
+      "message": "metric.distance",
+      "iosRowID": "distance",
+      "webGlyph": "Ruler",
+      "iosGlyph": "ruler",
+      "colorToken": "foreground"
+    },
+    "moving_time": {
+      "message": "metric.moving_time",
+      "iosRowID": "movingTime",
+      "webGlyph": "Timer",
+      "iosGlyph": "stopwatch",
+      "colorToken": "foreground"
+    },
+    "elapsed_time": {
+      "message": "metric.elapsed_time",
+      "iosRowID": "elapsedTime",
+      "webGlyph": "Timer",
+      "iosGlyph": "stopwatch",
+      "colorToken": "foreground"
+    },
+    "total_elevation_gain": {
+      "message": "metric.total_elevation_gain",
+      "iosRowID": "elevationGain",
+      "webGlyph": "Mountain",
+      "iosGlyph": "mountain.2",
+      "colorToken": "foreground"
+    },
+    "elev_high": {
+      "message": "metric.elev_high",
+      "iosRowID": "elevHigh",
+      "webGlyph": "Mountain",
+      "iosGlyph": "mountain.2",
+      "colorToken": "foreground"
+    },
+    "elev_low": {
+      "message": "metric.elev_low",
+      "iosRowID": "elevLow",
+      "webGlyph": "Mountain",
+      "iosGlyph": "mountain.2",
+      "colorToken": "foreground"
+    },
+    "date": {
+      "message": "metric.date",
+      "iosRowID": "date",
+      "webGlyph": "Calendar",
+      "iosGlyph": "calendar",
+      "colorToken": "foreground"
+    },
+    "average_speed": {
+      "message": "metric.average_speed",
+      "iosRowID": "averageSpeed",
+      "webGlyph": "Gauge",
+      "iosGlyph": "speedometer",
+      "colorToken": "foreground"
+    },
+    "max_speed": {
+      "message": "metric.max_speed",
+      "iosRowID": "maxSpeed",
+      "webGlyph": "Gauge",
+      "iosGlyph": "speedometer",
+      "colorToken": "foreground"
+    },
+    "average_pace": {
+      "message": "metric.average_pace",
+      "iosRowID": "averagePace",
+      "webGlyph": "Timer",
+      "iosGlyph": "stopwatch",
+      "colorToken": "foreground"
+    },
+    "best_pace": {
+      "message": "metric.best_pace",
+      "iosRowID": "bestPace",
+      "webGlyph": "Timer",
+      "iosGlyph": "stopwatch",
+      "colorToken": "foreground"
+    },
+    "average_watts": {
+      "message": "metric.average_watts",
+      "iosRowID": "averageWatts",
+      "webGlyph": "Zap",
+      "iosGlyph": "bolt",
+      "colorToken": "foreground"
+    },
+    "max_watts": {
+      "message": "metric.max_watts",
+      "iosRowID": "maxWatts",
+      "webGlyph": "Zap",
+      "iosGlyph": "bolt",
+      "colorToken": "foreground"
+    },
+    "weighted_average_watts": {
+      "message": "metric.weighted_average_watts",
+      "iosRowID": "weightedAverageWatts",
+      "webGlyph": "Zap",
+      "iosGlyph": "bolt",
+      "colorToken": "foreground"
+    },
+    "average_heartrate": {
+      "message": "metric.average_heartrate",
+      "iosRowID": "averageHeartrate",
+      "webGlyph": "Heart",
+      "iosGlyph": "heart",
+      "colorToken": "foreground"
+    },
+    "max_heartrate": {
+      "message": "metric.max_heartrate",
+      "iosRowID": "maxHeartrate",
+      "webGlyph": "Heart",
+      "iosGlyph": "heart",
+      "colorToken": "foreground"
+    },
+    "calories": {
+      "message": "metric.calories",
+      "iosRowID": "calories",
+      "webGlyph": "Flame",
+      "iosGlyph": "flame",
+      "colorToken": "foreground"
+    },
+    "kilojoules": {
+      "message": "metric.kilojoules",
+      "iosRowID": "kilojoules",
+      "webGlyph": "Zap",
+      "iosGlyph": "bolt",
+      "colorToken": "foreground"
+    }
+  },
+  "messages": {
+    "category.bcXcSki": {
+      "source": "BC & XC Ski",
+      "context": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "arguments": {}
+    },
+    "category.trailHike": {
+      "source": "Trail / Hike",
+      "context": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "arguments": {}
+    },
+    "category.run": {
+      "source": "Run",
+      "context": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "arguments": {}
+    },
+    "category.ride": {
+      "source": "Ride",
+      "context": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "arguments": {}
+    },
+    "category.misc": {
+      "source": "Miscellaneous",
+      "context": "Sport category name used in filters, legends and accessible labels. Preserve the category identity; sport protocol values are never translated.",
+      "arguments": {}
+    },
+    "action.back": {
+      "source": "Back",
+      "context": "Return to the preceding screen; does not dismiss a modal.",
+      "arguments": {}
+    },
+    "action.close": {
+      "source": "Close",
+      "context": "Dismiss the current presentation.",
+      "arguments": {}
+    },
+    "action.fit": {
+      "source": "Fit activities",
+      "context": "Fit available activity routes in the map viewport.",
+      "arguments": {}
+    },
+    "action.showOnMap": {
+      "source": "Show on map",
+      "context": "Activate an activity and show its route; selection is independent.",
+      "arguments": {}
+    },
+    "action.clearFiltersAndShowOnMap": {
+      "source": "Clear filters and show on map",
+      "context": "Clear incompatible filters before activating an activity.",
+      "arguments": {}
+    },
+    "action.select": {
+      "source": "Select",
+      "context": "Add to the selection set, independent of map activation.",
+      "arguments": {}
+    },
+    "action.activate": {
+      "source": "Activate on map",
+      "context": "Make this activity the active map route without changing selection.",
+      "arguments": {}
+    },
+    "action.exportGPX": {
+      "source": "Download GPX",
+      "context": "Export route data: browser downloads a file; iOS presents the system share sheet.",
+      "arguments": {}
+    },
+    "action.shareGPX": {
+      "source": "Share GPX",
+      "context": "Native variant of exportGPX; presents the iOS system share sheet.",
+      "arguments": {}
+    },
+    "metric.distance": {
+      "source": "Distance",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.moving_time": {
+      "source": "Moving time",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.elapsed_time": {
+      "source": "Elapsed time",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.total_elevation_gain": {
+      "source": "Elevation gain",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.elev_high": {
+      "source": "Maximum elevation",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.elev_low": {
+      "source": "Minimum elevation",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.date": {
+      "source": "Date",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.average_speed": {
+      "source": "Average speed",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.max_speed": {
+      "source": "Maximum speed",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.average_pace": {
+      "source": "Average pace",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.best_pace": {
+      "source": "Best pace",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.average_watts": {
+      "source": "Average power",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.max_watts": {
+      "source": "Maximum power",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.weighted_average_watts": {
+      "source": "Weighted average power",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.average_heartrate": {
+      "source": "Average heart rate",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.max_heartrate": {
+      "source": "Maximum heart rate",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.calories": {
+      "source": "Energy",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "metric.kilojoules": {
+      "source": "Work",
+      "context": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
+      "arguments": {}
+    },
+    "connect.title": {
+      "source": "Connect Strava to see your activities",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.purpose": {
+      "source": "ActivityMap shows your Strava activities on a map, in a list and as stats.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.permissions": {
+      "source": "ActivityMap reads your activities, including private ones, and updates those you edit here.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.button": {
+      "source": "Connect with Strava",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.hint": {
+      "source": "Opens Strava to approve access to your activities.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.waiting": {
+      "source": "Waiting for Strava",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.failed": {
+      "source": "Couldn\u2019t connect to Strava. Please try again.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.cancelled": {
+      "source": "Strava connection was cancelled. Connect again whenever you\u2019re ready.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.expired.title": {
+      "source": "Your sign-in has expired",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.expired.message": {
+      "source": "Connect with Strava again to restore access to your activities.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.disconnected.title": {
+      "source": "Strava is disconnected",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.disconnected.message": {
+      "source": "Connect with Strava again to load your activities.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.verify.title": {
+      "source": "Couldn\u2019t verify your session",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.verify.pending": {
+      "source": "Checking session\u2026",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "connect.verify.retry": {
+      "source": "Retry session verification",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "permission.none": {
+      "source": "No activities are shared.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "permission.public": {
+      "source": "Private activities aren\u2019t shared.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "permission.edit": {
+      "source": "Editing isn\u2019t allowed.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "permission.reconnect": {
+      "source": "Connect with Strava again to grant the missing permissions.",
+      "context": "Strava authorization permission, recovery or accessibility copy.",
+      "arguments": {}
+    },
+    "selection.selected": {
+      "source": "Selected",
+      "context": "Accessible state; selection is independent of activation. Missing values are never zero.",
+      "arguments": {}
+    },
+    "selection.notSelected": {
+      "source": "Not selected",
+      "context": "Accessible state; selection is independent of activation. Missing values are never zero.",
+      "arguments": {}
+    },
+    "selection.mixed": {
+      "source": "Partially selected",
+      "context": "Accessible state; selection is independent of activation. Missing values are never zero.",
+      "arguments": {}
+    },
+    "metric.notRecorded": {
+      "source": "Not recorded",
+      "context": "Accessible state; selection is independent of activation. Missing values are never zero.",
+      "arguments": {}
+    },
+    "connect.verify.message": {
+      "source": "Your sign-in was saved. {reason}",
+      "context": "Session verification recovery; reason is a verbatim diagnostic from the current error owner, not translated here.",
+      "arguments": {
+        "reason": "string"
+      }
+    },
+    "selection.count": {
+      "source": "{count} activities",
+      "context": "Complete selected activity count; zero uses the other form in English. Do not build the sentence by concatenation.",
+      "arguments": {
+        "count": "number"
+      },
+      "plural": {
+        "argument": "count",
+        "one": "{count} activity",
+        "other": "{count} activities"
+      }
+    }
+  }
+}

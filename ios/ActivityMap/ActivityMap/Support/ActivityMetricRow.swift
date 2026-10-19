@@ -10,11 +10,13 @@ struct ActivityMetricRow: Identifiable {
 
     static func rows(for activity: Activity) -> [ActivityMetricRow] {
         var rows = [ActivityMetricRow(
-            id: "date", title: "Date", icon: "calendar",
+            id: "date", title: String(localized: AppMessages.metricDate()), icon: "calendar",
             value: Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))]
         func add(_ id: String, _ title: String, _ icon: String, _ value: String) {
             guard value != Formatters.unknown else { return }
-            rows.append(.init(id: id, title: title, icon: icon, value: value))
+            let semantic = MetricPresentation.definition(id)
+            rows.append(.init(id: id, title: semantic.map { String(localized: $0.title) } ?? title,
+                              icon: semantic?.glyph ?? icon, value: value))
         }
         add("distance", "Distance", "ruler", Formatters.distance(activity.distance))
         add("movingTime", "Moving time", "stopwatch", Formatters.duration(activity.movingTime))

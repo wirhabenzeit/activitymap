@@ -23,6 +23,7 @@ export const browserSuites = {
   list: 'verify-list-inspection.mjs',
   stats: 'verify-stats-focus.mjs',
   account: 'verify-account-deletion.mjs',
+  presentation: 'verify-presentation.mjs',
 };
 
 export function fixtureEnvironment(inherited, base) {
@@ -163,7 +164,7 @@ export async function runBrowserHarness({
 }) {
   assert(
     suites.length > 0 && suites.every((suite) => browserSuites[suite]),
-    'Choose list, stats, and/or account',
+    'Choose list, stats, account, and/or presentation',
   );
   await mkdir(output, { recursive: true });
   await mkdir(join(root, '.quality'), { recursive: true });

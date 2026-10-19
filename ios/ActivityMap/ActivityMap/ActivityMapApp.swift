@@ -2,6 +2,7 @@ import SwiftUI
 
 @main
 struct ActivityMapApp: App {
+    @State private var displayPreferences = DisplayPreferences.shared
     private let isTesting = ProcessInfo.processInfo.arguments.contains("--unit-testing")
     private let persistence: Result<LocalStore, Error>
     #if DEBUG
@@ -44,7 +45,8 @@ struct ActivityMapApp: App {
             switch persistence {
             case .success(let store):
                 ContentView().environment(\.localStore, store)
-                    .preferredColorScheme(DisplayPreferences.shared.appearance.colorScheme)
+                    .environment(displayPreferences)
+                    .preferredColorScheme(displayPreferences.appearance.colorScheme)
             case .failure:
                 ContentUnavailableView(
                     "Couldn’t open saved activities", systemImage: "externaldrive.badge.exclamationmark",

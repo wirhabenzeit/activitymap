@@ -1,13 +1,15 @@
 import {
-  FaPersonSkiingNordic,
-  FaPersonWalking,
-  FaPersonRunning,
   FaPersonBiking,
   FaPersonCircleQuestion,
+  FaPersonRunning,
+  FaPersonSkiingNordic,
+  FaPersonWalking,
 } from 'react-icons/fa6';
-
-import { type Activity } from '~/server/db/schema';
 import { type IconType } from 'react-icons/lib';
+
+import { message } from '~/lib/presentation/messages';
+import { sportCategories } from '~/lib/presentation/sports';
+import { type Activity } from '~/server/db/schema';
 
 export type CategorySetting = Record<
   'bcXcSki' | 'trailHike' | 'run' | 'ride' | 'misc',
@@ -20,86 +22,25 @@ export type CategorySetting = Record<
   }
 >;
 
-export const categorySettings: CategorySetting = {
-  bcXcSki: {
-    name: 'BC & XC Ski',
-    color: '#1982C4',
-    icon: FaPersonSkiingNordic,
-    alias: ['BackcountrySki', 'NordicSki', 'RollerSki'],
-    active: true,
-  },
-  trailHike: {
-    name: 'Trail / Hike',
-    color: '#FF595E',
-    icon: FaPersonWalking,
-    alias: ['Hike', 'TrailRun', 'RockClimbing', 'Snowshoe'],
-    active: true,
-  },
-  run: {
-    name: 'Run',
-    color: '#FFCA3A',
-    icon: FaPersonRunning,
-    alias: ['Run', 'VirtualRun'],
-    active: true,
-  },
-  ride: {
-    name: 'Ride',
-    color: '#8AC926',
-    icon: FaPersonBiking,
-    alias: [
-      'Ride',
-      'VirtualRide',
-      'GravelRide',
-      'MountainBikeRide',
-      'EBikeRide',
-      'EMountainBikeRide',
-      'Handcycle',
-      'Velomobile',
-    ],
-    active: true,
-  },
-  misc: {
-    name: 'Miscellaneous',
-    color: '#6A4C93',
-    icon: FaPersonCircleQuestion,
-    active: true,
-    alias: [
-      'AlpineSki',
-      'Badminton',
-      'Canoeing',
-      'Crossfit',
-      'Elliptical',
-      'Golf',
-      'HighIntensityIntervalTraining',
-      'IceSkate',
-      'InlineSkate',
-      'Kayaking',
-      'Kitesurf',
-      'Pickleball',
-      'Pilates',
-      'Racquetball',
-      'Rowing',
-      'Sail',
-      'Skateboard',
-      'Snowboard',
-      'Soccer',
-      'Squash',
-      'StairStepper',
-      'StandUpPaddling',
-      'Surfing',
-      'Swim',
-      'TableTennis',
-      'Tennis',
-      'VirtualRow',
-      'Walk',
-      'WeightTraining',
-      'Wheelchair',
-      'Windsurf',
-      'Workout',
-      'Yoga',
-    ],
-  },
+const categoryIcons = {
+  bcXcSki: FaPersonSkiingNordic,
+  trailHike: FaPersonWalking,
+  run: FaPersonRunning,
+  ride: FaPersonBiking,
+  misc: FaPersonCircleQuestion,
 };
+export const categorySettings = Object.fromEntries(
+  sportCategories.map((category) => [
+    category.id,
+    {
+      name: message(category.message),
+      color: category.color,
+      icon: categoryIcons[category.id],
+      alias: [...category.sports],
+      active: true,
+    },
+  ]),
+) as CategorySetting;
 
 const colorMap: Partial<Record<Activity['sport_type'], string>> = {};
 

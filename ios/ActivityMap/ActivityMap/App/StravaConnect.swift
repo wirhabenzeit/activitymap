@@ -28,17 +28,17 @@ extension EnvironmentValues {
 
 /// Why ActivityMap connects to Strava and what the requested `read`,
 /// `activity:read`, `activity:read_all` and `activity:write` scopes are for. Mirrors the web
-/// copy in `src/components/auth/strava-connect.tsx`.
+/// adapter through the shared presentation catalog.
 enum StravaConnectCopy {
-    static let purpose = "ActivityMap shows your Strava activities on a map, in a list and as stats."
-    static let permissions = "ActivityMap reads your activities, including private ones, and updates those you edit here."
-    static let failure = "Couldn’t connect to Strava. Please try again."
+    static let purpose = String(localized: AppMessages.connectPurpose())
+    static let permissions = String(localized: AppMessages.connectPermissions())
+    static let failure = String(localized: AppMessages.connectFailed())
 }
 
 /// What a limited Strava grant leaves out (issue #303). Mirrors
 /// `stravaPermissionNotes` in `src/lib/strava-permissions.ts`.
 enum StravaPermissionsCopy {
-    static let reconnect = "Connect with Strava again to grant the missing permissions."
+    static let reconnect = String(localized: AppMessages.permissionReconnect())
 
     static func isLimited(_ permissions: ActivityMapAPI.StravaPermissions?) -> Bool {
         guard let permissions else { return false }
@@ -50,14 +50,14 @@ enum StravaPermissionsCopy {
         var notes: [String] = []
         switch permissions.activities {
         case .none:
-            notes.append("No activities are shared.")
+            notes.append(String(localized: AppMessages.permissionNone()))
         case .public:
-            notes.append("Private activities aren’t shared.")
+            notes.append(String(localized: AppMessages.permissionPublic()))
         case .all:
             break
         }
         if !permissions.edit {
-            notes.append("Editing isn’t allowed.")
+            notes.append(String(localized: AppMessages.permissionEdit()))
         }
         return notes
     }
@@ -80,11 +80,11 @@ struct StravaConnectButton: View {
             .buttonStyle(.plain)
             .disabled(connect.isConnecting)
             .opacity(connect.isConnecting ? 0.6 : 1)
-            .accessibilityLabel("Connect with Strava")
-            .accessibilityHint("Opens Strava to approve access to your activities.")
+            .accessibilityLabel(Text(AppMessages.connectButton()))
+            .accessibilityHint(Text(AppMessages.connectHint()))
             .accessibilityIdentifier("strava-connect")
             if connect.isConnecting {
-                ProgressView().accessibilityLabel("Waiting for Strava")
+                ProgressView().accessibilityLabel(Text(AppMessages.connectWaiting()))
             }
         }
     }
@@ -101,13 +101,13 @@ struct StravaConnectControls: View {
         VStack(alignment: alignment, spacing: 12) {
             StravaConnectButton()
             if connect.failed && !connect.isConnecting {
-                Text(StravaConnectCopy.failure)
+                Text(AppMessages.connectFailed())
                     .font(.subheadline)
                     .foregroundStyle(.red)
                     .accessibilityIdentifier("strava-connect-failure")
             }
             if showsPermissions {
-                Text(StravaConnectCopy.permissions)
+                Text(AppMessages.connectPermissions())
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -128,8 +128,10 @@ func displayEmail(_ email: String?) -> String? {
 /// Strava, or `nil` when browsing can continue.
 struct StravaConnectPrompt: Equatable {
     enum Recovery: Equatable { case connect, verifySession }
-    let title: String
-    let message: String
+    let localizedTitle: LocalizedStringResource
+    let localizedMessage: LocalizedStringResource
+    var title: String { String(localized: localizedTitle) }
+    var message: String { String(localized: localizedMessage) }
     let recovery: Recovery
 
     init?(status: SyncController.Status?, authStatus: AuthController.Status? = nil) {
@@ -137,22 +139,22 @@ struct StravaConnectPrompt: Equatable {
         // Keep cached browsing available; recover here only when the shell is blocked.
         if case .sessionRestoreFailed(let reason) = authStatus,
            status == .signedOut || status == .expired || status == .disconnected {
-            title = "Couldn’t verify your session"
-            message = "Your sign-in was saved. " + reason
+            localizedTitle = AppMessages.connectVerifyTitle()
+            localizedMessage = AppMessages.connectVerifyMessage(reason)
             recovery = .verifySession
             return
         }
         recovery = .connect
         switch status {
         case .signedOut:
-            title = "Connect Strava to see your activities"
-            message = StravaConnectCopy.purpose
+            localizedTitle = AppMessages.connectTitle()
+            localizedMessage = AppMessages.connectPurpose()
         case .expired:
-            title = "Your sign-in has expired"
-            message = "Connect with Strava again to restore access to your activities."
+            localizedTitle = AppMessages.connectExpiredTitle()
+            localizedMessage = AppMessages.connectExpiredMessage()
         case .disconnected:
-            title = "Strava is disconnected"
-            message = "Connect with Strava again to load your activities."
+            localizedTitle = AppMessages.connectDisconnectedTitle()
+            localizedMessage = AppMessages.connectDisconnectedMessage()
         default:
             return nil
         }
@@ -183,10 +185,10 @@ struct StravaConnectOverlay: View {
     private var card: some View {
         VStack(spacing: 20) {
             VStack(spacing: 8) {
-                Text(prompt.title)
+                Text(prompt.localizedTitle)
                     .font(.title3.weight(.semibold))
                     .accessibilityAddTraits(.isHeader)
-                Text(prompt.message)
+                Text(prompt.localizedMessage)
                     .foregroundStyle(.secondary)
             }
             .multilineTextAlignment(.center)
@@ -198,7 +200,7 @@ struct StravaConnectOverlay: View {
                     } label: {
                         HStack {
                             if connect.isVerifyingSession { ProgressView() }
-                            Text(connect.isVerifyingSession ? "Checking session…" : "Retry session verification")
+                            Text(connect.isVerifyingSession ? AppMessages.connectVerifyPending() : AppMessages.connectVerifyRetry())
                         }
                     }
                     .buttonStyle(.borderedProminent)

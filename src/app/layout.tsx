@@ -1,8 +1,10 @@
 import '~/styles/globals.css';
 
-import { ThemeProvider } from '~/components/theme-provider';
-import { AnalyticsGuarded } from '~/components/analytics-guarded';
 import type { Viewport } from 'next';
+
+import { AnalyticsGuarded } from '~/components/analytics-guarded';
+import { ThemeProvider } from '~/components/theme-provider';
+import { resolveMessageLocale } from '~/lib/presentation/messages';
 
 // Configure these values as needed
 export const viewport: Viewport = {
@@ -57,7 +59,7 @@ export default function RootLayout({
 }) {
   return (
     <html
-      lang="en"
+      lang={resolveMessageLocale()}
       style={{ width: '100dvw', height: '100dvh' }}
       suppressHydrationWarning
     >
