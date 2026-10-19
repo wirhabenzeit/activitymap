@@ -6,6 +6,7 @@ struct AppShell: View {
     @State private var auth = AuthController()
     @State private var sync: SyncController?
     @Environment(\.localStore) private var localStore
+    @Environment(\.locale) private var locale
     @Environment(\.scenePhase) private var scenePhase
     @State private var sheets: BrowseSheetPresentation
     @State private var statsNavigation = StatsShellNavigation()
@@ -79,7 +80,7 @@ struct AppShell: View {
         .overlay {
             if let connectPrompt { StravaConnectOverlay(prompt: connectPrompt).transition(.opacity) }
             else if sync?.isLoadingInitialActivities == true {
-                ProgressView("Loading your recent activities…")
+                ProgressView { Text(AppMessages.statusFirstSummaryLoading(locale: locale)) }
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .background(.regularMaterial)
             }
@@ -102,25 +103,28 @@ struct AppShell: View {
         .onChange(of: auth.syncSession) { _, session in
             if let localStore { sync?.setSession(session, storage: localStore) }
         }
-        .alert(sync?.firstSummaryError != nil ? "Could not load your recent activities"
-               : sync?.firstSummaryCount == 0 ? "No activities found in Strava" : "Your recent activities are ready",
+        .alert(Text(sync?.firstSummaryError != nil ? AppMessages.statusFirstSummaryFailed(locale: locale)
+               : sync?.firstSummaryCount == 0 ? AppMessages.statusFirstSummaryEmpty(locale: locale) : AppMessages.statusFirstSummaryReady(locale: locale)),
                isPresented: Binding(get: { sync?.firstSummaryError != nil || (sync?.firstSummaryCount != nil && sync?.status == .ready) },
                                     set: { if !$0 { sync?.firstSummaryCount = nil; sync?.firstSummaryError = nil } })) {
             if sync?.firstSummaryError != nil {
                 if sync?.canRefresh == true && sync?.firstSummaryRetryable == true {
-                    Button("Retry") {
+                    Button {
                         sync?.firstSummaryError = nil
                         Task { await refresh() }
-                    }
+                    } label: { Text(AppMessages.actionRetry(locale: locale)) }
                 }
-                Button("Close", role: .cancel) { sync?.firstSummaryError = nil }
+                Button(role: .cancel) { sync?.firstSummaryError = nil } label: { Text(AppMessages.actionClose(locale: locale)) }
             } else {
-                Button("Continue") { sync?.firstSummaryCount = nil }
+                Button { sync?.firstSummaryCount = nil } label: { Text(AppMessages.actionContinue(locale: locale)) }
             }
         } message: {
-            Text(sync?.firstSummaryError ?? (sync?.firstSummaryCount == 0
-                 ? "New activities will appear here after you record them in Strava."
-                 : "\(sync?.firstSummaryCount ?? 0) activities fetched. Older history, details and photos continue in the background."))
+            if let error = sync?.firstSummaryMessage {
+                Text(verbatim: error.string(locale: locale))
+            } else {
+                Text(sync?.firstSummaryCount == 0 ? AppMessages.statusFirstSummaryEmptyMessage(locale: locale)
+                     : AppMessages.statusFirstSummaryCount(sync?.firstSummaryCount ?? 0, locale: locale))
+            }
         }
         .task(id: scenePhase) {
             guard scenePhase == .active else { sync?.pause(); return }
@@ -315,7 +319,7 @@ struct AppShell: View {
             // The shell's white bar tint must not reach the panel's controls.
             .tint(AppTheme.accent)
             .accessibilityElement(children: .contain)
-            .accessibilityLabel("Filters")
+            .accessibilityLabel(Text(AppMessages.navigationFilters(locale: locale)))
             .accessibilityAddTraits(floating ? .isModal : [])
             // Tapping outside or the filter button closes the floating panel;
             // VoiceOver users dismiss it with the escape gesture.
@@ -333,11 +337,11 @@ struct AppShell: View {
         case .filters:
             NavigationStack {
                 FilterPanel(store: store, scope: filterScope)
-                    .navigationTitle("Filters")
+                    .navigationTitle(Text(AppMessages.navigationFilters(locale: locale)))
                     .navigationBarTitleDisplayMode(.inline)
                     .toolbar {
                         ToolbarItem(placement: .confirmationAction) {
-                            Button("Done") { sheets.showsFilters = false }
+                            Button { sheets.showsFilters = false } label: { Text(AppMessages.actionDone(locale: locale)) }
                                 .accessibilityIdentifier("filters-done")
                         }
                     }
@@ -406,7 +410,7 @@ struct AppShell: View {
         .frame(width: 44, height: 44)
         .accessibilityLabel(filterButtonLabel)
         .accessibilityIdentifier("browse-filters")
-        .accessibilityValue(open ? "Expanded" : "Collapsed")
+        .accessibilityValue(Text(open ? AppMessages.navigationExpanded(locale: locale) : AppMessages.navigationCollapsed(locale: locale)))
         .accessibilityAddTraits(open ? .isSelected : [])
     }
 
@@ -422,7 +426,7 @@ struct AppShell: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white).frame(minHeight: 44)
             }
-            .accessibilityLabel("View: \(store.selectedTab.title)")
+            .accessibilityLabel(Text(AppMessages.navigationCurrentView(store.selectedTab.title, locale: locale)))
             .accessibilityIdentifier("browse-destination-menu")
         }
     }
@@ -450,8 +454,8 @@ struct AppShell: View {
             .accessibilityHidden(true)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Settings")
-        .accessibilityValue(syncing ? "Syncing activities" : "")
+        .accessibilityLabel(Text(AppMessages.navigationSettings(locale: locale)))
+        .accessibilityValue(syncing ? Text(AppMessages.statusActivitiesSyncing(locale: locale)) : Text(verbatim: ""))
         .accessibilityIdentifier("open-settings")
     }
 
@@ -510,7 +514,7 @@ struct AppShell: View {
         .padding(.vertical, toolbarLayout.pickerVerticalInset)
         .background(Color.white.opacity(0.08), in: Capsule())
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("View")
+        .accessibilityLabel(Text(AppMessages.navigationView(locale: locale)))
     }
 }
 
@@ -542,7 +546,7 @@ struct FilterCountBadge: View {
     let count: Int
 
     /// VoiceOver reads the count with the button, e.g. "Filters, 3 active".
-    static func label(count: Int) -> String { count == 0 ? "Filters" : "Filters, \(count) active" }
+    static func label(count: Int) -> String { count == 0 ? String(localized: AppMessages.navigationFilters()) : String(localized: AppMessages.navigationActiveFilters(count)) }
 
     var body: some View {
         Text("\(count)")

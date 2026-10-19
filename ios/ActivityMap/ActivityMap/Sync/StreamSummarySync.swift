@@ -147,13 +147,7 @@ final class StreamSummarySync {
             }
             // Keep metadata sync successful and retry opportunistically on a
             // later ordinary pass, honoring server backoff across manual refresh.
-            let delay: TimeInterval
-            switch error as? APIClient.RequestError {
-            case .rateLimited(let seconds, _): delay = seconds
-            case .serviceUnavailable(let seconds, _): delay = seconds ?? 60
-            case .server(_, _, _, _, _, let seconds): delay = seconds ?? 60
-            default: delay = 60
-            }
+            let delay = APIClient.errorFacts(for: error).retryAfter ?? 60
             retryAt = now().addingTimeInterval(max(1, delay))
         }
     }

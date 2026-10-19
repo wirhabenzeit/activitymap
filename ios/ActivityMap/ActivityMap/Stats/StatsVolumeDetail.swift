@@ -14,6 +14,9 @@ extension StatsHistoryRange {
 /// Groupings are calculated with the tile's metric on the background stats
 /// executor. Switching grouping only selects an already-paired result.
 struct StatsVolumeDetail<CompactSummary: View>: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let history: [StatsHistoryRange: [StatsHistoryBucket]]
     let averages: [StatsHistoryRange: [StatsPoint]]
     let metric: StatsMetric
@@ -40,7 +43,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
         ActivityCategory.allCases.filter { sport in buckets.contains { ($0.bySport[sport] ?? 0) > 0 } }
     }
     private var axisTicks: [Double] { StatsDisplay.axisTicks(maximum: maximum) }
-    private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0]) : 1 }
+    private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0], units: units) : 1 }
     private var maximum: Double { max(1, max(buckets.map(\.total).max() ?? 1, trend.map(\.y).max() ?? 0)) * 1.08 }
     private func lower(_ bucket: StatsHistoryBucket, _ sport: ActivityCategory) -> Double {
         sports.prefix(while: { $0 != sport }).reduce(0) { $0 + (bucket.bySport[$1] ?? 0) }
@@ -50,8 +53,8 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     }
     private func label(_ day: Int) -> String {
         switch shownRange {
-        case .weeks: "Week of \(StatsDisplay.shortDate(day))"
-        case .months: StatsDisplay.month(day)
+        case .weeks: "Week of \(StatsDisplay.shortDate(day, locale: locale))"
+        case .months: StatsDisplay.month(day, locale: locale)
         case .years: String(StatsDates.parts(day).year!)
         }
     }
@@ -111,13 +114,13 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
     }
     @ViewBuilder private var dateRange: some View {
         if let first = buckets.first, let last = buckets.last {
-            Text("\(StatsDisplay.date(first.start)) – \(StatsDisplay.date(last.end))")
+            Text("\(StatsDisplay.date(first.start, locale: locale, dateFormat: preferences?.dateFormat ?? .system)) – \(StatsDisplay.date(last.end, locale: locale, dateFormat: preferences?.dateFormat ?? .system))")
                 .font(.caption).foregroundStyle(.secondary)
         }
     }
     @ViewBuilder private var total: some View {
         if !buckets.isEmpty {
-            Text("\(Text(StatsDisplay.measurement(buckets.reduce(0) { $0 + $1.total }, metric: metric)).font(.title2.weight(.semibold))) \(Text(shownRange.totalLabel).font(.caption).foregroundColor(.secondary))")
+            Text("\(Text(StatsDisplay.measurement(buckets.reduce(0) { $0 + $1.total }, metric: metric, units: units, locale: locale)).font(.title2.weight(.semibold))) \(Text(shownRange.totalLabel).font(.caption).foregroundColor(.secondary))")
                 .monospacedDigit()
         }
     }
@@ -137,7 +140,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                         .lineStyle(.init(lineWidth: segmentIncomplete(segment) ? 1 : 2 - progress,
                                          dash: segmentIncomplete(segment) ? [2, 3] : []))
                         .accessibilityLabel("\(label(buckets[index].start))\(buckets[index].incomplete ? ", incomplete" : "")")
-                        .accessibilityValue(StatsDisplay.measurement(buckets[index].total, metric: metric))
+                        .accessibilityValue(StatsDisplay.measurement(buckets[index].total, metric: metric, units: units, locale: locale))
                         .accessibilityHidden(expanded)
                 }
             }
@@ -147,7 +150,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                     LineMark(x: .value("Period", Double(index)), y: .value("Average", point.y), series: .value("Line", "Average"))
                         .foregroundStyle(Color.secondary.mix(with: .primary, by: progress)).lineStyle(.init(lineWidth: 1.5, dash: [4, 3]))
                         .accessibilityLabel("\(averageLabel), \(label(point.x))")
-                        .accessibilityValue(StatsDisplay.measurement(point.y, metric: metric))
+                        .accessibilityValue(StatsDisplay.measurement(point.y, metric: metric, units: units, locale: locale))
                 }
             }
             if let selected {
@@ -162,8 +165,8 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                     // Labels start at their period; the latest one ends at its point.
                     AxisValueLabel(anchor: index == buckets.count - 1 ? .topTrailing : .topLeading) {
                         switch shownRange {
-                        case .weeks: Text(StatsDisplay.shortDate(buckets[index].start))
-                        case .months: Text(StatsDates.date(buckets[index].start).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)))
+                        case .weeks: Text(StatsDisplay.shortDate(buckets[index].start, locale: locale))
+                        case .months: Text(StatsDates.date(buckets[index].start).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)))
                         case .years: Text(label(buckets[index].start))
                         }
                     }.font(.caption2)
@@ -174,7 +177,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
             AxisMarks(position: .leading, values: axisTicks) { tick in
                 AxisGridLine()
                 AxisValueLabel {
-                    if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value), step: axisStep)) }
+                    if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value, units: units), step: axisStep, locale: locale)) }
                 }
             }
         }
@@ -192,10 +195,10 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                 let bucket = buckets[selected]
                 VStack(alignment: .leading, spacing: 3) {
                     Text("\(label(bucket.start))\(bucket.incomplete ? " · incomplete" : "")")
-                    Text("Total: \(StatsDisplay.measurement(bucket.total, metric: metric))").bold()
+                    Text("Total: \(StatsDisplay.measurement(bucket.total, metric: metric, units: units, locale: locale))").bold()
                     if expanded {
                         ForEach(sports) { sport in
-                            Text("\(sport.name): \(StatsDisplay.measurement(bucket.bySport[sport] ?? 0, metric: metric))")
+                            Text("\(sport.name): \(StatsDisplay.measurement(bucket.bySport[sport] ?? 0, metric: metric, units: units, locale: locale))")
                         }
                     }
                 }
@@ -232,10 +235,10 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                             GridRow {
                                 Text("\(label(bucket.start))\(bucket.incomplete ? " · incomplete" : "")")
                                 ForEach(sports) { sport in
-                                    Text(StatsDisplay.measurement(bucket.bySport[sport] ?? 0, metric: metric))
+                                    Text(StatsDisplay.measurement(bucket.bySport[sport] ?? 0, metric: metric, units: units, locale: locale))
                                         .accessibilityLabel("\(sport.name), \(label(bucket.start))")
                                 }
-                                Text(StatsDisplay.measurement(bucket.total, metric: metric)).fontWeight(.semibold)
+                                Text(StatsDisplay.measurement(bucket.total, metric: metric, units: units, locale: locale)).fontWeight(.semibold)
                             }
                             .accessibilityElement(children: .combine)
                             .accessibilityHint(bucket.incomplete ? "Incomplete \(shownRange.period)" : "")
@@ -271,7 +274,7 @@ struct StatsVolumeDetail<CompactSummary: View>: View {
                     .mix(with: sport.color.opacity(partial ? 0.35 : 1), by: progress))
                 .accessibilityLabel(description)
                 .accessibilityHidden(!expanded || (segment > 0 && index == segment))
-                .accessibilityValue(StatsDisplay.measurement(value, metric: metric))
+                .accessibilityValue(StatsDisplay.measurement(value, metric: metric, units: units, locale: locale))
         }
     }
 

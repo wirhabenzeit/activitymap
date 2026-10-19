@@ -1,59 +1,7 @@
+import type { SportType } from '~/contracts/sport';
 import type { Activity } from '~/server/db/schema';
 
-export const sportTypes = [
-  'AlpineSki',
-  'BackcountrySki',
-  'Badminton',
-  'Canoeing',
-  'Crossfit',
-  'EBikeRide',
-  'EMountainBikeRide',
-  'Elliptical',
-  'Golf',
-  'GravelRide',
-  'Handcycle',
-  'HighIntensityIntervalTraining',
-  'Hike',
-  'IceSkate',
-  'InlineSkate',
-  'Kayaking',
-  'Kitesurf',
-  'MountainBikeRide',
-  'NordicSki',
-  'Pickleball',
-  'Pilates',
-  'Racquetball',
-  'Ride',
-  'RockClimbing',
-  'RollerSki',
-  'Rowing',
-  'Run',
-  'Sail',
-  'Skateboard',
-  'Snowboard',
-  'Snowshoe',
-  'Soccer',
-  'Squash',
-  'StairStepper',
-  'StandUpPaddling',
-  'Surfing',
-  'Swim',
-  'TableTennis',
-  'Tennis',
-  'TrailRun',
-  'Velomobile',
-  'VirtualRide',
-  'VirtualRow',
-  'VirtualRun',
-  'Walk',
-  'WeightTraining',
-  'Wheelchair',
-  'Windsurf',
-  'Workout',
-  'Yoga',
-] as const;
-
-export type SportType = (typeof sportTypes)[number];
+export { sportTypes, type SportType } from '~/contracts/sport';
 
 export interface StravaAthlete {
   id: number;

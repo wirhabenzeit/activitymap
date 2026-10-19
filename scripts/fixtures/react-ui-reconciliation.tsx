@@ -206,7 +206,7 @@ function Content() {
       </Dialog>
       <SettingsDialog open={settings} onOpenChange={setSettings} />
       <EditActivity
-        row={table.getCoreRowModel().rows[0]!}
+        activity={table.getCoreRowModel().rows[0]!.original}
         open={edit}
         setOpen={setEdit}
         trigger={false}

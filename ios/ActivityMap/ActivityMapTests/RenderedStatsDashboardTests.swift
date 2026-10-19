@@ -716,14 +716,13 @@ import Testing
     }
 
     @Test func displayPreferencesRedrawAndSurviveSettingsReopening() async throws {
-        let preferences = DisplayPreferences.shared
-        let oldUnits = preferences.units, oldDate = preferences.dateFormat, oldAppearance = preferences.appearance
-        defer {
-            preferences.units = oldUnits; preferences.dateFormat = oldDate; preferences.appearance = oldAppearance
-        }
+        let name = "RenderedDisplayPreferences-\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: name))
+        defer { defaults.removePersistentDomain(forName: name) }
+        let preferences = DisplayPreferences(defaults: defaults)
         preferences.units = .metric; preferences.dateFormat = .system; preferences.appearance = .light
         let auth = AuthController()
-        let initial = try StatsDashboardHarness(root: AccountSheet(destination: .settings, auth: auth),
+        let initial = try StatsDashboardHarness(root: AccountSheet(destination: .settings, auth: auth).environment(preferences),
                                                size: CGSize(width: 402, height: 874))
         defer { initial.close() }
         try await Task.sleep(for: .milliseconds(150))
@@ -733,12 +732,12 @@ import Testing
         let after = try initial.capture("display-after")
         #expect(before.pngData() != after.pngData())
         initial.close()
-        let reopened = try StatsDashboardHarness(root: AccountSheet(destination: .settings, auth: auth),
+        let reopened = try StatsDashboardHarness(root: AccountSheet(destination: .settings, auth: auth).environment(preferences),
                                                 size: CGSize(width: 402, height: 874))
         defer { reopened.close() }
         try await Task.sleep(for: .milliseconds(150))
         try reopened.capture("display-reopened")
-        let restored = DisplayPreferences()
+        let restored = DisplayPreferences(defaults: defaults)
         #expect(restored.units == .imperial && restored.dateFormat == .iso && restored.appearance == .dark)
     }
 

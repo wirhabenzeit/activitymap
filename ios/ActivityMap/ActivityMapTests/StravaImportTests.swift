@@ -26,7 +26,7 @@ import Testing
         #expect(submissions == 1)
         continuation?.resume(returning: running); await request.value
         #expect(!controller.canStart(session))
-        #expect(controller.progressMessage?.contains("200 activity summaries") == true)
+        #expect(controller.progressMessage?.contains("Summaries fetched: 200") == true)
         let restored = StravaImportController(defaults: defaults, load: { _ in running })
         restored.activate(session); await restored.refresh(session)
         #expect(restored.snapshot?.status == .running)

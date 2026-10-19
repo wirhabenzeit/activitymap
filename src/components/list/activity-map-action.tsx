@@ -1,6 +1,5 @@
 'use client';
 
-import { Map } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { Button } from '~/components/ui/button';
@@ -8,10 +7,11 @@ import type {
   ActivityMapCommand,
   MapActionVariant,
 } from '~/hooks/use-show-on-map';
+import type { Activity } from '~/lib/activity';
+import { semanticAction } from '~/lib/presentation/icons';
 import { message } from '~/lib/presentation/messages';
 import { canFrameRoute, routeCoordinates } from '~/lib/route-framing';
 import { cn } from '~/lib/utils';
-import type { Activity } from '~/server/db/schema';
 
 /** One eligibility/name policy in compact rows and full detail surfaces. */
 export function ActivityMapAction({
@@ -33,10 +33,10 @@ export function ActivityMapAction({
       canFrameRoute(routeCoordinates({ map_polyline, map_summary_polyline })),
     [map_polyline, map_summary_polyline],
   );
-  const label = message(
-    variant === 'show' ? 'action.showOnMap' : 'action.clearFiltersAndShowOnMap',
+  const { label, Icon } = semanticAction(
+    variant === 'show' ? 'showOnMap' : 'clearFiltersAndShowOnMap',
   );
-  const unavailable = 'No GPS route recorded';
+  const unavailable = message('activity.action.noRoute');
   return (
     <Button
       type="button"
@@ -49,10 +49,21 @@ export function ActivityMapAction({
           'bg-header-background/10 text-header-background hover:bg-header-background/15',
       )}
       onClick={() => onShowOnMap(activity, variant)}
-      aria-label={`${label}: ${activity.name}${hasRoute ? '' : `; ${unavailable}`}`}
+      aria-label={
+        hasRoute
+          ? message('activity.action.named', {
+              action: label,
+              name: activity.name,
+            })
+          : message('activity.action.unavailable', {
+              action: label,
+              name: activity.name,
+              reason: unavailable,
+            })
+      }
       title={hasRoute ? label : unavailable}
     >
-      <Map className="size-4" aria-hidden="true" />
+      <Icon className="size-4" aria-hidden="true" />
       {labelled && label}
     </Button>
   );

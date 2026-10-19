@@ -114,7 +114,7 @@ export function generatedFiles(catalog, existingCatalog) {
       .sort(),
     'Native standalone metric coverage differs',
   );
-  const protocolSource = load('src/server/strava/types.ts');
+  const protocolSource = load('src/contracts/sport.ts');
   for (const sport of members)
     assert(
       protocolSource.includes(`'${sport}'`),

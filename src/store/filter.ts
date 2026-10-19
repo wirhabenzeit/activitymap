@@ -1,9 +1,11 @@
 import { type SetStateAction } from 'react';
 import { type StateCreator } from 'zustand';
 
-import { categorySettings, type CategorySetting } from '~/settings/category';
+import type { SportType } from '~/contracts/sport';
+import type { Activity } from '~/lib/activity';
+import { type CategorySetting, categorySettings } from '~/settings/category';
 import { type inequalityFilters } from '~/settings/filter';
-import { type Activity, type SportType } from '~/server/db/schema';
+
 import { type RootState } from './index';
 
 export type CategoryGroup = keyof CategorySetting;

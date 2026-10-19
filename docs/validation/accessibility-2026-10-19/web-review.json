@@ -1,0 +1,137 @@
+{
+  "passed": true,
+  "browser": "155.0.8059.82",
+  "previews": [
+    {
+      "width": 390,
+      "height": 844,
+      "scale": 1,
+      "direction": "ltr",
+      "bounds": {
+        "x": 16,
+        "y": 176.5,
+        "width": 358,
+        "height": 491
+      },
+      "membership": [
+        "Edit",
+        " Refresh from Strava",
+        "Download GPX",
+        " Open in Strava"
+      ]
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "scale": 1,
+      "direction": "ltr",
+      "bounds": {
+        "x": 198,
+        "y": 16,
+        "width": 448,
+        "height": 358
+      },
+      "membership": [" Refresh from Strava", "Download GPX", " Open in Strava"]
+    },
+    {
+      "width": 1024,
+      "height": 768,
+      "scale": 1,
+      "direction": "ltr",
+      "bounds": {
+        "x": 288,
+        "y": 138.5,
+        "width": 448,
+        "height": 491
+      },
+      "membership": [" Refresh from Strava", "Download GPX", " Open in Strava"]
+    },
+    {
+      "width": 512,
+      "height": 768,
+      "scale": 1,
+      "direction": "ltr",
+      "bounds": {
+        "x": 32,
+        "y": 138.5,
+        "width": 448,
+        "height": 491
+      },
+      "membership": [
+        "Edit",
+        " Refresh from Strava",
+        "Download GPX",
+        " Open in Strava"
+      ]
+    },
+    {
+      "width": 1440,
+      "height": 1000,
+      "scale": 1,
+      "direction": "ltr",
+      "bounds": {
+        "x": 496,
+        "y": 254.5,
+        "width": 448,
+        "height": 491
+      },
+      "membership": [" Refresh from Strava", "Download GPX", " Open in Strava"]
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "scale": 2,
+      "direction": "ltr",
+      "bounds": {
+        "x": 32,
+        "y": 32,
+        "width": 326,
+        "height": 780
+      },
+      "membership": [
+        "Edit",
+        " Refresh from Strava",
+        "Download GPX",
+        " Open in Strava"
+      ]
+    },
+    {
+      "width": 844,
+      "height": 390,
+      "scale": 1.7,
+      "direction": "rtl",
+      "bounds": {
+        "x": 41.203125,
+        "y": 27.1875,
+        "width": 761.59375,
+        "height": 335.625
+      },
+      "membership": [" Refresh from Strava", "Download GPX", " Open in Strava"]
+    }
+  ],
+  "writes": [
+    {
+      "name": "A",
+      "description": ""
+    },
+    {
+      "description": "Description edited during background sync"
+    },
+    {
+      "name": "Cache recovery"
+    }
+  ],
+  "checks": [
+    "keyboard focus containment/restoration",
+    "menu membership/disabled state and denied-edit/read-refresh permission parity",
+    "44px map/menu/dismiss targets",
+    "landscape/tablet/Split View/200% text/RTL preview",
+    "Combine and sport filter non-color/mixed state",
+    "pending single submission and dismissal guard",
+    "one-character name/empty-description committed response",
+    "opening draft baseline survives background library prop updates",
+    "request/retry error facts and draft retention",
+    "partial photos, repeated local cache retry with named44px actions and no remote resubmission, upstream-success recovery"
+  ],
+  "assistiveTechnology": "DOM accessibility roles and keyboard only; VoiceOver not exercised"
+}

@@ -249,11 +249,11 @@ struct StatsDashboardFace {
 
 /// Calendar coordinates are wall-clock dates; never format them in the viewer's timezone.
 enum StatsDisplay {
-    static func dailyRate(_ value: Double) -> String {
+    static func dailyRate(_ value: Double, locale: Locale = .current) -> String {
         if value != 0 && abs(value) < 1 {
-            return value.formatted(.number.precision(.significantDigits(1...2)))
+            return value.formatted(.number.precision(.significantDigits(1...2)).locale(locale))
         }
-        return number(value, decimals: 1)
+        return number(value, decimals: 1, locale: locale)
     }
     /// Explicit ticks let labels use the actual interval after unit conversion.
     static func axisTicks(maximum: Double, count: Int = 3) -> [Double] {
@@ -275,28 +275,28 @@ enum StatsDisplay {
         let text = (rounded == 0 ? 0 : rounded).formatted(.number.precision(.fractionLength(0...decimals)).locale(locale))
         return text + (scale == 1000 ? "k" : "")
     }
-    static func number(_ value: Double, decimals: Int = 0) -> String {
-        value.formatted(.number.precision(.fractionLength(decimals)))
+    static func number(_ value: Double, decimals: Int = 0, locale: Locale = .current) -> String {
+        value.formatted(.number.precision(.fractionLength(decimals)).locale(locale))
     }
-    static func value(_ value: Double, metric: StatsMetric) -> String {
-        number(metric.displayValue(value), decimals: metric == .time && abs(value) < 10 ? 1 : 0)
+    static func value(_ value: Double, metric: StatsMetric, units: UnitSystem = .metric, locale: Locale = .current) -> String {
+        number(metric.displayValue(value, units: units), decimals: metric == .time && abs(value) < 10 ? 1 : 0, locale: locale)
     }
-    static func measurement(_ value: Double, metric: StatsMetric) -> String {
-        "\(self.value(value, metric: metric)) \(metric == .count ? "activities" : metric.displayUnit)"
+    static func measurement(_ value: Double, metric: StatsMetric, units: UnitSystem = .metric, locale: Locale = .current) -> String {
+        "\(self.value(value, metric: metric, units: units, locale: locale)) \(metric == .count ? "activities" : metric.displayUnit(units: units))"
     }
-    static func weekday(_ day: Int) -> String {
-        ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"][day - StatsDates.monday(day)]
+    static func weekday(_ day: Int, locale: Locale = .current) -> String {
+        StatsDates.date(day).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).weekday(.abbreviated))
     }
-    static func date(_ day: Int) -> String {
-        Formatters.shortDate(StatsDates.date(day), timeZone: .gmt)
+    static func date(_ day: Int, locale: Locale = .current, dateFormat: PreferredDateFormat = .system) -> String {
+        Formatters.shortDate(StatsDates.date(day), timeZone: .gmt, locale: locale, dateFormat: dateFormat)
     }
     /// Day and month without the year, e.g. "28 Sep".
-    static func shortDate(_ day: Int) -> String {
-        StatsDates.date(day).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
+    static func shortDate(_ day: Int, locale: Locale = .current) -> String {
+        StatsDates.date(day).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
     }
     /// A whole month, e.g. "Oct 2026", for monthly bars and readouts.
-    static func month(_ day: Int) -> String {
-        StatsDates.date(day).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).year())
+    static func month(_ day: Int, locale: Locale = .current) -> String {
+        StatsDates.date(day).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).year())
     }
     static func option(_ option: StatsToggleOption) -> String {
         switch option {

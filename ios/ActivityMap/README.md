@@ -11,6 +11,35 @@ The SwiftUI client supports mobile sign-in and local-first activity synchronizat
 
 Swift Package Manager pins the Mapbox dependency in `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
 
+## Activity action accessibility tests
+
+`ActivityMapUITests/ActivityActionUITests` exercises the production scrolling
+activity detail through the real accessibility automation interface. Run it on
+an iPhone and an iPad simulator with the same command below, replacing the
+suite name with `ActivityMapUITests/ActivityActionUITests`.
+
+Its three journeys cover seven layouts/states (standard, accessibility3 text,
+no GPS, summary geometry, dark, landscape and RTL), meaningful action names,
+disabled route reasons, 44-point targets, ordering after recorded details,
+native GPX sharing, repeated cancellation, leaving detail during sharing,
+iPad popover anchoring, cached sampled elevation and summary invalidation.
+The sampled-elevation journey asserts the actual exported XML and zero stream
+requests. Fixture telemetry observes real export files and the native share
+presenter while UIKit hides background accessibility during its modal.
+
+The DEBUG-only fixture uses synthetic activities, an in-memory store and
+isolated display preferences. It does not restore authentication or download
+anything. It writes only synthetic diagnostics to a unique temporary path
+provided by the test. The bounded native harness includes these journeys and
+the API error-fact, editing, sync and display-preference regression suites.
+
+These journeys replace `RenderedActivityActionTests`' hosted accessibility
+traversal: the iOS 27 hosted tree omitted all SwiftUI nodes even though screenshots
+showed the complete rows. No accessibility assertion is skipped or replaced by
+OCR. Verify three executed UI tests and zero failures/skips in the result bundle.
+This simulator evidence supports #387; it does not certify live VoiceOver or
+physical-device acceptance.
+
 ## Map photo UI tests
 
 The three map-photo interaction journeys run in `ActivityMapUITests/MapPhotoUITests`

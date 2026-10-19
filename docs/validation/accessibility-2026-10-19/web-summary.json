@@ -1,0 +1,20 @@
+{
+  "startedAt": "2026-10-19T20:20:24.595Z",
+  "suites": [
+    {
+      "name": "accessibility",
+      "passed": true,
+      "durationMs": 15081
+    }
+  ],
+  "compilation": [
+    {
+      "name": "accessibility",
+      "passed": true,
+      "durationMs": 48837
+    }
+  ],
+  "workspace": "/Users/dominik/Documents/github/activitymap/.quality/browser-176oL4",
+  "passed": true,
+  "finishedAt": "2026-10-19T20:21:35.182Z"
+}

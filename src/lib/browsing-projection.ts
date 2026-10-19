@@ -1,4 +1,4 @@
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/lib/activity';
 import { type FilterState, applyFilters } from '~/store/filter';
 
 /** Ordinary eligibility only. Selection never feeds this projection. */

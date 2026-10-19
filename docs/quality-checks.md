@@ -127,11 +127,15 @@ The suite deliberately excludes broad app-hosted SwiftUI accessibility traversal
 checks: that host can yield an empty AX tree, so it cannot substitute for XCUI.
 The retired rendered map/photo checks were replaced by `MapPhotoUITests` in #425.
 List selection visibility and Back retention now use `ListSelectionUITests` for the same reason.
-The same host limitation was reproduced with unchanged action views in #427:
-three `RenderedActivityActionTests` methods (eight parameter cases) failed at
-their first AX lookup, while the controller/file suite passed 19 methods and
-35 parameter executions. Those rendered checks remain excluded and are not
-reported as passed by this harness.
+The action-row hosted AX checks encountered the same empty-tree limitation and
+were retired after replacement with `ActivityActionUITests`. Three real XCUI
+journeys cover seven presentation states (standard, accessibility large text,
+no GPS, summary geometry, dark mode, landscape and RTL), action labels/availability,
+44-point targets, native GPX sharing/cancellation/view departure, and offline
+cached-elevation export/invalidation. The fixture observes the actual presenter,
+iPad popover anchor and temporary GPX files; no stream request is permitted.
+`APIErrorFactsTests`, editing/sharing, authentication recovery, sync/ingestion/import,
+stream and preference/presentation suites also run in the bounded harness.
 Other rendered suites and device-only touch/VoiceOver acceptance remain outside
 this smoke boundary; failures there are not silently treated as passing here.
 Pending photo-pipeline/sync-integrity suites from #422/#423 and filter/GPX

@@ -52,6 +52,20 @@ nonisolated enum APIClient {
         }
     }
 
+    /// Transport facts shared by feature controllers. These do not choose whether,
+    /// when or how often a feature retries. A missing server retryability flag is
+    /// distinct from the server explicitly rejecting a retry.
+    struct ErrorFacts: Sendable, Equatable {
+        var requestID: String? = nil
+        var retryAfter: TimeInterval? = nil
+        var authenticationRejected = false
+        var serverRetryable: Bool? = nil
+    }
+
+    static func errorFacts(for error: Error) -> ErrorFacts {
+        (error as? RequestError)?.facts ?? ErrorFacts()
+    }
+
     static func get<Payload: Decodable & Sendable>(
         _ path: String,
         query: [URLQueryItem] = [],
@@ -274,5 +288,24 @@ nonisolated extension APIClient {
         let body: Data
 
         var isPending: Bool { statusCode == 202 }
+    }
+}
+
+nonisolated extension APIClient.RequestError {
+    var facts: APIClient.ErrorFacts {
+        switch self {
+        case .server(let code, _, let status, let requestID, let retryable, let retryAfter):
+            .init(requestID: requestID, retryAfter: retryAfter,
+                  authenticationRejected: status == 401 || code == "not_authenticated",
+                  serverRetryable: retryable)
+        case .rateLimited(let retryAfter, let requestID):
+            .init(requestID: requestID, retryAfter: retryAfter)
+        case .serviceUnavailable(let retryAfter, let requestID):
+            .init(requestID: requestID, retryAfter: retryAfter)
+        case .unexpectedStatus(let status):
+            .init(authenticationRejected: status == 401)
+        case .transport, .encoding, .decoding, .schemaVersionMismatch:
+            .init()
+        }
     }
 }

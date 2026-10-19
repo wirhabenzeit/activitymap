@@ -2,7 +2,7 @@ import Foundation
 
 nonisolated struct IngestionPresentation {
     struct Row: Identifiable {
-        var id: String { title }
+        let id: String
         let title: String
         let coverage: String
         let counts: String
@@ -11,71 +11,71 @@ nonisolated struct IngestionPresentation {
         let retryAt: Date?
         let outcome: ActivityMapAPI.IngestionRunOutcome?
     }
-    static func rows(_ status: ActivityMapAPI.IngestionStatus) -> [Row] {
+    static func rows(_ status: ActivityMapAPI.IngestionStatus, locale: Locale = .current) -> [Row] {
         let h = status.history, d = status.details, s = status.streams, p = status.photos
         return [
-            Row(title: "Activity history", coverage: progress(h.progress),
-                counts: h.totalActivityCount == nil ? "\(h.knownActivityCount) activities imported · Strava total not yet known" : "\(h.knownActivityCount) activities imported · full history discovered",
-                schedule: scheduling(h.scheduling), reason: h.schedulingReason.map(reason), retryAt: h.retryAt, outcome: h.lastOutcome),
-            Row(title: "Activity details", coverage: progress(d.progress),
-                counts: "\(d.detailed) fetched · \(d.neverFetched) awaiting first fetch · \(d.invalidated) awaiting refresh · \(d.retryWaiting) of these waiting to retry",
-                schedule: scheduling(d.scheduling), reason: d.schedulingReason.map(reason), retryAt: d.retryAt, outcome: d.lastOutcome),
-            Row(title: "Streams & charts", coverage: s.failed > 0 ? "Needs attention" : progress(s.progress),
-                counts: "\(s.withData) with data · \(s.withoutData) with no sensor data · \(s.runnable) queued · \(s.waiting) waiting · \(s.blocked) blocked · \(s.failed) failed. \(s.chartSummaries) chart summaries available.",
-                schedule: scheduling(s.scheduling), reason: s.schedulingReason.map(reason), retryAt: s.retryAt, outcome: nil),
-            Row(title: "Photo metadata", coverage: progress(p.progress),
-                counts: "\(p.current) of \(p.activitiesWithPhotos) activities with photos checked · \(p.refreshRequired) awaiting refresh · \(p.unknown) not checked. \(p.photoCount) photo records; image downloads are separate.",
-                schedule: scheduling(p.scheduling), reason: p.schedulingReason.map(reason), retryAt: p.retryAt, outcome: nil)
+            Row(id: "history", title: String(localized: AppMessages.statusPipelineHistory(locale: locale)), coverage: progress(h.progress, locale: locale),
+                counts: h.totalActivityCount == nil ? String(localized: AppMessages.statusHistoryUnknown(h.knownActivityCount, locale: locale)) : String(localized: AppMessages.statusHistoryComplete(h.knownActivityCount, locale: locale)),
+                schedule: scheduling(h.scheduling, locale: locale), reason: h.schedulingReason.map { reason($0, locale: locale) }, retryAt: h.retryAt, outcome: h.lastOutcome),
+            Row(id: "details", title: String(localized: AppMessages.statusPipelineDetails(locale: locale)), coverage: progress(d.progress, locale: locale),
+                counts: String(localized: AppMessages.statusDetailsCounts(d.detailed, d.neverFetched, d.invalidated, d.retryWaiting, locale: locale)),
+                schedule: scheduling(d.scheduling, locale: locale), reason: d.schedulingReason.map { reason($0, locale: locale) }, retryAt: d.retryAt, outcome: d.lastOutcome),
+            Row(id: "streams", title: String(localized: AppMessages.statusPipelineStreams(locale: locale)), coverage: s.failed > 0 ? String(localized: AppMessages.statusCompactNeedsAttention(locale: locale)) : progress(s.progress, locale: locale),
+                counts: String(localized: AppMessages.statusStreamsCounts(s.withData, s.withoutData, s.runnable, s.waiting, s.blocked, s.failed, s.chartSummaries, locale: locale)),
+                schedule: scheduling(s.scheduling, locale: locale), reason: s.schedulingReason.map { reason($0, locale: locale) }, retryAt: s.retryAt, outcome: nil),
+            Row(id: "photos", title: String(localized: AppMessages.statusPipelinePhotos(locale: locale)), coverage: progress(p.progress, locale: locale),
+                counts: String(localized: AppMessages.statusPhotosCounts(p.current, p.activitiesWithPhotos, p.refreshRequired, p.unknown, p.photoCount, locale: locale)),
+                schedule: scheduling(p.scheduling, locale: locale), reason: p.schedulingReason.map { reason($0, locale: locale) }, retryAt: p.retryAt, outcome: nil)
         ]
     }
     static func stale(_ status: ActivityMapAPI.IngestionStatus, now: Date) -> Bool {
         now.timeIntervalSince(status.observedAt) >= 120
     }
-    static func progress(_ value: ActivityMapAPI.IngestionProgress) -> String {
+    static func progress(_ value: ActivityMapAPI.IngestionProgress, locale: Locale = .current) -> String {
         switch value {
-        case .notStarted: "Not started"
-        case .inProgress: "Partially available"
-        case .complete: "Covered"
-        case .unknown: "Unknown"
+        case .notStarted: String(localized: AppMessages.statusProgressNotStarted(locale: locale))
+        case .inProgress: String(localized: AppMessages.statusProgressInProgress(locale: locale))
+        case .complete: String(localized: AppMessages.statusProgressComplete(locale: locale))
+        case .unknown: String(localized: AppMessages.statusProgressUnknown(locale: locale))
         }
     }
-    static func scheduling(_ value: ActivityMapAPI.IngestionScheduling) -> String {
+    static func scheduling(_ value: ActivityMapAPI.IngestionScheduling, locale: Locale = .current) -> String {
         switch value {
-        case .idle: "No work pending"
-        case .scheduled: "Automatic processing scheduled"
-        case .waiting: "Waiting to retry"
-        case .blocked: "Reconnect Strava to continue"
-        case .disabled: "Background processing is disabled on the server"
-        case .stalled: "Background processing has stopped reporting; contact support if this continues"
-        case .notScheduled: "No automatic refresh is scheduled"
-        case .unknown: "No background run has been recorded"
+        case .idle: String(localized: AppMessages.statusSchedulingIdle(locale: locale))
+        case .scheduled: String(localized: AppMessages.statusSchedulingScheduled(locale: locale))
+        case .waiting: String(localized: AppMessages.statusSchedulingWaiting(locale: locale))
+        case .blocked: String(localized: AppMessages.statusSchedulingBlocked(locale: locale))
+        case .disabled: String(localized: AppMessages.statusSchedulingDisabled(locale: locale))
+        case .stalled: String(localized: AppMessages.statusSchedulingStalled(locale: locale))
+        case .notScheduled: String(localized: AppMessages.statusSchedulingNotScheduled(locale: locale))
+        case .unknown: String(localized: AppMessages.statusSchedulingUnknown(locale: locale))
         }
     }
-    static func reason(_ value: ActivityMapAPI.IngestionReason) -> String {
+    static func reason(_ value: ActivityMapAPI.IngestionReason, locale: Locale = .current) -> String {
         switch value {
-        case .rateLimited: "Strava request limit reached; processing will resume on a later run"
-        case .timeBudget: "More work remains for the next scheduled run"
-        case .credentialsUnavailable: "Reconnect Strava to continue"
-        case .unauthorized: "Strava rejected the connection; reconnect Strava"
-        case .upstreamError: "Strava could not be reached"
-        case .invalidResponse: "Strava returned data that could not be read"
-        case .detailFailures: "Some activity details could not be fetched and will be retried"
-        case .photoRefreshFailed: "Photo metadata could not be refreshed"
-        case .historyFetchFailed: "Activity history could not be fetched"
-        case .persistenceFailed: "The server could not save the update"
-        case .internalError: "The server could not finish processing"
+        case .rateLimited: String(localized: AppMessages.statusReasonRateLimited(locale: locale))
+        case .timeBudget: String(localized: AppMessages.statusReasonTimeBudget(locale: locale))
+        case .credentialsUnavailable: String(localized: AppMessages.statusReasonCredentialsUnavailable(locale: locale))
+        case .unauthorized: String(localized: AppMessages.statusReasonUnauthorized(locale: locale))
+        case .upstreamError: String(localized: AppMessages.statusReasonUpstreamError(locale: locale))
+        case .invalidResponse: String(localized: AppMessages.statusReasonInvalidResponse(locale: locale))
+        case .detailFailures: String(localized: AppMessages.statusReasonDetailFailures(locale: locale))
+        case .photoRefreshFailed: String(localized: AppMessages.statusReasonPhotoRefreshFailed(locale: locale))
+        case .historyFetchFailed: String(localized: AppMessages.statusReasonHistoryFetchFailed(locale: locale))
+        case .persistenceFailed: String(localized: AppMessages.statusReasonPersistenceFailed(locale: locale))
+        case .internalError: String(localized: AppMessages.statusReasonInternalError(locale: locale))
         }
     }
-    static func outcome(_ value: ActivityMapAPI.IngestionRunOutcome) -> String {
+    static func outcome(_ value: ActivityMapAPI.IngestionRunOutcome, locale: Locale = .current) -> String {
         let title: String
         switch value.outcome {
-        case .succeeded: title = "Last run succeeded"
-        case .partial: title = "Last run partly succeeded"
-        case .deferred: title = "Last run deferred"
-        case .failed: title = "Last run failed"
-        case .blocked: title = "Last run blocked"
+        case .succeeded: title = String(localized: AppMessages.statusOutcomeSucceeded(locale: locale))
+        case .partial: title = String(localized: AppMessages.statusOutcomePartial(locale: locale))
+        case .deferred: title = String(localized: AppMessages.statusOutcomeDeferred(locale: locale))
+        case .failed: title = String(localized: AppMessages.statusOutcomeFailed(locale: locale))
+        case .blocked: title = String(localized: AppMessages.statusOutcomeBlocked(locale: locale))
         }
-        return title + (value.reason.map { ": " + reason($0) } ?? "")
+        return value.reason.map { String(localized: AppMessages.statusOutcomeWithReason(title, reason($0, locale: locale), locale: locale)) } ?? title
     }
 }
 
@@ -85,7 +85,8 @@ nonisolated extension IngestionPresentation {
         let total: Int
         var fraction: Double { Double(completed) / Double(total) }
         var percent: Double { floor(fraction * 1000) / 10 }
-        var percentage: String { percent.formatted(.number.precision(.fractionLength(0...1))) + "%" }
+        var percentage: String { formattedPercentage() }
+        func formattedPercentage(locale: Locale = .current) -> String { (percent / 100).formatted(.percent.precision(.fractionLength(0...1)).locale(locale)) }
     }
     struct Summary {
         let title: String
@@ -97,27 +98,27 @@ nonisolated extension IngestionPresentation {
         guard let completed, total > 0 else { return nil }
         return CoverageProgress(completed: min(total, max(0, completed)), total: total)
     }
-    static func summaries(_ value: ActivityMapAPI.IngestionStatus) -> [Summary] {
+    static func summaries(_ value: ActivityMapAPI.IngestionStatus, locale: Locale = .current) -> [Summary] {
         let h = value.history, d = value.details, s = value.streams, p = value.photos
         return [
-            Summary(title: "History", count: "\(h.knownActivityCount.formatted()) imported" + (h.totalActivityCount == nil ? " · total unknown" : ""), status: compactStatus(h.progress, h.scheduling, outcome: h.lastOutcome)),
-            Summary(title: "Details", count: "\(d.detailed.formatted()) of \(h.knownActivityCount.formatted()) ready", status: compactStatus(d.progress, d.scheduling, outcome: d.lastOutcome), progress: coverageProgress(d.detailed, total: h.knownActivityCount)),
-            Summary(title: "Streams", count: "\((s.withData + s.withoutData).formatted()) of \(h.knownActivityCount.formatted()) checked", status: s.failed > 0 ? "Needs attention" : compactStatus(s.progress, s.scheduling), progress: coverageProgress(s.withData + s.withoutData, total: h.knownActivityCount)),
-            Summary(title: "Photos", count: p.activitiesWithPhotos == 0 ? "No photos reported" : p.activitiesWithStoredPhotos.map { "\($0.formatted()) of \(p.activitiesWithPhotos.formatted()) activities have photos available" } ?? "Photo availability not reported by this server", status: compactStatus(p.progress, p.scheduling), progress: coverageProgress(p.activitiesWithStoredPhotos, total: p.activitiesWithPhotos))
+            Summary(title: String(localized: AppMessages.statusSummaryHistory(locale: locale)), count: String(localized: h.totalActivityCount == nil ? AppMessages.statusHistorySummaryUnknown(h.knownActivityCount, locale: locale) : AppMessages.statusHistorySummary(h.knownActivityCount, locale: locale)), status: compactStatus(h.progress, h.scheduling, outcome: h.lastOutcome, locale: locale)),
+            Summary(title: String(localized: AppMessages.statusSummaryDetails(locale: locale)), count: String(localized: AppMessages.statusDetailsSummary(d.detailed, h.knownActivityCount, locale: locale)), status: compactStatus(d.progress, d.scheduling, outcome: d.lastOutcome, locale: locale), progress: coverageProgress(d.detailed, total: h.knownActivityCount)),
+            Summary(title: String(localized: AppMessages.statusSummaryStreams(locale: locale)), count: String(localized: AppMessages.statusStreamsSummary(s.withData + s.withoutData, h.knownActivityCount, locale: locale)), status: s.failed > 0 ? String(localized: AppMessages.statusCompactNeedsAttention(locale: locale)) : compactStatus(s.progress, s.scheduling, locale: locale), progress: coverageProgress(s.withData + s.withoutData, total: h.knownActivityCount)),
+            Summary(title: String(localized: AppMessages.statusSummaryPhotos(locale: locale)), count: p.activitiesWithPhotos == 0 ? String(localized: AppMessages.statusNoPhotos(locale: locale)) : p.activitiesWithStoredPhotos.map { String(localized: AppMessages.statusPhotosSummary($0, p.activitiesWithPhotos, locale: locale)) } ?? String(localized: AppMessages.statusPhotosUnknown(locale: locale)), status: compactStatus(p.progress, p.scheduling, locale: locale), progress: coverageProgress(p.activitiesWithStoredPhotos, total: p.activitiesWithPhotos))
         ]
     }
-    static func compactStatus(_ progress: ActivityMapAPI.IngestionProgress, _ scheduling: ActivityMapAPI.IngestionScheduling, outcome: ActivityMapAPI.IngestionRunOutcome? = nil) -> String {
+    static func compactStatus(_ progress: ActivityMapAPI.IngestionProgress, _ scheduling: ActivityMapAPI.IngestionScheduling, outcome: ActivityMapAPI.IngestionRunOutcome? = nil, locale: Locale = .current) -> String {
         switch scheduling {
-        case .blocked: return "Reconnect"
-        case .disabled: return "Paused"
-        case .stalled: return "Needs attention"
-        case .unknown: return "Schedule unknown"
-        case .waiting: return "Waiting"
-        case .notScheduled: return "Refresh pending"
+        case .blocked: return String(localized: AppMessages.statusCompactReconnect(locale: locale))
+        case .disabled: return String(localized: AppMessages.statusCompactPaused(locale: locale))
+        case .stalled: return String(localized: AppMessages.statusCompactNeedsAttention(locale: locale))
+        case .unknown: return String(localized: AppMessages.statusCompactScheduleUnknown(locale: locale))
+        case .waiting: return String(localized: AppMessages.statusCompactWaiting(locale: locale))
+        case .notScheduled: return String(localized: AppMessages.statusCompactRefreshPending(locale: locale))
         case .scheduled:
-            if outcome?.outcome == .deferred && outcome?.reason == .rateLimited { return "Waiting" }
-            return progress == .complete ? "Checking" : progress == .notStarted ? "Queued" : "Importing"
-        case .idle: return progress == .complete ? "Ready" : progress == .unknown ? "Unknown" : "Not started"
+            if outcome?.outcome == .deferred && outcome?.reason == .rateLimited { return String(localized: AppMessages.statusCompactWaiting(locale: locale)) }
+            return progress == .complete ? String(localized: AppMessages.statusCompactChecking(locale: locale)) : progress == .notStarted ? String(localized: AppMessages.statusCompactQueued(locale: locale)) : String(localized: AppMessages.statusCompactImporting(locale: locale))
+        case .idle: return progress == .complete ? String(localized: AppMessages.statusCompactReady(locale: locale)) : progress == .unknown ? String(localized: AppMessages.statusProgressUnknown(locale: locale)) : String(localized: AppMessages.statusProgressNotStarted(locale: locale))
         }
     }
 }

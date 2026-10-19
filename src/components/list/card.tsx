@@ -1,9 +1,6 @@
 'use client';
 
 import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
-import { decode } from '@mapbox/polyline';
-import { ReloadIcon } from '@radix-ui/react-icons';
-import { useQueryClient } from '@tanstack/react-query';
 import { type Row } from '@tanstack/react-table';
 import type { Feature, LineString } from 'geojson';
 import {
@@ -12,10 +9,10 @@ import {
   MoreHorizontal,
   Pencil,
   Image as PhotosIcon,
-  Route,
+  RefreshCw,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { ActivitySelectionSymbol } from '~/components/activity-selection-controls';
 import { DismissButton } from '~/components/dismiss-button';
@@ -27,7 +24,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
-import { useDateFormat } from '~/hooks/use-display-preferences';
+import { useActivityMutations } from '~/hooks/use-activity-mutations';
+import {
+  useDateFormat,
+  useFormattingLocale,
+} from '~/hooks/use-display-preferences';
 import { useElementSize } from '~/hooks/use-element-size';
 import { usePhotos } from '~/hooks/use-photos';
 import type {
@@ -35,15 +36,20 @@ import type {
   MapActionVariant,
 } from '~/hooks/use-show-on-map';
 import { useToast } from '~/hooks/use-toast';
-import { reloadStreamSummaryActivity } from '~/lib/activity-stream-summary';
+import { type Activity } from '~/lib/activity';
+import { isSilentActivityCommandError } from '~/lib/activity-command-session';
+import { activityGPXCoordinates } from '~/lib/activity-gpx';
+import { activityMutationAvailability } from '~/lib/activity-mutation-availability';
+import {
+  mutationFailureNotice,
+  mutationNotice,
+} from '~/lib/activity-mutation-notice';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
-import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
-import { requestLibrarySync } from '~/lib/sync/library-sync';
+import { semanticAction } from '~/lib/presentation/icons';
+import { message } from '~/lib/presentation/messages';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { cn } from '~/lib/utils';
-import { type Activity } from '~/server/db/schema';
-import { refreshActivity } from '~/server/strava/actions';
 import { categorySettings } from '~/settings/category';
 import { aliasMap } from '~/settings/category';
 import { store, useShallowStore } from '~/store';
@@ -57,7 +63,8 @@ import { RouteDetailsContent } from './route-details-content';
 import { type Features } from './table-extensions';
 
 interface ActivityCardContentProps {
-  row: Row<Features, Activity>;
+  activity: Activity;
+  commands?: ReturnType<typeof useActivityMutations>;
   onCollapse?: () => void;
   onClearSelection?: () => void;
   showMapButton?: boolean;
@@ -71,25 +78,34 @@ interface ActivityCardContentProps {
 const LABELLED_ACTIONS_WIDTH = 520;
 
 export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
+  const activity = row.original;
   const [open, setOpen] = useState(false);
-  const isGuest = useShallowStore((state) => state.isGuest);
+  const canEdit = useShallowStore(
+    (state) => activityMutationAvailability(state).canEdit,
+  );
 
   return (
     <>
       <div
         className="flex h-full w-full items-center truncate italic"
-        onDoubleClick={() => !isGuest && setOpen(true)}
+        onDoubleClick={() => canEdit && setOpen(true)}
       >
-        {row.original.description}
+        {activity.description}
       </div>
-      <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
+      <EditActivity
+        activity={activity}
+        open={open}
+        setOpen={setOpen}
+        trigger={false}
+      />
     </>
   );
 }
 
 /** Route details shown in place of a table row (map panel and list). */
 export function ActivityCardContent({
-  row,
+  activity,
+  commands: suppliedCommands,
   onCollapse,
   onClearSelection,
   showMapButton = true,
@@ -99,88 +115,66 @@ export function ActivityCardContent({
   mapActionVariant = 'show',
 }: ActivityCardContentProps) {
   const dateFormat = useDateFormat();
+  const locale = useFormattingLocale();
   const [open, setOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const boundCommands = useActivityMutations(activity.id);
+  const commands = suppliedCommands ?? boundCommands;
+  const loading = commands.isPending;
   const { isGuest, stravaConnected, userId } = useShallowStore((state) => ({
     isGuest: state.isGuest,
     stravaConnected: state.user?.stravaConnected ?? false,
     userId: state.user?.id,
   }));
+  const { canEdit, editReason } = useShallowStore(activityMutationAvailability);
   const { data: allPhotos = [] } = usePhotos();
-  const queryClient = useQueryClient();
   const { toast } = useToast();
   const [cardRef, { width: cardWidth }] = useElementSize();
   const labelled = cardWidth >= LABELLED_ACTIONS_WIDTH;
 
-  const sport_type = row.original.sport_type;
+  const sport_type = activity.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
-  const activityId = row.original.id;
+  const activityId = activity.id;
 
   const photos = allPhotos.filter((p) => p.activity_id === activityId);
 
-  const id: number = row.getValue('id');
+  const id: number = activity.id;
 
-  const date = row.original.start_date_local;
+  const date = activity.start_date_local;
+  const coordinates = useMemo(
+    () => activityGPXCoordinates(activity),
+    [activity],
+  );
+  const canExport = coordinates.length > 0;
   const handleRefresh = async () => {
-    const isCurrent = () => {
-      const state = useShallowStore.getState();
-      return !!userId && state.user?.id === userId && !state.isGuest;
-    };
-    if (!isCurrent()) return;
-    if (!stravaConnected) return;
-    setLoading(true);
+    if (loading || !commands.isCurrent()) return;
     try {
-      await refreshActivity(row.original.id);
-      if (!userId || !isCurrent()) return;
-
-      if (userId) {
-        await reloadStreamSummaryActivity(
-          queryClient,
-          userId,
-          String(row.original.id),
+      const outcome = await commands.refresh();
+      if (commands.isCurrent())
+        toast(
+          mutationNotice(
+            outcome,
+            'refresh',
+            () => commands.retryCache(outcome),
+            commands.isCurrent,
+          ),
         );
-      }
-
-      if (userId)
-        await requestLibrarySync(
-          queryClient,
-          authenticatedLibraryScope(userId),
-        );
-      if (!isCurrent()) return;
-
-      toast({
-        title: 'Activity Refreshed',
-        description: 'Successfully refreshed activity data from Strava.',
-      });
     } catch (error) {
-      if (!isCurrent()) return;
-      console.error(error);
-      toast({
-        title: 'Error',
-        description: 'Failed to refresh activity.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
+      if (isSilentActivityCommandError(error)) return;
+      if (commands.isCurrent()) toast(mutationFailureNotice(error, 'refresh'));
     }
   };
 
   const handleDownloadGpx = () => {
-    const polyline =
-      row.original.map_polyline ?? row.original.map_summary_polyline;
-    if (!polyline) return;
-
-    // Decode polyline to coordinates
-    const coordinates = decode(polyline).map(([lat, lon]) => [lon, lat]);
-    const name: string = row.getValue('name');
+    if (!canExport) return;
+    const name: string = activity.name;
 
     // Create GeoJSON object
     const geojson: Feature<LineString> = {
       type: 'Feature',
       properties: {
         name,
-        time: row.original.start_date.toISOString(),
+        time: activity.start_date.toISOString(),
       },
       geometry: {
         type: 'LineString',
@@ -192,9 +186,9 @@ export function ActivityCardContent({
     const options: { metadata: { name: string; time: string; desc?: string } } =
       {
         metadata: {
-          name: String(row.getValue('name')),
-          time: row.original.start_date.toISOString(),
-          desc: row.original.description ?? undefined,
+          name: String(activity.name),
+          time: activity.start_date.toISOString(),
+          desc: activity.description ?? undefined,
         },
       };
 
@@ -218,7 +212,7 @@ export function ActivityCardContent({
       <ElevationChart
         activityId={String(activityId)}
         userId={userId}
-        streamMetadata={activityStreamMetadata(row.original)}
+        streamMetadata={activityStreamMetadata(activity)}
       />
     ) : null;
 
@@ -235,8 +229,8 @@ export function ActivityCardContent({
         >
           <div className="flex items-center gap-2">
             <ActivitySelectionSymbol
-              id={row.original.id}
-              name={String(row.getValue('name'))}
+              id={activity.id}
+              name={String(activity.name)}
               disabled={readOnly}
             >
               {Icon && sport_group && (
@@ -248,20 +242,24 @@ export function ActivityCardContent({
             </ActivitySelectionSymbol>
             <div className="min-w-0 flex-1">
               <CardTitle className="text-base leading-5">
-                {row.getValue('name')}
+                {activity.name}
               </CardTitle>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {sport_type} · {formatPreferredDate(date, dateFormat)} ·{' '}
-                {formatLocalTime(date, {
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                {sport_type} · {formatPreferredDate(date, dateFormat, locale)} ·{' '}
+                {formatLocalTime(
+                  date,
+                  {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  },
+                  locale,
+                )}
               </p>
             </div>
             {/* The map overlay provides its fit action in the navigation header. */}
             {showMapButton && onShowOnMap && (
               <ActivityMapAction
-                activity={row.original}
+                activity={activity}
                 onShowOnMap={onShowOnMap}
                 variant={mapActionVariant}
                 labelled={labelled}
@@ -271,11 +269,21 @@ export function ActivityCardContent({
               <Button
                 variant="ghost"
                 size="sm"
-                className="h-7 shrink-0 px-2 text-xs"
-                onClick={() => setOpen(true)}
-                disabled={isGuest || readOnly}
+                className="min-h-11 shrink-0 px-2 text-xs"
+                onClick={() => canEdit && setOpen(true)}
+                title={editReason}
+                aria-label={
+                  editReason
+                    ? message('activity.action.unavailable', {
+                        action: message('action.edit'),
+                        name: activity.name,
+                        reason: editReason,
+                      })
+                    : undefined
+                }
+                disabled={loading || !canEdit || readOnly}
               >
-                Edit
+                {message('action.edit')}
               </Button>
             )}
             <DropdownMenu modal={false}>
@@ -283,8 +291,8 @@ export function ActivityCardContent({
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-7 w-7"
-                  aria-label="More route actions"
+                  className="size-11"
+                  aria-label={message('actions.more')}
                 >
                   <MoreHorizontal className="h-4 w-4" />
                 </Button>
@@ -292,26 +300,61 @@ export function ActivityCardContent({
               <DropdownMenuContent align="end">
                 {!labelled && (
                   <DropdownMenuItem
-                    onSelect={() => setOpen(true)}
-                    disabled={isGuest || readOnly}
+                    onSelect={() => canEdit && setOpen(true)}
+                    title={editReason}
+                    aria-label={
+                      editReason
+                        ? message('activity.action.unavailable', {
+                            action: message('action.edit'),
+                            name: activity.name,
+                            reason: editReason,
+                          })
+                        : undefined
+                    }
+                    disabled={loading || !canEdit || readOnly}
                   >
-                    <Pencil /> Edit
+                    <Pencil aria-hidden="true" />
+                    <span>
+                      {message('action.edit')}
+                      {editReason && (
+                        <span className="block text-xs text-muted-foreground">
+                          {editReason}
+                        </span>
+                      )}
+                    </span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem
                   onSelect={() => void handleRefresh()}
                   disabled={loading || isGuest || readOnly || !stravaConnected}
                 >
-                  <ReloadIcon /> Refresh from Strava
+                  <RefreshCw aria-hidden="true" /> {message('action.refresh')}
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onSelect={handleDownloadGpx}
-                  disabled={
-                    !row.original.map_polyline &&
-                    !row.original.map_summary_polyline
+                  title={
+                    !canExport ? message('activity.action.noRoute') : undefined
                   }
+                  aria-label={
+                    !canExport
+                      ? message('activity.action.unavailable', {
+                          action: message('action.exportGPX'),
+                          name: activity.name,
+                          reason: message('activity.action.noRoute'),
+                        })
+                      : undefined
+                  }
+                  disabled={!canExport}
                 >
-                  <Download /> Download GPX
+                  <Download aria-hidden="true" />
+                  <span>
+                    {message('action.exportGPX')}
+                    {!canExport && (
+                      <span className="block text-xs text-muted-foreground">
+                        {message('activity.action.noRoute')}
+                      </span>
+                    )}
+                  </span>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
                   <Link
@@ -319,7 +362,8 @@ export function ActivityCardContent({
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <ExternalLink /> Open in Strava
+                    <ExternalLink aria-hidden="true" />{' '}
+                    {message('action.openInStrava')}
                   </Link>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -327,7 +371,7 @@ export function ActivityCardContent({
             {onCollapse && (
               <DismissButton
                 intent="collapse"
-                label="Collapse route details"
+                label={message('action.collapse')}
                 onClick={onCollapse}
               />
             )}
@@ -336,10 +380,10 @@ export function ActivityCardContent({
                 variant="ghost"
                 size="sm"
                 onClick={onClearSelection}
-                aria-label="Clear selection"
-                title="Clear selection"
+                aria-label={message('action.clearSelection')}
+                title={message('action.clearSelection')}
               >
-                Clear selection
+                {message('action.clearSelection')}
               </Button>
             )}
           </div>
@@ -347,26 +391,26 @@ export function ActivityCardContent({
         <RouteDetailsContent
           key={activityId}
           elevation={elevationProfile}
-          description={row.original.description}
+          description={activity.description}
         >
           <ActivityDetailStats
-            activity={row.original}
+            activity={activity}
             photos={
               photos.length > 0 ? (
                 <section
                   className="min-w-0 border-t pt-3"
-                  aria-label="Activity photos"
+                  aria-label={message('activity.photos')}
                 >
                   <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-muted-foreground">
                     <PhotosIcon className="h-4 w-4" aria-hidden="true" />
-                    Photos
+                    {message('activity.photos')}
                     <span className="text-xs font-normal text-muted-foreground tabular-nums">
                       {photos.length}
                     </span>
                   </h3>
                   <PhotoLightbox
                     photos={photos}
-                    title={row.getValue('name')}
+                    title={activity.name}
                     className="h-24 sm:h-28"
                   />
                 </section>
@@ -375,7 +419,13 @@ export function ActivityCardContent({
           />
         </RouteDetailsContent>
       </Card>
-      <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
+      <EditActivity
+        activity={activity}
+        commands={commands}
+        open={open}
+        setOpen={setOpen}
+        trigger={false}
+      />
     </>
   );
 }
@@ -395,15 +445,19 @@ export function ActivityCard({
   mapActionVariant?: MapActionVariant;
 }) {
   const [open, setOpen] = useState(false);
-  const { isHighlighted, isGuest } = useShallowStore((state) => ({
+  const { isHighlighted, canEdit } = useShallowStore((state) => ({
     isHighlighted: state.highlighted === row.original.id,
-    isGuest: state.isGuest,
+    canEdit: activityMutationAvailability(state).canEdit,
   }));
 
   const sport_type = row.original.sport_type;
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
-  const highlightLabel = `${isHighlighted ? 'Deactivate' : 'Make active'}: ${row.original.name}`;
+  const ActivationIcon = semanticAction('activate').Icon;
+  const highlightLabel = message(
+    isHighlighted ? 'action.deactivateActivity' : 'action.activateActivity',
+    { name: row.original.name },
+  );
 
   const prototypeSelected = useShallowStore((state) =>
     state.selected.includes(row.original.id),
@@ -420,7 +474,7 @@ export function ActivityCard({
     <>
       <div
         className="flex w-full min-w-0 items-center space-x-2"
-        onDoubleClick={() => !isGuest && setOpen(true)}
+        onDoubleClick={() => canEdit && setOpen(true)}
       >
         <ActivitySelectionSymbol
           id={row.original.id}
@@ -446,11 +500,9 @@ export function ActivityCard({
             )}
             aria-label={highlightLabel}
             aria-pressed={isHighlighted}
-            title={
-              isHighlighted
-                ? 'Active on map. Clear highlight'
-                : 'Highlight route on map'
-            }
+            title={message(
+              isHighlighted ? 'action.deactivateHint' : 'action.activateHint',
+            )}
             onClick={() => {
               const state = store.getState();
               state.setHighlighted(
@@ -458,7 +510,10 @@ export function ActivityCard({
               );
             }}
           >
-            <Route aria-hidden="true" strokeWidth={isHighlighted ? 2.5 : 2} />
+            <ActivationIcon
+              aria-hidden="true"
+              strokeWidth={isHighlighted ? 2.5 : 2}
+            />
           </Button>
         )}
         {showMapButton && onShowOnMap && (
@@ -470,7 +525,12 @@ export function ActivityCard({
           />
         )}
       </div>
-      <EditActivity row={row} open={open} setOpen={setOpen} trigger={false} />
+      <EditActivity
+        activity={row.original}
+        open={open}
+        setOpen={setOpen}
+        trigger={false}
+      />
     </>
   );
 }

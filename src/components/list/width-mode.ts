@@ -1,5 +1,8 @@
 import { type RowData, type Table } from '@tanstack/react-table';
 import { FoldHorizontal, MoveHorizontal, Pin } from 'lucide-react';
+
+import { message } from '~/lib/presentation/messages';
+
 import { type Features } from './table-extensions';
 
 /**
@@ -13,9 +16,17 @@ export const widthModes: Record<
   WidthMode,
   { label: string; next: WidthMode; icon: typeof Pin }
 > = {
-  fit: { label: 'Fit to width', next: 'pinned', icon: FoldHorizontal },
-  pinned: { label: 'Scroll, name pinned', next: 'free', icon: Pin },
-  free: { label: 'Scroll freely', next: 'fit', icon: MoveHorizontal },
+  fit: {
+    label: message('list.width.fit'),
+    next: 'pinned',
+    icon: FoldHorizontal,
+  },
+  pinned: { label: message('list.width.pinned'), next: 'free', icon: Pin },
+  free: {
+    label: message('list.width.free'),
+    next: 'fit',
+    icon: MoveHorizontal,
+  },
 };
 
 export function getWidthMode<TData extends RowData>(

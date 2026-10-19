@@ -3,6 +3,7 @@ import UIKit
 import Observation
 
 struct StatsScreen: View {
+    @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     var sync: SyncController? = nil
     var refresh: () async -> Void = {}
@@ -77,7 +78,7 @@ struct StatsScreen: View {
                         if presentation.hasContent {
                             ForEach(StatsTileGroup.allCases, id: \.self) { group in
                                 VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                                    Text(group.title).font(.title2.weight(.semibold))
+                                    Text(group.titleResource(locale: locale)).font(.title2.weight(.semibold))
                                         .accessibilityAddTraits(.isHeader)
                                     let columns = !typeSize.isAccessibilitySize
                                         && geometry.size.width >= (detailLimit != nil ? 640 : 760) ? 2 : 1

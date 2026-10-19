@@ -28,10 +28,10 @@ struct ActivityDetailActions: View {
             VStack(spacing: 0) {
                 if let editing {
                     Button { isEditing = true } label: {
-                        row(title: Text("Edit activity"), subtitle: "Change name, sport or description", icon: "pencil",
+                        row(title: Text(AppMessages.activityEditTitle(locale: locale)), subtitle: Text(AppMessages.activityEditSubtitle(locale: locale)), icon: ActionPresentation.glyph(.edit),
                             trailing: "chevron.right", busy: false)
                     }
-                    .accessibilityLabel("Edit activity")
+                    .accessibilityLabel(Text(AppMessages.activityEditTitle(locale: locale)))
                     .accessibilityIdentifier("activity-edit-action")
                     .sheet(isPresented: $isEditing) {
                         ActivityEditForm(activity: activity, service: editing)
@@ -41,25 +41,25 @@ struct ActivityDetailActions: View {
                 if let showOnMap, !overMap {
                     Button { showOnMap(activity.id) } label: {
                         row(title: Text(AppMessages.actionShowOnMap(locale: locale)),
-                            subtitle: hasRoute ? "Select this activity and frame its route" : "This activity has no GPS route",
+                            subtitle: Text(hasRoute ? AppMessages.activityActionShowOnMapHint(locale: locale) : AppMessages.activityActionNoRoute(locale: locale)),
                             icon: ActionPresentation.glyph(.showOnMap), trailing: "arrow.up.right", busy: false)
                     }
                     .disabled(!hasRoute)
                     .opacity(hasRoute ? 1 : 0.5)
                     .accessibilityLabel(Text(AppMessages.actionShowOnMap(locale: locale)))
                     .accessibilityIdentifier("activity-show-on-map")
-                    .accessibilityHint(hasRoute ? "Select this activity and frame its route" : "This activity has no GPS route")
+                    .accessibilityHint(Text(hasRoute ? AppMessages.activityActionShowOnMapHint(locale: locale) : AppMessages.activityActionNoRoute(locale: locale)))
                     Divider().padding(.leading, 44)
                 }
                 ActivityShareButton(activities: { [activity] }) {
-                    row(title: Text("Share activity"), subtitle: "Create an expiring link to its map", icon: "square.and.arrow.up",
+                    row(title: Text(AppMessages.actionShareActivity(locale: locale)), subtitle: Text(AppMessages.activityActionShareHint(locale: locale)), icon: ActionPresentation.glyph(.shareActivity),
                         trailing: "chevron.right", busy: false)
                 }
                 .accessibilityIdentifier("activity-share")
                 Divider().padding(.leading, 44)
                 Button(action: openStrava) {
-                    row(title: openingStrava ? Text("Opening Strava…") : Text("Open in Strava"),
-                        subtitle: "View the original activity", icon: "arrow.up.right.square",
+                    row(title: Text(openingStrava ? AppMessages.actionOpeningStrava(locale: locale) : AppMessages.actionOpenInStrava(locale: locale)),
+                        subtitle: Text(AppMessages.activityActionStravaHint(locale: locale)), icon: ActionPresentation.glyph(.openInStrava),
                         trailing: "arrow.up.right", busy: openingStrava)
                 }
                 .disabled(openingStrava)
@@ -67,15 +67,15 @@ struct ActivityDetailActions: View {
                 Divider().padding(.leading, 44)
                 Button(action: { workflow.export(source: source, current: { source }) }) {
                     row(title: Text(workflow.isExporting ? AppMessages.actionPreparingGPX(locale: locale) : AppMessages.actionExportGPXNative(locale: locale)),
-                        subtitle: availability.subtitle, icon: ActionPresentation.glyph(.exportGPX),
+                        subtitle: Text(availability.subtitleResource(locale: locale)), icon: ActionPresentation.glyph(.exportGPX),
                         trailing: "square.and.arrow.up", busy: workflow.isExporting)
                 }
                 .disabled(!availability.canExport || workflow.isExporting || workflow.file != nil)
                 .opacity(availability.canExport ? 1 : 0.5)
                 .accessibilityIdentifier("activity-export-gpx")
-                .accessibilityHint(availability.hint)
+                .accessibilityHint(Text(availability.hintResource(locale: locale)))
                 .background(ActivityGPXSharePresenter(file: $workflow.file) { error in
-                    workflow.report(title: "Couldn’t share GPX", message: error.localizedDescription)
+                    workflow.report(title: String(localized: AppMessages.activityActionShareGPXFailed(locale: locale)), message: error.localizedDescription)
                 })
             }
             .buttonStyle(.plain)
@@ -88,7 +88,7 @@ struct ActivityDetailActions: View {
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("activity-detail-actions")
         .alert(item: $workflow.failure) { failure in
-            Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text("OK")))
+            Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text(AppMessages.actionOk(locale: locale))))
         }
         .task(id: key) { await workflow.prepare(source, key: key, current: { self.source }) }
         .onDisappear {
@@ -97,13 +97,13 @@ struct ActivityDetailActions: View {
         }
     }
 
-    private func row(title: Text, subtitle: String, icon: String, trailing: String, busy: Bool) -> some View {
+    private func row(title: Text, subtitle: Text, icon: String, trailing: String, busy: Bool) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(AppTheme.Typography.icon).foregroundStyle(AppTheme.accent).frame(width: 22)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
                 title.font(.subheadline.weight(.medium)).foregroundStyle(.primary)
-                Text(subtitle).font(.caption).foregroundStyle(AppTheme.secondaryText)
+                subtitle.font(.caption).foregroundStyle(AppTheme.secondaryText)
             }
             .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -123,7 +123,7 @@ struct ActivityDetailActions: View {
             defer { openingStrava = false; stravaTask = nil }
             do { try await StravaActivityLink.open(activityID: id) }
             catch is CancellationError { }
-            catch { if !Task.isCancelled { workflow.report(title: "Couldn’t open Strava", message: error.localizedDescription) } }
+            catch { if !Task.isCancelled { workflow.report(title: String(localized: AppMessages.activityActionOpenFailed(locale: locale)), message: error.localizedDescription) } }
         }
     }
 

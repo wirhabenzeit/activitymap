@@ -1,7 +1,14 @@
 'use client';
 
 import { format } from 'date-fns/format';
-import { FunnelX, ListFilter, MoreHorizontal, Search } from 'lucide-react';
+import {
+  Check,
+  FunnelX,
+  ListFilter,
+  Minus,
+  MoreHorizontal,
+  Search,
+} from 'lucide-react';
 import { CalendarIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
@@ -39,10 +46,10 @@ import {
   useSidebar,
 } from '~/components/ui/sidebar';
 import { Switch } from '~/components/ui/switch';
+import type { SportType } from '~/contracts/sport';
 import { useDisplayUnits } from '~/hooks/use-display-preferences';
 import { measurementScale, measurementUnit } from '~/lib/units';
 import { cn } from '~/lib/utils';
-import { type SportType } from '~/server/db/schema';
 import { categorySettings } from '~/settings/category';
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
 import { useShallowStore } from '~/store';
@@ -111,6 +118,9 @@ export function CategoryFilter() {
         ([id, { name, color, icon: Icon, alias }]) => (
           <SidebarMenuItem key={id}>
             <SidebarMenuButton
+              data-category-state={String(
+                sportGroup[id as keyof typeof sportGroup],
+              )}
               aria-pressed={
                 sportGroup[id as keyof typeof sportGroup] === 'mixed'
                   ? 'mixed'
@@ -118,6 +128,17 @@ export function CategoryFilter() {
               }
               onClick={(e) => {
                 e.preventDefault();
+                // Keyboard/assistive activation has no pointer click count.
+                // Apply each command once without the pointer double-click delay.
+                if (e.detail === 0) {
+                  setSportGroup((group) => ({
+                    ...group,
+                    [id]: toggleSportGroupState(
+                      group[id as keyof typeof group],
+                    ),
+                  }));
+                  return;
+                }
                 setClicks(clicks + 1);
                 setKey(id as keyof typeof categorySettings);
               }}
@@ -137,7 +158,18 @@ export function CategoryFilter() {
                 {name}
               </span>
               {sportGroup[id as keyof typeof sportGroup] === 'mixed' ? (
-                <span className="sr-only">Some activity types selected</span>
+                <>
+                  <Minus
+                    className="ml-auto size-3.5 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only">Some activity types selected</span>
+                </>
+              ) : sportGroup[id as keyof typeof sportGroup] ? (
+                <Check
+                  className="ml-auto size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
               ) : null}
             </SidebarMenuButton>
             <DropdownMenu modal={false}>

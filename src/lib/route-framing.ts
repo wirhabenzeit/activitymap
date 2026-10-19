@@ -1,6 +1,6 @@
 import polyline from '@mapbox/polyline';
 
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/lib/activity';
 
 export type RouteBounds = [[number, number], [number, number]];
 type Rect = { left: number; top: number; right: number; bottom: number };

@@ -20,8 +20,8 @@ import Testing
     @Test func sharedPresentationMatchesWebForEveryScenario() throws {
         let expected = try JSONDecoder().decode([String: [Expected]].self, from: Data(contentsOf: shared.appending(path: "ingestion-client-expectations.v1.json")))
         for scenario in try corpus().scenarios {
-            let rows = IngestionPresentation.rows(scenario.status)
-            let summaries = IngestionPresentation.summaries(scenario.status)
+            let rows = IngestionPresentation.rows(scenario.status, locale: Locale(identifier: "en_US"))
+            let summaries = IngestionPresentation.summaries(scenario.status, locale: Locale(identifier: "en_US"))
             #expect(summaries.count == 4)
             #expect(summaries[0].count.contains("total unknown") == (scenario.status.history.totalActivityCount == nil))
             #expect((summaries[2].status == "Needs attention") == (scenario.status.streams.failed > 0 || scenario.status.streams.scheduling == .stalled))

@@ -6,6 +6,7 @@ struct BrowseContent: View {
     var sync: SyncController? = nil
     var isSigningIn = false
     var mapPicker: RoutePicker? = nil
+    @Environment(\.locale) private var locale
     @Environment(\.browseStatsDestination) private var statsDestination
     @Environment(\.stravaConnect) private var stravaConnect
     @Environment(\.browsePaneWidth) private var paneWidth
@@ -96,7 +97,7 @@ struct BrowseContent: View {
     }
 
     private var presentation: BrowsingPresentation {
-        BrowsingPresentation(store: store, sync: sync, isSigningIn: isSigningIn)
+        BrowsingPresentation(store: store, sync: sync, isSigningIn: isSigningIn, locale: locale)
     }
 
     private func recover(_ action: BrowsingPresentation.Recovery) {

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { sportTypes } from '~/server/strava/types';
+import { sportTypes } from '~/contracts/sport';
 
 import { activityDTOSchema } from './activity';
 import { photoDTOSchema } from './photo';
@@ -10,13 +10,17 @@ import { photoDTOSchema } from './photo';
 export const ACTIVITY_NAME_MAX_LENGTH = 255;
 export const ACTIVITY_DESCRIPTION_MAX_LENGTH = 10_000;
 
-const activityNameSchema = z
+export const activityNameSchema = z
   .string()
   .min(1)
   .max(ACTIVITY_NAME_MAX_LENGTH)
-  .refine((name) => name.trim().length > 0, {
-    message: 'Name must contain a non-whitespace character',
-  });
+  .refine((name) => name.trim().length > 0);
+
+export const editableActivityFields = {
+  name: activityNameSchema,
+  description: z.string().max(ACTIVITY_DESCRIPTION_MAX_LENGTH),
+  sport_type: z.enum(sportTypes),
+};
 
 /**
  * Editable fields exposed to first-party clients. Omission means "leave the
@@ -25,9 +29,9 @@ const activityNameSchema = z
  */
 export const updateActivityRequestSchema = z
   .strictObject({
-    name: activityNameSchema.optional(),
-    description: z.string().max(ACTIVITY_DESCRIPTION_MAX_LENGTH).optional(),
-    sport_type: z.enum(sportTypes).optional(),
+    name: editableActivityFields.name.optional(),
+    description: editableActivityFields.description.optional(),
+    sport_type: editableActivityFields.sport_type.optional(),
   })
   .refine((value) => Object.keys(value).length > 0, {
     message: 'At least one editable field is required',

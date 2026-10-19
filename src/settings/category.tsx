@@ -7,9 +7,9 @@ import {
 } from 'react-icons/fa6';
 import { type IconType } from 'react-icons/lib';
 
+import type { Activity } from '~/lib/activity';
 import { message } from '~/lib/presentation/messages';
 import { sportCategories } from '~/lib/presentation/sports';
-import { type Activity } from '~/server/db/schema';
 
 export type CategorySetting = Record<
   'bcXcSki' | 'trailHike' | 'run' | 'ride' | 'misc',

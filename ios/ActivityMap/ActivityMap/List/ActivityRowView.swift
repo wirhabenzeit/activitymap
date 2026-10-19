@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct ActivityRowView: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
     @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     let activity: Activity
@@ -64,19 +66,19 @@ struct ActivityRowView: View {
                     }
                 }
                 if !ActivityTableLayout.showsDate(settings, availableWidth: availableWidth) {
-                    Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
+                    Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system))
                         .font(.caption2).foregroundStyle(AppTheme.secondaryText)
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.trailing, 6)
             if ActivityTableLayout.showsDate(settings, availableWidth: availableWidth) {
-                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt))
+                Text(Formatters.shortDate(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system))
                     .font(.caption).foregroundStyle(AppTheme.secondaryText)
                     .frame(width: 120, alignment: .leading)
             }
             ForEach(settings.orderedMetrics) { metric in
-                Text(ActivityTableLayout.value(metric, activity: activity, speedDisplay: speedDisplay))
+                Text(ActivityTableLayout.value(metric, activity: activity, speedDisplay: speedDisplay, units: units, locale: locale))
                     .font(.caption).monospacedDigit()
                     .lineLimit(1).minimumScaleFactor(0.85)
                     .frame(width: ActivityTableLayout.width(metric, availableWidth: availableWidth), alignment: .trailing)
@@ -88,24 +90,24 @@ struct ActivityRowView: View {
         ActivityMetricFlow(spacing: 16, rowSpacing: 8, stacked: typeSize.isAccessibilitySize) {
             ForEach(settings.orderedMetrics) { metric in
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(metric.value(for: activity, speedDisplay: speedDisplay))
+                    Text(metric.value(for: activity, speedDisplay: speedDisplay, units: units, locale: locale))
                         .font(.subheadline.weight(.medium)).monospacedDigit()
-                    Text(metric.title(speedDisplay: speedDisplay))
+                    Text(metric.title(speedDisplay: speedDisplay, locale: locale))
                         .font(.caption2).foregroundStyle(AppTheme.secondaryText)
                 }
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel(metric.title(speedDisplay: speedDisplay))
-                .accessibilityValue(metric.value(for: activity, speedDisplay: speedDisplay))
+                .accessibilityLabel(metric.title(speedDisplay: speedDisplay, locale: locale))
+                .accessibilityValue(metric.value(for: activity, speedDisplay: speedDisplay, units: units, locale: locale))
             }
         }
     }
 
     private var accessibleDetails: String {
-        ([activity.sportType.rawValue, Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt)]
+        ([activity.sportType.rawValue, Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system)]
             + settings.orderedMetrics.map { metric in
-                let value = metric.value(for: activity, speedDisplay: speedDisplay)
-                return "\(metric.title(speedDisplay: speedDisplay)): \(value == Formatters.unknown ? "Not recorded" : value)"
+                let value = metric.value(for: activity, speedDisplay: speedDisplay, units: units, locale: locale)
+                return "\(metric.title(speedDisplay: speedDisplay, locale: locale)): \(value == Formatters.unknown ? "Not recorded" : value)"
             } + [isInspected ? "Inspected" : "Not inspected", isSelected ? "Selected" : "Not selected"]
             + (isActive ? [String(localized: ActiveRoutePresentation.state(true, locale: locale))] : [])).joined(separator: ". ")
     }

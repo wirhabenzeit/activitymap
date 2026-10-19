@@ -20,7 +20,7 @@ const mutate = (change) => {
 test('sport membership is unique, exhaustive and protocol-stable on both clients', () => {
   assert.equal(validateCatalog(catalog).size, 50);
   const source = readFileSync(
-    new URL('../src/server/strava/types.ts', import.meta.url),
+    new URL('../src/contracts/sport.ts', import.meta.url),
     'utf8',
   );
   const sports = source

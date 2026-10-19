@@ -1,14 +1,14 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { store } from '~/store';
-import { MainNav } from './main-nav';
-import { SidebarTrigger } from '~/components/ui/sidebar';
-import { Separator } from '~/components/ui/separator';
-
 import * as React from 'react';
 
+import { Separator } from '~/components/ui/separator';
+import { SidebarTrigger } from '~/components/ui/sidebar';
+import { store } from '~/store';
+
 import { ShareButton } from '../share-button';
+import { MainNav } from './main-nav';
 
 export const AppHeader = () => {
   const pathname = usePathname();
@@ -19,7 +19,7 @@ export const AppHeader = () => {
   return (
     <header className="fixed inset-x-0 top-0 z-[60] border-border/40 bg-header-background px-2 text-header-foreground">
       <div className="flex h-14 items-center">
-        <SidebarTrigger className="h-8 w-8" />
+        <SidebarTrigger />
         <Separator
           orientation="vertical"
           color="white"

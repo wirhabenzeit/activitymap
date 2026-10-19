@@ -2,7 +2,9 @@ import SwiftUI
 
 /// Shared hierarchy for Map and List; see docs/activity-detail-presentation.md.
 struct ActivityDetailContent<Profile: View, Photos: View>: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
     let activity: Activity
+    @Environment(\.locale) private var locale
     @Environment(\.activityDetailOverMap) private var overMap
     var headerTrailingInset: CGFloat = 0
     var showsHeading = true
@@ -34,7 +36,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                 ActivityHeadlineStats(activity: activity)
             }
             photos(activity)
-            ForEach(ActivityMetricGroup.groups(for: activity)) { group in
+            ForEach(ActivityMetricGroup.groups(for: activity, locale: locale, units: preferences?.units ?? .metric, dateFormat: preferences?.dateFormat ?? .system)) { group in
                 VStack(alignment: .leading, spacing: 12) {
                     Divider()
                     Label(group.title, systemImage: group.icon)
@@ -50,7 +52,7 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
                             .fixedSize(horizontal: false, vertical: true)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .accessibilityElement(children: .ignore)
-                            .accessibilityLabel("\(group.title), \(metric.title)")
+                            .accessibilityLabel(Text(AppMessages.activityMetricAccessibility(group.title, metric.title, locale: locale)))
                             .accessibilityValue(metric.value)
                             .accessibilityIdentifier("activity-metric-\(metric.id)")
                         }
@@ -75,7 +77,7 @@ struct ActivityDetailDescription: View {
 
     var body: some View {
         if let description = activity.description, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            Text(description).font(.subheadline)
+            Text(verbatim: description).font(.subheadline)
                 .fixedSize(horizontal: false, vertical: true)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .textSelection(.enabled)
@@ -85,7 +87,9 @@ struct ActivityDetailDescription: View {
 
 /// The same three actual measurements on every detail surface.
 struct ActivityHeadlineStats: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
     let activity: Activity
+    @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
 
     var body: some View {
@@ -101,17 +105,17 @@ struct ActivityHeadlineStats: View {
     }
 
     @ViewBuilder private var metrics: some View {
-        metric("Distance", value: Formatters.distance(activity.distance))
-        metric("Moving time", value: Formatters.duration(activity.movingTime))
+        metric(AppMessages.metricDistance(locale: locale), value: Formatters.distance(activity.distance, locale: locale, units: preferences?.units ?? .metric))
+        metric(AppMessages.metricMovingTime(locale: locale), value: Formatters.duration(activity.movingTime, locale: locale))
         let display = SpeedDisplay.forSport(activity.sportType)
         if display == .speed {
-            metric("Elevation gain", value: Formatters.elevation(activity.totalElevationGain))
+            metric(AppMessages.metricTotalElevationGain(locale: locale), value: Formatters.elevation(activity.totalElevationGain, locale: locale, units: preferences?.units ?? .metric))
         } else {
-            metric("Average pace", value: display.format(activity.averageSpeed))
+            metric(AppMessages.metricAveragePace(locale: locale), value: display.format(activity.averageSpeed, units: preferences?.units ?? .metric, locale: locale))
         }
     }
 
-    private func metric(_ title: String, value: String) -> some View {
+    private func metric(_ title: LocalizedStringResource, value: String) -> some View {
         VStack(alignment: typeSize.isAccessibilitySize ? .leading : .center, spacing: 5) {
             Text(value).font(.headline).monospacedDigit()
                 .lineLimit(1).minimumScaleFactor(0.7)
@@ -121,7 +125,7 @@ struct ActivityHeadlineStats: View {
         }
         .frame(maxWidth: .infinity, alignment: typeSize.isAccessibilitySize ? .leading : .center)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
+        .accessibilityLabel(Text(title))
         .accessibilityValue(value)
     }
 }
@@ -142,6 +146,8 @@ extension EnvironmentValues {
 
 /// Shared identity stays in one place while Map summary grows into detail.
 struct ActivityDetailIdentity: View {
+    @Environment(\.locale) private var locale
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
     @Environment(\.activityDetailPaging) private var paging
     let activity: Activity
     var trailingInset: CGFloat = 0
@@ -152,7 +158,7 @@ struct ActivityDetailIdentity: View {
         HStack(alignment: .top, spacing: AppTheme.Spacing.small) {
             BrowseSportSymbol(category: activity.category)
             VStack(alignment: .leading, spacing: AppTheme.Spacing.tight) {
-                Text(activity.name).font(.headline)
+                Text(verbatim: activity.name).font(.headline)
                     .foregroundStyle(onNavigationBar ? Color.white : .primary)
                     // Native bars reserve one line for identity and one for
                     // metadata; wrapping a long title must not grow the bar.
@@ -164,11 +170,11 @@ struct ActivityDetailIdentity: View {
                     .accessibilityValue(paging?.position(activity.id) ?? "")
                     .accessibilityActions {
                         if let paging, paging.position(activity.id) != nil {
-                            if paging.canGoPrevious(activity.id) { Button("Previous activity", action: paging.previous) }
-                            if paging.canGoNext(activity.id) { Button("Next activity", action: paging.next) }
+                            if paging.canGoPrevious(activity.id) { Button(action: paging.previous) { Text(AppMessages.actionPreviousActivity()) } }
+                            if paging.canGoNext(activity.id) { Button(action: paging.next) { Text(AppMessages.actionNextActivity()) } }
                         }
                     }
-                Text("\(activity.sportType.rawValue) · \(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt))")
+                Text(AppMessages.activityRowSubtitle(activity.sportType.editingTitle, Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system), locale: locale))
                     .font(.caption).foregroundStyle(onNavigationBar ? Color.white.opacity(0.8) : AppTheme.secondaryText)
                     .lineLimit(onNavigationBar || titleLineLimit == 1 ? 1 : nil)
                     .truncationMode(.tail)
@@ -225,7 +231,7 @@ struct ActivityDetailSequence {
     }
     var position: String? {
         guard ids.count > 1, let index else { return nil }
-        return String(localized: "\(index + 1) of \(ids.count)")
+        return String(localized: AppMessages.activityPosition(index + 1, ids.count))
     }
 }
 
@@ -236,14 +242,14 @@ struct ActivityDetailStepButtons: View {
     var onNavigationBar = false
     var body: some View {
         HStack(spacing: 0) {
-            step("Previous activity", icon: "chevron.up", identifier: "activity-previous", action: previous)
-            step("Next activity", icon: "chevron.down", identifier: "activity-next", action: next)
+            step(AppMessages.actionPreviousActivity(), icon: ActionPresentation.glyph(.previousActivity), identifier: "activity-previous", action: previous)
+            step(AppMessages.actionNextActivity(), icon: ActionPresentation.glyph(.nextActivity), identifier: "activity-next", action: next)
         }
         .buttonStyle(.plain)
         .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
     }
 
-    private func step(_ label: LocalizedStringKey, icon: String, identifier: String,
+    private func step(_ label: LocalizedStringResource, icon: String, identifier: String,
                       action: (() -> Void)?) -> some View {
         Button { action?() } label: {
             Image(systemName: icon)

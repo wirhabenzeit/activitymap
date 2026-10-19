@@ -560,6 +560,85 @@ export const upsertActivityDTOs = async (
   publishLibraryCommit(scope, 'write');
 };
 
+/** Called only by the library writer. Does not advance or invent a sync cursor. */
+export async function commitActivityResponse(
+  scope: string,
+  activity: ActivityDTO,
+  replacementPhotos: PhotoDTO[] | undefined,
+  signal: AbortSignal,
+): Promise<void> {
+  signal.throwIfAborted();
+  const db = await openDatabase();
+  if (!db) throw new Error('IndexedDB is unavailable');
+  signal.throwIfAborted();
+  const tx = db.transaction(
+    [ACTIVITIES_STORE, PHOTOS_STORE, STREAM_SUMMARIES_STORE],
+    'readwrite',
+  );
+  const completed = txToPromise(tx);
+  const abort = () => {
+    try {
+      tx.abort();
+    } catch {
+      /* Already committed. */
+    }
+  };
+  signal.addEventListener('abort', abort, { once: true });
+  const activities = tx.objectStore(ACTIVITIES_STORE);
+  const photos = tx.objectStore(PHOTOS_STORE);
+  const pk = buildPk(scope, activity.id);
+  const existing = activities.get(pk) as IDBRequest<ActivityRecord | undefined>;
+  const previousPhotos =
+    replacementPhotos === undefined
+      ? null
+      : (photos.index('by_scope').getAll(scope) as IDBRequest<PhotoRecord[]>);
+  let remaining = previousPhotos ? 2 : 1;
+  const apply = () => {
+    if (--remaining) return;
+    if (signal.aborted) {
+      abort();
+      return;
+    }
+    // Never resurrect a deletion or overwrite a newer download/other-tab edit.
+    const old = existing.result?.data;
+    if (
+      !old ||
+      (old.last_updated &&
+        (!activity.last_updated || old.last_updated > activity.last_updated))
+    )
+      return;
+    activities.put({
+      pk,
+      scope,
+      id: activity.id,
+      data: activity,
+    } satisfies ActivityRecord);
+    tx.objectStore(STREAM_SUMMARIES_STORE).delete(pk);
+    if (replacementPhotos !== undefined) {
+      for (const photo of previousPhotos?.result ?? []) {
+        if (photo.data.activity_id === activity.id) photos.delete(photo.pk);
+      }
+      for (const photo of replacementPhotos) {
+        photos.put({
+          pk: buildPk(scope, photo.unique_id),
+          scope,
+          id: photo.unique_id,
+          data: photo,
+        } satisfies PhotoRecord);
+      }
+    }
+  };
+  existing.onsuccess = apply;
+  if (previousPhotos) previousPhotos.onsuccess = apply;
+  try {
+    await completed;
+    signal.throwIfAborted();
+    publishLibraryCommit(scope, 'write');
+  } finally {
+    signal.removeEventListener('abort', abort);
+  }
+}
+
 export const deleteActivityDTOsByIds = async (
   scope: string,
   ids: string[],

@@ -1,10 +1,13 @@
 'use client';
 
-import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import { Flame, Gauge, Heart, Info, Mountain, Users, Zap } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { Flame, Heart, Info, Mountain, Users, Zap, Gauge } from 'lucide-react';
-import type { Activity } from '~/server/db/schema';
+
+import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import { useFormattingLocale } from '~/hooks/use-display-preferences';
+import type { Activity } from '~/lib/activity';
 import { activityDetailStats } from '~/lib/activity-detail-stats';
+import { message } from '~/lib/presentation/messages';
 
 const icons = {
   'time-speed': Gauge,
@@ -25,14 +28,14 @@ export function ActivityDetailStats({
 }) {
   const { headline, groups } = activityDetailStats(
     activity,
-    undefined,
+    useFormattingLocale(),
     useDisplayUnits(),
   );
   return (
     <div className="space-y-5">
       <dl
-        className="grid grid-cols-3 gap-2 border-t pt-4"
-        aria-label="Activity summary"
+        className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,6rem),1fr))] gap-2 border-t pt-4"
+        aria-label={message('activity.summary')}
       >
         {headline.map((stat) => (
           <div
@@ -70,17 +73,23 @@ export function ActivityDetailStats({
                   <Icon className="h-4 w-4" aria-hidden="true" />
                   {group.title}
                 </h3>
-                <dl className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <dl className="grid grid-cols-[repeat(auto-fit,minmax(min(100%,8rem),1fr))] gap-x-4 gap-y-3">
                   {group.stats.map((stat) => (
                     <div
                       key={stat.id}
                       className="flex min-w-0 flex-col gap-0.5"
                       data-stat={stat.id}
                     >
-                      <dt className="text-xs text-muted-foreground">
+                      <dt
+                        className="text-xs text-muted-foreground"
+                        aria-label={message('activity.metric.accessibility', {
+                          group: group.title,
+                          metric: stat.label,
+                        })}
+                      >
                         {stat.label}
                       </dt>
-                      <dd className="order-first break-words text-sm font-medium tabular-nums">
+                      <dd className="order-first text-sm font-medium break-words tabular-nums">
                         {stat.value}
                       </dd>
                     </div>
