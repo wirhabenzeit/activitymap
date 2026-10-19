@@ -1,13 +1,13 @@
-import { withApiV1Observability } from '~/server/api/observability';
-import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
-import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
-import { createShareLinksHandler } from '../handler';
-import { shareLinkDependencies } from '../dependencies';
+import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 
-export const POST = withApiV1Observability(
-  withApiV1RateLimit(createShareLinksHandler(shareLinkDependencies, 'revoke'), {
-    route: 'POST /api/v1/share-links/revoke',
-    resolveUserId: resolveRateLimitUserId,
-  }),
-  { route: 'POST /api/v1/share-links/revoke' },
+import { shareLinkDependencies } from '../dependencies';
+import { createShareLinksHandler } from '../handler';
+
+export const POST = withAuthenticatedApiV1(
+  (request, context) =>
+    createShareLinksHandler(
+      { ...shareLinkDependencies, resolveActor: context.actor },
+      'revoke',
+    )(request),
+  { route: 'POST /api/v1/share-links/revoke', cache: 'private-no-store' },
 );

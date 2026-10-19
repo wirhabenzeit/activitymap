@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import type { Activity, Photo } from '~/server/db/schema';
-import type { Actor } from '~/server/auth/actor';
-import { ActivityMutationError } from '~/server/application/activities';
+import { parseMutationActivityId } from '~/server/api/activity-id';
 import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
+import { ActivityMutationError } from '~/server/application/activities';
+import type { Actor } from '~/server/auth/actor';
+import type { Activity, Photo } from '~/server/db/schema';
 import { userKeyFor } from '~/server/http/rate-limit';
 
 import {
@@ -146,11 +148,20 @@ void test('PATCH validates ownership boundary inputs and preserves omitted versu
     ['/api/v1/activities/7', { name: 'x'.repeat(256) }],
     ['/api/v1/activities/7', { description: 'x'.repeat(10_001) }],
   ] as const) {
-    assert.equal((await handler(request(path, body))).status, 400);
+    assert.equal(
+      (
+        await handler(
+          request(path, body),
+          parseMutationActivityId(path.split('/')[4] ?? ''),
+        )
+      ).status,
+      400,
+    );
   }
 
   const response = await handler(
     request('/api/v1/activities/7', { description: '' }),
+    7,
   );
   assert.equal(response.status, 200);
   assert.deepEqual(seen, [{ id: 7, description: '' }]);
@@ -202,6 +213,7 @@ void test('mutation errors retain status, retryability, retry guidance and recov
     });
     const response = await handler(
       request('/api/v1/activities/7', { name: 'Updated' }),
+      7,
     );
     assert.equal(response.status, status);
     assert.equal(response.headers.get('retry-after'), retryAfter);
@@ -272,6 +284,7 @@ void test('POST refresh returns authoritative stream metadata and explicit photo
         accessToken: 'ignored-client-secret',
         athleteId: '999',
       }),
+      7,
     );
     assert.equal(response.status, 200);
     const body = (await response.json()) as {
@@ -318,11 +331,11 @@ void test('both mutation routes require an actor before invoking the service', a
     },
   });
   assert.equal(
-    (await update(request('/api/v1/activities/7', { name: 'x' }))).status,
+    (await update(request('/api/v1/activities/7', { name: 'x' }), 7)).status,
     401,
   );
   assert.equal(
-    (await refresh(request('/api/v1/activities/7/refresh'))).status,
+    (await refresh(request('/api/v1/activities/7/refresh'), 7)).status,
     401,
   );
 });
@@ -463,4 +476,41 @@ void test('failure to schedule optional work cannot fail a committed first-page 
     200,
   );
   assert.equal(errors.length, 1);
+});
+
+void test('explicit mutation IDs keep authorization before validation and do not depend on routed URLs', async () => {
+  let calls = 0;
+  const authorized = createUpdateActivityHandler({
+    resolveActor: async () => actor,
+    update: async (_actor, input) => {
+      calls++;
+      assert.equal(input.id, 7);
+      return activity();
+    },
+  });
+  const anonymous = createUpdateActivityHandler({
+    resolveActor: async () => null,
+  });
+  const malformed = () =>
+    new Request('https://app.test/adapter-independent', {
+      method: 'PATCH',
+      body: '{invalid',
+    });
+  assert.equal((await anonymous(malformed(), null)).status, 401);
+  assert.equal((await authorized(malformed(), null)).status, 400);
+  assert.equal((await authorized(malformed(), 7)).status, 400);
+  assert.equal(calls, 0);
+  assert.equal(
+    (
+      await authorized(
+        new Request('https://app.test/adapter-independent', {
+          method: 'PATCH',
+          body: JSON.stringify({ name: 'Updated' }),
+        }),
+        7,
+      )
+    ).status,
+    200,
+  );
+  assert.equal(calls, 1);
 });

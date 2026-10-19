@@ -1,8 +1,10 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
-import { join, dirname } from 'node:path';
+import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
+import { test } from 'node:test';
+
 import { buildOpenApiDocument } from './openapi.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -39,7 +41,7 @@ function implementedV1Operations(): string[] {
       const path = `/api/v1/${pathSegments.join('/')}`;
 
       for (const match of source.matchAll(
-        /export\s+const\s+(DELETE|GET|HEAD|OPTIONS|PATCH|POST|PUT)\s*=/g,
+        /export\s+(?:const|(?:async\s+)?function)\s+(DELETE|GET|HEAD|OPTIONS|PATCH|POST|PUT)\s*(?:=|\()/g,
       )) {
         operations.push(`${match[1]?.toLowerCase()} ${path}`);
       }

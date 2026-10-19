@@ -1,15 +1,18 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
-import { createActivityStreamsHandler } from './handler';
+
+import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
 import type { Actor } from '~/server/auth/actor';
+import { userKeyFor } from '~/server/http/rate-limit';
 import {
-  ActivityStreamsUnavailableError,
   type ActivityStreamsRepository,
+  ActivityStreamsUnavailableError,
 } from '~/server/repositories/activity-streams';
 import { StravaApiError } from '~/server/strava/client';
 import { StravaBudgetExceededError } from '~/server/strava/request-budget';
-import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
-import { userKeyFor } from '~/server/http/rate-limit';
+
+import { createActivityStreamsHandler } from './handler';
 
 const actor: Actor = {
   userId: 'owner',
@@ -30,7 +33,7 @@ void test('stream boundary requires authentication and preserves a string ID for
     repository,
     resolveActor: async () => null,
   });
-  assert.equal((await anonymous(request())).status, 401);
+  assert.equal((await anonymous(request(), '9007199254740993')).status, 401);
   for (const authentication of ['cookie', 'bearer'] as const) {
     const handler = createActivityStreamsHandler({
       repository: {
@@ -43,7 +46,7 @@ void test('stream boundary requires authentication and preserves a string ID for
       },
       resolveActor: async () => ({ ...actor, authentication }),
     });
-    const response = await handler(request());
+    const response = await handler(request(), '9007199254740993');
     assert.equal(response.status, 200);
     assert.equal(response.headers.get('cache-control'), 'private, no-store');
     assert.match(await response.text(), /"state":"not_fetched"/);
@@ -64,8 +67,11 @@ void test('invalid inputs and inaccessible activities reveal no availability', a
     'refresh=maybe',
     'fetch=none&refresh=true',
   ])
-    assert.equal((await handler(request(query))).status, 400);
-  const denied = await handler(request());
+    assert.equal(
+      (await handler(request(query), '9007199254740993')).status,
+      400,
+    );
+  const denied = await handler(request(), '9007199254740993');
   assert.equal(denied.status, 404);
   assert.doesNotMatch(
     await denied.text(),
@@ -78,7 +84,7 @@ void test('pending requests and errors use standard envelopes and retry guidance
     resolveActor: async () => actor,
     fetch: async () => ({ status: 'superseded' }),
   });
-  const response = await pending(request(''));
+  const response = await pending(request(''), '9007199254740993');
   assert.equal(response.status, 202);
   assert.equal(response.headers.get('retry-after'), '3');
   for (const [error, status] of [
@@ -94,7 +100,7 @@ void test('pending requests and errors use standard envelopes and retry guidance
         throw error;
       },
     });
-    const failed = await handler(request(''));
+    const failed = await handler(request(''), '9007199254740993');
     assert.equal(failed.status, status);
     const body = await failed.text();
     assert.match(body, /"requestId":/);
@@ -142,18 +148,44 @@ void test('compact summary boundary retains authentication, validation and pendi
         view: 'compact',
         repository: compactRepository,
         resolveActor: async () => null,
-      })(compactRequest())
+      })(compactRequest(), '42')
     ).status,
     401,
   );
   assert.equal(
-    (await handler(compactRequest('fetch=none&refresh=true'))).status,
+    (await handler(compactRequest('fetch=none&refresh=true'), '42')).status,
     400,
   );
-  const response = await handler(compactRequest('fetch=auto'));
+  const response = await handler(compactRequest('fetch=auto'), '42');
   assert.equal(response.status, 202);
   assert.equal(response.headers.get('retry-after'), '3');
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
   const body = (await response.json()) as { data: { summary: unknown } };
   assert.equal(body.data.summary, null);
+});
+
+void test('explicit stream IDs keep authorization before validation and never reparse the URL', async () => {
+  let calls = 0;
+  const handler = createActivityStreamsHandler({
+    repository: {
+      ...repository,
+      async read(_actor, id) {
+        calls++;
+        assert.equal(id, '9007199254740993');
+        return null;
+      },
+    },
+    resolveActor: async () => actor,
+  });
+  const anonymous = createActivityStreamsHandler({
+    repository,
+    resolveActor: async () => null,
+  });
+  const request = () =>
+    new Request('https://app.test/adapter-independent?fetch=none');
+  assert.equal((await anonymous(request(), null)).status, 401);
+  assert.equal((await handler(request(), null)).status, 400);
+  assert.equal(calls, 0);
+  assert.equal((await handler(request(), '9007199254740993')).status, 200);
+  assert.equal(calls, 1);
 });

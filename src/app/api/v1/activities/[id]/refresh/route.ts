@@ -1,7 +1,5 @@
-import { withApiV1Observability } from '~/server/api/observability';
-import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
-import { resolveActor } from '~/server/auth/actor';
-import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
+import { parseMutationActivityId } from '~/server/api/activity-id';
+import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { logger } from '~/server/logging/logger';
 
 import { createRefreshActivityHandler } from '../mutation-handler';
@@ -9,14 +7,19 @@ import { createRefreshActivityHandler } from '../mutation-handler';
 const ROUTE = 'POST /api/v1/activities/{id}/refresh';
 
 export const maxDuration = 60;
-export const POST = withApiV1Observability(
-  withApiV1RateLimit(
-    createRefreshActivityHandler({
-      resolveActor: (request) => resolveActor(request.headers),
-      onError: (error, requestId) =>
-        logger.error('Activity refresh request failed', { error, requestId }),
-    }),
-    { route: ROUTE, resolveUserId: resolveRateLimitUserId },
-  ),
-  { route: ROUTE },
-);
+export async function POST(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  return withAuthenticatedApiV1(
+    async (request, context) => {
+      const { id } = await params;
+      return createRefreshActivityHandler({
+        resolveActor: context.actor,
+        onError: (error, requestId) =>
+          logger.error('Activity refresh request failed', { error, requestId }),
+      })(request, parseMutationActivityId(id));
+    },
+    { route: ROUTE, cache: 'private-no-store' },
+  )(request);
+}

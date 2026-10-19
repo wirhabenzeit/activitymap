@@ -1,27 +1,27 @@
 import { ZodError } from 'zod';
-import { StravaApiError } from '~/server/strava/client';
-import type { Actor } from '~/server/auth/actor';
-import { errorEnvelope } from '~/contracts/v1/error';
-import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
+
 import {
   activityCompactStreamSummaryDTOSchema,
-  toCompactStreamSummaryDTO,
   activityStreamSummaryDTOSchema,
   activityStreamsDTOSchema,
   toActivityStreamSummaryDTO,
   toActivityStreamsDTO,
+  toCompactStreamSummaryDTO,
 } from '~/contracts/v1/activity-streams';
-import { streamActivityIdSchema } from '~/server/strava/streams';
-import { StravaBudgetExceededError } from '~/server/strava/request-budget';
+import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
+import { PRIVATE_API_HEADERS, apiFailure } from '~/server/api/transport';
 import {
-  fetchActivityStreams,
   classifyStreamFetchFailure,
+  fetchActivityStreams,
 } from '~/server/application/activity-streams';
-import {
-  ActivityStreamsUnavailableError,
-  type ActivityStreamsRepository,
-} from '~/server/repositories/activity-streams';
+import type { Actor } from '~/server/auth/actor';
 import { requestIdFor } from '~/server/http/request-id';
+import {
+  type ActivityStreamsRepository,
+  ActivityStreamsUnavailableError,
+} from '~/server/repositories/activity-streams';
+import { StravaApiError } from '~/server/strava/client';
+import { StravaBudgetExceededError } from '~/server/strava/request-budget';
 
 export function createActivityStreamsHandler(deps: {
   resolveActor: (request: Request) => Promise<Actor | null>;
@@ -32,17 +32,10 @@ export function createActivityStreamsHandler(deps: {
   /** `summary` serves the downsampled streams instead of the raw samples. */
   view?: 'raw' | 'summary' | 'compact';
 }) {
-  const path =
-    deps.view === 'compact'
-      ? /^\/api\/v1\/activities\/([^/]+)\/streams\/summary\/compact\/?$/
-      : deps.view === 'summary'
-        ? /^\/api\/v1\/activities\/([^/]+)\/streams\/summary\/?$/
-        : /^\/api\/v1\/activities\/([^/]+)\/streams\/?$/;
-  return async (request: Request): Promise<Response> => {
+  return async (request: Request, id: string | null): Promise<Response> => {
     const requestId = requestIdFor(request);
     const headers = {
-      'Cache-Control': 'private, no-store',
-      Vary: 'Cookie, Authorization',
+      ...PRIVATE_API_HEADERS,
     };
     const fail = (
       status: number,
@@ -51,24 +44,19 @@ export function createActivityStreamsHandler(deps: {
       retryable = false,
       retryAfter?: number,
     ) =>
-      Response.json(errorEnvelope(code, message, { requestId, retryable }), {
-        status,
-        headers: {
-          ...headers,
-          ...(retryAfter ? { 'Retry-After': String(retryAfter) } : {}),
-        },
+      apiFailure(requestId, status, code, message, {
+        retryable,
+        retryAfterSeconds: retryAfter,
       });
     try {
       const actor = await deps.resolveActor(request);
       if (!actor)
         return fail(401, 'not_authenticated', 'Authentication is required.');
       const url = new URL(request.url);
-      const match = path.exec(url.pathname);
-      const parsedId = streamActivityIdSchema.safeParse(match?.[1]);
       const fetchMode = url.searchParams.get('fetch') ?? 'auto';
       const refresh = url.searchParams.get('refresh') ?? 'false';
       if (
-        !parsedId.success ||
+        id === null ||
         !['auto', 'none'].includes(fetchMode) ||
         !['true', 'false'].includes(refresh) ||
         (fetchMode === 'none' && refresh === 'true')
@@ -79,7 +67,6 @@ export function createActivityStreamsHandler(deps: {
           'Invalid activity ID or stream query.',
         );
       }
-      const id = parsedId.data;
       const now = deps.now ?? (() => new Date());
       let status = 200;
       if (fetchMode !== 'none') {

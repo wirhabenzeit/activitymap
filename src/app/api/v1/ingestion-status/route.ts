@@ -1,20 +1,19 @@
+import { INGESTION_STATUS_MAX_AGE_SECONDS } from '~/contracts/v1/ingestion-status';
+import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { deriveIngestionStatus } from '~/server/application/ingestion-status';
-import { resolveActor } from '~/server/auth/actor';
-import { resolveRateLimitUserId } from '~/server/auth/rate-limit-user';
 import { photoBackfillEnabled } from '~/server/config/photo-backfill';
 import { streamBackfillEnabled } from '~/server/config/stream-backfill';
 import { logger } from '~/server/logging/logger';
 import { ingestionStatusRepository } from '~/server/repositories/ingestion-status';
-import { withApiV1Observability } from '~/server/api/observability';
-import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
+
 import { createIngestionStatusHandler } from './handler';
 
 const ROUTE = 'GET /api/v1/ingestion-status';
 
-export const GET = withApiV1Observability(
-  withApiV1RateLimit(
+export const GET = withAuthenticatedApiV1(
+  (request, context) =>
     createIngestionStatusHandler({
-      resolveActor: (request) => resolveActor(request.headers),
+      resolveActor: context.actor,
       loadStatus: async (actor, observedAt) =>
         deriveIngestionStatus(
           await ingestionStatusRepository.snapshot(
@@ -33,8 +32,9 @@ export const GET = withApiV1Observability(
           requestId,
         });
       },
-    }),
-    { route: ROUTE, resolveUserId: resolveRateLimitUserId },
-  ),
-  { route: ROUTE },
+    })(request),
+  {
+    route: ROUTE,
+    cache: { privateMaxAgeSeconds: INGESTION_STATUS_MAX_AGE_SECONDS },
+  },
 );

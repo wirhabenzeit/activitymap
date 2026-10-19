@@ -1,15 +1,18 @@
 import { ZodError } from 'zod';
 
+import { makeEnvelope } from '~/contracts/v1/envelope';
+import { errorEnvelope } from '~/contracts/v1/error';
 import {
-  createdShareLinkDTOSchema,
   createShareLinkRequestSchema,
+  createdShareLinkDTOSchema,
   revokeShareLinkRequestSchema,
   revokeShareLinkResultSchema,
   shareLinkListDTOSchema,
 } from '~/contracts/v1/share-links';
-import { makeEnvelope } from '~/contracts/v1/envelope';
-import { errorEnvelope } from '~/contracts/v1/error';
-import type { Actor } from '~/server/auth/actor';
+import {
+  PRIVATE_API_HEADERS,
+  mutationOriginAllowed,
+} from '~/server/api/transport';
 import {
   ForbiddenError,
   ShareLinkNotFoundError,
@@ -17,6 +20,7 @@ import {
   type listShareLinksForActor,
   type revokeShareLinkForActor,
 } from '~/server/application/share-links';
+import type { Actor } from '~/server/auth/actor';
 import { requestIdFor } from '~/server/http/request-id';
 
 type Dependencies = {
@@ -27,8 +31,7 @@ type Dependencies = {
 };
 
 const headers = {
-  'Cache-Control': 'private, no-store',
-  Vary: 'Cookie, Authorization',
+  ...PRIVATE_API_HEADERS,
   'Referrer-Policy': 'no-referrer',
 };
 
@@ -47,11 +50,9 @@ export function createShareLinksHandler(
       const actor = await deps.resolveActor(request);
       if (!actor)
         return failure(401, 'not_authenticated', 'Authentication is required.');
-      const origin = request.headers.get('origin');
       if (
         operation !== 'list' &&
-        origin &&
-        origin !== new URL(request.url).origin
+        !mutationOriginAllowed(request, 'if-present')
       ) {
         return failure(403, 'forbidden', 'The request origin is not allowed.');
       }
