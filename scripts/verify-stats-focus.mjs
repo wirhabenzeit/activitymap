@@ -1,8 +1,17 @@
 // Real shell, charts, URL/history and adaptive activity inspection against local DTOs.
 import assert from 'node:assert/strict';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright-core';
+
+import {
+  cleanupBrowserFixture,
+  prepareBrowserFixture,
+} from './quality/browser-fixtures.mjs';
+import {
+  launchBrowser,
+  recordBrowserEvidence,
+  waitForFixtureRoute,
+} from './quality/browser-support.mjs';
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:3000');
 assert(
@@ -10,51 +19,22 @@ assert(
   'Use a local dev server',
 );
 const output = resolve(process.argv[3] || '/tmp/activitymap-stats-focus');
-const route = resolve(import.meta.dirname, '../src/app/stats-focus-test');
-await mkdir(route); // Refuse to replace an existing route.
+const fixtureRoot = resolve(import.meta.dirname, '..');
+await prepareBrowserFixture(fixtureRoot, 'stats');
 await mkdir(output, { recursive: true });
 let browser;
+let evidence;
+let failure;
 try {
-  await writeFile(
-    join(route, 'page.tsx'),
-    `
-'use client';
-import { useMemo, useState } from 'react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StatsTileGrid } from '~/components/stats/tiles';
-import { StatsActivityInspector } from '~/components/stats/tiles/activity-inspector';
-import { AppSidebar } from '~/components/layout/app-sidebar';
-import { AppHeader } from '~/components/layout/app-header';
-import { SidebarProvider } from '~/components/ui/sidebar';
-import { activityDTOSchema } from '~/contracts/v1/activity';
-import { dtoToActivity } from '~/lib/sync/v1-mappers';
-import { toStatsActivity } from '~/lib/stats/tile-series';
-import { dayFromISODate } from '~/lib/stats/tile-data';
-import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
-const defaults = Object.fromEntries(Object.keys(activityDTOSchema.shape).filter(key => key !== 'streams').map(key => [key, null]));
-function FixtureStats() {
-  const activities = useMemo(() => fixture.activities.map(item => dtoToActivity(activityDTOSchema.parse({...defaults, ...item}))), []);
-  const stats = useMemo(() => activities.map(toStatsActivity), [activities]);
-  return <StatsActivityInspector activities={activities}>{(open, detailsOpen, inspection) => <StatsTileGrid {...inspection} activities={stats} reportingDay={dayFromISODate('2026-09-22')} onOpenActivity={open} detailsOpen={detailsOpen} />}</StatsActivityInspector>;
-}
-export default function Review() {
-  const [client] = useState(() => new QueryClient());
-  const [shown, setShown] = useState(true);
-  return <QueryClientProvider client={client}><SidebarProvider className="flex h-dvh flex-col"><AppHeader /><div className="flex min-h-0 flex-1 overflow-hidden"><AppSidebar /><main className="flex min-w-0 flex-1 flex-col overflow-hidden"><div className="h-14 w-full shrink-0"/><div className="min-h-0 w-full flex-1 overflow-hidden"><button id="test-peer-destination" className="sr-only" onClick={() => setShown(value => !value)}>Switch destination</button>{shown ? <FixtureStats /> : <div>Map destination</div>}</div></main></div></SidebarProvider></QueryClientProvider>;
-}
-`,
-  );
-  browser = await chromium.launch({
-    executablePath:
-      process.env.CHROME_PATH ||
-      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  });
+  await waitForFixtureRoute(new URL('/stats-focus-test', base));
+  browser = await launchBrowser();
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     reducedMotion: 'reduce',
     serviceWorkers: 'block',
     locale: 'en-US',
   });
+  evidence = await recordBrowserEvidence(context, { base, output });
   await context.addInitScript(() => {
     localStorage.setItem('theme', 'light');
     // Count native transitions; reduced-motion runs should never invoke one.
@@ -482,7 +462,7 @@ export default function Review() {
     const initialID = new URL(activityURL).searchParams.get('activity');
     await focus
       .locator(
-        `[data-stats-activity-id]:not([data-stats-activity-id="${initialID}"])`,
+        `[data-stats-activity-id]:visible:not([data-stats-activity-id="${initialID}"])`,
       )
       .first()
       .click();
@@ -756,12 +736,11 @@ export default function Review() {
     await focus.getByRole('combobox', { name: 'Volume grouping' }).innerText(),
     'By month',
   );
+  // Other tile focus surfaces stay mounted but hidden. Bind to the visible
+  // scroller after remount, rather than the first hidden tile in document order.
   await page.waitForFunction(
-    (top) =>
-      Math.abs(
-        document.querySelector('[data-stats-focus-scroll]').scrollTop - top,
-      ) < 2,
-    savedFocusScroll,
+    ({ element, top }) => Math.abs(element.scrollTop - top) < 2,
+    { element: await focusScroller.elementHandle(), top: savedFocusScroll },
   );
   await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
   await active(null);
@@ -804,11 +783,11 @@ export default function Review() {
       2,
     ),
   );
+} catch (error) {
+  failure = error;
+  throw error;
 } finally {
+  await evidence?.finish(failure);
   await browser?.close();
-  await rm(route, { recursive: true, force: true });
-  await rm(
-    resolve(import.meta.dirname, '../.next/dev/types/app/stats-focus-test'),
-    { recursive: true, force: true },
-  );
+  await cleanupBrowserFixture(fixtureRoot, 'stats');
 }

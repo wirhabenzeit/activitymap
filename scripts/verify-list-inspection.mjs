@@ -1,9 +1,18 @@
 // Run against this checkout's local Next dev server. Uses the real list, detail,
 // sidebar and URL hook with fixture DTOs; creates/removes only its own test route.
 import assert from 'node:assert/strict';
-import { mkdir, writeFile, rm } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
-import { chromium } from 'playwright-core';
+
+import {
+  cleanupBrowserFixture,
+  prepareBrowserFixture,
+} from './quality/browser-fixtures.mjs';
+import {
+  launchBrowser,
+  recordBrowserEvidence,
+  waitForFixtureRoute,
+} from './quality/browser-support.mjs';
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:3000');
 assert(
@@ -11,48 +20,15 @@ assert(
   'Use a local dev server',
 );
 const output = resolve(process.argv[3] || '/tmp/activitymap-list-inspection');
-const route = resolve(import.meta.dirname, '../src/app/list-inspection-test');
-await mkdir(route); // Refuse to overwrite any existing route.
+const fixtureRoot = resolve(import.meta.dirname, '..');
+await prepareBrowserFixture(fixtureRoot, 'list');
 await mkdir(output, { recursive: true });
 let browser;
+let evidence;
+let failure;
 try {
-  await writeFile(
-    join(route, 'page.tsx'),
-    `
-'use client';
-import { Suspense, useMemo, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ActivityListView } from '~/components/list/activity-list';
-import { AppSidebar } from '~/components/layout/app-sidebar';
-import { AppHeader } from '~/components/layout/app-header';
-import { SidebarProvider } from '~/components/ui/sidebar';
-import { useFilteredActivities } from '~/hooks/use-filtered-activities';
-import { activityDTOSchema } from '~/contracts/v1/activity';
-import { dtoToActivity } from '~/lib/sync/v1-mappers';
-import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
-const defaults = Object.fromEntries(Object.keys(activityDTOSchema.shape).filter(key => key !== 'streams').map(key => [key, null]));
-function FixtureList() {
-  const dense = useSearchParams().has('dense');
-  const activities = useMemo(() => {
-    const raw = dense ? Array.from({length:205}, (_, index) => ({...fixture.activities[0], id:String(index+1), name:'Activity '+String(index+1).padStart(3,'0')})) : fixture.activities;
-    return raw.map(item => dtoToActivity(activityDTOSchema.parse({...defaults, ...item})));
-  }, [dense]);
-  const { filterIDs } = useFilteredActivities(activities);
-  return <ActivityListView activities={activities} filterIDs={filterIDs} />;
-}
-export default function Review() {
-  const [client] = useState(() => new QueryClient());
-  const [shown, setShown] = useState(true);
-  return <Suspense><QueryClientProvider client={client}><SidebarProvider className="flex h-dvh flex-col"><AppHeader /><div className="flex min-h-0 flex-1 overflow-hidden"><AppSidebar /><main className="flex min-w-0 flex-1 flex-col overflow-hidden"><div className="h-14 w-full shrink-0"/><div className="min-h-0 w-full flex-1 overflow-hidden"><button id="test-peer-destination" className="sr-only" onClick={() => setShown(value => !value)}>Switch destination</button>{shown ? <FixtureList /> : <div>Map destination</div>}</div></main></div></SidebarProvider></QueryClientProvider></Suspense>;
-}
-`,
-  );
-  browser = await chromium.launch({
-    executablePath:
-      process.env.CHROME_PATH ||
-      '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
-  });
+  await waitForFixtureRoute(new URL('/list-inspection-test', base));
+  browser = await launchBrowser();
   const errors = [];
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
@@ -61,6 +37,7 @@ export default function Review() {
     locale: 'en-US',
     timezoneId: 'Europe/Zurich',
   });
+  evidence = await recordBrowserEvidence(context, { base, output });
   await context.addInitScript(() => {
     localStorage.setItem('theme', 'light');
     localStorage.removeItem('activitymap-ui-state');
@@ -479,18 +456,54 @@ export default function Review() {
     '1',
   );
   await row(100).focus();
-  const scrollBefore = await page
-    .locator('#table-main')
-    .evaluate((table) => table.parentElement.scrollTop);
+  const inspectedRowIsVisible = () =>
+    row(100).evaluate((element) => {
+      const scroller = element.closest('table').parentElement;
+      const bounds = scroller.getBoundingClientRect();
+      const header = scroller.querySelector('thead').getBoundingClientRect();
+      const item = element.getBoundingClientRect();
+      return item.top >= header.bottom && item.bottom <= bounds.bottom;
+    });
+  assert(
+    await inspectedRowIsVisible(),
+    'Focused row is visible before inspection',
+  );
   await page.keyboard.press('Enter');
   await waitID('100');
+  await page.waitForFunction(
+    () =>
+      document
+        .querySelector('#table-main [data-activity-id="100"]')
+        ?.getAttribute('aria-current') === 'true',
+  );
+  // Opening reserves the saved-hidden Date column and styles the inspected row.
+  // These layout changes can anchor scroll differently across platforms. Closing
+  // must retain the settled open offset exactly and return focus to that row.
+  const scrollBeforeClose = await row(100).evaluate(async (element) => {
+    await document.fonts.ready;
+    await new Promise((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve)),
+    );
+    return element.closest('table').parentElement.scrollTop;
+  });
+  assert(await inspectedRowIsVisible(), 'Inspected row stays visible');
   await page.keyboard.press('Escape');
   await waitID(null);
+  await detail.waitFor({ state: 'detached' });
+  assert.equal(
+    await page.evaluate(() =>
+      document.activeElement?.getAttribute('data-activity-id'),
+    ),
+    '100',
+    'Closing returns keyboard focus to the inspected row',
+  );
+  assert(await inspectedRowIsVisible(), 'Returned row stays visible');
   assert.equal(
     await page
       .locator('#table-main')
       .evaluate((table) => table.parentElement.scrollTop),
-    scrollBefore,
+    scrollBeforeClose,
+    'Closing retains the exact settled inspection scroll offset',
   );
   console.log(
     'PASS saved columns, sorted stepping order, retained scroll and focus after paging away',
@@ -730,6 +743,7 @@ export default function Review() {
   );
   console.log(`Evidence: ${output}`);
 } catch (error) {
+  failure = error;
   const page = browser?.contexts()[0]?.pages()[0];
   if (page) {
     console.error(
@@ -748,10 +762,7 @@ export default function Review() {
   }
   throw error;
 } finally {
+  await evidence?.finish(failure);
   await browser?.close();
-  await rm(route, { recursive: true, force: true });
-  await rm(
-    resolve(import.meta.dirname, '../.next/dev/types/app/list-inspection-test'),
-    { recursive: true, force: true },
-  );
+  await cleanupBrowserFixture(fixtureRoot, 'list');
 }
