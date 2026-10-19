@@ -174,43 +174,26 @@ private struct StatsDetailDestination<Content: View>: View {
     let title: String
     var backLabel = "Back to Stats dashboard"
     var usesShellHeader = false
+    var toolbarTrailing = AnyView(EmptyView())
     var closeInspection: (() -> Bool)? = nil
     @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
+    @AppToolbarEnvironment private var toolbarLayout
 
     var body: some View {
         content()
         .background(AppTheme.contentBackground)
         .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
-        .toolbar(usesShellHeader ? .hidden : .visible, for: .navigationBar)
-        .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            if !usesShellHeader {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button { goBack() } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 20, weight: .medium))
-                            .frame(width: 44, height: 44)
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.white)
-                    .accessibilityLabel(backLabel)
-                    .accessibilityIdentifier("stats-detail-back")
-                }.sharedBackgroundVisibility(.hidden)
-                ToolbarItem(placement: .principal) {
-                    Text(title).font(.headline).foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity)
-                        .accessibilityAddTraits(.isHeader)
-                        .accessibilityIdentifier("stats-detail-title")
-                }
-            }
-        }
+        .appNavigationBar(AppToolbar(
+            leading: AnyView(AppToolbarBackButton(label: backLabel, identifier: "stats-detail-back", action: goBack)),
+            principal: AnyView(Text(title).font(.headline).foregroundStyle(.white)
+                .lineLimit(toolbarLayout.isCompact ? 1 : nil)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("stats-detail-title")),
+            trailing: toolbarTrailing), embedded: usesShellHeader)
         .background(DetailBackGesture())
         .accessibilityAction(.escape) { goBack() }
     }
@@ -227,11 +210,12 @@ struct StatsDetailScreen: View {
     let tile: StatsTileDefinition
     var sync: SyncController? = nil
     var usesShellHeader = false
+    var toolbarTrailing = AnyView(EmptyView())
 
     var body: some View {
         StatsDetailDestination(title: tile.title,
                                backLabel: dashboard.inspectedActivityID != nil ? "Back to \(tile.title)" : "Back to Stats dashboard",
-                               usesShellHeader: usesShellHeader, closeInspection: {
+                               usesShellHeader: usesShellHeader, toolbarTrailing: toolbarTrailing, closeInspection: {
             guard dashboard.inspectedActivityID != nil else { return false }
             dashboard.inspectedActivityID = nil
             return true

@@ -680,7 +680,7 @@ extension RenderedRoutePickingTests {
             if navigation.viewControllers.count == 2, let destination = navigation.topViewController {
                 openingFrames.append(destination.view.frame)
                 openingInsets.append(destination.view.safeAreaInsets.top)
-                #expect(!navigation.isNavigationBarHidden)
+                #expect(navigation.isNavigationBarHidden == customRootHeader)
             }
         }
         #expect(!openingFrames.isEmpty)
@@ -688,11 +688,16 @@ extension RenderedRoutePickingTests {
         #expect(openingInsets.allSatisfy { abs($0 - (openingInsets.first ?? $0)) < 1 }, "Root and detail keep the same native bar inset during the push")
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         let barFrame = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
-        #expect(abs(barFrame.minY - host.host.view.safeAreaInsets.top) < 2,
-                "The detail's native Back/title bar occupies the top header position")
+        if customRootHeader {
+            #expect(abs(try compactBrowseHeaderBottom(in: host.snapshot()) - headerBottom) < 1,
+                    "The detail uses the same compact 44pt header as its browsing root")
+        } else {
+            #expect(abs(barFrame.minY - host.host.view.safeAreaInsets.top) < 2,
+                    "The detail's native Back/title bar occupies the top header position")
+        }
         #expect(host.controllers(of: UINavigationController.self).filter {
             !$0.isNavigationBarHidden && $0.navigationBar.window != nil
-        }.count == 1, "Exactly one native navigation bar is visible")
+        }.count == (customRootHeader ? 0 : 1), "Exactly one app or native navigation bar is visible")
         let contentFrame = navigation.topViewController?.view.frame
         try host.save("list-single-header-\(scenario)")
         for _ in 0..<5 {
@@ -702,7 +707,7 @@ extension RenderedRoutePickingTests {
             #expect(navigation.topViewController?.view.frame == contentFrame,
                     "Detail content must not shift after the push transition completes")
         }
-        #expect(!navigation.isNavigationBarHidden)
+        #expect(navigation.isNavigationBarHidden == customRootHeader)
         let popGesture = try #require(navigation.interactivePopGestureRecognizer)
         #expect(popGesture.isEnabled)
         #expect(popGesture.delegate?.gestureRecognizerShouldBegin?(popGesture) == true,
@@ -1317,10 +1322,119 @@ extension RenderedRoutePickingTests {
     }
 }
 
+extension RenderedRoutePickingTests {
+    @Test func landscapeToolbarStaysCompactThroughListAndStatsNavigation() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer {
+            MapboxOptions.accessToken = token
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        }
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+        try await listWait { scene.effectiveGeometry.interfaceOrientation == .landscapeRight }
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-07")), timeZone: .gmt)
+        store.selectedTab = .list
+        let dashboard = StatsDashboardState()
+        await StatsDashboardTests.load(dashboard, store)
+        let stats = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: dashboard)) }
+        let host = try ListHarness(root: AppShell(store: store, statsContent: stats)
+            .environment(\.statsDetailPresentation, .navigation)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.verticalSizeClass, .compact)
+            .environment(\.dynamicTypeSize, .large)
+            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)),
+            size: scene.effectiveGeometry.coordinateSpace.bounds.size)
+        defer { host.host.dismiss(animated: false); host.close() }
+
+        func checkHeader(_ capture: String) throws {
+            let bottom = try compactBrowseHeaderBottom(in: host.snapshot())
+            #expect(abs(bottom - host.window.safeAreaInsets.top - 44) < 1,
+                    "Every landscape navigation level has one 44pt toolbar: \(capture), \(bottom)")
+            #expect(host.controllers(of: UINavigationController.self).allSatisfy {
+                $0.isNavigationBarHidden || $0.navigationBar.window == nil
+            }, "The shared compact toolbar replaces every native bar in landscape")
+            try host.save("shared-toolbar-\(capture)")
+        }
+        func push(_ navigation: UINavigationController, depth: Int, capture: String, action: () -> Void) async throws {
+            action()
+            var safeAreaTops: [CGFloat] = []
+            var scrollInsets: [CGFloat] = []
+            var viewportHeights: [CGFloat] = []
+            for _ in 0..<30 {
+                try await Task.sleep(for: .milliseconds(25))
+                if navigation.viewControllers.count == depth, let destination = navigation.topViewController,
+                   let scroll = host.descendants(of: UIScrollView.self).first(where: {
+                       $0.isDescendant(of: destination.view) && $0.bounds.height > 100
+                   }) {
+                    safeAreaTops.append(destination.view.safeAreaInsets.top)
+                    scrollInsets.append(scroll.adjustedContentInset.top)
+                    viewportHeights.append(scroll.bounds.height)
+                }
+            }
+            try await listWait { navigation.viewControllers.count == depth && navigation.transitionCoordinator == nil }
+            for samples in [safeAreaTops, scrollInsets, viewportHeights] {
+                let first = try #require(samples.first)
+                #expect(samples.allSatisfy { abs($0 - first) < 1 },
+                        "Destination layout remains stable during a native push: \(capture), \(samples)")
+            }
+            try checkHeader(capture)
+            let gesture = try #require(navigation.interactivePopGestureRecognizer)
+            #expect(gesture.isEnabled)
+            #expect(gesture.delegate?.gestureRecognizerShouldBegin?(gesture) == true,
+                    "Hiding native chrome must preserve native edge-swipe Back")
+        }
+
+        try await listWait { host.descendants(of: UICollectionView.self).contains { $0.contentSize.height > $0.bounds.height * 2 } }
+        let list = try #require(host.descendants(of: UICollectionView.self).first { $0.contentSize.height > $0.bounds.height * 2 })
+        let listNavigation = try #require(host.controllers(of: UINavigationController.self).last)
+        list.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
+        try await Task.sleep(for: .milliseconds(200))
+        let listOffset = list.contentOffset
+        try checkHeader("list-root")
+        let activityID = try #require(store.activities.first?.id)
+        try await push(listNavigation, depth: 2, capture: "list-detail") { store.inspect(activityID) }
+        listNavigation.popViewController(animated: true)
+        try await listWait { listNavigation.viewControllers.count == 1 && listNavigation.transitionCoordinator == nil && store.inspectedActivityID == nil }
+        #expect(list.contentOffset == listOffset, "Back preserves the exact List scroll position")
+        try checkHeader("list-back")
+        store.selectedTab = .map
+        try await Task.sleep(for: .milliseconds(400))
+        try checkHeader("map-root")
+        store.selectedTab = .stats
+        try await listWait { dashboard.completedTiles.count == StatsDashboard.tiles.count }
+        try await Task.sleep(for: .milliseconds(300))
+        let statsNavigation = try #require(host.controllers(of: UINavigationController.self).first)
+        let statsRoot = try #require(statsNavigation.viewControllers.first?.view)
+        let statsScroll = try #require(host.descendants(of: UIScrollView.self).first {
+            !($0 is UICollectionView) && $0.isDescendant(of: statsRoot) && $0.contentSize.height > 1500
+        })
+        statsScroll.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        let statsOffset = statsScroll.contentOffset
+        try checkHeader("stats-root")
+        try await push(statsNavigation, depth: 2, capture: "stats-focus") { dashboard.toggleExpansion(.weeklyVolume) }
+        try await push(statsNavigation, depth: 3, capture: "stats-activity") { dashboard.inspectedActivityID = activityID }
+        statsNavigation.popViewController(animated: true)
+        try await listWait { statsNavigation.viewControllers.count == 2 && statsNavigation.transitionCoordinator == nil && dashboard.inspectedActivityID == nil }
+        #expect(dashboard.expandedTile == .weeklyVolume)
+        try checkHeader("stats-activity-back")
+        statsNavigation.popViewController(animated: true)
+        try await listWait { statsNavigation.viewControllers.count == 1 && statsNavigation.transitionCoordinator == nil && dashboard.expandedTile == nil }
+        #expect(statsScroll.contentOffset == statsOffset, "Closing focus preserves the Stats dashboard scroll position")
+        #expect(store.selectedActivityIDs.isEmpty && store.mapContext.pendingRequest == nil)
+        try checkHeader("stats-focus-back")
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        try await listWait { scene.effectiveGeometry.interfaceOrientation == .portrait }
+    }
+}
+
 /// Read the solid navigation-blue strip at the blank physical left margin.
 /// Decode to explicit RGBA instead of assuming the renderer's provider format.
 @MainActor
-private func compactBrowseHeaderBottom(in image: UIImage) throws -> CGFloat {
+func compactBrowseHeaderBottom(in image: UIImage) throws -> CGFloat {
     let pixels = try #require(image.cgImage)
     let width = pixels.width, height = pixels.height
     var rgba = [UInt8](repeating: 0, count: width * height * 4)

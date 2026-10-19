@@ -141,21 +141,14 @@ struct ListScreen: View {
 }
 
 private struct ListRootChrome: ViewModifier {
-    let toolbar: BrowseRootToolbar?
-    let header: AnyView?
+    let toolbar: AppToolbar?
+    let header: AppToolbar?
     let visible: Bool
     @ViewBuilder func body(content: Content) -> some View {
         if let header {
-            content
-                .toolbar(.hidden, for: .navigationBar)
-                .safeAreaInset(edge: .top, spacing: 0) { header }
+            content.appNavigationBar(header)
         } else if let toolbar {
-            content
-                .toolbar(visible ? .visible : .hidden, for: .navigationBar)
-                .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-                .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-                .toolbarColorScheme(.dark, for: .navigationBar)
-                .toolbar { toolbar }
+            content.appNavigationBar(toolbar, visible: visible)
         } else { content }
     }
 }
@@ -163,10 +156,9 @@ private struct ListRootChrome: ViewModifier {
 /// Hosted outside the owning navigation stack, including the outer Stats shell.
 struct BrowseListFooter: View {
     @Bindable var store: ActivityStore
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @Environment(\.dynamicTypeSize) private var typeSize
+    @AppToolbarEnvironment private var toolbarLayout
     var body: some View {
-        if store.selectedTab == .list && (verticalSizeClass != .compact || typeSize.isAccessibilitySize) {
+        if store.selectedTab == .list && !toolbarLayout.packsListControls {
             HStack(spacing: 8) {
                 SelectionBar(store: store, includesTotal: true, expandsCount: true)
                 ListControls(presentation: store.listPresentation, store: store, iconOnly: true)

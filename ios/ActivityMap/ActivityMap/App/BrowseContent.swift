@@ -133,28 +133,13 @@ private struct BrowseStatsDestinationKey: EnvironmentKey {
     var detailPresented = false
 }
 
-/// Compact browsing pages share one native bar so UIKit preserves retained
-/// content insets and scroll positions across push and Back.
-struct BrowseRootToolbar: ToolbarContent {
-    let leading: AnyView
-    let principal: AnyView
-    let trailing: AnyView
-    var body: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarLeading) { leading }
-            .sharedBackgroundVisibility(.hidden)
-        ToolbarItem(placement: .principal) { principal }
-        ToolbarItemGroup(placement: .topBarTrailing) { trailing }
-            .sharedBackgroundVisibility(.hidden)
-    }
-}
-
 extension EnvironmentValues {
     @Entry var listFooterHostedByShell = false
     @Entry var listShellNavigation: ListShellNavigation? = nil
-    @Entry var listRootToolbar: BrowseRootToolbar? = nil
+    @Entry var listRootToolbar: AppToolbar? = nil
     /// Compact landscape chrome belongs to the List's root page, so pushing
     /// native detail does not resize the navigation controller itself.
-    @Entry var listRootHeader: AnyView? = nil
+    @Entry var listRootHeader: AppToolbar? = nil
 
     /// The shell's target column width, independent of a retained native
     /// navigation root's temporarily stale frame during destination switches.

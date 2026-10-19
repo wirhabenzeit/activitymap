@@ -10,50 +10,43 @@ struct ActivityDetailView: View {
     var onMapShown: (() -> Void)? = nil
     var hostTab = AppTab.list
     @Environment(\.dismiss) private var dismiss
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
-    @Environment(\.dynamicTypeSize) private var typeSize
+    @AppToolbarEnvironment private var toolbarLayout
     @State private var navigationReference = DetailNavigationReference()
 
     var body: some View {
         ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false, hostTab: hostTab)
         .background(AppTheme.surface)
-        .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden()
-        .toolbar(.visible, for: .navigationBar)
-        .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-        .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button { dismiss() } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 20, weight: .medium))
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .accessibilityLabel(backLabel)
-                .accessibilityIdentifier(backIdentifier)
-            }.sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .principal) {
-                if let activity = store.activity(id: activityID) {
-                    ActivityDetailIdentity(activity: activity, titleLineLimit: 2, onNavigationBar: true)
-                }
+        .appNavigationBar(toolbar)
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            if hostTab == .list && toolbarLayout.packsListControls {
+                SelectionBar(store: store, includesTotal: true, expandsCount: true)
+                    .padding(.horizontal, 8).background(.bar)
             }
-            ToolbarItem(placement: .topBarTrailing) {
+        }
+        .background(DetailBackGesture(navigationReference: navigationReference))
+        .accessibilityAction(.escape) { dismiss() }
+    }
+
+    private var toolbar: AppToolbar {
+        AppToolbar(leading: AnyView(AppToolbarBackButton(label: backLabel, identifier: backIdentifier) { dismiss() }),
+            principal: AnyView(Group {
+                if let activity = store.activity(id: activityID) {
+                    ActivityDetailIdentity(activity: activity, titleLineLimit: toolbarLayout.titleLineLimit, onNavigationBar: true)
+                }
+            }), trailing: AnyView(HStack(spacing: AppToolbarLayout.spacing) {
                 if let editing = store.activityEditing, let activity = store.activity(id: activityID) {
                     ActivityEditButton(activity: activity, service: editing, onNavigationBar: true)
                 }
-            }.sharedBackgroundVisibility(.hidden)
-            ToolbarItem(placement: .topBarTrailing) {
                 Button {
                     showActivityOnMapFromDetail(activityID, store: store, navigationController: navigationReference.controller)
                     onMapShown?()
                 } label: {
                     Image(systemName: "map")
                         .font(.body.weight(.semibold))
-                        .frame(width: 44, height: 44)
+                        .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
                         .background(.white.opacity(0.18), in: Circle())
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .foregroundStyle(.white)
@@ -63,17 +56,9 @@ struct ActivityDetailView: View {
                 .accessibilityIdentifier("activity-show-on-map")
                 .accessibilityHint(store.routableActivityIDs.contains(activityID)
                     ? "Select this activity and frame its route" : "This activity has no GPS route")
-            }.sharedBackgroundVisibility(.hidden)
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if hostTab == .list && verticalSizeClass == .compact && !typeSize.isAccessibilitySize {
-                SelectionBar(store: store, includesTotal: true, expandsCount: true)
-                    .padding(.horizontal, 8).background(.bar)
-            }
-        }
-        .background(DetailBackGesture(navigationReference: navigationReference))
-        .accessibilityAction(.escape) { dismiss() }
+            }))
     }
+
 }
 
 /// This action changes browsing destinations, rather than going Back to List.
