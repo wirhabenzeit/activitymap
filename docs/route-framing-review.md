@@ -35,3 +35,12 @@ Standard's projected wide-detail route extended about 3.5 points into the fitter
 - Additional browser checks passed for a point route (zoom 16), a date-line route (short arc), no GPS (List retained with feedback), persisted fitted cameras, and unchanged camera after results expansion.
 
 Native evidence invokes production intents in the screenshot harness; it does not certify manually tapping the native controls or dragging the native sheet on a physical device. That real native UI acceptance remains outstanding, so this PR addresses #275 without automatically closing it. Browser text scaling and iOS Dynamic Type are different stress cases, not equivalent accessibility certification. Full expansion may intentionally cover the map; it must not cause unsolicited repeated fits.
+
+
+## Recipient-map reconciliation — 2026-10-19
+
+The capability-link recipient map now consumes the same `routeBounds`, `routeFitPadding` and `routeFramingPolicy` as browsing. Both clients of that policy use the shortest longitude arc, valid-coordinate handling, measured panel clearance, minimum usable viewport and maximum zoom. The recipient view still receives only its explicit `SharedActivityDTO` subset and performs one initial fit; selecting a different activity, scrolling its card or resizing does not reset the camera. Its card scrolls within a height derived from the fitter's minimum clearance, so a short landscape window does not conceal the entire route area.
+
+Consumer inventory: `InteractiveMap` retains its explicit-fit request lifecycle, settled-layout wait and gesture cancellation; `SharedActivityMap` retains its initial-load lifecycle and public DTO boundary. Those are intentional lifecycle differences around the common geometry policy.
+
+Validation: all nine route-framing/shared-route tests passed, including a disclosed date-line crossing and a measured landscape card. TypeScript and scoped ESLint passed. A temporary browser fixture rendered the production recipient component with a recording map adapter at 390×844, 844×390 and 1180×820: the fit requested the approximately 2-degree arc, cleared the measured card, retained at least 80 pixels in both dimensions, and did not repeat after selecting the second activity. The landscape card scrolled and stayed within the viewport. This validates component layout and camera arguments; it does not certify live Mapbox rendering.

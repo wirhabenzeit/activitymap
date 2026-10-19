@@ -54,6 +54,7 @@ import {
   routeBounds,
   routeCoordinates,
   routeFitPadding,
+  routeFramingPolicy,
 } from '~/lib/route-framing';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { cn, groupBy } from '~/lib/utils';
@@ -438,7 +439,7 @@ export default function InteractiveMap() {
       hasAutoCenteredOnLatest.current = true;
       const camera = map.cameraForBounds(bounds, {
         padding,
-        maxZoom: 16,
+        maxZoom: routeFramingPolicy.maxZoom,
         bearing: map.getBearing(),
         pitch: map.getPitch(),
       });

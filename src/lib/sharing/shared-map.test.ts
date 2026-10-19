@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
+
+import polyline from '@mapbox/polyline';
 import test from 'node:test';
 
 import type { SharedActivityDTO } from '~/contracts/share/activity';
+import { routeBounds } from '~/lib/route-framing';
 
 import { buildSharedRouteCollection } from './shared-map';
 
@@ -40,4 +43,21 @@ void test('buildSharedRouteCollection decodes only the explicitly shared routes'
     [-120.95, 40.7],
     [-126.453, 43.252],
   ]);
+});
+
+void test('recipient route framing keeps a disclosed date-line crossing local', () => {
+  const routes = buildSharedRouteCollection([
+    activity({
+      route_polyline: polyline.encode([
+        [10, 179],
+        [11, -179],
+      ]),
+    }),
+    activity({ id: 'not-disclosed', route_polyline: null }),
+  ]);
+  const bounds = routeBounds(
+    routes.features.flatMap((feature) => feature.geometry.coordinates),
+  )!;
+  assert.ok(bounds[1][0] - bounds[0][0] < 2.001);
+  assert.ok(bounds[0][1] < 10 && bounds[1][1] > 11);
 });

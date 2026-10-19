@@ -1,35 +1,40 @@
 'use client';
 
+import { Gauge, Mountain, Route, Timer } from 'lucide-react';
+import type { Expression } from 'mapbox-gl';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import ReactMapGL, {
+  FullscreenControl,
+  Layer,
+  type MapMouseEvent,
+  type MapRef,
+  NavigationControl,
+  Source,
+} from 'react-map-gl/mapbox';
+
+import { ElevationPlot } from '~/components/list/elevation-plot';
+import type { SharedActivityDTO } from '~/contracts/share/activity';
 import {
-  useDisplayUnits,
   useDateFormat,
+  useDisplayUnits,
 } from '~/hooks/use-display-preferences';
+import { formatPreferredDate } from '~/lib/date-preferences';
+import { formatLocalTime } from '~/lib/local-date-time';
+import {
+  routeBounds,
+  routeFitPadding,
+  routeFramingPolicy,
+} from '~/lib/route-framing';
+import {
+  buildSharedRouteCollection,
+  sharedElevationProfile,
+} from '~/lib/sharing/shared-map';
 import {
   formatSpeed,
   speedDisplayForSport,
   speedLabel,
 } from '~/lib/speed-display';
 import { formatMeasurement } from '~/lib/units';
-import { useCallback, useMemo, useRef, useState } from 'react';
-
-import { Gauge, Mountain, Route, Timer } from 'lucide-react';
-import { LngLatBounds, type Expression } from 'mapbox-gl';
-import ReactMapGL, {
-  FullscreenControl,
-  Layer,
-  NavigationControl,
-  Source,
-  type MapMouseEvent,
-  type MapRef,
-} from 'react-map-gl/mapbox';
-import { ElevationPlot } from '~/components/list/elevation-plot';
-import type { SharedActivityDTO } from '~/contracts/share/activity';
-import { formatPreferredDate } from '~/lib/date-preferences';
-import { formatLocalTime } from '~/lib/local-date-time';
-import {
-  buildSharedRouteCollection,
-  sharedElevationProfile,
-} from '~/lib/sharing/shared-map';
 import { categorySettings, colorMap, iconMap } from '~/settings/category';
 import { baseMaps, defaultMapPosition } from '~/settings/map';
 
@@ -176,6 +181,7 @@ export function SharedActivityMap({
   expiresAt,
 }: SharedActivityMapProps) {
   const mapRef = useRef<MapRef>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const routes = useMemo(
     () => buildSharedRouteCollection(activities),
     [activities],
@@ -194,29 +200,22 @@ export function SharedActivityMap({
     const map = mapRef.current?.getMap();
     if (!map || routes.features.length === 0) return;
 
-    const bounds = new LngLatBounds();
-    for (const feature of routes.features) {
-      for (const coordinate of feature.geometry.coordinates) {
-        bounds.extend(coordinate as [number, number]);
-      }
-    }
-    if (!bounds.isEmpty()) {
-      // Keep routes clear of the details card, which is taller with a profile.
-      const card = activities.some((activity) => activity.elevation_profile)
-        ? 410
-        : 260;
-      map.fitBounds(bounds, {
-        duration: 0,
-        maxZoom: 15,
-        padding: {
-          top: 56,
-          right: 40,
-          bottom: Math.min(card, map.getContainer().clientHeight * 0.6),
-          left: 40,
-        },
-      });
-    }
-  }, [activities, routes]);
+    const bounds = routeBounds(
+      routes.features.flatMap((feature) => feature.geometry.coordinates),
+    );
+    const padding = routeFitPadding(
+      map.getContainer().getBoundingClientRect(),
+      panelRef.current?.getBoundingClientRect(),
+    );
+    if (!bounds || !padding) return;
+    // Fit the disclosed route subset once using the actual card footprint.
+    // Later selection, scrolling and resizing preserve the user's camera.
+    map.fitBounds(bounds, {
+      duration: 0,
+      maxZoom: routeFramingPolicy.maxZoom,
+      padding,
+    });
+  }, [routes]);
 
   const handleRouteClick = useCallback(
     (event: MapMouseEvent) => {
@@ -320,8 +319,18 @@ export function SharedActivityMap({
         )}
       </ReactMapGL>
 
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 p-3 sm:p-5">
-        <div className="pointer-events-auto mx-auto max-w-3xl">
+      <div
+        className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col p-3 sm:p-5"
+        style={{
+          // Leave the same minimum usable map area that the fitter requires,
+          // including on short windows and with enlarged text.
+          maxHeight: `calc(100dvh - ${routeFramingPolicy.padding.top + routeFramingPolicy.minimumExtent + routeFramingPolicy.panelGap}px)`,
+        }}
+      >
+        <div
+          ref={panelRef}
+          className="pointer-events-auto mx-auto min-h-0 w-full max-w-3xl overflow-y-auto"
+        >
           {activities.length > 1 && (
             <div className="mb-2 flex max-w-full gap-2 overflow-x-auto rounded-lg bg-background/90 p-2 shadow backdrop-blur-sm">
               {activities.map((activity) => (

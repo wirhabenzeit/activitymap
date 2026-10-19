@@ -1,8 +1,17 @@
 import polyline from '@mapbox/polyline';
+
 import type { Activity } from '~/server/db/schema';
 
 export type RouteBounds = [[number, number], [number, number]];
 type Rect = { left: number; top: number; right: number; bottom: number };
+
+/** Camera and clearance policy shared by browsing and recipient maps. */
+export const routeFramingPolicy = {
+  maxZoom: 16,
+  minimumExtent: 80,
+  panelGap: 24,
+  padding: { top: 32, left: 24, right: 64, bottom: 40 },
+} as const;
 
 /** Match the geometry displayed by createFeature, including its summary preference. */
 export function routeCoordinates(
@@ -63,13 +72,14 @@ export function routeBounds(
 export function routeFitPadding(map: Rect, panel?: Rect | null) {
   const width = map.right - map.left,
     height = map.bottom - map.top;
-  const base = { top: 32, left: 24, right: 64, bottom: 40 };
-  const usable = (p: typeof base) =>
-    width - p.left - p.right >= 80 && height - p.top - p.bottom >= 80;
-  const area = (p: typeof base) =>
+  const base = { ...routeFramingPolicy.padding };
+  const usable = (p: Record<keyof typeof base, number>) =>
+    width - p.left - p.right >= routeFramingPolicy.minimumExtent &&
+    height - p.top - p.bottom >= routeFramingPolicy.minimumExtent;
+  const area = (p: Record<keyof typeof base, number>) =>
     Math.max(0, width - p.left - p.right) *
     Math.max(0, height - p.top - p.bottom);
-  let padding = base;
+  let padding: Record<keyof typeof base, number> = base;
   if (
     panel &&
     panel.right > map.left &&
@@ -79,11 +89,17 @@ export function routeFitPadding(map: Rect, panel?: Rect | null) {
   ) {
     const above = {
       ...base,
-      bottom: Math.max(base.bottom, map.bottom - panel.top + 24),
+      bottom: Math.max(
+        base.bottom,
+        map.bottom - panel.top + routeFramingPolicy.panelGap,
+      ),
     };
     const beside = {
       ...base,
-      right: Math.max(base.right, map.right - panel.left + 24),
+      right: Math.max(
+        base.right,
+        map.right - panel.left + routeFramingPolicy.panelGap,
+      ),
     };
     const candidates = [above, beside].filter(usable);
     if (!candidates.length) return null;
