@@ -30,6 +30,7 @@ import { ShareButton } from '~/components/share-button';
 import { Dialog, DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import {
   DropdownMenu,
+  DropdownMenuItem,
   DropdownMenuPortal,
   DropdownMenuSub,
   DropdownMenuSubTrigger,
@@ -135,6 +136,16 @@ function Content() {
       <div className="flex flex-wrap gap-3">
         <button onClick={() => setSettings(true)}>Open Settings</button>
         <button onClick={() => setEdit(true)}>Open Edit</button>
+        <DropdownMenu modal={false}>
+          <DropdownMenuTrigger asChild>
+            <button>Dialog actions</button>
+          </DropdownMenuTrigger>
+          <PreferenceMenuContent>
+            <DropdownMenuItem onSelect={() => setEdit(true)}>
+              Edit from menu
+            </DropdownMenuItem>
+          </PreferenceMenuContent>
+        </DropdownMenu>
         <ShareButton />
         <LayerSwitcher />
         <button onClick={() => setConnect(true)}>Open Connect</button>

@@ -126,6 +126,16 @@ try {
       'Selecting a new sport changes the actual form',
     );
     await dialog.getByRole('button', { name: 'Close Edit activity' }).click();
+    await page.waitForFunction(
+      () => document.activeElement?.textContent === 'Open Edit',
+    );
+    assert.equal(
+      await page
+        .getByRole('button', { name: 'Open Edit', exact: true })
+        .evaluate((element) => element === document.activeElement),
+      true,
+      'Trigger-less Edit restores its external invoker',
+    );
     await page
       .getByRole('button', { name: 'Open Settings', exact: true })
       .click();
@@ -319,6 +329,51 @@ try {
   const photoTarget = await closePhoto.boundingBox();
   assert(photoTarget && photoTarget.width >= 44 && photoTarget.height >= 44);
   await closePhoto.click();
+  for (const reducedMotion of ['reduce', 'no-preference']) {
+    await page.emulateMedia({ reducedMotion });
+    await page
+      .getByRole('button', { name: 'Dialog actions', exact: true })
+      .click();
+    await page
+      .getByRole('menuitem', { name: 'Edit from menu', exact: true })
+      .focus();
+    await page.keyboard.press('Enter');
+    const editDialog = page.getByRole('dialog', {
+      name: 'Edit activity',
+      exact: true,
+    });
+    await editDialog.waitFor();
+    await page.keyboard.press('Escape');
+    await editDialog.waitFor({ state: 'hidden' });
+    await page.waitForFunction(
+      () => document.activeElement?.textContent === 'Dialog actions',
+    );
+    assert.equal(
+      await page.getByRole('menu', { includeHidden: true }).count(),
+      0,
+      'Dialog teardown leaves no closed actions menu',
+    );
+    await page.evaluate(() => {
+      document.body.dataset.escapeUnclaimed = 'false';
+      window.addEventListener(
+        'keydown',
+        (event) => {
+          if (event.key === 'Escape')
+            document.body.dataset.escapeUnclaimed = String(
+              !event.defaultPrevented,
+            );
+        },
+        { once: true },
+      );
+    });
+    await page.keyboard.press('Escape');
+    assert.equal(
+      await page.locator('body').getAttribute('data-escape-unclaimed'),
+      'true',
+      `${reducedMotion}: no stale dismissal layer consumes the next Escape`,
+    );
+  }
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.getByRole('button', { name: 'Open Connect', exact: true }).click();
   await fits(page.getByRole('dialog'));
   await page.keyboard.press('Escape');
@@ -338,6 +393,7 @@ try {
           'dialog bounds/fixed footer/focus',
           'actual Edit sport and Share expiry option hit testing/selection',
           'nested dialog popover/menu/submenu interaction and dismissal',
+          'menu-to-Edit focus/Escape handoff with reduced and normal motion',
           'persistent pointer+keyboard checkboxes',
           'available-height menu',
           'map availability+dispatch',
