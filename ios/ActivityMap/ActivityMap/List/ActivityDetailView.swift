@@ -19,12 +19,6 @@ struct ActivityDetailView: View {
         .background(AppTheme.surface)
         .navigationBarBackButtonHidden()
         .appNavigationBar(toolbar)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            if hostTab == .list && toolbarLayout.packsListControls {
-                SelectionBar(store: store, includesTotal: true, expandsCount: true)
-                    .padding(.horizontal, 8).background(.bar)
-            }
-        }
         .background(DetailBackGesture(navigationReference: navigationReference))
         .accessibilityAction(.escape) { dismiss() }
     }

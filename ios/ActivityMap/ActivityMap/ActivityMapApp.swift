@@ -7,6 +7,7 @@ struct ActivityMapApp: App {
     private let persistence: Result<LocalStore, Error>
     #if DEBUG
     private let isMapPhotoUITesting = ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
+    private let isListSelectionUITesting = ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing")
     #endif
 
     init() {
@@ -18,7 +19,8 @@ struct ActivityMapApp: App {
 
     private static var usesInMemoryPersistence: Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing") { return true }
+        if ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
+            || ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing") { return true }
         #endif
         return ProcessInfo.processInfo.arguments.contains("--unit-testing")
     }
@@ -26,7 +28,9 @@ struct ActivityMapApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if isMapPhotoUITesting {
+            if isListSelectionUITesting {
+                ListSelectionUITestFixture(standalone: ProcessInfo.processInfo.arguments.contains("--list-standalone"))
+            } else if isMapPhotoUITesting {
                 MapPhotoUITestFixture(resultsPresented: ProcessInfo.processInfo.arguments.contains("--map-photo-results"))
             } else {
                 standardContent

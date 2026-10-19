@@ -23,6 +23,7 @@ export const nativeSuites = [
   'ActivityMapTests/MapPhotoTests',
   'ActivityMapTests/PhotoGalleryTests',
   'ActivityMapUITests/MapPhotoUITests',
+  'ActivityMapUITests/ListSelectionUITests',
 ];
 
 export function validateNativeSummary(summary) {

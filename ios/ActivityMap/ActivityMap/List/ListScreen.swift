@@ -80,12 +80,14 @@ struct ListScreen: View {
 
 }
 
-/// Hosted outside the owning navigation stack, including the outer Stats shell.
+/// List controls stay available beside an adjacent inspector, but not when
+/// a pushed detail replaces the list. Both shell hosts share this policy.
 struct BrowseListFooter: View {
     @Bindable var store: ActivityStore
+    @Environment(\.listShellNavigation) private var navigation
     @AppToolbarEnvironment private var toolbarLayout
     var body: some View {
-        if store.selectedTab == .list && !toolbarLayout.packsListControls {
+        if store.selectedTab == .list && navigation?.detailPresented != true && !toolbarLayout.packsListControls {
             HStack(spacing: 8) {
                 SelectionBar(store: store, includesTotal: true, expandsCount: true)
                 ListControls(presentation: store.listPresentation, store: store, iconOnly: true)

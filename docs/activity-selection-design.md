@@ -10,27 +10,27 @@ The [Map/List contract](map-list-parity-contract.md#approved-selection-update-fo
 
 ## Use cases and limits
 
-| User goal | What the group provides |
-| --- | --- |
-| Find activities passing through a location | A map tap finds overlapping routes; switching to List marks those same activities without a transfer action. |
-| Explore a manageable subset | Only selected activities restricts Map and List to the group, intersected with ordinary filters. |
-| View particular outings together | Combine collects trips, repeated visits or routes found through separate taps and searches. Fit selection frames their geographic extent. |
-| Calculate totals for particular outings | Selected summaries operate on the whole group, with disclosure for members hidden by ordinary filters. |
-| Share particular outings | The existing sharing flow can use the group. A separate sharing picker/draft redesign is a follow-up, not a dependency of this delivery. |
+| User goal                                  | What the group provides                                                                                                                   |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Find activities passing through a location | A map tap finds overlapping routes; switching to List marks those same activities without a transfer action.                              |
+| Explore a manageable subset                | Only selected activities restricts Map and List to the group, intersected with ordinary filters.                                          |
+| View particular outings together           | Combine collects trips, repeated visits or routes found through separate taps and searches. Fit selection frames their geographic extent. |
+| Calculate totals for particular outings    | Selected summaries operate on the whole group, with disclosure for members hidden by ordinary filters.                                    |
+| Share particular outings                   | The existing sharing flow can use the group. A separate sharing picker/draft redesign is a follow-up, not a dependency of this delivery.  |
 
 Several routes found by one tap are ordinary exploration. Combining several independent choices is the advanced workflow. The group is not a temporary map hit buffer and is not automatically cleared by opening an activity or switching destinations.
 
 ## Agreed interface
 
-| Surface | Arrangement |
-| --- | --- |
-| Map results | **Combine icon → N selected → Fit selection → existing size control → Clear**. Keep the group controls outside the results/detail transition. |
-| List | **Combine icon → N selected**, then Clear and existing display/paging controls in the footer. The footer remains reachable during List inspection. |
-| Filters | A native switch/checkbox labelled **Only selected activities**, shared by Map and List. Disable it at zero selection. Include it in browsing filter counts and Reset. |
-| Active scope | A funnel indicator beside the selected count, and active feedback on the Filters control. The restriction must remain apparent with Filters closed. |
-| Combine on | Highlight the icon, expose its On/Off state accessibly, and show **Combine on** beside/below the count. Tapping it again ends the mode without discarding the group. |
-| Activity rows | Keep the existing sport-icon footprint. Outside Combine it identifies the sport; inside Combine it toggles membership and overlays a small checkmark on selected icons. Keep selected names/backgrounds identifiable in both modes. |
-| Zero selection | Map shows no selection controls until a route pick creates a group; List keeps its existing footer. Hide or disable unavailable Clear/Fit actions. |
+| Surface        | Arrangement                                                                                                                                                                                                                         |
+| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Map results    | **Combine icon → N selected → Fit selection → existing size control → Clear**. Keep the group controls outside the results/detail transition.                                                                                       |
+| List           | **Combine icon → N selected**, then Clear and existing display/paging controls in the footer. The footer remains reachable during List inspection.                                                                                  |
+| Filters        | A native switch/checkbox labelled **Only selected activities**, shared by Map and List. Disable it at zero selection. Include it in browsing filter counts and Reset.                                                               |
+| Active scope   | A funnel indicator beside the selected count, and active feedback on the Filters control. The restriction must remain apparent with Filters closed.                                                                                 |
+| Combine on     | Highlight the icon, expose its On/Off state accessibly, and show **Combine on** beside/below the count. Tapping it again ends the mode without discarding the group.                                                                |
+| Activity rows  | Keep the existing sport-icon footprint. Outside Combine it identifies the sport; inside Combine it toggles membership and overlays a small checkmark on selected icons. Keep selected names/backgrounds identifiable in both modes. |
+| Zero selection | Map shows no selection controls until a route pick creates a group; List keeps its existing footer. Hide or disable unavailable Clear/Fit actions.                                                                                  |
 
 Combine is a direct toggle, not a menu of input modes. Clear is directly available and includes hidden members. Camera fitting remains independent of selection, restriction, Back and sheet sizing. The Map group Share action appears in Results only while Combine is on; an open detail shares that activity alone. Map result-row taps always open details; only the sport icon/checkmark changes membership. One persistent header button uses **Fit selection** in Results and **Fit route** in detail; this work does not introduce another framing vocabulary.
 
@@ -38,18 +38,18 @@ Sport icons do not secretly select during ordinary browsing. There is no separat
 
 ## Interaction rules
 
-| Action | Default | Combine on |
-| --- | --- | --- |
-| Tap one map route | Replace group with that activity; activate/open it. | Add it; repeated hits do not toggle it off or activate a new activity through passive addition. |
-| Tap overlapping routes / confirm area selection | Replace with the deduplicated hit set; show results for multiple hits. | Union the hit set with the existing group; retain valid focus. |
-| Tap empty map | Clear group and map focus; disable Only selected; retain camera. | Preserve group, focus, detail and mode. |
-| Tap a sport icon in List/results | No selection action. | Add/remove that activity. |
-| Tap a row name / open details | Inspect the activity; preserve group. | Same. |
-| Show on map | Validate, replace group with target, activate, switch to Map and frame its route. | Validate, add target, activate, switch to Map and frame its route. |
-| Back / close detail | Return to the originating results/List; preserve group, focus and camera. | Same. |
-| Clear | Empty the entire group, including hidden IDs; clear map focus and Only selected. | Same, while keeping Combine on. |
-| Switch Map/List | Preserve group, mode, scope and retained browsing context. | Same. |
-| Fit / expand / collapse | Change only the named camera or presentation property. | Same. |
+| Action                                          | Default                                                                           | Combine on                                                                                      |
+| ----------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Tap one map route                               | Replace group with that activity; activate/open it.                               | Add it; repeated hits do not toggle it off or activate a new activity through passive addition. |
+| Tap overlapping routes / confirm area selection | Replace with the deduplicated hit set; show results for multiple hits.            | Union the hit set with the existing group; retain valid focus.                                  |
+| Tap empty map                                   | Clear group and map focus; disable Only selected; retain camera.                  | Preserve group, focus, detail and mode.                                                         |
+| Tap a sport icon in List/results                | No selection action.                                                              | Add/remove that activity.                                                                       |
+| Tap a row name / open details                   | Inspect the activity; preserve group.                                             | Same.                                                                                           |
+| Show on map                                     | Validate, replace group with target, activate, switch to Map and frame its route. | Validate, add target, activate, switch to Map and frame its route.                              |
+| Back / close detail                             | Return to the originating results/List; preserve group, focus and camera.         | Same.                                                                                           |
+| Clear                                           | Empty the entire group, including hidden IDs; clear map focus and Only selected.  | Same, while keeping Combine on.                                                                 |
+| Switch Map/List                                 | Preserve group, mode, scope and retained browsing context.                        | Same.                                                                                           |
+| Fit / expand / collapse                         | Change only the named camera or presentation property.                            | Same.                                                                                           |
 
 Low-level add/remove transitions retain the existing focus invariants: passive addition does not activate; an actual removal may activate a sole remaining eligible selected member; filter changes never choose a new focus. A multi-hit replacement presents results rather than choosing an arbitrary detail. Cancelled area selection and failed/loading-style hit queries do not clear selection.
 
@@ -89,19 +89,20 @@ Reuse the existing native browsing shell, List and Map results surface. This is 
 
 **Map on iPhone:** the existing draggable results sheet gets a persistent group row with an SF Symbols `checklist` button before **N selected**, then one contextual Fit button and Clear. Fit frames the selection in Results and the inspected route in detail (including while collapsed); the detail heading has no duplicate Fit button. The grabber/detents continue to resize it; no redundant web expand button is needed. When inspecting a route, keep that group row and put Results/stepping in a separate navigation row where necessary. Collapsed shows only the group controls, with no route name or detail content. Results and detail share one middle height; opening/back, paging and membership changes never resize it. Its hidden results viewport stays stable so collapse/detail transitions preserve the exact list position. Closing/collapsing the sheet must not hide the active mode. At zero selection, show no selection controls or sheet. The next route pick creates a group and reveals Combine in its header.
 
-**List on iPhone:** reuse the existing bottom status bar, with checklist → count/status on the left, Clear and display options on the right. No new checkbox column or upper selection toolbar. The native sport/checkmark overlay already exists in `BrowseSportSymbol`; gate the badge and sport-button interaction on Combine. Retain selected row tint/leading marker outside the mode. Host the footer outside the owning navigation stack (including the outer Stats navigation stack) so pushing an activity does not remove the mode or its exit.
+**List on iPhone:** reuse the existing bottom status bar, with checklist → count/status on the left, Clear and display options on the right. No new checkbox column or upper selection toolbar. The native sport/checkmark overlay already exists in `BrowseSportSymbol`; gate the badge and sport-button interaction on Combine. Retain selected row tint/leading marker outside the mode. Show these controls only while the list is visible. A full-page activity detail hides the footer in every orientation; Back restores the controls without changing selection or Combine mode.
 
 **Filters:** add Only selected activities near the result count/search in the browsing Form. Count it in browsing active filters and Reset. Add the matching part/popover to the iPad filter rail; exclude it from Stats. Closing Filters preserves its value.
 
-**Landscape and iPad:** preserve the existing landscape adaptation that carries List status in the compact shell bar when a bottom bar would consume too much height; checklist still precedes count. A pushed detail must retain a compact mode/exit, without replacing Back. iPad keeps the Map side-panel header and List footer within the browsing pane. Existing retained List scroll, adjacent detail, filter rail/column and Map camera remain owned by their current presenters. Accessibility text may wrap controls into two rows instead of shrinking their hit targets.
+**Landscape and iPad:** preserve the existing landscape adaptation that carries List status in the compact shell bar when a bottom bar would consume too much height; checklist still precedes count. A pushed List detail has no selection controls. iPad retains the List footer while the list remains visible beside an adjacent inspector; a pushed detail hides it. The Map side-panel header remains unchanged. Existing retained List scroll, adjacent detail, filter rail/column and Map camera remain owned by their current presenters. Accessibility text may wrap controls into two rows instead of shrinking their hit targets.
 
-| Native presentation | Selection controls |
-| --- | --- |
-| Phone List root / portrait detail | Persistent footer: checklist, count/status, Clear, display options where applicable. |
-| Phone Map results / route detail | Persistent sheet group header; independent Results/Back and stepping below when needed. |
-| Empty Map | No selection dock, count or Combine icon. Tap a route first. |
-| Short landscape List | Existing compact shell status area; explicit active mode and exit also on pushed detail. |
-| Regular iPad | Map panel header and List pane footer; same shared store flags and icon ordering. |
+| Native presentation                    | Selection controls                                                                      |
+| -------------------------------------- | --------------------------------------------------------------------------------------- |
+| Phone List root                        | Footer: checklist, count/status, Clear, display options where applicable.               |
+| Full-page List detail, any orientation | No selection controls; Back preserves selection and Combine mode.                       |
+| Phone Map results / route detail       | Persistent sheet group header; independent Results/Back and stepping below when needed. |
+| Empty Map                              | No selection dock, count or Combine icon. Tap a route first.                            |
+| Short landscape List                   | Compact shell status area while the list is visible.                                    |
+| Regular iPad                           | Map panel header and List pane footer; same shared store flags and icon ordering.       |
 
 The [native layout proposal](activity-selection/README.md) illustrates the List footer, Map results header and Filters toggle; these are mockups, not a completed SwiftUI implementation. The actual native release requires simulator renders and physical iPhone/iPad/VoiceOver checks.
 
@@ -109,37 +110,37 @@ The [native layout proposal](activity-selection/README.md) illustrates the List 
 
 Steps 1–4 are implemented locally. Step 5 has browser/simulator evidence; physical-device, beta and full release-suite acceptance remain open. Keep state, scope and controls together when releasing this behavior change.
 
-| Step | Deliverable | Completion evidence |
-| --- | --- | --- |
-| 1. Shared transitions | Add versioned selection-interaction fixtures for mode, scope and named actions; port unchanged focus/inspection invariants. Define expected differences from the existing additive Show on map and empty Add-tap rules. | TypeScript and Swift consume the same vectors through production state owners. |
-| 2. Production web state and projection | Move mode/scope into the actual selection owner; introduce named input actions and a distinct browsing projection. Keep ordinary filtering available for reconciliation and Stats. Update Show on map, map/area/photo picking, clear/reset and streamed-library handling. | Correct replacement/union, independent inspection, stable hidden IDs and no visibility feedback loop. |
-| 3. Production web controls | Port approved header/footer/filter/icon layout into authenticated Map/List. Preserve user column/density settings instead of the fixture's simplified columns. Remove duplicate default bulk menus; keep Combine visible in detail; hide Map selection controls at zero selection. | Browser journeys at narrow phone, landscape and desktop, including keyboard/history and active scope recovery. |
-| 4. iOS state and presenters | Add shared store mode/scope; update reducer, caches, picker and visible route IDs; replace local Add mode. Compose reusable native selection controls into sheet, footer, compact shell/detail and Filters. | Equivalent reducer/picker tests; no stale asynchronous pick; retained camera, navigation and scroll. |
-| 5. Release validation and cleanup | Simulator/gallery renders, device/VoiceOver review and beta tasks. Remove temporary prototype store/flags and obsolete callers; retain a development fixture route only if useful, backed by production components. Update contracts and implementation evidence. | Both platforms follow the approved rules; #384 status distinguishes delivery, remaining device checks and any sharing follow-up. |
+| Step                                   | Deliverable                                                                                                                                                                                                                                                                        | Completion evidence                                                                                                              |
+| -------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Shared transitions                  | Add versioned selection-interaction fixtures for mode, scope and named actions; port unchanged focus/inspection invariants. Define expected differences from the existing additive Show on map and empty Add-tap rules.                                                            | TypeScript and Swift consume the same vectors through production state owners.                                                   |
+| 2. Production web state and projection | Move mode/scope into the actual selection owner; introduce named input actions and a distinct browsing projection. Keep ordinary filtering available for reconciliation and Stats. Update Show on map, map/area/photo picking, clear/reset and streamed-library handling.          | Correct replacement/union, independent inspection, stable hidden IDs and no visibility feedback loop.                            |
+| 3. Production web controls             | Port approved header/footer/filter/icon layout into authenticated Map/List. Preserve user column/density settings instead of the fixture's simplified columns. Remove duplicate default bulk menus; keep Combine visible in detail; hide Map selection controls at zero selection. | Browser journeys at narrow phone, landscape and desktop, including keyboard/history and active scope recovery.                   |
+| 4. iOS state and presenters            | Add shared store mode/scope; update reducer, caches, picker and visible route IDs; replace local Add mode. Compose reusable native selection controls into sheet, footer, compact shell/detail and Filters.                                                                        | Equivalent reducer/picker tests; no stale asynchronous pick; retained camera, navigation and scroll.                             |
+| 5. Release validation and cleanup      | Simulator/gallery renders, device/VoiceOver review and beta tasks. Remove temporary prototype store/flags and obsolete callers; retain a development fixture route only if useful, backed by production components. Update contracts and implementation evidence.                  | Both platforms follow the approved rules; #384 status distinguishes delivery, remaining device checks and any sharing follow-up. |
 
 ### Web owners
 
-| Area | Files and concrete change |
-| --- | --- |
-| State and commands | `src/store/selection.ts`, `src/store/index.ts`: session mode/scope, named pick/toggle/clear/scope actions; no persisted stale selected-only state. Stop inferring user intent solely from functional versus array updates. |
-| Eligibility and projection | `src/hooks/use-filtered-activities.ts` plus a browsing projection hook: preserve ordinary eligibility; narrow only browsing consumers. |
-| Map input and presentation | `src/components/map/selection-control.tsx`, `interactive-map.tsx`, `photo.tsx`: mode-aware input, projected layer/photo/pick IDs, compact persistent header when a group exists. |
-| List and detail | `src/components/list/card.tsx`, `activity-list.tsx`, `data-table.tsx`, `data-table-pagination.tsx`, `columns.tsx`, `data-table-view-options.tsx`: sport affordance gating, icon-before-count footer outside detail transition, mode-only bulk actions and accurate totals. |
-| Filters and lifecycle | `src/components/layout/app-sidebar.tsx`, `layout/sidebar/filters.tsx`, authenticated browsing layout: Only selected, active count/indicator, browsing Reset and reviewed session lifetime. |
-| Show on map | `src/lib/show-on-map.ts` and callers: validate before mutation, replace by default, union in Combine, then activate/frame. Preserve explicit recovery for ordinary filters. |
-| Prototype cleanup | The temporary store and bar have been removed. `components/activity-selection-controls.tsx` uses production state; `app/selection-prototype/` retains only local gallery setup and development-only routing. |
+| Area                       | Files and concrete change                                                                                                                                                                                                                                                  |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| State and commands         | `src/store/selection.ts`, `src/store/index.ts`: session mode/scope, named pick/toggle/clear/scope actions; no persisted stale selected-only state. Stop inferring user intent solely from functional versus array updates.                                                 |
+| Eligibility and projection | `src/hooks/use-filtered-activities.ts` plus a browsing projection hook: preserve ordinary eligibility; narrow only browsing consumers.                                                                                                                                     |
+| Map input and presentation | `src/components/map/selection-control.tsx`, `interactive-map.tsx`, `photo.tsx`: mode-aware input, projected layer/photo/pick IDs, compact persistent header when a group exists.                                                                                           |
+| List and detail            | `src/components/list/card.tsx`, `activity-list.tsx`, `data-table.tsx`, `data-table-pagination.tsx`, `columns.tsx`, `data-table-view-options.tsx`: sport affordance gating, icon-before-count footer outside detail transition, mode-only bulk actions and accurate totals. |
+| Filters and lifecycle      | `src/components/layout/app-sidebar.tsx`, `layout/sidebar/filters.tsx`, authenticated browsing layout: Only selected, active count/indicator, browsing Reset and reviewed session lifetime.                                                                                 |
+| Show on map                | `src/lib/show-on-map.ts` and callers: validate before mutation, replace by default, union in Combine, then activate/frame. Preserve explicit recovery for ordinary filters.                                                                                                |
+| Prototype cleanup          | The temporary store and bar have been removed. `components/activity-selection-controls.tsx` uses production state; `app/selection-prototype/` retains only local gallery setup and development-only routing.                                                               |
 
 ### iOS owners
 
-| Area | Files and concrete change |
-| --- | --- |
-| State and projections | `Models/SelectionState.swift`, `ActivityStore.swift`: shared mode/scope and named actions; keep ordinary `visibleIDs` for reconciliation; derive browsing IDs/activities independently. Normalize last-member removal and inspect eligibility in final state. |
-| List caching and summaries | `ActivityStore.listedSnapshot`, `List/ActivitySummaryView.swift`: include selection/scope in cache keys whenever restricted, even when not sorting by selection. Filtered summaries use browsing scope; selected totals include hidden IDs. Do not re-filter geometry on every drag frame. |
-| Map picker and query safety | `Map/RoutePicker.swift`, `MapScreen.swift`: remove `isAdding` as an independent state owner; use shared Combine. Guard pending queries with current mode/scope/eligibility as well as geometry revision/generation. Empty taps in Combine return before clearing detail; clear/zero selection do not end the mode. |
-| Map surface | `Map/RoutePickerSheet.swift`: persistent group controls before count, direct Fit/Clear, mode-only sport toggles and collapsed/detail mode visibility; no empty Map dock. Keep native detents and camera-fit footprint logic. |
-| List and native rows | `List/ListScreen.swift`, `ActivityRowView.swift`, `Support/BrowseComponents.swift`: replace menu-based mode entry; reuse sport badge with mode gating; keep selected row identity. Factor reusable group controls rather than another platform-local mode. |
-| Footer/detail/landscape hosts | `App/BrowseContent.swift`, `AppShell.swift`, `List/ActivityDetailView.swift`: keep controls outside pushed List roots, prevent duplicate toolbars, preserve Back/gesture and compact-shell adaptation. |
-| Filter Form and rail | `Sidebar/FilterPanel.swift`, `FilterRail.swift`, `FilterPart`, `Models/ActivityFilters.swift`: browsing-only selection filter, active count/reset, displayed count, rail popover, Stats exclusion. |
+| Area                          | Files and concrete change                                                                                                                                                                                                                                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| State and projections         | `Models/SelectionState.swift`, `ActivityStore.swift`: shared mode/scope and named actions; keep ordinary `visibleIDs` for reconciliation; derive browsing IDs/activities independently. Normalize last-member removal and inspect eligibility in final state.                                                      |
+| List caching and summaries    | `ActivityStore.listedSnapshot`, `List/ActivitySummaryView.swift`: include selection/scope in cache keys whenever restricted, even when not sorting by selection. Filtered summaries use browsing scope; selected totals include hidden IDs. Do not re-filter geometry on every drag frame.                         |
+| Map picker and query safety   | `Map/RoutePicker.swift`, `MapScreen.swift`: remove `isAdding` as an independent state owner; use shared Combine. Guard pending queries with current mode/scope/eligibility as well as geometry revision/generation. Empty taps in Combine return before clearing detail; clear/zero selection do not end the mode. |
+| Map surface                   | `Map/RoutePickerSheet.swift`: persistent group controls before count, direct Fit/Clear, mode-only sport toggles and collapsed/detail mode visibility; no empty Map dock. Keep native detents and camera-fit footprint logic.                                                                                       |
+| List and native rows          | `List/ListScreen.swift`, `ActivityRowView.swift`, `Support/BrowseComponents.swift`: replace menu-based mode entry; reuse sport badge with mode gating; keep selected row identity. Factor reusable group controls rather than another platform-local mode.                                                         |
+| Footer/detail/landscape hosts | `App/BrowseContent.swift`, `AppShell.swift`, `List/ActivityDetailView.swift`: share navigation state with the footer, hide selection controls when details replace the list, preserve Back/gesture and compact-shell adaptation.                                                                                   |
+| Filter Form and rail          | `Sidebar/FilterPanel.swift`, `FilterRail.swift`, `FilterPart`, `Models/ActivityFilters.swift`: browsing-only selection filter, active count/reset, displayed count, rail popover, Stats exclusion.                                                                                                                 |
 
 Do not add sync/API/database fields or server filtering for this feature. Selection and its display scope are local browsing concerns. Preserve the existing auth, sharing/privacy and activity availability rules.
 
@@ -175,7 +176,6 @@ Verification on 13 October 2026:
 
 Physical iPhone/iPad touch and VoiceOver, full release-suite acceptance and beta journeys remain open. An exploratory broad native run encountered photo/cache/render failures and was interrupted. Related filter/navigation/camera failures were investigated and those checks now pass in isolation; a clean repository-wide native run has not been established. Sharing picker/draft redesign remains separately scoped.
 
-
 ### Device follow-up: stable sheet size and controls-only collapse
 
 Physical-device review on 13 October showed two problems: detail content leaked below the collapsed group row, and resizing the sheet while switching Results/detail made both the container and its contents move at once. The phone sheet now has one geometry-based middle height (about half the window) for results and detail, independent of selection count. Opening, Back and paging change the content without resizing or overlapping crossfades; dragging still selects Compact/Middle/Large. Collapsed contains only Combine, count/status, Fit and Clear, with all activity content clipped, hidden from accessibility and noninteractive. The inspected activity and results scroll position are retained for reopening.
@@ -184,13 +184,11 @@ The prior dynamic-height UIKit bridge is removed. The native presenter uses ordi
 
 `nativeMiddleDetentStaysStillWhenSwitchingResultsAndDetail` samples animation frames through repeated Results/detail and membership changes, asserting unchanged height, selected stop and presenter, plus manual detent restoration. `nativeSheetShowsOnlyControlsWhenCollapsedAndRetainsScroll` verifies the collapsed surface visually and checks exact scroll retention at normal and accessibility text sizes. All 14 targeted tests in the rendered sheet and MapResults suites pass on the iPhone 18 Pro / iOS 27 simulator, including stacked sheets, List-to-Map handoff, large text and retained scroll. Collapsed captures were visually checked and a signed Dev build prepared for Tailscale installation. Physical-device acceptance of this refinement remains open.
 
-
 ### Device follow-up: one contextual Fit button
 
 The persistent Map group header owns the only Fit control on web and iOS. Results fits the selected group; activity detail fits the currently inspected route, including after paging or collapsing. The accessible label/title follows that target (Fit selection / Fit route). Native no-GPS detail disables the action instead of fitting a different selected route. List/Stats Show on map remains a navigation action.
 
 The rendered native regression activates the real control through Results → activity 1 → activity 2 → Results and checks camera commands and retained selection/inspection, plus disabled no-GPS/collapsed behavior. It and the frame-sampled stable-height regression pass. The web browser journey checks a single Fit control, the changing target label, and selection retention after fitting; the complete responsive selection journey, TypeScript and scoped ESLint pass.
-
 
 ### Device follow-up: consistent phone header and translucent results
 

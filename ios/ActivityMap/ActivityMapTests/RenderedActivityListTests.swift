@@ -966,48 +966,9 @@ private struct AdaptiveListFixture: View {
 }
 
 
-extension RenderedRoutePickingTests {
-    @Test(arguments: ["phone", "dark", "landscape", "tablet", "large-text"])
-    func selectionControlsSurviveListInspection(variant: String) async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
-        let store = ActivityStore(activities: (1...4).map { ActivityStoreSelectionTests.activity($0) },
-                                  listPresentation: ActivityListPresentation(defaults: nil))
-        store.selectedTab = .list; store.replaceSelection(with: [2, 4])
-        let landscape = variant == "landscape", tablet = variant == "tablet"
-        let size = landscape ? CGSize(width: 844, height: 390) : tablet ? CGSize(width: 834, height: 1194) : CGSize(width: 390, height: 844)
-        let host = try ListHarness(root: AppShell(store: store)
-            .environment(\.horizontalSizeClass, tablet ? .regular : .compact)
-            .environment(\.verticalSizeClass, landscape ? .compact : .regular)
-            .environment(\.dynamicTypeSize, variant == "large-text" ? .accessibility3 : .large)
-            .environment(\.colorScheme, variant == "dark" ? .dark : .light)
-            .environment(\.mapStyleOverride, MapStyle(json: Self.listOfflineStyle)), size: size)
-        defer { host.close() }
-        try await listWait { host.accessibilityElement(label: "Combine selections") != nil }
-        #expect(host.accessibilityElement(label: "Deselect Activity 4") == nil)
-        let control = try #require(host.accessibilityElement(label: "Combine selections"))
-        #expect(control.accessibilityFrame.width >= 44 && control.accessibilityFrame.height >= 44)
-        store.setCombine(true)
-        try await listWait { host.accessibilityElement(label: "Deselect Activity 4") != nil }
-        #expect(host.accessibilityElement(label: "Select Activity 3") != nil)
-        try host.save("selection-384-\(variant)-list")
-        store.inspect(2)
-        try await listWait { store.inspectedActivityID == 2 && host.accessibilityElement(label: "Combine selections") != nil }
-        if !tablet {
-            let navigation = try #require(host.controllers(of: UINavigationController.self).last)
-            try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
-        }
-        #expect(host.accessibilityElement(label: "Combine selections") != nil, "Mode must be reachable in pushed detail")
-        try host.save("selection-384-\(variant)-detail")
-        store.setOnlySelected(true)
-        #expect(store.listedActivities.count == 2)
-        store.clearSelection()
-        #expect(!store.onlySelected && store.isCombining && store.inspectedActivityID == 2)
-        store.setCombine(false)
-        try await listWait { host.accessibilityElement(label: "Combine selections")?.accessibilityValue == "Off" }
-    }
-}
+// Selection-control visibility and return state are covered by ListSelectionUITests
+// through XCUI; the hosted SwiftUI accessibility tree is not reliable on iOS 27.
+
 
 
 extension RenderedRoutePickingTests {

@@ -7,6 +7,8 @@ struct BrowseContent: View {
     var isSigningIn = false
     var mapPicker: RoutePicker? = nil
     @Environment(\.listFooterHostedByShell) private var footerHostedByShell
+    @Environment(\.listShellNavigation) private var shellNavigation
+    @State private var localNavigation = ListShellNavigation()
     @Environment(\.browseStatsDestination) private var statsDestination
     @Environment(\.stravaConnect) private var stravaConnect
     @Environment(\.browsePaneWidth) private var paneWidth
@@ -65,6 +67,9 @@ struct BrowseContent: View {
 
             }
         }
+        // Standalone browsing shares navigation state with its sibling footer,
+        // just as AppShell does when it hosts that footer outside this view.
+        .environment(\.listShellNavigation, shellNavigation ?? localNavigation)
         // Extend only the browsing pane; native navigation bars keep their
         // system safe areas. Negative padding reclaims the unused gutter while
         // GeometryReader and map fitting see the resulting actual viewport.

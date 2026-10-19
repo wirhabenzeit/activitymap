@@ -13,7 +13,7 @@ explicit disposable Postgres service.
 | `pnpm test:browser:install`            | Provision the lockfile-matched Playwright Chromium; append `--with-deps` on Linux                                                 |
 | `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
 | `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
-| `pnpm test:ios`                        | Build and run the sixteen selected iOS suites on an owned simulator                                                               |
+| `pnpm test:ios`                        | Build and run the seventeen selected iOS suites on an owned simulator                                                             |
 | `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
 | `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
 | `pnpm format:check src/path.ts`        | Check explicit files                                                                                                              |
@@ -93,6 +93,7 @@ The bounded suite is:
 - `MapPhotoTests`: photo availability, payloads and shared fixture parity.
 - `PhotoGalleryTests`: gallery state and image request/cache behavior.
 - `MapPhotoUITests`: three real XCUI map/photo interactions using the offline app fixture.
+- `ListSelectionUITests`: real List push/Back and phone rotation, with selection controls restricted to the visible list; also covers standalone hosting and adjacent inspection when run on iPad.
 
 `xcodebuild build-for-testing` has an eighteen-minute cold-build budget, followed
 by `xcodebuild test-without-building` with a separate twelve-minute runtime budget.
@@ -120,6 +121,7 @@ labelled accordingly.
 The suite deliberately excludes broad app-hosted SwiftUI accessibility traversal
 checks: that host can yield an empty AX tree, so it cannot substitute for XCUI.
 The retired rendered map/photo checks were replaced by `MapPhotoUITests` in #425.
+List selection visibility and Back retention now use `ListSelectionUITests` for the same reason.
 The same host limitation was reproduced with unchanged action views in #427:
 three `RenderedActivityActionTests` methods (eight parameter cases) failed at
 their first AX lookup, while the controller/file suite passed 19 methods and
