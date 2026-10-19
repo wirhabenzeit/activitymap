@@ -36,8 +36,7 @@ struct RoutePickerSheet: View {
             GeometryReader { viewport in
                 MapResultsNavigation(store: store, picker: picker, detailID: detail?.id,
                     results: AnyView(results), expansion: expansion, compactProfile: !isSidePanel,
-                    bottomContentInset: bottomInset,
-                    allowsContinuation: !collapsed && (isSidePanel || picker.detent == .expanded))
+                    bottomContentInset: bottomInset)
                     // The iOS 26 custom panel still reveals a stable viewport.
                     .frame(width: viewport.size.width,
                            height: panelExpandedHeight.map { max(0, $0 + bottomInset - panelHeaderHeight) } ?? viewport.size.height,

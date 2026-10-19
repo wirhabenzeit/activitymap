@@ -14,8 +14,10 @@ struct MapRotationUITestFixture: View {
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let continuation = ProcessInfo.processInfo.arguments.contains("--activity-continuation-ui-testing")
         let count = continuation ? 3 : 30
+        let routeNames = [1: "Zürich – Gabelbach", 2: "Sontheim – Zürich", 3: "Geltendorf – Zürich"]
         let activities = (1...count).map { id in
-            var activity = Activity(id: id, name: "Rotation activity \(id)", sportType: .ride,
+            let name = continuation ? routeNames[id]! : "Rotation activity \(id)"
+            var activity = Activity(id: id, name: name, sportType: .ride,
                      startDate: date, startDateLocal: date, timezone: "UTC",
                      distance: 1000, movingTime: 600, elapsedTime: 600,
                      totalElevationGain: 10, averageSpeed: 2, commute: false,
@@ -42,6 +44,9 @@ struct MapRotationUITestFixture: View {
             return activity
         }
         let store = ActivityStore(activities: activities, listPresentation: ActivityListPresentation(defaults: nil))
+        // Keep the actual Edit entry point and editor in continuation journeys.
+        // This offline fixture intentionally has no coordinator that could save.
+        if continuation { store.activityEditing = ActivityEditingService() }
         store.selectedTab = ProcessInfo.processInfo.arguments.contains("--activity-continuation-list") ? .list : .map
         store.replaceSelection(with: Set(1...count))
         let picker = RoutePicker()
@@ -127,13 +132,20 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
 
         private func sample(root: UIViewController, window: UIWindow) {
             let controllers = allControllers(root)
-            // Results is the first native sheet containing our results scroller;
-            // the Settings sheet above it owns a separate controller and scroll.
+            // Results normally has a loaded root scroller. A direct List-to-Map
+            // handoff can push detail before the retained root lays out, so also
+            // recognize the attached, app-owned detail controller. Editor and
+            // Settings sheets have neither marker.
             let panel = controllers.first { controller in
                 guard controller.presentingViewController != nil,
                       controller.presentationController is UISheetPresentationController,
                       controller.viewIfLoaded != nil else { return false }
-                return findResultsScroll(in: controller) != nil
+                let hasVisibleMapDetail = store.selectedTab == .map && picker.detailID != nil
+                    && allControllers(controller).contains {
+                        $0.viewIfLoaded?.accessibilityIdentifier == "map-results-navigation-detail"
+                            && $0.viewIfLoaded?.window === window
+                    }
+                return hasVisibleMapDetail || findResultsScroll(in: controller) != nil
             }
             let scroll = panel.flatMap(findResultsScroll)
             if let scroll { resultsScroll = scroll }
@@ -165,8 +177,9 @@ private struct MapRotationPresentationProbe: UIViewControllerRepresentable {
                 ? stableSamples + 1 : 0
             priorGeometry = geometry
             var values: [String: Any] = [
-                "ready": (store.selectedTab == .list || (panel != nil && scroll != nil)) && stableSamples >= 10,
+                "ready": (store.selectedTab == .list || (panel != nil && (scroll != nil || detailScroll != nil))) && stableSamples >= 10,
                 "orientation": orientation,
+                "selectedTab": store.selectedTab.title.lowercased(),
                 "selection": store.selectedActivityIDs.sorted(),
                 "candidates": picker.candidateIDs,
                 "detent": picker.detent.rawValue, "detailID": picker.detailID ?? -1,

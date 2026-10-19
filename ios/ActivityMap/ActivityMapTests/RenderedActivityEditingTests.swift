@@ -73,7 +73,7 @@ struct RenderedActivityEditingTests {
         #expect(!recovered.contains("Saving to Strava") && recovered.contains("Choose a valid name"))
     }
 
-    @Test func wideDetailExposesEditBesideMapNavigation() async throws {
+    @Test func wideDetailExposesEditAndMapInFooter() async throws {
         let original = try Fixtures.activity(["id": "1", "description": "A day in the mountains"])
         let source = SyncFixtures.complete([original])
         let store = ActivityStore()
@@ -90,6 +90,13 @@ struct RenderedActivityEditingTests {
         defer { window.isHidden = true; window.rootViewController = nil; oldWindow?.makeKeyAndVisible() }
         host.view.frame = window.bounds; host.view.layoutIfNeeded()
         try await Task.sleep(for: .milliseconds(300))
+        func scrolls(_ view: UIView) -> [UIScrollView] {
+            ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(scrolls)
+        }
+        let scroll = try #require(scrolls(host.view).max { $0.bounds.height < $1.bounds.height })
+        scroll.setContentOffset(CGPoint(x: scroll.contentOffset.x,
+            y: max(-scroll.adjustedContentInset.top, scroll.contentSize.height - scroll.bounds.height + scroll.adjustedContentInset.bottom)), animated: false)
+        try await Task.sleep(for: .milliseconds(200))
         let directory = URL(fileURLWithPath: "/tmp/activitymap-editing-preview")
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let image = UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
@@ -99,7 +106,7 @@ struct RenderedActivityEditingTests {
         let recognize = VNRecognizeTextRequest(); recognize.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([recognize])
         let text = (recognize.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(text.contains("Edit") && text.contains("Show on map"))
+        #expect(text.contains("Edit activity") && text.contains("Show on map"))
         #expect(store.activities.first?.name == original.name)
     }
 

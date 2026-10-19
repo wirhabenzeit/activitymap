@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// The host owns the activity order and whether its sheet is fully expanded.
+/// The host owns the activity order and whether detail can accept navigation.
 /// A missing successor means the sequence ends; the scroll view never wraps it.
 struct ActivityDetailContinuation {
     let currentID: Int
@@ -86,9 +86,8 @@ struct ActivityContinuationScrollView<Content: View>: View {
                 // All states occupy the same height, so arming cannot move the
                 // bottom boundary and accidentally disarm its own gesture.
                 ZStack(alignment: .leading) {
-                    Text("Pull up for next activity").opacity(successor.isEnabled && !pull.isArmed ? 1 : 0)
+                    Text("Pull up for next activity").opacity(pull.isArmed ? 0 : 1)
                     Text("Release for next activity").opacity(pull.isArmed ? 1 : 0)
-                    Text("Expand to continue").opacity(successor.isEnabled ? 0 : 1)
                 }
                 .font(.caption.weight(.semibold))
                 .fixedSize(horizontal: false, vertical: true)
@@ -99,12 +98,12 @@ struct ActivityContinuationScrollView<Content: View>: View {
         }
         .padding(.horizontal, AppTheme.Spacing.large)
         .padding(.vertical, 16)
+        .opacity(successor.isEnabled ? 1 : 0.5)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(successor.isEnabled
-            ? Text("Next activity: \(successor.nextName)") : Text("Expand to continue to \(successor.nextName)"))
+        .accessibilityLabel(Text("Next activity: \(successor.nextName)"))
         .accessibilityValue(successor.isEnabled
             ? (pull.isArmed ? Text("Release to open") : Text("Pull up to continue"))
-            : Text("Expand the sheet to continue"))
+            : Text("Unavailable"))
         .accessibilityHint("Pull past the bottom and release, or use Next activity")
         .accessibilityIdentifier("activity-continuation-cue")
         .accessibilityActions {

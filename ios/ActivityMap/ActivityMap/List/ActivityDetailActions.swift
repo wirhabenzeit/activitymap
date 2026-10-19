@@ -3,12 +3,16 @@ import SwiftUI
 struct ActivityDetailActions: View {
     @Environment(\.locale) private var locale
     let activity: Activity
+    var hasRoute = true
+    var showOnMap: ((Int) -> Void)? = nil
+    var editing: ActivityEditingService? = nil
     var summaries: StreamSummaryLoader? = nil
     @Environment(\.activityDetailOverMap) private var overMap
     var exportStore: ActivityStore? = nil
     @State private var workflow = ActivityGPXExportController()
     @State private var stravaTask: Task<Void, Never>?
     @State private var openingStrava = false
+    @State private var isEditing = false
     private var source: ActivityGPXExportSource {
         .capture(activity: activity, store: exportStore, summaries: summaries)
     }
@@ -22,6 +26,31 @@ struct ActivityDetailActions: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(spacing: 0) {
+                if let editing {
+                    Button { isEditing = true } label: {
+                        row(title: Text("Edit activity"), subtitle: "Change name, sport or description", icon: "pencil",
+                            trailing: "chevron.right", busy: false)
+                    }
+                    .accessibilityLabel("Edit activity")
+                    .accessibilityIdentifier("activity-edit-action")
+                    .sheet(isPresented: $isEditing) {
+                        ActivityEditForm(activity: activity, service: editing)
+                    }
+                    Divider().padding(.leading, 44)
+                }
+                if let showOnMap, !overMap {
+                    Button { showOnMap(activity.id) } label: {
+                        row(title: Text(AppMessages.actionShowOnMap(locale: locale)),
+                            subtitle: hasRoute ? "Select this activity and frame its route" : "This activity has no GPS route",
+                            icon: ActionPresentation.glyph(.showOnMap), trailing: "arrow.up.right", busy: false)
+                    }
+                    .disabled(!hasRoute)
+                    .opacity(hasRoute ? 1 : 0.5)
+                    .accessibilityLabel(Text(AppMessages.actionShowOnMap(locale: locale)))
+                    .accessibilityIdentifier("activity-show-on-map")
+                    .accessibilityHint(hasRoute ? "Select this activity and frame its route" : "This activity has no GPS route")
+                    Divider().padding(.leading, 44)
+                }
                 ActivityShareButton(activities: { [activity] }) {
                     row(title: Text("Share activity"), subtitle: "Create an expiring link to its map", icon: "square.and.arrow.up",
                         trailing: "chevron.right", busy: false)
@@ -56,6 +85,8 @@ struct ActivityDetailActions: View {
                 }
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("activity-detail-actions")
         .alert(item: $workflow.failure) { failure in
             Alert(title: Text(failure.title), message: Text(failure.message), dismissButton: .default(Text("OK")))
         }

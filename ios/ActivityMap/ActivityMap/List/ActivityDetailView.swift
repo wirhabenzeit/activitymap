@@ -3,7 +3,6 @@ import UIKit
 
 /// Native List navigation destination. Wide List and Map host the same panel.
 struct ActivityDetailView: View {
-    @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     let activityID: Int
     var backLabel = "Back to activities"
@@ -13,11 +12,14 @@ struct ActivityDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.activityDetailPaging) private var paging
     @AppToolbarEnvironment private var toolbarLayout
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var navigationReference = DetailNavigationReference()
 
     var body: some View {
-        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false, hostTab: hostTab)
+        ActivityDetailPanel(store: store, activityID: activityID, showsHeading: false, hostTab: hostTab,
+                            showOnMap: { id in
+            showActivityOnMapFromDetail(id, store: store, navigationController: navigationReference.controller)
+            onMapShown?()
+        })
         .background(AppTheme.surface)
         .navigationBarBackButtonHidden()
         .appNavigationBar(toolbar)
@@ -31,34 +33,12 @@ struct ActivityDetailView: View {
                 if let activity = store.activity(id: activityID) {
                     ActivityDetailIdentity(activity: activity, titleLineLimit: toolbarLayout.titleLineLimit, onNavigationBar: true)
                 }
-            }), trailing: AnyView(HStack(spacing: AppToolbarLayout.spacing) {
+            }), trailing: AnyView(Group {
                 if let paging, paging.position(activityID) != nil {
                     ActivityDetailStepButtons(
                         previous: paging.canGoPrevious(activityID) ? paging.previous : nil,
-                        next: paging.canGoNext(activityID) ? paging.next : nil, onNavigationBar: true,
-                        compact: horizontalSizeClass != .regular && !toolbarLayout.isCompact)
+                        next: paging.canGoNext(activityID) ? paging.next : nil, onNavigationBar: true)
                 }
-                if let editing = store.activityEditing, let activity = store.activity(id: activityID) {
-                    ActivityEditButton(activity: activity, service: editing, onNavigationBar: true)
-                }
-                Button {
-                    showActivityOnMapFromDetail(activityID, store: store, navigationController: navigationReference.controller)
-                    onMapShown?()
-                } label: {
-                    BrowseActionIcon(.showOnMap)
-                        .font(.body.weight(.semibold))
-                        .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
-                        .background(.white.opacity(0.18), in: Circle())
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.white)
-                .disabled(!store.canShowOnMap(activityID))
-                .opacity(store.canShowOnMap(activityID) ? 1 : 0.4)
-                .accessibilityLabel(Text(AppMessages.actionShowOnMap(locale: locale)))
-                .accessibilityIdentifier("activity-show-on-map")
-                .accessibilityHint(store.canShowOnMap(activityID)
-                    ? "Select this activity and frame its route" : "This activity has no GPS route")
             }))
     }
 
@@ -82,7 +62,7 @@ struct ActivityDetailView: View {
 }
 
 /// Resolve by identity on every update, never retain the destination's initial snapshot.
-/// Editing/map actions stay by the title; Strava/GPX rows scroll with detail.
+/// Identity stays at the top; activity actions scroll with the shared footer.
 struct ActivityDetailPanel: View {
     @Environment(\.activityDetailOverMap) private var overMap
     @Bindable var store: ActivityStore
@@ -104,11 +84,7 @@ struct ActivityDetailPanel: View {
                 if let mapExpansion {
                     MapActivityDetailReveal(store: store, activity: activity, expansion: mapExpansion, compactProfile: compactMapProfile,
                                             bottomContentInset: mapBottomContentInset,
-                                            trailingInset: headerTrailingInset, hasRoute: store.canShowOnMap(activityID)) { id in
-                        if let showOnMap { showOnMap(id) }
-                        else if overMap { store.mapContext.request(.fitActivity(id)) }
-                        else { store.showOnMap(id) }
-                    }
+                                            trailingInset: headerTrailingInset)
                 } else {
                     // Keep native safe-area scrolling: an extra clipping mask
                     // cuts content off above the home indicator.
@@ -149,8 +125,6 @@ private struct MapActivityDetailReveal: View {
     // content layout stable while the outer host collapses or expands.
     private var progress: CGFloat { compactProfile ? expansion.progress : 1 }
     let trailingInset: CGFloat
-    let hasRoute: Bool
-    let showOnMap: (Int) -> Void
     private var reveal: CGFloat { min(1, max(0, (progress - 0.25) / 0.75)) }
 
     var body: some View {
@@ -172,9 +146,7 @@ private struct MapActivityDetailReveal: View {
 
     // The Map title row has no duplicate Fit action; the group header owns it.
     private var heading: some View {
-        ActivityDetailHeading(activity: activity, trailingInset: trailingInset,
-                              titleLineLimit: titleLineLimit,
-                              hasRoute: hasRoute, showOnMap: showOnMap, editing: store.activityEditing)
+        ActivityDetailHeading(activity: activity, trailingInset: trailingInset, titleLineLimit: titleLineLimit)
             .padding(.horizontal, AppTheme.Spacing.large)
             .padding(.vertical, AppTheme.Spacing.small)
     }
@@ -191,11 +163,11 @@ private struct MapActivityDetailReveal: View {
                 .padding(.horizontal, AppTheme.Spacing.large)
                 .padding(.vertical, AppTheme.Spacing.small)
                 ActivityDetailContent(activity: activity, showsHeading: false, showsPrimaryMetrics: false, showsDescription: false,
-                                      streamSummaries: store.streamSummaries, exportStore: store,
+                                      editing: store.activityEditing, streamSummaries: store.streamSummaries, exportStore: store,
                                       profile: { _ in EmptyView() }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             } else {
                 ActivityDetailContent(activity: activity, showsHeading: false,
-                                      streamSummaries: store.streamSummaries, exportStore: store,
+                                      editing: store.activityEditing, streamSummaries: store.streamSummaries, exportStore: store,
                                       profile: { _ in elevation }, photos: { activity in PhotoGalleryView(store: store, activityID: activity.id) })
             }
         }

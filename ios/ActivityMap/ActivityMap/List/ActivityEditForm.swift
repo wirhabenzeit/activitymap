@@ -1,37 +1,6 @@
 import SwiftUI
 import UIKit
 
-/// Each detail host presents its own editor, including above a native Map sheet.
-struct ActivityEditButton: View {
-    let activity: Activity
-    let service: ActivityEditingService
-    var onNavigationBar = false
-    var showsIcon = false
-    @State private var isPresented = false
-
-    var body: some View {
-        Button { isPresented = true } label: {
-            HStack(spacing: 6) {
-                if showsIcon { Image(systemName: "pencil") }
-                Text("Edit")
-            }
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-            .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, showsIcon ? 12 : 8)
-            .frame(minWidth: AppTheme.minimumTarget, minHeight: AppTheme.minimumTarget)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
-        .accessibilityLabel("Edit activity")
-        .accessibilityIdentifier("activity-edit-action")
-        .sheet(isPresented: $isPresented) {
-            ActivityEditForm(activity: activity, service: service)
-        }
-    }
-}
-
 struct ActivityEditForm: View {
     @State private var model: ActivityEditModel
     let service: ActivityEditingService

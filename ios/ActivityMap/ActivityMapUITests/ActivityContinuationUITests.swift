@@ -1,4 +1,5 @@
 import UIKit
+import Vision
 import XCTest
 
 /// Exercise the real native scroll and presentation hierarchy. Pure policy
@@ -49,6 +50,80 @@ final class ActivityContinuationUITests: XCTestCase {
         try await continuationJourney(list: true)
     }
 
+    func testMapMediumSheetPullAdvancesWithoutExpanding() async throws {
+        // Normal opening height is the physical-device path. It must not need
+        // an extra grabber gesture before its scroll continuation is usable.
+        try await continuationJourney(list: false, expanded: false)
+    }
+
+    func testListLongTitleAndFooterActions() async throws {
+        let app = launch(list: true)
+        defer { app.terminate() }
+        let initial = try await state(in: app) { $0.ready }
+        try await open(3, app: app, list: true)
+        _ = try await state(in: app) { $0.ready && $0.inspectedID == 3 }
+        let title = app.staticTexts.matching(identifier: "activity-detail-name")
+            .allElementsBoundByIndex.first(where: \.isHittable)
+        let heading = try XCTUnwrap(title, app.debugDescription)
+        XCTAssertEqual(heading.label, "Geltendorf – Zürich")
+        capture(app, name: "List long title before navigation")
+        // Text's AX frame is its intrinsic glyph width, not its available
+        // layout width. Inspect pixels so a truncated title cannot pass just
+        // because accessibility still exposes the complete underlying string.
+        let renderedTitle = try recognizedText(in: heading).folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "en_US"))
+        XCTAssertTrue(renderedTitle.contains("geltendorf") && renderedTitle.contains("zurich"),
+                      "The full route name must be legible in the header: \(renderedTitle)")
+        XCTAssertFalse(app.buttons["activity-navigation-menu"].exists, "Next and Previous must be direct controls")
+        let next = try visibleButton("activity-next", in: app)
+        XCTAssertTrue(next.isEnabled)
+        XCTAssertTrue(app.buttons["activity-previous"].exists)
+        XCTAssertFalse(app.buttons.matching(identifier: "activity-edit-action").allElementsBoundByIndex.contains(where: \.isHittable),
+                       "Edit must scroll with the footer, not consume header space")
+        XCTAssertFalse(app.buttons.matching(identifier: "activity-show-on-map").allElementsBoundByIndex.contains(where: \.isHittable),
+                       "Show on map must scroll with the footer, not consume header space")
+        capture(app, name: "List long title and direct navigation")
+
+        next.tap()
+        _ = try await state(in: app) { $0.ready && $0.inspectedID == 2 }
+        let previous = try visibleButton("activity-previous", in: app)
+        XCTAssertTrue(previous.isEnabled)
+        previous.tap()
+        _ = try await state(in: app) { $0.ready && $0.inspectedID == 3 }
+        _ = try await scrollToBottom(app, expectedID: 3, list: true)
+        let footer = app.descendants(matching: .any).matching(identifier: "activity-detail-actions").firstMatch
+        XCTAssertTrue(footer.exists, app.debugDescription)
+        let edit = try visibleButton("activity-edit-action", in: app)
+        let showOnMap = try visibleButton("activity-show-on-map", in: app)
+        XCTAssertTrue(footer.frame.contains(edit.frame), "Edit belongs to the shared bottom actions")
+        XCTAssertTrue(footer.frame.contains(showOnMap.frame), "Show on map belongs to the shared bottom actions")
+        capture(app, name: "List footer exposes editing and map actions")
+        edit.tap()
+        let name = app.descendants(matching: .any).matching(identifier: "activity-edit-name").firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(name.value as? String, "Geltendorf – Zürich")
+        let cancel = app.buttons["activity-edit-cancel"]
+        XCTAssertTrue(cancel.isHittable)
+        cancel.tap()
+        XCTAssertTrue(cancel.waitForNonExistence(timeout: 10), app.debugDescription)
+        let afterCancel = try await state(in: app) { $0.ready && $0.inspectedID == 3 }
+        XCTAssertEqual(afterCancel.selection, initial.selection)
+        XCTAssertEqual(afterCancel.selectedTab, "list")
+        try visibleButton("activity-show-on-map", in: app).tap()
+        let mapped = try await state(in: app) { $0.ready && $0.selectedTab == "map" && $0.inspectedID == -1 }
+        // Show on map replaces the selection while Combine is off; its
+        // established selection semantics are independent of List inspection.
+        XCTAssertEqual(mapped.selection, [3])
+        XCTAssertEqual(mapped.detailID, 3, "The footer must show the inspected activity on Map")
+        capture(app, name: "List footer opens the activity on Map")
+        try visibleButton("browse-destination-list", in: app).tap()
+        let returned = try await state(in: app) { $0.ready && $0.selectedTab == "list" && $0.inspectedID == -1 }
+        XCTAssertEqual(returned.selection, mapped.selection)
+        XCTAssertTrue(app.buttons["activity-list-row-3"].isHittable,
+                      "Returning to List must show its root, without the outgoing detail in navigation history")
+        XCTAssertFalse(app.buttons["list-detail-back"].exists)
+        capture(app, name: "List root after footer Show on map")
+    }
+
     func testLastMapActivityDoesNotWrap() async throws {
         let app = launch()
         defer { app.terminate() }
@@ -64,10 +139,11 @@ final class ActivityContinuationUITests: XCTestCase {
         capture(app, name: "Last Map activity remains final")
     }
 
-    private func continuationJourney(list: Bool) async throws {
-        let app = launch(list: list)
+    private func continuationJourney(list: Bool, expanded: Bool = true) async throws {
+        let app = launch(list: list, expanded: expanded)
         defer { app.terminate() }
         let initial = try await state(in: app) { $0.ready }
+        if !list { XCTAssertEqual(initial.detent, expanded ? 2 : 1) }
         let ids = list ? initial.listedIDs : initial.candidates
         let first = try XCTUnwrap(ids.first)
         let next = try XCTUnwrap(ids.dropFirst().first)
@@ -79,7 +155,12 @@ final class ActivityContinuationUITests: XCTestCase {
         let flung = try await state(in: app) { $0.ready }
         XCTAssertEqual(flung.currentID(list: list), first, "Momentum must never select another activity")
         let bottom = try await scrollToBottom(app, expectedID: first, list: list)
-        capture(app, name: "\(list ? "List" : "Map") pull cue at bottom")
+        let cue = app.descendants(matching: .any).matching(identifier: "activity-continuation-cue").firstMatch
+        XCTAssertTrue(cue.isHittable, app.debugDescription)
+        XCTAssertEqual(cue.value as? String, "Pull up to continue",
+                       "The progress-ring cue must be enabled at the normal opening height")
+        if !list { XCTAssertEqual(bottom.detent, initial.detent, "Scrolling must keep the chosen sheet height") }
+        capture(app, name: "\(list ? "List" : (expanded ? "Expanded Map" : "Medium Map")) pull cue at bottom")
         pull(app, frame: rect(bottom.detailContentFrame), distance: 45)
         let short = try await state(in: app) { $0.ready }
         XCTAssertEqual(short.currentID(list: list), first, "A small rubber-band bounce must cancel")
@@ -91,6 +172,10 @@ final class ActivityContinuationUITests: XCTestCase {
         if !list {
             XCTAssertEqual(advanced.navigationDepth, 2, "Switching activities must replace one detail, not deepen the stack")
             XCTAssertEqual(advanced.controllerID, initial.controllerID, "Pull-to-next must keep the native Map sheet")
+            XCTAssertEqual(advanced.detent, initial.detent, "Continuing must not expand the medium sheet")
+            XCTAssertEqual(advanced.nativeDetent, initial.nativeDetent)
+            XCTAssertEqual(rect(advanced.sheetFrame).height, rect(bottom.sheetFrame).height, accuracy: 2,
+                           "Compare detail to detail: results and details may have different medium heights")
         }
         capture(app, name: "\(list ? "List" : "Map") next activity at top")
         // Settling the new page must not fire another continuation.
@@ -115,12 +200,13 @@ final class ActivityContinuationUITests: XCTestCase {
         }
     }
 
-    private func launch(list: Bool = false) -> XCUIApplication {
+    private func launch(list: Bool = false, expanded: Bool = true) -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
-        app.launchArguments = ["--map-rotation-ui-testing", "--map-rotation-expanded",
-                               "--activity-continuation-ui-testing", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchArguments = ["--map-rotation-ui-testing", "--activity-continuation-ui-testing",
+                               "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+            + (expanded ? ["--map-rotation-expanded"] : [])
             + (list ? ["--activity-continuation-list"] : [])
         app.launch()
         return app
@@ -135,7 +221,7 @@ final class ActivityContinuationUITests: XCTestCase {
 
     private func scrollToBottom(_ app: XCUIApplication, expectedID: Int, list: Bool) async throws -> FixtureState {
         var current = try await state(in: app) { $0.ready }
-        for _ in 0..<16 {
+        for _ in 0..<32 {
             XCTAssertEqual(current.currentID(list: list), expectedID, "Reaching the bottom should not switch activity")
             let remaining = current.detailMaximumOffset - current.detailOffset
             if remaining <= 2 { return current }
@@ -148,16 +234,38 @@ final class ActivityContinuationUITests: XCTestCase {
             pull(app, frame: frame, distance: min(max(40, CGFloat(remaining) + 12), frame.height * 0.5))
             current = try await state(in: app) { $0.ready }
         }
+        capture(app, name: "Detail bottom unreachable")
         XCTFail("Could not reach the detail bottom: \(current.detailOffset) / \(current.detailMaximumOffset)")
         return current
     }
 
     private func pull(_ app: XCUIApplication, frame: CGRect, distance: CGFloat) {
         let viewport = frame.intersection(app.frame)
-        let start = coordinate(app, x: viewport.midX, y: viewport.maxY - 40)
+        // Start comfortably inside the visible scroll content, clear of the
+        // sheet's rounded bottom and the home-indicator gesture region. A pan
+        // keeps its native scroll ownership when the finger leaves the pane;
+        // clamping travel to a medium sheet would prevent a full bottom pull.
+        let startY = viewport.minY + viewport.height * 0.75
+        let start = coordinate(app, x: viewport.midX, y: startY)
+        let endY = max(app.frame.minY + 80, startY - distance)
         start.press(forDuration: 0.05,
-                    thenDragTo: start.withOffset(CGVector(dx: 0, dy: -min(distance, viewport.height - 60))),
+                    thenDragTo: coordinate(app, x: viewport.midX, y: endY),
                     withVelocity: .slow, thenHoldForDuration: 0.25)
+    }
+
+    private func recognizedText(in element: XCUIElement) throws -> String {
+        let image = try XCTUnwrap(element.screenshot().image.cgImage)
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        request.recognitionLanguages = ["en-US", "de-DE"]
+        request.usesLanguageCorrection = false
+        try VNImageRequestHandler(cgImage: image).perform([request])
+        return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+    }
+
+    private func visibleButton(_ identifier: String, in app: XCUIApplication) throws -> XCUIElement {
+        try XCTUnwrap(app.buttons.matching(identifier: identifier).allElementsBoundByIndex.first(where: \.isHittable),
+                      "Missing visible \(identifier): \(app.debugDescription)")
     }
 
     private func detailScroll(in app: XCUIApplication) -> XCUIElement {
@@ -178,6 +286,9 @@ final class ActivityContinuationUITests: XCTestCase {
 
     private struct FixtureState: Decodable {
         let ready: Bool
+        let selectedTab: String
+        let detent: Int
+        let nativeDetent: String
         let selection: [Int]
         let candidates: [Int]
         let listedIDs: [Int]

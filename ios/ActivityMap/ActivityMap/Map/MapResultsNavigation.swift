@@ -12,7 +12,6 @@ struct MapResultsNavigation: UIViewControllerRepresentable {
     var expansion: CGFloat = 1
     var compactProfile = false
     var bottomContentInset: CGFloat = 0
-    var allowsContinuation = false
     @Environment(\.self) private var environment
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -68,8 +67,7 @@ struct MapResultsNavigation: UIViewControllerRepresentable {
 
         private func destination(state: MapActivityDetailState) -> AnyView {
             AnyView(MapActivityDetailDestination(store: parent.store, picker: parent.picker, state: state,
-                compactProfile: parent.compactProfile, bottomContentInset: parent.bottomContentInset,
-                allowsContinuation: parent.allowsContinuation)
+                compactProfile: parent.compactProfile, bottomContentInset: parent.bottomContentInset)
                 .environment(\.self, parent.environment))
         }
 
@@ -161,7 +159,6 @@ private struct MapActivityDetailDestination: View {
     @Bindable var state: MapActivityDetailState
     let compactProfile: Bool
     let bottomContentInset: CGFloat
-    let allowsContinuation: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var sequence: ActivityDetailSequence {
@@ -178,10 +175,12 @@ private struct MapActivityDetailDestination: View {
         guard let nextID = sequence.nextID, let next = store.activity(id: nextID) else { return nil }
         let currentID = state.activityID
         return ActivityDetailContinuation(currentID: currentID, nextID: nextID, nextName: next.name,
-            isEnabled: allowsContinuation && picker.detailID == currentID && !picker.isPaging) {
+            // The ordinary opening sheet is already a usable scroll surface.
+            // Reuse its visibility state instead of requiring a larger detent.
+            isEnabled: state.expansion.progress > 0.8 && picker.detailID == currentID && !picker.isPaging) {
                 // Recheck live order/selection after the pull; it may have
                 // changed while the person was reading or dragging.
-                guard picker.detailID == currentID,
+                guard state.expansion.progress > 0.8, picker.detailID == currentID,
                       ActivityDetailSequence(ids: picker.candidateIDs, currentID: currentID).nextID == nextID,
                       !picker.isPaging else { return }
                 picker.showDetail(nextID, store: store)
