@@ -35,6 +35,11 @@ struct ListScreen: View {
         } destination: { id in
             ActivityDetailView(store: store, activityID: id)
         }
+        // The footer belongs to the root page, so native push/pop and
+        // interactive Back carry it with the list rather than hiding it later.
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            BrowseListFooter(store: store)
+        }
     }
 
     private func activityList(width: CGFloat, inspectedID: Int?) -> some View {
@@ -80,14 +85,13 @@ struct ListScreen: View {
 
 }
 
-/// List controls stay available beside an adjacent inspector, but not when
-/// a pushed detail replaces the list. Both shell hosts share this policy.
+/// Root-page controls remain available beside an adjacent inspector and
+/// leave with the list during native navigation to a full-page detail.
 struct BrowseListFooter: View {
     @Bindable var store: ActivityStore
-    @Environment(\.listShellNavigation) private var navigation
     @AppToolbarEnvironment private var toolbarLayout
     var body: some View {
-        if store.selectedTab == .list && navigation?.detailPresented != true && !toolbarLayout.packsListControls {
+        if store.selectedTab == .list && !toolbarLayout.packsListControls {
             HStack(spacing: 8) {
                 SelectionBar(store: store, includesTotal: true, expandsCount: true)
                 ListControls(presentation: store.listPresentation, store: store, iconOnly: true)

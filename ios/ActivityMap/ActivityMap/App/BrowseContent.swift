@@ -6,9 +6,6 @@ struct BrowseContent: View {
     var sync: SyncController? = nil
     var isSigningIn = false
     var mapPicker: RoutePicker? = nil
-    @Environment(\.listFooterHostedByShell) private var footerHostedByShell
-    @Environment(\.listShellNavigation) private var shellNavigation
-    @State private var localNavigation = ListShellNavigation()
     @Environment(\.browseStatsDestination) private var statsDestination
     @Environment(\.stravaConnect) private var stravaConnect
     @Environment(\.browsePaneWidth) private var paneWidth
@@ -20,19 +17,16 @@ struct BrowseContent: View {
             ZStack {
                 // Retaining this native List preserves the exact scroll offset,
                 // including partially visible rows. No reconstructed anchor jump.
-                VStack(spacing: 0) {
-                    NavigationStack {
-                        ListScreen(store: store, emptyState: presentation.empty, recover: recover)
-                            .environment(\.browsePaneWidth, landscapeInsets == PhoneLandscapeInsets()
-                                ? paneWidth : geometry.size.width)
-                            // Establish inline metrics before the first detail push.
-                            .navigationBarTitleDisplayMode(.inline)
-                    }
+                NavigationStack {
+                    ListScreen(store: store, emptyState: presentation.empty, recover: recover)
+                        .environment(\.browsePaneWidth, landscapeInsets == PhoneLandscapeInsets()
+                            ? paneWidth : geometry.size.width)
+                        // Establish inline metrics before the first detail push.
+                        .navigationBarTitleDisplayMode(.inline)
+                }
                     // Compact List owns its header inside this stack. Reclaim
                     // the shell's placeholder consistently, including offscreen.
                     .ignoresSafeArea(.container, edges: listRootHeader == nil ? [] : .top)
-                    if !footerHostedByShell { BrowseListFooter(store: store) }
-                }
                     .id(store.mapContext.scopeRevision)
                     .refreshable {
                         guard sync?.canRefresh ?? true else { return }
@@ -67,9 +61,6 @@ struct BrowseContent: View {
 
             }
         }
-        // Standalone browsing shares navigation state with its sibling footer,
-        // just as AppShell does when it hosts that footer outside this view.
-        .environment(\.listShellNavigation, shellNavigation ?? localNavigation)
         // Extend only the browsing pane; native navigation bars keep their
         // system safe areas. Negative padding reclaims the unused gutter while
         // GeometryReader and map fitting see the resulting actual viewport.
@@ -139,7 +130,6 @@ private struct BrowseStatsDestinationKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
-    @Entry var listFooterHostedByShell = false
     @Entry var listShellNavigation: ListShellNavigation? = nil
     @Entry var listRootToolbar: AppToolbar? = nil
     /// Compact landscape chrome belongs to the List's root page, so pushing

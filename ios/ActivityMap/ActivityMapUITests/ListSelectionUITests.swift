@@ -83,6 +83,25 @@ final class ListSelectionUITests: XCTestCase {
         let exit = app.buttons[tablet ? "Close activity details" : "Back to activities"]
         XCTAssertTrue(exit.waitForExistence(timeout: 10), app.debugDescription)
         assertControls(in: app, visible: tablet)
+        if !tablet {
+            // The List footer belongs to the outgoing page, including when
+            // an interactive Back is cancelled and then completed.
+            let edge = app.coordinate(withNormalizedOffset: CGVector(dx: 0, dy: 0.5))
+                .withOffset(CGVector(dx: 2, dy: 0))
+            edge.press(forDuration: 0.05,
+                       thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.2, dy: 0.5)),
+                       withVelocity: .slow, thenHoldForDuration: 0.4)
+            XCTAssertTrue(exit.exists && exit.isHittable, "A cancelled Back must keep the detail open")
+            assertControls(in: app, visible: false)
+            edge.press(forDuration: 0.05,
+                       thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5)),
+                       withVelocity: .slow, thenHoldForDuration: 0.2)
+            XCTAssertTrue(exit.waitForNonExistence(timeout: 10), app.debugDescription)
+            assertListControls(in: app)
+            activity.tap()
+            XCTAssertTrue(exit.waitForExistence(timeout: 10), app.debugDescription)
+            assertControls(in: app, visible: false)
+        }
         if !tablet && !standalone {
             XCUIDevice.shared.orientation = .landscapeLeft
             XCTAssertTrue(exit.waitForExistence(timeout: 10), app.debugDescription)

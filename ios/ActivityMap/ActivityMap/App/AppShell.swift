@@ -230,24 +230,20 @@ struct AppShell: View {
     /// outside the moving page. List and Stats share the adaptive navigation toolbar.
     @ViewBuilder private func navigableContent(nativeListHeader: Bool, sidebarAvailable: Bool) -> some View {
         if usesStatsNavigation {
-            VStack(spacing: 0) {
-                NavigationStack {
-                    content
-                        .appNavigationBar(browseRootToolbar(sidebarAvailable: sidebarAvailable),
-                            visible: (store.selectedTab == .list && nativeListHeader)
-                                || (store.selectedTab == .stats && nativeStatsHeader)
-                                || (store.selectedTab == .map && nativeMapHeader),
-                            compactPlaceholder: store.selectedTab == .list)
-                        .navigationDestination(item: statsDetailSelection) { id in
-                            if let dashboard = statsNavigation.dashboard,
-                               let tile = StatsDashboard.tiles.first(where: { $0.id == id }) {
-                                statsFocusPage(tile, dashboard: dashboard)
-                            }
+            NavigationStack {
+                content
+                    .appNavigationBar(browseRootToolbar(sidebarAvailable: sidebarAvailable),
+                        visible: (store.selectedTab == .list && nativeListHeader)
+                            || (store.selectedTab == .stats && nativeStatsHeader)
+                            || (store.selectedTab == .map && nativeMapHeader),
+                        compactPlaceholder: store.selectedTab == .list)
+                    .navigationDestination(item: statsDetailSelection) { id in
+                        if let dashboard = statsNavigation.dashboard,
+                           let tile = StatsDashboard.tiles.first(where: { $0.id == id }) {
+                            statsFocusPage(tile, dashboard: dashboard)
                         }
-                }
-                BrowseListFooter(store: store)
+                    }
             }
-            .environment(\.listFooterHostedByShell, true)
         } else {
             content
         }
