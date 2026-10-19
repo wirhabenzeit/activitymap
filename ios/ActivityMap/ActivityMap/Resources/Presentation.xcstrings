@@ -157,18 +157,6 @@
         }
       }
     },
-    "action.shareGPX": {
-      "comment": "Native variant of exportGPX; presents the iOS system share sheet.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Share GPX"
-          }
-        }
-      }
-    },
     "metric.distance": {
       "comment": "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.",
       "extractionState": "manual",
@@ -693,6 +681,126 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "action.exportGPXNative": {
+      "comment": "Native export action. Presents the system share sheet after preparing a GPX file.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Export GPX"
+          }
+        }
+      }
+    },
+    "action.preparingGPX": {
+      "comment": "Native GPX export action while the file is being prepared.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preparing GPX…"
+          }
+        }
+      }
+    },
+    "action.closeActivityDetails": {
+      "comment": "Dismiss adjacent activity inspection; leaves selection unchanged.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close activity details"
+          }
+        }
+      }
+    },
+    "action.activateActivity": {
+      "comment": "Make the named activity the active map route without changing selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Make active: %@"
+          }
+        }
+      }
+    },
+    "action.deactivateActivity": {
+      "comment": "Clear the active map route without changing selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deactivate: %@"
+          }
+        }
+      }
+    },
+    "action.activateHint": {
+      "comment": "Accessibility hint for the inactive route toggle.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Makes this activity active without opening details or changing selection"
+          }
+        }
+      }
+    },
+    "action.deactivateHint": {
+      "comment": "Accessibility hint for the active route toggle.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Clears the active route without changing selection"
+          }
+        }
+      }
+    },
+    "state.activeRoute": {
+      "comment": "The activity is the active map route; distinct from selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active on map"
+          }
+        }
+      }
+    },
+    "state.inactiveRoute": {
+      "comment": "The activity is not the active map route; distinct from selection.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not active"
+          }
+        }
+      }
+    },
+    "state.selectedActiveRoute": {
+      "comment": "Accessibility value for a selected activity that is also the active map route.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected. Active on map"
           }
         }
       }

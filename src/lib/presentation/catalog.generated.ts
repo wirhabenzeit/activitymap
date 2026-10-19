@@ -149,7 +149,11 @@ export const presentation = {
       "iosGlyph": "location",
       "mirrorsInRTL": false,
       "intent": "Make this activity the active map route without changing selection.",
-      "colorToken": "foreground"
+      "colorToken": "foreground",
+      "iosGlyphVariants": {
+        "active": "location.fill",
+        "badge": "location.fill"
+      }
     },
     "exportGPX": {
       "message": "action.exportGPX",
@@ -158,7 +162,7 @@ export const presentation = {
       "mirrorsInRTL": false,
       "intent": "Export route data: browser downloads a file; iOS presents the system share sheet.",
       "colorToken": "foreground",
-      "iosMessage": "action.shareGPX"
+      "iosMessage": "action.exportGPXNative"
     }
   },
   "metrics": {
@@ -353,11 +357,6 @@ export const presentation = {
     "action.exportGPX": {
       "source": "Download GPX",
       "context": "Export route data: browser downloads a file; iOS presents the system share sheet.",
-      "arguments": {}
-    },
-    "action.shareGPX": {
-      "source": "Share GPX",
-      "context": "Native variant of exportGPX; presents the iOS system share sheet.",
       "arguments": {}
     },
     "metric.distance": {
@@ -583,6 +582,60 @@ export const presentation = {
         "one": "{count} activity",
         "other": "{count} activities"
       }
+    },
+    "action.exportGPXNative": {
+      "source": "Export GPX",
+      "context": "Native export action. Presents the system share sheet after preparing a GPX file.",
+      "arguments": {}
+    },
+    "action.preparingGPX": {
+      "source": "Preparing GPX…",
+      "context": "Native GPX export action while the file is being prepared.",
+      "arguments": {}
+    },
+    "action.closeActivityDetails": {
+      "source": "Close activity details",
+      "context": "Dismiss adjacent activity inspection; leaves selection unchanged.",
+      "arguments": {}
+    },
+    "action.activateActivity": {
+      "source": "Make active: {name}",
+      "context": "Make the named activity the active map route without changing selection.",
+      "arguments": {
+        "name": "string"
+      }
+    },
+    "action.deactivateActivity": {
+      "source": "Deactivate: {name}",
+      "context": "Clear the active map route without changing selection.",
+      "arguments": {
+        "name": "string"
+      }
+    },
+    "action.activateHint": {
+      "source": "Makes this activity active without opening details or changing selection",
+      "context": "Accessibility hint for the inactive route toggle.",
+      "arguments": {}
+    },
+    "action.deactivateHint": {
+      "source": "Clears the active route without changing selection",
+      "context": "Accessibility hint for the active route toggle.",
+      "arguments": {}
+    },
+    "state.activeRoute": {
+      "source": "Active on map",
+      "context": "The activity is the active map route; distinct from selection.",
+      "arguments": {}
+    },
+    "state.inactiveRoute": {
+      "source": "Not active",
+      "context": "The activity is not the active map route; distinct from selection.",
+      "arguments": {}
+    },
+    "state.selectedActiveRoute": {
+      "source": "Selected. Active on map",
+      "context": "Accessibility value for a selected activity that is also the active map route.",
+      "arguments": {}
     }
   }
 } as const;
@@ -605,7 +658,6 @@ export type MessageArguments = {
   "action.select": Record<never, never>;
   "action.activate": Record<never, never>;
   "action.exportGPX": Record<never, never>;
-  "action.shareGPX": Record<never, never>;
   "metric.distance": Record<never, never>;
   "metric.moving_time": Record<never, never>;
   "metric.elapsed_time": Record<never, never>;
@@ -649,4 +701,14 @@ export type MessageArguments = {
   "metric.notRecorded": Record<never, never>;
   "connect.verify.message": { reason: string };
   "selection.count": { count: number };
+  "action.exportGPXNative": Record<never, never>;
+  "action.preparingGPX": Record<never, never>;
+  "action.closeActivityDetails": Record<never, never>;
+  "action.activateActivity": { name: string };
+  "action.deactivateActivity": { name: string };
+  "action.activateHint": Record<never, never>;
+  "action.deactivateHint": Record<never, never>;
+  "state.activeRoute": Record<never, never>;
+  "state.inactiveRoute": Record<never, never>;
+  "state.selectedActiveRoute": Record<never, never>;
 };

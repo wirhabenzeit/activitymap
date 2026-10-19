@@ -46,9 +46,16 @@ import UIKit
         let back = try #require(ActionPresentation.definition("back", locale: english))
         #expect(back.mirrorsInRTL)
         #expect(back.glyph == "chevron.backward")
+        for action in NativeActionID.allCases {
+            #expect(ActionPresentation.definition(action.rawValue) != nil)
+            #expect(!ActionPresentation.glyph(action).isEmpty)
+        }
+        #expect(ActionPresentation.glyph(.activate, variant: "active") == "location.fill")
+        #expect(ActionPresentation.glyph(.activate, variant: "badge") == "location.fill")
+        #expect(ActionPresentation.glyph(.activate) == "location")
         #expect(ActionPresentation.definition("close")?.mirrorsInRTL == false)
         #expect(ActionPresentation.definition("select")?.glyph != ActionPresentation.definition("activate")?.glyph)
-        #expect(String(localized: try #require(ActionPresentation.definition("exportGPX", locale: english)).title) == "Share GPX")
+        #expect(String(localized: try #require(ActionPresentation.definition("exportGPX", locale: english)).title) == "Export GPX")
         #expect(String(localized: try #require(MetricPresentation.definition("averageWatts", locale: english)).title) == "Average power")
     }
 

@@ -41,9 +41,6 @@ nonisolated enum AppMessages {
     static func actionExportGPX(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("action.exportGPX", defaultValue: "Download GPX", table: "Presentation", locale: locale, comment: "Export route data: browser downloads a file; iOS presents the system share sheet.")
     }
-    static func actionShareGPX(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("action.shareGPX", defaultValue: "Share GPX", table: "Presentation", locale: locale, comment: "Native variant of exportGPX; presents the iOS system share sheet.")
-    }
     static func metricDistance(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("metric.distance", defaultValue: "Distance", table: "Presentation", locale: locale, comment: "Standalone metric label and accessible name. Contextual short labels in detail groups may intentionally differ.")
     }
@@ -173,6 +170,36 @@ nonisolated enum AppMessages {
     static func selectionCount(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("selection.count", defaultValue: "\(count) activities", table: "Presentation", locale: locale, comment: "Complete selected activity count; zero uses the other form in English. Do not build the sentence by concatenation.")
     }
+    static func actionExportGPXNative(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.exportGPXNative", defaultValue: "Export GPX", table: "Presentation", locale: locale, comment: "Native export action. Presents the system share sheet after preparing a GPX file.")
+    }
+    static func actionPreparingGPX(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.preparingGPX", defaultValue: "Preparing GPX…", table: "Presentation", locale: locale, comment: "Native GPX export action while the file is being prepared.")
+    }
+    static func actionCloseActivityDetails(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.closeActivityDetails", defaultValue: "Close activity details", table: "Presentation", locale: locale, comment: "Dismiss adjacent activity inspection; leaves selection unchanged.")
+    }
+    static func actionActivateActivity(_ name: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.activateActivity", defaultValue: "Make active: \(name)", table: "Presentation", locale: locale, comment: "Make the named activity the active map route without changing selection.")
+    }
+    static func actionDeactivateActivity(_ name: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.deactivateActivity", defaultValue: "Deactivate: \(name)", table: "Presentation", locale: locale, comment: "Clear the active map route without changing selection.")
+    }
+    static func actionActivateHint(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.activateHint", defaultValue: "Makes this activity active without opening details or changing selection", table: "Presentation", locale: locale, comment: "Accessibility hint for the inactive route toggle.")
+    }
+    static func actionDeactivateHint(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.deactivateHint", defaultValue: "Clears the active route without changing selection", table: "Presentation", locale: locale, comment: "Accessibility hint for the active route toggle.")
+    }
+    static func stateActiveRoute(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("state.activeRoute", defaultValue: "Active on map", table: "Presentation", locale: locale, comment: "The activity is the active map route; distinct from selection.")
+    }
+    static func stateInactiveRoute(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("state.inactiveRoute", defaultValue: "Not active", table: "Presentation", locale: locale, comment: "The activity is not the active map route; distinct from selection.")
+    }
+    static func stateSelectedActiveRoute(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("state.selectedActiveRoute", defaultValue: "Selected. Active on map", table: "Presentation", locale: locale, comment: "Accessibility value for a selected activity that is also the active map route.")
+    }
 }
 
 nonisolated enum SportPresentation {
@@ -266,7 +293,25 @@ nonisolated enum MetricPresentation {
     }
 }
 
+nonisolated enum NativeActionID: String, CaseIterable {
+    case back
+    case close
+    case fit
+    case showOnMap
+    case clearFiltersAndShowOnMap
+    case select
+    case activate
+    case exportGPX
+}
+
 nonisolated enum ActionPresentation {
+    static func glyph(_ id: NativeActionID, variant: String? = nil) -> String {
+        switch (id.rawValue, variant) {
+        case ("activate", "active"): "location.fill"
+        case ("activate", "badge"): "location.fill"
+        default: definition(id.rawValue)!.glyph
+        }
+    }
     static func definition(_ id: String, locale: Locale = .current) -> (title: LocalizedStringResource, glyph: String, mirrorsInRTL: Bool)? {
         switch id {
         case "back": (AppMessages.actionBack(locale: locale), "chevron.backward", true)
@@ -276,7 +321,7 @@ nonisolated enum ActionPresentation {
         case "clearFiltersAndShowOnMap": (AppMessages.actionClearFiltersAndShowOnMap(locale: locale), "mappin", false)
         case "select": (AppMessages.actionSelect(locale: locale), "square", false)
         case "activate": (AppMessages.actionActivate(locale: locale), "location", false)
-        case "exportGPX": (AppMessages.actionShareGPX(locale: locale), "square.and.arrow.up", false)
+        case "exportGPX": (AppMessages.actionExportGPXNative(locale: locale), "square.and.arrow.up", false)
         default: nil
         }
     }

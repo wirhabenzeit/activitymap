@@ -149,3 +149,24 @@ test('directional navigation and contextual export/activation retain distinct se
     catalog.actions.clearFiltersAndShowOnMap.message,
   );
 });
+
+test('native action variants and export terminology are generated from explicit metadata', () => {
+  assert.equal(
+    catalog.messages[catalog.actions.exportGPX.iosMessage].source,
+    'Export GPX',
+  );
+  assert.equal(
+    catalog.messages[catalog.actions.exportGPX.message].source,
+    'Download GPX',
+  );
+  assert.deepEqual(catalog.actions.activate.iosGlyphVariants, {
+    active: 'location.fill',
+    badge: 'location.fill',
+  });
+  const invalid = structuredClone(catalog);
+  invalid.actions.activate.iosGlyphVariants.active = '';
+  assert.throws(
+    () => validateCatalog(invalid),
+    /Empty native action glyph variant/,
+  );
+});
