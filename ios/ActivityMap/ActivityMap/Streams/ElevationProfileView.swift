@@ -214,6 +214,7 @@ struct ElevationPlot: View {
     var onSelection: (ElevationProfile.Point?) -> Void = { _ in }
     var onDrag: (Bool) -> Void = { _ in }
     @State private var accessibleSampleID: Int?
+    @State private var marker = ElevationMarker()
     @ScaledMetric(relativeTo: .caption) private var chartHeight = 160.0
     @ScaledMetric(relativeTo: .caption) private var reservedHeight = 200.0
     private var selected: ElevationProfile.Point? {
@@ -227,6 +228,7 @@ struct ElevationPlot: View {
         Binding(get: { selectedX }, set: { value in
             accessibleSampleID = nil
             selectedX = value
+            marker.point = value.map { profile.nearest(to: $0 * profile.distanceDivisor(units: units)) }
         })
     }
     private var hasGestureSelection: Bool { selectedX != nil && accessibleSampleID == nil }
@@ -251,43 +253,8 @@ struct ElevationPlot: View {
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)
             .frame(minHeight: 24)
-            Chart {
-                ForEach(profile.points) { point in
-                    AreaMark(x: .value("Distance", point.distance / profile.distanceDivisor(units: units)),
-                             yStart: .value("Baseline", profile.altitudeDomain.lowerBound / units.elevationScale), yEnd: .value("Elevation", point.altitude / units.elevationScale))
-                        .foregroundStyle(AppTheme.accent.opacity(0.15))
-                        .interpolationMethod(.linear)
-                    LineMark(x: .value("Distance", point.distance / profile.distanceDivisor(units: units)), y: .value("Elevation", point.altitude / units.elevationScale))
-                        .foregroundStyle(AppTheme.accent).lineStyle(StrokeStyle(lineWidth: 2))
-                        .interpolationMethod(.linear)
-                }
-                if let selected {
-                    RuleMark(x: .value("Distance", selected.distance / profile.distanceDivisor(units: units)))
-                        .foregroundStyle(.secondary).lineStyle(StrokeStyle(lineWidth: 1, dash: [3, 3]))
-                    PointMark(x: .value("Distance", selected.distance / profile.distanceDivisor(units: units)), y: .value("Elevation", selected.altitude / units.elevationScale))
-                        .foregroundStyle(AppTheme.accent).symbolSize(45)
-
-                }
-            }
-            .chartXScale(domain: 0...(profile.span / profile.distanceDivisor(units: units)))
-            .chartYScale(domain: (profile.altitudeDomain.lowerBound / units.elevationScale)...(profile.altitudeDomain.upperBound / units.elevationScale))
-            .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
-            .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) }
-            .chartXAxisLabel("Distance (\(profile.distanceUnit(units: units)))", alignment: .center)
-            .chartOverlay { proxy in
-                GeometryReader { geometry in
-                    Color.clear.contentShape(Rectangle())
-                        .gesture(ElevationScrubGesture(bounds: geometry.size) { location in
-                            guard let location, let plotFrame = proxy.plotFrame else {
-                                gestureSelection.wrappedValue = nil
-                                return
-                            }
-                            let frame = geometry[plotFrame]
-                            let x = min(max(0, location.x - frame.minX), frame.width)
-                            gestureSelection.wrappedValue = proxy.value(atX: x, as: Double.self)
-                        })
-                }
-            }
+            ElevationChart(profile: profile, units: units, marker: marker) { gestureSelection.wrappedValue = $0 }
+                .equatable()
             .frame(height: compact ? reservedHeight * 0.75 - 32 : chartHeight)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Elevation profile, \(profile.accessibilityDescription(units: units, locale: locale))")
@@ -306,12 +273,96 @@ struct ElevationPlot: View {
         .frame(minHeight: compact ? reservedHeight * 0.75 : reservedHeight, alignment: .top)
         .onChange(of: units) { _, _ in select(nil) }
         .onChange(of: selected?.id) { _, _ in onSelection(selected) }
+        // Selections from the host binding; gestures update the marker directly.
+        .onChange(of: selected, initial: true) { _, point in
+            if marker.point != point { marker.point = point }
+        }
         .onChange(of: hasGestureSelection) { _, selecting in onDrag(selecting) }
         .onDisappear { select(nil); onSelection(nil); onDrag(false) }
     }
     private func select(_ point: ElevationProfile.Point?) {
         accessibleSampleID = point?.id
         selectedX = point.map { $0.distance / profile.distanceDivisor(units: units) }
+        marker.point = point
+    }
+}
+
+/// The selected sample, observed only by the marker layer over the chart.
+@Observable final class ElevationMarker {
+    var point: ElevationProfile.Point?
+}
+
+/// Every recorded sample as area and line marks (up to 600). Scrubbing changes
+/// only the marker layer, so this plot is neither rebuilt nor laid out again.
+private struct ElevationChart: View, Equatable {
+    let profile: ElevationProfile
+    let units: UnitSystem
+    let marker: ElevationMarker
+    /// Chart x value under the finger, or nil once it lifts.
+    let select: (Double?) -> Void
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.profile == rhs.profile && lhs.units == rhs.units && lhs.marker === rhs.marker
+    }
+
+    var body: some View {
+        Chart {
+            ForEach(profile.points) { point in
+                AreaMark(x: .value("Distance", point.distance / profile.distanceDivisor(units: units)),
+                         yStart: .value("Baseline", profile.altitudeDomain.lowerBound / units.elevationScale), yEnd: .value("Elevation", point.altitude / units.elevationScale))
+                    .foregroundStyle(AppTheme.accent.opacity(0.15))
+                    .interpolationMethod(.linear)
+                LineMark(x: .value("Distance", point.distance / profile.distanceDivisor(units: units)), y: .value("Elevation", point.altitude / units.elevationScale))
+                    .foregroundStyle(AppTheme.accent).lineStyle(StrokeStyle(lineWidth: 2))
+                    .interpolationMethod(.linear)
+            }
+        }
+        .chartXScale(domain: 0...(profile.span / profile.distanceDivisor(units: units)))
+        .chartYScale(domain: (profile.altitudeDomain.lowerBound / units.elevationScale)...(profile.altitudeDomain.upperBound / units.elevationScale))
+        .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
+        .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) }
+        .chartXAxisLabel("Distance (\(profile.distanceUnit(units: units)))", alignment: .center)
+        .chartOverlay { proxy in
+            GeometryReader { geometry in
+                let plot = proxy.plotFrame.map { geometry[$0] } ?? .zero
+                ElevationMarkerLayer(marker: marker, profile: profile, units: units, proxy: proxy, plot: plot)
+                Color.clear.contentShape(Rectangle())
+                    .gesture(ElevationScrubGesture(bounds: geometry.size) { location in
+                        guard let location, proxy.plotFrame != nil else { select(nil); return }
+                        let x = min(max(0, location.x - plot.minX), plot.width)
+                        select(proxy.value(atX: x, as: Double.self))
+                    })
+            }
+        }
+    }
+}
+
+/// Draws what the chart's RuleMark and PointMark did, in plot coordinates.
+private struct ElevationMarkerLayer: View {
+    let marker: ElevationMarker
+    let profile: ElevationProfile
+    let units: UnitSystem
+    let proxy: ChartProxy
+    let plot: CGRect
+
+    var body: some View {
+        ZStack(alignment: .topLeading) {
+            if let point = marker.point,
+               let x = proxy.position(forX: point.distance / profile.distanceDivisor(units: units)),
+               let y = proxy.position(forY: point.altitude / units.elevationScale) {
+                Path { path in
+                    path.move(to: CGPoint(x: plot.minX + x, y: plot.minY))
+                    path.addLine(to: CGPoint(x: plot.minX + x, y: plot.maxY))
+                }
+                .stroke(.secondary, style: StrokeStyle(lineWidth: 1, dash: [3, 3]))
+                // PointMark's symbolSize(45) is the symbol's area.
+                Circle().fill(AppTheme.accent)
+                    .frame(width: 7.6, height: 7.6)
+                    .position(x: plot.minX + x, y: plot.minY + y)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .allowsHitTesting(false)
     }
 }
 

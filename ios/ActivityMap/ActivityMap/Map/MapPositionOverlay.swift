@@ -22,6 +22,20 @@ final class MapPositionState {
     }
 }
 
+/// The only reader of the elevation cursor on the map, so a scrub invalidates
+/// this empty view rather than MapScreen.
+struct ElevationCursorObserver: View {
+    let store: ActivityStore
+    let changed: () -> Void
+
+    var body: some View {
+        Color.clear
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+            .onChange(of: store.elevationCursor) { _, _ in changed() }
+    }
+}
+
 /// SDK view annotations can be culled by steep terrain even when their screen
 /// projection is visible. Draw the position indicators above the map instead.
 struct MapPositionOverlay: View {

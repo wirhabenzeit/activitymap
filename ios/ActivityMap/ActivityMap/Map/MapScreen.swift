@@ -287,6 +287,9 @@ struct MapScreen: View {
             }
         }
         .overlay { MapPositionOverlay(state: positions) }
+        // Scrubbing moves the cursor per touch event. Observing it here, not
+        // in this body, repositions the dot without rebuilding map content.
+        .background { ElevationCursorObserver(store: store) { refreshPositions(proxy: proxy) } }
         .ignoresSafeArea()
         .onChange(of: store.selectedTab) { _, tab in
             if tab == .map { scheduleNavigation(proxy: proxy) }
@@ -306,7 +309,6 @@ struct MapScreen: View {
             refreshPositions(proxy: proxy)
         }
         .onChange(of: context.locatedPosition.map { [$0.latitude, $0.longitude] }) { _, _ in refreshPositions(proxy: proxy) }
-        .onChange(of: store.elevationCursor) { _, _ in refreshPositions(proxy: proxy) }
         .onChange(of: picker.detailID) { _, _ in refreshPositions(proxy: proxy) }
         .onChange(of: store.activeActivityID) { _, _ in refreshPositions(proxy: proxy) }
         .onChange(of: geometry.size) { _, _ in
