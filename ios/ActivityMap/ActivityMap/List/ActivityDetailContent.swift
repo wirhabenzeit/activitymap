@@ -25,6 +25,9 @@ struct ActivityDetailContent<Profile: View, Photos: View>: View {
     }
 
     var body: some View {
+        #if DEBUG
+        let _ = PerfProbe.count("ActivityDetailContent")
+        #endif
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if showsHeading {
                 ActivityDetailHeading(activity: activity, trailingInset: headerTrailingInset)

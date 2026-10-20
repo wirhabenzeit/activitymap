@@ -77,6 +77,9 @@ struct ActivityContinuationScrollView<Content: View>: View {
     }
 
     var body: some View {
+        #if DEBUG
+        let _ = PerfProbe.count("ActivityContinuationScrollView")
+        #endif
         ScrollView {
             VStack(spacing: 0) { content() }
                 .padding(.bottom, bottomContentInset)

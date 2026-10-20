@@ -39,6 +39,7 @@ struct MapRotationUITestFixture: View {
 
     init(expanded: Bool = false) {
         MapboxOptions.accessToken = "pk.offline-test"
+        PerfProbe.install()
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let continuation = ProcessInfo.processInfo.arguments.contains("--activity-continuation-ui-testing")
         let count = continuation ? 3 : 30
@@ -130,8 +131,13 @@ struct MapRotationUITestFixture: View {
         try await storage.apply(mutations, scope: session.scope)
         let metadata = ActivityMapAPI.StreamMetadata(generation: "ui-profile", revision: "1", state: .current,
             fetchStatus: .succeeded, availableTypes: [.distance, .altitude, .latlng], fetchedAt: .now, expiresAt: nil)
-        let distances: [Double] = [0, 125, 250, 375, 500, 625, 750, 875, 1000]
-        let altitudes: [Double] = [680, 760, 880, 1100, 1420, 1260, 970, 820, 720]
+        // Performance journeys use a production-sized (300 sample) profile.
+        let dense = ProcessInfo.processInfo.arguments.contains("--perf-dense-profile")
+        // The codec stores exact decimetres, seconds and 1e-5 degrees.
+        let distances: [Double] = dense ? (0..<300).map { Double($0 * 5) }
+            : [0, 125, 250, 375, 500, 625, 750, 875, 1000]
+        let altitudes: [Double] = dense ? distances.map { ((1050 + 370 * sin($0 / 240)) * 10).rounded() / 10 }
+            : [680, 760, 880, 1100, 1420, 1260, 970, 820, 720]
         let summary = ActivityMapAPI.StreamSummary(version: 1, basis: .distance,
             time: distances.map { $0 * 0.6 }, distance: distances,
             latlng: distances.map { [46 + $0 / 100000, 8 + $0 / 100000] },
@@ -212,7 +218,7 @@ private struct MapRotationPresentationProbe: UIViewRepresentable {
             sampling = Task { [weak self] in
                 while !Task.isCancelled {
                     guard let self else { return }
-                    if let window, let root = window.rootViewController {
+                    if !PerfProbe.measuring, let window, let root = window.rootViewController {
                         sample(root: root, window: window)
                     }
                     do { try await Task.sleep(for: .milliseconds(50)) } catch { return }

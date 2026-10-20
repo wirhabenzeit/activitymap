@@ -46,6 +46,9 @@ struct MapScreen: View {
     @State private var resultsGeometry: MapResultsPresentationGeometry?
 
     var body: some View {
+        #if DEBUG
+        let _ = PerfProbe.count("MapScreen")
+        #endif
         ZStack(alignment: .bottomTrailing) {
             GeometryReader { geometry in
                 MapReader { proxy in

@@ -26,6 +26,9 @@ struct RoutePickerSheet: View {
     private var fitActivityID: Int? { detail?.id ?? store.activeActivityID }
 
     var body: some View {
+        #if DEBUG
+        let _ = PerfProbe.count("RoutePickerSheet")
+        #endif
         VStack(spacing: 0) {
             if isSidePanel {
                 sidePanelHeader

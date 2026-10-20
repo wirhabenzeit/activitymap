@@ -232,6 +232,9 @@ struct ElevationPlot: View {
     private var hasGestureSelection: Bool { selectedX != nil && accessibleSampleID == nil }
 
     var body: some View {
+        #if DEBUG
+        let _ = PerfProbe.count("ElevationPlot")
+        #endif
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
                 Text("Elevation (\(units.elevationUnit))").foregroundStyle(AppTheme.secondaryText)
