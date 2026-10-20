@@ -386,6 +386,9 @@ private struct StatsDetailContent: View {
             }
         }
         .onAppear(perform: grow)
+        // The callback captures this page, which also owns exit. Release it
+        // when the page leaves; grow rebinds it when returning from inspection.
+        .onDisappear { exit.collapse = nil }
         // The shell's pushed root is inactive. The visible destination must
         // own demand when its metric changes; the shared cache reuses values.
         .task(id: request) { await dashboard.load(store: store, request: request) }

@@ -16,6 +16,7 @@ struct StatsPeriodDetail<Curve: View>: View {
     @ViewBuilder let curve: () -> Curve
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
+    @Environment(\.statsExpansionProgress) private var sharedExpansionProgress
     @State private var width: CGFloat = 0
     private var monthly: Bool { if case .month = rhythm { return true }; return false }
     private var sideBySide: Bool { expanded && width >= 1000 && !typeSize.isAccessibilitySize }
@@ -27,13 +28,19 @@ struct StatsPeriodDetail<Curve: View>: View {
                 curve().environment(\.statsFocusChartHeight, width >= 760 ? 320 : 200)
                     .environment(\.statsDetailHeightLimit, width < 760 ? min(shortViewportLimit ?? 200, 200) : shortViewportLimit)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                StatsExpansionReveal(expanded: expanded) {
-                    rhythmView.padding(.top, sideBySide ? 0 : 24)
+                if expanded || (sharedExpansionProgress ?? 0) > 0 {
+                    StatsExpansionReveal(expanded: expanded) {
+                        rhythmView.padding(.top, sideBySide ? 0 : 24)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            StatsExpansionReveal(expanded: expanded) {
-                StatsPeriodHistoryTable(rows: history, metric: metric, monthly: monthly).padding(.top, 24)
+            // A zero-height reveal alone leaves its controls in the native
+            // accessibility tree. Mount details only while focused or morphing.
+            if expanded || (sharedExpansionProgress ?? 0) > 0 {
+                StatsExpansionReveal(expanded: expanded) {
+                    StatsPeriodHistoryTable(rows: history, metric: metric, monthly: monthly).padding(.top, 24)
+                }
             }
         }.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
