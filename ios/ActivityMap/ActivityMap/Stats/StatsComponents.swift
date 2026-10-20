@@ -14,10 +14,20 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     @ViewBuilder let content: () -> Content
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
+    @Environment(\.statsExpansionProgress) private var expansion
 
     var body: some View {
         if detailScreen {
-            tileBody.padding(12)
+            // While a focus page grows out of its dashboard card, it starts
+            // with that card's surface and inset; at rest neither remains.
+            let card = 1 - (expansion ?? 1)
+            // The surface stays opaque until the dashboard behind has faded.
+            let surface = min(1, card / 0.6)
+            let shape = RoundedRectangle(cornerRadius: AppTheme.cornerRadius * card)
+            tileBody
+                .padding(12 + (AppTheme.Spacing.large - 12) * card)
+                .background(AppTheme.surface.opacity(surface), in: shape)
+                .overlay(shape.strokeBorder(AppTheme.separator.opacity(0.35 * surface), lineWidth: 0.5))
         } else {
             tileBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -28,9 +38,20 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     private var tileBody: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if detailScreen {
-                ViewThatFits(in: .horizontal) {
-                    HStack { periodLabel; Spacer(minLength: 8); controls() }
-                    VStack(alignment: .leading, spacing: 8) { periodLabel; controls() }
+                VStack(alignment: .leading, spacing: 0) {
+                    // The card's title row hands over to the navigation title.
+                    StatsExpansionReveal(expanded: false, inverted: true) {
+                        HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
+                            BrowseSectionHeading(title: title)
+                            Spacer(minLength: 0)
+                            BrowseIconLabel(systemImage: "arrow.up.left.and.arrow.down.right", isSelected: false)
+                        }
+                        .frame(minHeight: AppTheme.minimumTarget)
+                    }
+                    ViewThatFits(in: .horizontal) {
+                        HStack { periodLabel; Spacer(minLength: 8); controls() }
+                        VStack(alignment: .leading, spacing: 8) { periodLabel; controls() }
+                    }
                 }
             } else if shortViewportLimit != nil && !typeSize.isAccessibilitySize && !controlsInContent {
                 // iPhone landscape: one header row where the card is wide enough.
@@ -446,7 +467,6 @@ extension EnvironmentValues {
     @Entry var statsFocusChartHeight: Double? = nil
     @Entry var statsTileInspection: StatsTileInspection? = nil
     @Entry var statsDetailPresentation = StatsDetailPresentation.automatic
-    @Entry var statsTransitionNamespace: Namespace.ID? = nil
     @Entry var statsInspectedActivityID: Int? = nil
     @Entry var statsShellNavigation: StatsShellNavigation? = nil
 }
