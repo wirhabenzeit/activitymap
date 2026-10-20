@@ -11,22 +11,30 @@ struct StatsPeriodDetail<Curve: View>: View {
     let history: [StatsPeriodHistoryComparison]
     let metric: StatsMetric
     let today: Int
+    var expanded = true
     let openActivity: (Int) -> Void
     @ViewBuilder let curve: () -> Curve
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
     @State private var width: CGFloat = 0
     private var monthly: Bool { if case .month = rhythm { return true }; return false }
+    private var sideBySide: Bool { expanded && width >= 1000 && !typeSize.isAccessibilitySize }
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            let layout = width >= 1000 && !typeSize.isAccessibilitySize ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
+        // Gaps live inside the reveals, so a collapsed card keeps its height.
+        VStack(alignment: .leading, spacing: 0) {
+            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
             layout {
                 curve().environment(\.statsFocusChartHeight, width >= 760 ? 320 : 200)
                     .environment(\.statsDetailHeightLimit, width < 760 ? min(shortViewportLimit ?? 200, 200) : shortViewportLimit)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                rhythmView.frame(maxWidth: .infinity, alignment: .leading)
+                StatsExpansionReveal(expanded: expanded) {
+                    rhythmView.padding(.top, sideBySide ? 0 : 24)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            StatsPeriodHistoryTable(rows: history, metric: metric, monthly: monthly)
+            StatsExpansionReveal(expanded: expanded) {
+                StatsPeriodHistoryTable(rows: history, metric: metric, monthly: monthly).padding(.top, 24)
+            }
         }.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
     @ViewBuilder private var rhythmView: some View {
@@ -58,6 +66,7 @@ private struct StatsMonthRhythmView: View {
     private var sports: [ActivityCategory] { ActivityCategory.allCases.filter { sport in rhythm.days.contains { day in day.activities.contains { $0.sport == sport } } } }
     private var offset: Int { rhythm.days.first.map { $0.day - StatsDates.monday($0.day) } ?? 0 }
     private var listsDays: Bool { typeSize.isAccessibilitySize || width < 314 }
+    private var weeks: [Int] { Array(0..<((offset + rhythm.days.count + 6) / 7)) }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Daily rhythm").font(.headline)
@@ -80,10 +89,27 @@ private struct StatsMonthRhythmView: View {
                     }.buttonStyle(.plain).accessibilityAddTraits(day.day == focusedDay ? .isSelected : [])
                 }
             } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 1), count: 7), spacing: 6) {
-                    ForEach(0..<7, id: \.self) { index in Text(StatsDisplay.weekday(StatsDates.monday(today) + index)).font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true) }
-                    ForEach((-offset)..<0, id: \.self) { _ in Color.clear.frame(height: 60).accessibilityHidden(true) }
-                    ForEach(rhythm.days, id: \.day) { day in dayCell(day) }
+                // Eager rows, not a lazy grid: estimated row heights changed
+                // between layout passes and shook the block while the card grew.
+                VStack(spacing: 6) {
+                    HStack(spacing: 1) {
+                        ForEach(0..<7, id: \.self) { index in
+                            Text(StatsDisplay.weekday(StatsDates.monday(today) + index)).font(.caption2).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity).accessibilityHidden(true)
+                        }
+                    }
+                    ForEach(weeks, id: \.self) { week in
+                        HStack(alignment: .top, spacing: 1) {
+                            ForEach(0..<7, id: \.self) { column in
+                                let index = week * 7 + column - offset
+                                if rhythm.days.indices.contains(index) {
+                                    dayCell(rhythm.days[index]).frame(maxWidth: .infinity)
+                                } else {
+                                    Color.clear.frame(maxWidth: .infinity).frame(height: 60).accessibilityHidden(true)
+                                }
+                            }
+                        }
+                    }
                 }
             }
             StatsRhythmLegend(sports: sports)

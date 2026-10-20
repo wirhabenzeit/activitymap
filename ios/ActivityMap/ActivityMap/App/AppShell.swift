@@ -10,7 +10,6 @@ struct AppShell: View {
     @State private var sheets: BrowseSheetPresentation
     @State private var statsNavigation = StatsShellNavigation()
     @State private var listNavigation = ListShellNavigation()
-    @Namespace private var statsTransitionNamespace
     @Environment(\.statsDetailPresentation) private var statsDetailPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shellSize: CGSize = .zero
@@ -61,7 +60,6 @@ struct AppShell: View {
             if usesStatsNavigation {
                 shellContent
                     .environment(\.statsShellNavigation, statsNavigation)
-                    .environment(\.statsTransitionNamespace, statsTransitionNamespace)
             } else {
                 shellContent
             }
@@ -168,15 +166,12 @@ struct AppShell: View {
                                         usesShellHeader: !nativeStatsHeader,
                                         toolbarTrailing: nativeStatsHeader ? AnyView(filterButton(sidebarAvailable: false)) : AnyView(EmptyView()))
             .tint(AppTheme.accent)
-        // Reduce Motion uses cross-fade on iOS 27 and standard navigation on iOS 26.
-        if reduceMotion {
-            if #available(iOS 27.0, *) {
-                content.navigationTransition(.crossFade)
-            } else {
-                content
-            }
+        // The focus page grows its own card out of the dashboard. Reduce
+        // Motion uses cross-fade on iOS 27 and standard navigation on iOS 26.
+        if reduceMotion, #available(iOS 27.0, *) {
+            content.navigationTransition(.crossFade)
         } else {
-            content.navigationTransition(.zoom(sourceID: tile.id, in: statsTransitionNamespace))
+            content
         }
     }
 

@@ -919,7 +919,7 @@ import Testing
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         let page = try #require(navigation.topViewController)
-        #expect(page.preferredTransition != nil, "Regular-width iPad zooms the tile into its focus page")
+        #expect(page.preferredTransition == nil, "The focus page grows its own card instead of the system zoom")
         let detail = try #require(host.descendants(UIScrollView.self, in: page.view).first { abs($0.bounds.width - initialWidth) < 2 })
         #expect(abs(detail.bounds.width - initialWidth) < 2)
         #expect(state.expandedTile == .weeklyVolume && inspection.volumeRange == .months)

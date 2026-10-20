@@ -161,11 +161,10 @@ struct StatsDashboardTile: View {
         case .comparison(let values, let current, let previous, let band, let rhythm, let history):
             headline(values.current, metric: metric, suffix: " so far")
             comparison(values, context: comparisonContext)
-            if expanded {
-                StatsPeriodDetail(rhythm: rhythm, history: history, metric: metric, today: today, openActivity: openActivity) {
-                    comparisonChart(current: current, previous: previous, band: band)
-                }
-            } else {
+            // Always the same chart; rhythm and history reveal on the card's
+            // own progress instead of appearing whole when `expanded` flips.
+            StatsPeriodDetail(rhythm: rhythm, history: history, metric: metric, today: today,
+                              expanded: expanded, openActivity: openActivity) {
                 comparisonChart(current: current, previous: previous, band: band)
             }
         case .pace(let pace):
