@@ -71,6 +71,11 @@ try {
     await page.waitForFunction((id) => document.activeElement?.id === id, id);
   };
   const openEdit = async () => {
+    // A hidden dialog can still be finishing its portal exit and restoring
+    // focus. Start the next keyboard journey after its modal lock releases.
+    await page.waitForFunction(
+      () => !document.body.hasAttribute('data-scroll-locked'),
+    );
     const direct = recorded.getByRole('button', {
       name: copy('action.edit'),
       exact: true,
