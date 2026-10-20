@@ -278,6 +278,12 @@ struct StatsCalendarHistoryScroll<Content: View>: View {
     var saveWeek: (Int?) -> Void
     let content: Content
     @State private var week: Int?
+    /// Restoring a position while the page slides or zooms in leaves the lazy
+    /// columns' accessibility nodes behind the visible ones: the latest weeks
+    /// are drawn and tappable but unreachable to VoiceOver. Rebuild the
+    /// columns once, after the transition, wherever a position was restored.
+    @State private var restoring: Bool
+    @Environment(\.statsFocusSettled) private var settled
 
     init(restoredWeek: Int?, initialWeek: Int, saveWeek: @escaping (Int?) -> Void,
          @ViewBuilder content: () -> Content) {
@@ -286,10 +292,11 @@ struct StatsCalendarHistoryScroll<Content: View>: View {
         self.saveWeek = saveWeek
         self.content = content()
         _week = State(initialValue: restoredWeek ?? initialWeek)
+        _restoring = State(initialValue: restoredWeek != nil)
     }
 
     var body: some View {
-        ScrollView(.horizontal) { content }
+        ScrollView(.horizontal) { content.id(restoring ? settled : true) }
             .scrollPosition(id: $week, anchor: .leading)
             .defaultScrollAnchor(.trailing)
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)

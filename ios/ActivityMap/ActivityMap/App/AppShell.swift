@@ -166,20 +166,12 @@ struct AppShell: View {
         }
     }
 
-    @ViewBuilder private func statsFocusPage(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
+    private func statsFocusPage(_ tile: StatsTileDefinition, dashboard: StatsDashboardState) -> some View {
         let content = StatsDetailScreen(store: store, dashboard: dashboard, tile: tile, sync: sync,
                                         usesShellHeader: !nativeStatsHeader,
                                         toolbarTrailing: nativeStatsHeader ? AnyView(filterButton(sidebarAvailable: false)) : AnyView(EmptyView()))
             .tint(AppTheme.accent)
-        // The focus page grows its own card out of the dashboard. Reduce
-        // Motion uses cross-fade on iOS 27 and standard navigation on iOS 26.
-        if reduceMotion, #available(iOS 27.0, *) {
-            content.navigationTransition(.crossFade)
-        } else if !reduceMotion, StatsFocusMotion.current == .zoom {
-            content.navigationTransition(.zoom(sourceID: tile.id, in: statsZoom))
-        } else {
-            content
-        }
+        return content.statsFocusTransition(tile.id, in: statsZoom, reduceMotion: reduceMotion)
     }
 
     private var shellContent: some View {

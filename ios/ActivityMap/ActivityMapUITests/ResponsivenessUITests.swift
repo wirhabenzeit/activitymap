@@ -21,33 +21,6 @@ final class ResponsivenessUITests: XCTestCase {
         try await scrubJourney(list: false)
     }
 
-    func testStatsFocusMorph() async throws { try await statsJourney(motion: "morph") }
-    func testStatsFocusPush() async throws { try await statsJourney(motion: "push") }
-    func testStatsFocusZoom() async throws { try await statsJourney(motion: "zoom") }
-
-    /// Unmeasured open/close for a side-by-side screen recording; prints the
-    /// wall-clock time of the open tap so the recording can be trimmed.
-    func testStatsFocusDemoMorph() async throws { try await statsDemo(motion: "morph") }
-    func testStatsFocusDemoZoom() async throws { try await statsDemo(motion: "zoom") }
-
-    private func statsDemo(motion: String) async throws {
-        let app = XCUIApplication()
-        app.launchArguments = ["--stats-ui-testing", "--stats-ui-scenario=standard",
-                               "--stats-focus-motion=\(motion)", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
-        app.launch()
-        defer { app.terminate() }
-        let expand = app.buttons["Expand Training volume"]
-        XCTAssertTrue(expand.waitForExistence(timeout: 15), app.debugDescription)
-        try await Task.sleep(for: .seconds(2))
-        let open = CGPoint(x: expand.frame.midX, y: expand.frame.midY)
-        print("DEMO_MARK \(motion) \(Date().timeIntervalSince1970)")
-        coordinate(app, open).tap()
-        try await Task.sleep(for: .seconds(1.5))
-        let back = try XCTUnwrap(app.buttons.matching(identifier: "stats-detail-back").allElementsBoundByIndex.first(where: \.isHittable))
-        coordinate(app, CGPoint(x: back.frame.midX, y: back.frame.midY)).tap()
-        try await Task.sleep(for: .seconds(1.5))
-    }
-
     /// Control: a tap on the dashboard's empty side padding, so the cost of
     /// XCTest's own event synthesis can be separated from a transition.
     func testStatsNullTap() async throws {
@@ -68,14 +41,14 @@ final class ResponsivenessUITests: XCTestCase {
     }
 
     /// Opens and closes a chart and the calendar, measuring each transition.
-    private func statsJourney(motion: String) async throws {
+    func testStatsFocusTransition() async throws {
         for (title, slug) in [("Training volume", "volume"), ("Activity calendar", "calendar")] {
             continueAfterFailure = false
             XCUIDevice.shared.orientation = .portrait
             let report = FileManager.default.temporaryDirectory.appendingPathComponent("perf-\(UUID().uuidString).json")
             let app = XCUIApplication()
             app.launchArguments = ["--stats-ui-testing", "--stats-ui-scenario=standard", "--perf-probe",
-                                   "--stats-focus-motion=\(motion)", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+                                   "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
             app.launchEnvironment["ACTIVITYMAP_PERF_PATH"] = report.path
             app.launch()
             let dashboard = app.scrollViews["stats-dashboard"]
@@ -89,13 +62,13 @@ final class ResponsivenessUITests: XCTestCase {
             // Let every tile finish calculating before the transition starts.
             try await Task.sleep(for: .seconds(2))
             let open = CGPoint(x: expand.frame.midX, y: expand.frame.midY)
-            try await measure(app, report: report, name: "stats-\(motion)-open-\(slug)", settle: 1.5) {
+            try await measure(app, report: report, name: "stats-open-\(slug)", settle: 1.5) {
                 coordinate(app, open).tap()
             }
             let back = app.buttons.matching(identifier: "stats-detail-back").allElementsBoundByIndex.first(where: \.isHittable)
             let backButton = try XCTUnwrap(back, "The focus page must show Back: \(app.debugDescription)")
             let close = CGPoint(x: backButton.frame.midX, y: backButton.frame.midY)
-            try await measure(app, report: report, name: "stats-\(motion)-close-\(slug)", settle: 1.5) {
+            try await measure(app, report: report, name: "stats-close-\(slug)", settle: 1.5) {
                 coordinate(app, close).tap()
             }
             XCTAssertTrue(expand.waitForExistence(timeout: 5) && expand.isHittable, "Back must return to the dashboard")
