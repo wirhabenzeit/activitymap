@@ -190,7 +190,10 @@ struct MapScreen: View {
     }
 
     private func mapView(proxy: MapProxy, geometry: GeometryProxy) -> some View {
-        Map(viewport: $viewport) {
+        #if DEBUG
+        PerfProbe.count("MapScreen.map")
+        #endif
+        return Map(viewport: $viewport) {
             baseContent
             if terrain.includesTerrain, let configuration = terrainConfiguration {
                 MapTerrainContent(configuration: configuration, sourceID: terrain.sourceID)
