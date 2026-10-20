@@ -44,6 +44,7 @@ import {
 import { activityDTOSchema } from '~/contracts/v1/activity';
 import { useElementSize } from '~/hooks/use-element-size';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
+import { upsertActivityDTOs } from '~/lib/sync/v1-store';
 import type { Photo } from '~/server/db/schema';
 import { store } from '~/store';
 
@@ -54,9 +55,10 @@ const defaults = Object.fromEntries(
     .filter((key) => key !== 'streams')
     .map((key) => [key, null]),
 );
-const activities = fixture.activities.map((item) =>
-  dtoToActivity(activityDTOSchema.parse({ ...defaults, ...item })),
+const activityDTOs = fixture.activities.map((item) =>
+  activityDTOSchema.parse({ ...defaults, ...item }),
 );
+const activities = activityDTOs.map(dtoToActivity);
 const first = activities[0]!;
 const noRoute = {
   ...first,
@@ -105,6 +107,7 @@ function Probe({ tag, width }: { tag: 'div' | 'section'; width: number }) {
 }
 
 function Content() {
+  const [ready, setReady] = useState(false);
   const [settings, setSettings] = useState(false);
   const [edit, setEdit] = useState(false);
   const [connect, setConnect] = useState(false);
@@ -124,13 +127,29 @@ function Content() {
     getRowId: (row) => String(row.id),
   });
   useEffect(() => {
-    store.setState({
-      isInitialized: true,
-      isGuest: false,
-      user: undefined,
-      selected: activities.map((item) => item.id),
-    });
+    let active = true;
+    void (async () => {
+      await upsertActivityDTOs('auth:reconciliation-review', activityDTOs);
+      if (!active) return;
+      store.getState().initializeAuth({
+        currentUser: {
+          id: 'reconciliation-review',
+          name: 'Reconciliation fixture',
+          email: null,
+          image: null,
+          athleteId: 42,
+          stravaConnected: true,
+          stravaPermissions: null,
+        },
+      });
+      store.setState({ selected: activities.map((item) => item.id) });
+      setReady(true);
+    })();
+    return () => {
+      active = false;
+    };
   }, []);
+  if (!ready) return <p>Preparing fixture</p>;
   return (
     <main className="space-y-3 p-4">
       <div className="flex flex-wrap gap-3">
@@ -148,7 +167,14 @@ function Content() {
         </DropdownMenu>
         <ShareButton />
         <LayerSwitcher />
-        <button onClick={() => setConnect(true)}>Open Connect</button>
+        <button
+          onClick={() => {
+            store.getState().initializeAuth({ currentUser: null });
+            setConnect(true);
+          }}
+        >
+          Open Connect
+        </button>
         <button onClick={() => setFeature(true)}>Open Feature</button>
         <PhotoLightbox photos={[photo]} title="Fixture" />
       </div>

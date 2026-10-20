@@ -227,165 +227,174 @@ export function ActivityCardContent({
             stickyHeader && 'sticky top-0 z-10 bg-background',
           )}
         >
-          <div className="flex items-center gap-2">
-            <ActivitySelectionSymbol
-              id={activity.id}
-              name={String(activity.name)}
-              disabled={readOnly}
-            >
-              {Icon && sport_group && (
-                <Icon
-                  className="size-5 shrink-0"
-                  color={categorySettings[sport_group].color}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex min-w-0 flex-[1_1_12rem] items-center gap-2">
+              <ActivitySelectionSymbol
+                id={activity.id}
+                name={String(activity.name)}
+                disabled={readOnly}
+              >
+                {Icon && sport_group && (
+                  <Icon
+                    className="size-5 shrink-0"
+                    color={categorySettings[sport_group].color}
+                  />
+                )}
+              </ActivitySelectionSymbol>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-base leading-5 break-words">
+                  {activity.name}
+                </CardTitle>
+                <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                  {sport_type} · {formatPreferredDate(date, dateFormat, locale)}{' '}
+                  ·{' '}
+                  {formatLocalTime(
+                    date,
+                    {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    },
+                    locale,
+                  )}
+                </p>
+              </div>
+            </div>
+            <div className="ms-auto flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
+              {/* The map overlay provides its fit action in the navigation header. */}
+              {showMapButton && onShowOnMap && (
+                <ActivityMapAction
+                  activity={activity}
+                  onShowOnMap={onShowOnMap}
+                  variant={mapActionVariant}
+                  labelled={labelled}
                 />
               )}
-            </ActivitySelectionSymbol>
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-base leading-5">
-                {activity.name}
-              </CardTitle>
-              <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                {sport_type} · {formatPreferredDate(date, dateFormat, locale)} ·{' '}
-                {formatLocalTime(
-                  date,
-                  {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  },
-                  locale,
-                )}
-              </p>
-            </div>
-            {/* The map overlay provides its fit action in the navigation header. */}
-            {showMapButton && onShowOnMap && (
-              <ActivityMapAction
-                activity={activity}
-                onShowOnMap={onShowOnMap}
-                variant={mapActionVariant}
-                labelled={labelled}
-              />
-            )}
-            {labelled && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="min-h-11 shrink-0 px-2 text-xs"
-                onClick={() => canEdit && setOpen(true)}
-                title={editReason}
-                aria-label={
-                  editReason
-                    ? message('activity.action.unavailable', {
-                        action: message('action.edit'),
-                        name: activity.name,
-                        reason: editReason,
-                      })
-                    : undefined
-                }
-                disabled={loading || !canEdit || readOnly}
-              >
-                {message('action.edit')}
-              </Button>
-            )}
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
+              {labelled && (
                 <Button
                   variant="ghost"
-                  size="icon"
-                  className="size-11"
-                  aria-label={message('actions.more')}
+                  size="sm"
+                  className="min-h-11 shrink-0 px-2 text-xs"
+                  onClick={() => canEdit && setOpen(true)}
+                  title={editReason}
+                  aria-label={
+                    editReason
+                      ? message('activity.action.unavailable', {
+                          action: message('action.edit'),
+                          name: activity.name,
+                          reason: editReason,
+                        })
+                      : undefined
+                  }
+                  disabled={loading || !canEdit || readOnly}
                 >
-                  <MoreHorizontal className="h-4 w-4" />
+                  {message('action.edit')}
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {!labelled && (
+              )}
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-11 shrink-0"
+                    aria-label={message('actions.more')}
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  {!labelled && (
+                    <DropdownMenuItem
+                      onSelect={() => canEdit && setOpen(true)}
+                      title={editReason}
+                      aria-label={
+                        editReason
+                          ? message('activity.action.unavailable', {
+                              action: message('action.edit'),
+                              name: activity.name,
+                              reason: editReason,
+                            })
+                          : undefined
+                      }
+                      disabled={loading || !canEdit || readOnly}
+                    >
+                      <Pencil aria-hidden="true" />
+                      <span>
+                        {message('action.edit')}
+                        {editReason && (
+                          <span className="block text-xs text-muted-foreground">
+                            {editReason}
+                          </span>
+                        )}
+                      </span>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
-                    onSelect={() => canEdit && setOpen(true)}
-                    title={editReason}
+                    onSelect={() => void handleRefresh()}
+                    disabled={
+                      loading || isGuest || readOnly || !stravaConnected
+                    }
+                  >
+                    <RefreshCw aria-hidden="true" /> {message('action.refresh')}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onSelect={handleDownloadGpx}
+                    title={
+                      !canExport
+                        ? message('activity.action.noRoute')
+                        : undefined
+                    }
                     aria-label={
-                      editReason
+                      !canExport
                         ? message('activity.action.unavailable', {
-                            action: message('action.edit'),
+                            action: message('action.exportGPX'),
                             name: activity.name,
-                            reason: editReason,
+                            reason: message('activity.action.noRoute'),
                           })
                         : undefined
                     }
-                    disabled={loading || !canEdit || readOnly}
+                    disabled={!canExport}
                   >
-                    <Pencil aria-hidden="true" />
+                    <Download aria-hidden="true" />
                     <span>
-                      {message('action.edit')}
-                      {editReason && (
+                      {message('action.exportGPX')}
+                      {!canExport && (
                         <span className="block text-xs text-muted-foreground">
-                          {editReason}
+                          {message('activity.action.noRoute')}
                         </span>
                       )}
                     </span>
                   </DropdownMenuItem>
-                )}
-                <DropdownMenuItem
-                  onSelect={() => void handleRefresh()}
-                  disabled={loading || isGuest || readOnly || !stravaConnected}
+                  <DropdownMenuItem asChild>
+                    <Link
+                      href={`https://strava.com/activities/${id}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      <ExternalLink aria-hidden="true" />{' '}
+                      {message('action.openInStrava')}
+                    </Link>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              {onCollapse && (
+                <DismissButton
+                  intent="collapse"
+                  label={message('action.collapse')}
+                  onClick={onCollapse}
+                />
+              )}
+              {onClearSelection && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClearSelection}
+                  aria-label={message('action.clearSelection')}
+                  title={message('action.clearSelection')}
                 >
-                  <RefreshCw aria-hidden="true" /> {message('action.refresh')}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onSelect={handleDownloadGpx}
-                  title={
-                    !canExport ? message('activity.action.noRoute') : undefined
-                  }
-                  aria-label={
-                    !canExport
-                      ? message('activity.action.unavailable', {
-                          action: message('action.exportGPX'),
-                          name: activity.name,
-                          reason: message('activity.action.noRoute'),
-                        })
-                      : undefined
-                  }
-                  disabled={!canExport}
-                >
-                  <Download aria-hidden="true" />
-                  <span>
-                    {message('action.exportGPX')}
-                    {!canExport && (
-                      <span className="block text-xs text-muted-foreground">
-                        {message('activity.action.noRoute')}
-                      </span>
-                    )}
-                  </span>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link
-                    href={`https://strava.com/activities/${id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <ExternalLink aria-hidden="true" />{' '}
-                    {message('action.openInStrava')}
-                  </Link>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {onCollapse && (
-              <DismissButton
-                intent="collapse"
-                label={message('action.collapse')}
-                onClick={onCollapse}
-              />
-            )}
-            {onClearSelection && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClearSelection}
-                aria-label={message('action.clearSelection')}
-                title={message('action.clearSelection')}
-              >
-                {message('action.clearSelection')}
-              </Button>
-            )}
+                  {message('action.clearSelection')}
+                </Button>
+              )}
+            </div>
           </div>
         </CardHeader>
         <RouteDetailsContent

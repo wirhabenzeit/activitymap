@@ -120,9 +120,35 @@ try {
       },
       { scale, direction },
     );
+    // ResizeObserver-driven action labels commit after the new font/viewport
+    // layout. Sample settled geometry, keeping the same minimum target check.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) =>
+          requestAnimationFrame(() => requestAnimationFrame(resolve)),
+        ),
+    );
     await target(more(recorded));
     const map = recorded.getByRole('button', { name: /^Show on map:/ });
     await target(map);
+    const titleBounds = await recorded
+      .getByText(dto.name, { exact: true })
+      .boundingBox();
+    assert(
+      titleBounds && titleBounds.width >= 120,
+      `Activity title compressed by actions: ${JSON.stringify(titleBounds)}`,
+    );
+    for (const action of [map, more(recorded)]) {
+      const bounds = await action.boundingBox();
+      assert(
+        bounds &&
+          (bounds.x + bounds.width <= titleBounds.x ||
+            bounds.x >= titleBounds.x + titleBounds.width ||
+            bounds.y + bounds.height <= titleBounds.y ||
+            bounds.y >= titleBounds.y + titleBounds.height),
+        'Activity actions must not overlap the title',
+      );
+    }
     assert(await map.isEnabled());
     assert(
       await indoor.getByRole('button', { name: /^Show on map:/ }).isDisabled(),

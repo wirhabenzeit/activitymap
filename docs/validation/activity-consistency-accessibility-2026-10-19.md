@@ -75,6 +75,20 @@ The final separate unit bundle `/private/tmp/activitymap-stats-calendar-unit-fin
 
 Retained visual evidence: [compact iPad](accessibility-2026-10-19/native-stats-ipad-compact.png), [expanded iPad](accessibility-2026-10-19/native-stats-ipad-expanded.png), [phone large text](accessibility-2026-10-19/native-stats-phone-large-text.png), and [calendar history](accessibility-2026-10-19/native-stats-calendar-history.png). The iPad XCUIScreen attachments retain portrait raster dimensions while the actual automation viewport is landscape; use the native accessibility frames and assertions for bounds rather than interpreting those raster proportions as exact device geometry.
 
+## Combined PR integration, 20 October
+
+PR #437 combines this work with the original heads of #435 and #436. The Stats focus card keeps its grow/collapse transition while the regular-width heading participates in the same morph and remains ordinary scrolling content at rest. Back closes activity inspection before collapsing or dismissing the focus page. The focus callback is cleared on disappearance and rebound on return so it cannot retain a departed page and its snapshot.
+
+A real UI regression caught compact comparison cards exposing their hidden rhythm, day/month controls and period history through the native accessibility tree. Those details now mount only during expansion or focus, using the same boundary as Sport mix. The test first failed on both devices, then passed with the correction; it also verifies that explicit expansion makes the rhythm controls and history reachable.
+
+The final focused bundle `/private/tmp/activitymap-integration-final.xcresult` passes all 24 logical tests: 33 runtime executions per device, 66 total, with zero failures or skips on iPhone 18 Pro and iPad Pro 11-inch (M5), iOS 27.0 (24A434). This includes four real Stats UI journeys per device, calendar layout/rendering, native Back ownership and activity continuation policy/lifetime tests. The continuation timeout is now scoped to its committed attempt; departure or a newer attempt invalidates stale cleanup. The earlier integration bundle failed the compact comparison check and is superseded for that assertion.
+
+The complete `ActivityContinuationUITests` suite separately passes all 15 real UI journeys on the same iPhone simulator, with zero failures or skips, in `/private/tmp/activitymap-integration-continuation.xcresult`. It covers List/Map pulls, chart-origin pulls, native inertia, medium-sheet behavior, no wrap, explicit content Back, native navigation and retained results/selection.
+
+Combined browser CI also exposed a landscape Sport picker extending above the viewport. Select menus now respect Radix's available-height constraint, and the reconciliation check verifies the whole menu's bounds as well as option hit testing and selection. Its editing fixture now explicitly initializes a synthetic connected account and seeds its authenticated library cache; the connection journey explicitly resets to signed out. Permission-denied editing remains a separate accessibility regression. Large-text inspection also found the detail title compressed between action controls; identity and actions now wrap separately when space is short, and the browser review checks title space and non-overlap after responsive layout settles.
+
+TestFlight 1.0.0 (115.1) predates this integration and does not contain #435/#436 or these integration corrections. The existing physical-device and live VoiceOver acceptance items below remain open.
+
 ## Dedicated acceptance still required
 
 - Actual VoiceOver traversal on iPhone and iPad: names, rotor order, selected/mixed/Combine states, disabled reasons, error announcement, chart adjustment, gallery current-photo announcement and focus after completed/cancelled dialogs.
