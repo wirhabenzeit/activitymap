@@ -47,7 +47,11 @@ struct ActivityContinuationScrollView<Content: View>: View {
     var bottomContentInset: CGFloat = 0
     @ViewBuilder var content: () -> Content
     @Environment(\.activityDetailContinuation) private var continuation
-    @State private var pull = ActivityContinuationPull()
+    /// Scroll geometry reaches the pull every frame. Only the visible cue and
+    /// haptic trigger are SwiftUI state, so ordinary scrolling publishes nothing.
+    @State private var tracker = ActivityContinuationPullTracker()
+    @State private var nextIndicator = ActivityContinuationIndicatorState()
+    @State private var hapticGeneration = 0
     @State private var position = ScrollPosition(edge: .top)
     @State private var previousIndicator = ActivityContinuationIndicatorState()
     @State private var previousCueHeight: CGFloat?
@@ -77,6 +81,9 @@ struct ActivityContinuationScrollView<Content: View>: View {
     }
 
     var body: some View {
+        #if DEBUG
+        let _ = PerfProbe.count("ActivityContinuationScrollView")
+        #endif
         ScrollView {
             VStack(spacing: 0) { content() }
                 .padding(.bottom, bottomContentInset)
@@ -95,7 +102,7 @@ struct ActivityContinuationScrollView<Content: View>: View {
         .overlay(alignment: .bottom) {
             Group {
                 if let committed, committed.direction == .next { committedIndicator(committed) }
-                else { indicator(for: .next, state: .init(pull)) }
+                else { indicator(for: .next, state: nextIndicator) }
             }
             .padding(.bottom, bottomContentInset)
         }
@@ -105,33 +112,49 @@ struct ActivityContinuationScrollView<Content: View>: View {
             #if DEBUG
             ActivityContinuationScrollProbe.geometryChanged(geometry.offset)
             #endif
-            pull.configure(identity)
-            pull.updateGeometry(geometry)
+            tracker.pull.configure(identity)
+            tracker.pull.updateGeometry(geometry)
+            publishPull()
         }
         .onScrollPhaseChange { _, phase, context in
             #if DEBUG
             ActivityContinuationScrollProbe.phaseChanged(phase, offset: context.geometry.contentOffset.y)
             #endif
-            pull.configure(identity)
-            let released = ActivityContinuationIndicatorState(pull)
-            if pull.changePhase(to: phase, geometry: .init(context.geometry)) == .next {
-                commit(.next, state: released)
-            }
+            tracker.pull.configure(identity)
+            let released = ActivityContinuationIndicatorState(tracker.pull)
+            let direction = tracker.pull.changePhase(to: phase, geometry: .init(context.geometry))
+            publishPull()
+            if direction == .next { commit(.next, state: released) }
         }
-        .onChange(of: identity) { _, identity in pull.configure(identity) }
+        .onChange(of: identity) { _, identity in
+            tracker.pull.configure(identity)
+            publishPull()
+        }
         .onChange(of: navigation?.destination(for: .previous)?.id) { _, _ in previousIndicator = .init() }
         .onChange(of: navigation?.isEnabled) { _, enabled in
             if enabled != true { previousIndicator = .init() }
         }
         .onChange(of: activityID) { _, _ in
             previousIndicator = .init()
-            pull.configure(identity)
+            tracker.pull.configure(identity)
+            publishPull()
             var transaction = Transaction()
             transaction.disablesAnimations = true
             withTransaction(transaction) { position.scrollTo(edge: .top) }
         }
-        .onDisappear { commitLifetime.cancel(); pull.cancel(); previousIndicator = .init() }
-        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pull.hapticGeneration)
+        .onDisappear {
+            commitLifetime.cancel()
+            tracker.pull.cancel()
+            publishPull()
+            previousIndicator = .init()
+        }
+        .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: hapticGeneration)
+    }
+
+    private func publishPull() {
+        let indicator = ActivityContinuationIndicatorState(tracker.pull)
+        if nextIndicator != indicator { nextIndicator = indicator }
+        if hapticGeneration != tracker.pull.hapticGeneration { hapticGeneration = tracker.pull.hapticGeneration }
     }
 
     /// Navigates from where the finger left the page. Without the freeze,
@@ -224,6 +247,11 @@ struct ActivityContinuationScrollView<Content: View>: View {
         .accessibilityValue(state.isArmed ? Text("Release to open") : Text("Keep pulling"))
         .accessibilityIdentifier(previous ? "activity-continuation-previous-cue" : "activity-continuation-cue")
     }
+}
+
+/// Not observable: writing the pull's geometry schedules no view update.
+final class ActivityContinuationPullTracker {
+    var pull = ActivityContinuationPull()
 }
 
 /// A refused pull's delayed cleanup belongs only to that attempt. A later

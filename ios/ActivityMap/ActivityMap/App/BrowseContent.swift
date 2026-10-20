@@ -38,7 +38,8 @@ struct BrowseContent: View {
                     .accessibilityHidden(store.selectedTab != .list)
                 // Keep the loaded style, GeoJSON source and rendered route tiles
                 // alive too; saving only the camera causes routes to pop in later.
-                MapScreen(store: store, topOcclusion: geometry.safeAreaInsets.top, picker: mapPicker)
+                RetainedMapScreen(store: store, topOcclusion: geometry.safeAreaInsets.top, picker: mapPicker)
+                    .equatable()
                     .id(store.mapContext.scopeRevision)
                     .ignoresSafeArea(edges: .top)
                     .opacity(store.selectedTab == .map ? 1 : 0)
@@ -110,6 +111,24 @@ struct BrowseContent: View {
         case .showList: store.selectedTab = .list
         case .cancelSync: sync?.pause()
         }
+    }
+}
+
+/// This host re-runs for every shell update and whenever a push slides the
+/// root page, which changes GeometryReader's frame. MapScreen seeds its state
+/// with fresh objects in init, so SwiftUI cannot prove a rebuilt MapScreen
+/// unchanged; comparing its three inputs here skips the map's body instead.
+private struct RetainedMapScreen: View, Equatable {
+    let store: ActivityStore
+    let topOcclusion: CGFloat
+    let picker: RoutePicker?
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.store === rhs.store && lhs.topOcclusion == rhs.topOcclusion && lhs.picker === rhs.picker
+    }
+
+    var body: some View {
+        MapScreen(store: store, topOcclusion: topOcclusion, picker: picker)
     }
 }
 

@@ -203,11 +203,6 @@ struct StatsDashboardFace {
         didSet { if expandedTile != oldValue { inspectedActivityID = nil } }
     }
     private(set) var completedTiles: Set<StatsTileID> = []
-    /// Where each card sits on screen, for growing it into its focus page.
-    /// Layout bookkeeping only: writing it must not invalidate the dashboard.
-    @ObservationIgnored var tileFrames: [StatsTileID: CGRect] = [:]
-    /// The pending entrance, consumed by the focus page it opens.
-    @ObservationIgnored var focusEntrance: StatsFocusEntrance?
     private struct Entry {
         let source: StatsDashboardSource
         let option: StatsToggleOption?

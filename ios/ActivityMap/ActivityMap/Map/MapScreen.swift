@@ -46,6 +46,9 @@ struct MapScreen: View {
     @State private var resultsGeometry: MapResultsPresentationGeometry?
 
     var body: some View {
+        #if DEBUG
+        let _ = PerfProbe.count("MapScreen")
+        #endif
         ZStack(alignment: .bottomTrailing) {
             GeometryReader { geometry in
                 MapReader { proxy in
@@ -187,7 +190,10 @@ struct MapScreen: View {
     }
 
     private func mapView(proxy: MapProxy, geometry: GeometryProxy) -> some View {
-        Map(viewport: $viewport) {
+        #if DEBUG
+        PerfProbe.count("MapScreen.map")
+        #endif
+        return Map(viewport: $viewport) {
             baseContent
             if terrain.includesTerrain, let configuration = terrainConfiguration {
                 MapTerrainContent(configuration: configuration, sourceID: terrain.sourceID)
@@ -281,6 +287,9 @@ struct MapScreen: View {
             }
         }
         .overlay { MapPositionOverlay(state: positions) }
+        // Scrubbing moves the cursor per touch event. Observing it here, not
+        // in this body, repositions the dot without rebuilding map content.
+        .background { ElevationCursorObserver(store: store) { refreshPositions(proxy: proxy) } }
         .ignoresSafeArea()
         .onChange(of: store.selectedTab) { _, tab in
             if tab == .map { scheduleNavigation(proxy: proxy) }
@@ -300,7 +309,6 @@ struct MapScreen: View {
             refreshPositions(proxy: proxy)
         }
         .onChange(of: context.locatedPosition.map { [$0.latitude, $0.longitude] }) { _, _ in refreshPositions(proxy: proxy) }
-        .onChange(of: store.elevationCursor) { _, _ in refreshPositions(proxy: proxy) }
         .onChange(of: picker.detailID) { _, _ in refreshPositions(proxy: proxy) }
         .onChange(of: store.activeActivityID) { _, _ in refreshPositions(proxy: proxy) }
         .onChange(of: geometry.size) { _, _ in

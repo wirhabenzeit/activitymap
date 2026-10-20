@@ -485,6 +485,8 @@ extension EnvironmentValues {
     @Entry var statsDetailPresentation = StatsDetailPresentation.automatic
     @Entry var statsInspectedActivityID: Int? = nil
     @Entry var statsShellNavigation: StatsShellNavigation? = nil
+    /// False on a focus page until its navigation transition has finished.
+    @Entry var statsFocusSettled = true
 }
 
 /// Shared sizing for charts, calendar cells and any future compact/detail visual.
