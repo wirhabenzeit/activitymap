@@ -30,8 +30,9 @@ presenter while UIKit hides background accessibility during its modal.
 The DEBUG-only fixture uses synthetic activities, an in-memory store and
 isolated display preferences. It does not restore authentication or download
 anything. It writes only synthetic diagnostics to a unique temporary path
-provided by the test. The bounded native harness includes these journeys and
-the API error-fact, editing, sync and display-preference regression suites.
+provided by the test. The full native profile includes all three journeys. The
+PR profile selects the native sharing/cancellation journey alongside all selected
+API error-fact, editing, sync and display-preference suites.
 
 These journeys replace `RenderedActivityActionTests`' hosted accessibility
 traversal: the iOS 27 hosted tree omitted all SwiftUI nodes even though screenshots
@@ -319,7 +320,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-Required iOS CI compiles the app and Swift Testing target with `build-for-testing` against a generic simulator destination; it does not boot a simulator or execute these runtime tests. Run the tests locally before review using the command above. This keeps slow simulator startup and native Mapbox rendering out of the required PR checks. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
+Required iOS CI builds the app and runs the selected unit/app-hosted suites plus five real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
 
@@ -477,7 +478,45 @@ Swift Charts chooses round distance ticks automatically. Native chart selection 
 
 ## Bounded runtime regression command
 
-Run `pnpm test:ios` (or `node scripts/quality/native-harness.mjs` without web dependencies) from the repository root with Xcode 27. It owns a fresh simulator, executes six selected suites, requires nonzero passing results with no skipped tests, and saves logs plus an xcresult bundle. See [Quality checks](../../docs/quality-checks.md) for suite boundaries, timeouts, artifacts, and explicit existing-simulator reuse. Broader rendered and physical-device acceptance remains separate.
+Run from the repository root with Xcode 27; no web dependencies are needed for
+`node scripts/quality/native-harness.mjs`:
+
+```sh
+IOS_TEST_PROFILE=pr pnpm test:ios
+IOS_TEST_PROFILE=full pnpm test:ios
+```
+
+The local default is `full`. On iOS 27, `pr` builds the real app and runs all 30
+selected unit/app-hosted suites plus five real UI smoke methods: native GPX
+sharing/cancellation, List previous pull, Map next pull, Stats content/edge
+Back and standard Sport mix compact/expanded content. Pull-request CI and pushes
+to main select this profile only for native,
+shared contract/fixture or native tooling/workflow changes; unavailable diffs run
+it conservatively. Web-only changes skip the native app job. It has an
+18-minute cold-build limit, eight-minute test limit and 35-minute job limit.
+This is not the full UI matrix.
+
+The full profile runs 36 selected suites, including all 33 UI methods, with the
+same 18-minute build limit, a 35-minute test limit and a 65-minute manual CI job.
+Request it through [Full iOS runtime](../../.github/workflows/ios-full.yml) in
+Actions, choosing the branch or tag; it has no automatic schedule. Per-test
+allowances remain configured at 90 seconds by default and 180 seconds maximum
+in both profiles. The wrapper owns a fresh simulator, requires positive passing
+results with zero failures/skips for the selected boundary, and saves logs plus
+an xcresult bundle. Interrupted full runs do not count as passing coverage.
+
+Before the profile split and Sport mix test-helper correction, the full selection
+passed locally on 20 October 2026: 261 logical tests / 376 runtime executions
+across 36 suites, including the then-32 UI methods, with zero failures or skips,
+on an iPhone 18 Pro / iOS 27.0 simulator using Xcode 27.1. The hosted run failed
+the Sport mix scroll-reachability assertion before
+exceeding the former 25-minute whole-test budget and is not a full pass. The
+helper now accounts for navigation-bar obstruction, and standard/large-text
+Sport mix run independently with the same assertions; standard remains in PR
+smoke coverage. See
+[Quality checks](../../docs/quality-checks.md) for exact smoke methods, suite
+boundaries, evidence, timeouts and explicit existing-simulator reuse. Broader
+rendered and physical-device acceptance remains separate.
 
 ## Photo request and decode pipeline
 

@@ -9,6 +9,41 @@ permissions:
   contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      native: ${{ steps.native.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Detect changes affecting native checks
+        id: native
+        env:
+          CHANGE_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          native=true
+          if [[ -n "$CHANGE_BASE" && ! "$CHANGE_BASE" =~ ^0+$ ]] &&
+             git cat-file -e "$CHANGE_BASE^{commit}" &&
+             git diff --name-only -z --no-renames "$CHANGE_BASE" HEAD > "$RUNNER_TEMP/native-changed-paths"; then
+            native=false
+            while IFS= read -r -d '' path; do
+              case "$path" in
+                ios/*|shared/*|src/contracts/*|openapi/*|src/lib/streams/*|src/server/strava/stream*)
+                  native=true; break ;;
+                scripts/quality/native-harness.mjs|scripts/quality/process.mjs|scripts/quality/harness.test.mjs)
+                  native=true; break ;;
+                scripts/*swift*|scripts/*ios*|scripts/*compact*|scripts/verify-stream-dtos.sh|scripts/proofs/*|scripts/fixtures/compact-stream-corpus.ts|scripts/testflight/*)
+                  native=true; break ;;
+                scripts/generate-api-dtos-swift.ts|scripts/generate-map-catalog-swift.ts|scripts/generate-stats-tiles.ts|scripts/generate-presentation.mjs)
+                  native=true; break ;;
+                .github/workflows/ci.yml|.github/workflows/ios-full.yml|.github/workflows/testflight.yml)
+                  native=true; break ;;
+              esac
+            done < "$RUNNER_TEMP/native-changed-paths"
+          fi
+          echo "changed=$native" >> "$GITHUB_OUTPUT"
+
   quality:
     runs-on: ubuntu-24.04
     steps:
@@ -88,8 +123,9 @@ jobs:
       - name: Generate and compile the Swift client
         run: bash scripts/verify-swift-client.sh
 
-  # Builds the real app and runs bounded test suites on an owned simulator. The
-  # api-dtos:check step in `quality` only compares generated text, and
+  # Builds the real app and runs unit/app-hosted suites plus five UI smoke
+  # journeys on an owned simulator. The manual ios-full workflow runs the full
+  # UI matrix. The api-dtos:check step in `quality` only compares generated text, and
   # `swift-client` above compiles a separate OpenAPI-generated package, so
   # this job additionally catches runtime failures and requires nonzero tests.
   #
@@ -97,8 +133,12 @@ jobs:
   # to compile optional, availability-guarded APIs such as cross-fade navigation.
   # Keep the Xcode 27 runner for that SDK.
   ios-app:
+    needs: changes
+    if: needs.changes.outputs.native == 'true'
     runs-on: xcode-27
-    timeout-minutes: 55
+    timeout-minutes: 35
+    env:
+      IOS_TEST_PROFILE: pr
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-node@v7
@@ -114,7 +154,7 @@ jobs:
           bash scripts/verify-stream-dtos.sh origin/main
       - name: Verify compact summary codecs and encoded cache round trips
         run: bash scripts/verify-compact-stream-codec.sh
-      - name: Run bounded iOS runtime regressions on an owned simulator
+      - name: Run iOS unit and UI smoke regressions on an owned simulator
         run: node scripts/quality/native-harness.mjs
       - name: Upload native result bundle and test summary
         if: always()

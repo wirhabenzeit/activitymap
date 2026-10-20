@@ -50,43 +50,49 @@ final class StatsUITests: XCTestCase {
     }
 
     func testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable() throws {
+        try assertCompactSportMix(scenario: "standard")
+    }
+
+    func testLargeTextSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable() throws {
+        try assertCompactSportMix(scenario: "large-text")
+    }
+
+    private func assertCompactSportMix(scenario: String) throws {
         continueAfterFailure = false
-        for scenario in ["standard", "large-text"] {
-            let app = launch(scenario)
-            defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
-            let dashboard = app.scrollViews["stats-dashboard"]
-            XCTAssertTrue(dashboard.waitForExistence(timeout: 15), app.debugDescription)
-            let expand = app.buttons["Expand Sport mix"]
-            reveal(expand, in: dashboard, app: app)
-            XCTAssertGreaterThanOrEqual(expand.frame.height, 44)
-            let compactTile = dashboard.otherElements.matching(identifier: "stats-tile-sportMix").firstMatch
-            XCTAssertTrue(compactTile.waitForExistence(timeout: 10), app.debugDescription)
-            if scenario == "large-text" {
-                let lastShare = try XCTUnwrap(compactTile.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "%")).allElementsBoundByIndex.last)
-                reveal(lastShare, in: dashboard, app: app)
-            } else { reveal(compactTile, in: dashboard, app: app) }
-            capture("Compact Sport mix \(scenario)")
-            print("Compact Sport mix accessibility subtree (\(scenario)): \(compactTile.debugDescription)")
-            XCTAssertFalse(compactTile.descendants(matching: .any)["stats-sport-mix-extra-totals"].exists,
-                           "The compact tile must not expose expanded totals")
-            XCTAssertTrue(compactTile.buttons["Expand Sport mix"].exists,
-                          "The tile group must retain its explicit expansion action")
-            XCTAssertFalse(activityTotals(in: compactTile).exists, "Compact Sport mix must not expose activity totals")
-            XCTAssertFalse(compactTile.buttons["Distance and climb"].exists)
-            reveal(expand, in: dashboard, app: app)
-            expand.tap()
-            let detail = app.scrollViews["stats-detail-sportMix"]
-            XCTAssertTrue(detail.waitForExistence(timeout: 10), app.debugDescription)
-            assertSingleHeadingAndReachableSettings(app: app, detail: detail, title: "Sport mix")
-            let totals = activityTotals(in: detail)
-            reveal(totals, in: detail, app: app)
-            XCTAssertTrue(totals.isHittable, "Expanded activity totals must remain reachable")
-            // Wide focus uses the full table; compact focus discloses its
-            // secondary distance/climb values below the activity totals.
-            let extraTotals = detail.buttons["Distance and climb"]
-            if extraTotals.exists { reveal(extraTotals, in: detail, app: app) }
-            capture("Expanded Sport mix \(scenario)")
-        }
+        let app = launch(scenario)
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let dashboard = app.scrollViews["stats-dashboard"]
+        XCTAssertTrue(dashboard.waitForExistence(timeout: 15), app.debugDescription)
+        let expand = app.buttons["Expand Sport mix"]
+        reveal(expand, in: dashboard, app: app)
+        XCTAssertGreaterThanOrEqual(expand.frame.height, 44)
+        let compactTile = dashboard.otherElements.matching(identifier: "stats-tile-sportMix").firstMatch
+        XCTAssertTrue(compactTile.waitForExistence(timeout: 10), app.debugDescription)
+        if scenario == "large-text" {
+            let lastShare = try XCTUnwrap(compactTile.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "%")).allElementsBoundByIndex.last)
+            reveal(lastShare, in: dashboard, app: app)
+        } else { reveal(compactTile, in: dashboard, app: app) }
+        capture("Compact Sport mix \(scenario)")
+        print("Compact Sport mix accessibility subtree (\(scenario)): \(compactTile.debugDescription)")
+        XCTAssertFalse(compactTile.descendants(matching: .any)["stats-sport-mix-extra-totals"].exists,
+                       "The compact tile must not expose expanded totals")
+        XCTAssertTrue(compactTile.buttons["Expand Sport mix"].exists,
+                      "The tile group must retain its explicit expansion action")
+        XCTAssertFalse(activityTotals(in: compactTile).exists, "Compact Sport mix must not expose activity totals")
+        XCTAssertFalse(compactTile.buttons["Distance and climb"].exists)
+        reveal(expand, in: dashboard, app: app)
+        expand.tap()
+        let detail = app.scrollViews["stats-detail-sportMix"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 10), app.debugDescription)
+        assertSingleHeadingAndReachableSettings(app: app, detail: detail, title: "Sport mix")
+        let totals = activityTotals(in: detail)
+        reveal(totals, in: detail, app: app)
+        XCTAssertTrue(totals.isHittable, "Expanded activity totals must remain reachable")
+        // Wide focus uses the full table; compact focus discloses its
+        // secondary distance/climb values below the activity totals.
+        let extraTotals = detail.buttons["Distance and climb"]
+        if extraTotals.exists { reveal(extraTotals, in: detail, app: app) }
+        capture("Expanded Sport mix \(scenario)")
     }
 
     func testCalendarMultiYearPansAndVerticalScrollStayInDetail() throws {
@@ -264,16 +270,46 @@ final class StatsUITests: XCTestCase {
     }
 
     private func reveal(_ element: XCUIElement, in scroll: XCUIElement, app: XCUIApplication) {
+        let visibility = scrollVisibility(in: scroll, app: app)
+        let viewport = visibility.viewport.insetBy(dx: -1, dy: -1)
         for _ in 0..<18 {
-            let viewport = scroll.frame.intersection(app.frame).insetBy(dx: -1, dy: -1)
             if element.exists {
                 let frame = element.frame
-                if element.isHittable, viewport.contains(frame) { return }
+                if element.isHittable,
+                   viewport.contains(frame) || visibility.chrome.contains(where: { $0.contains(frame) }) { return }
                 if !frame.isEmpty, frame.minY < viewport.minY { scroll.swipeDown(); continue }
             }
             scroll.swipeUp()
         }
-        XCTFail("Stats content was not reachable in its scroll viewport: \(app.debugDescription)")
+        XCTFail("Stats content was not reachable in visible viewport \(viewport): \(app.debugDescription)")
+    }
+
+    private func scrollVisibility(in scroll: XCUIElement, app: XCUIApplication) -> (viewport: CGRect, chrome: [CGRect]) {
+        var viewport = scroll.frame.intersection(app.frame)
+        var chrome: [CGRect] = []
+        // SwiftUI's scroll AX frame includes the area behind stationary chrome.
+        // A control hidden there needs a downward swipe, even if its y is positive.
+        let topBars = app.navigationBars.allElementsBoundByIndex
+            + app.otherElements.matching(identifier: "app-toolbar").allElementsBoundByIndex
+        for bar in topBars where bar.isHittable {
+            let frame = bar.frame
+            chrome.append(frame)
+            if frame.intersects(viewport), frame.midY < viewport.midY {
+                let top = max(viewport.minY, frame.maxY)
+                viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
+                                  height: max(0, viewport.maxY - top))
+            }
+        }
+        for bar in app.tabBars.allElementsBoundByIndex where bar.isHittable {
+            let frame = bar.frame
+            chrome.append(frame)
+            if frame.intersects(viewport), frame.midY > viewport.midY {
+                viewport.size.height = max(0, min(viewport.maxY, frame.minY) - viewport.minY)
+            }
+        }
+        // Fixed toolbar actions such as native Back are already reachable in
+        // chrome, while scroll content must fit below/above those same bars.
+        return (viewport, chrome)
     }
 
     private func capture(_ name: String) {

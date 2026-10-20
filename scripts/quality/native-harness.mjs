@@ -45,46 +45,78 @@ export const nativeSuites = [
   'ActivityMapUITests/ListSelectionUITests',
 ];
 
+export const nativePRUISelectors = [
+  'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
+  'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
+  'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
+  'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
+  'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
+];
+
+export function nativeTestProfile(name = 'full') {
+  assert(['pr', 'full'].includes(name), `Unknown IOS_TEST_PROFILE: ${name}`);
+  return {
+    name,
+    suites:
+      name === 'pr'
+        ? [
+            ...nativeSuites.filter((suite) =>
+              suite.startsWith('ActivityMapTests/'),
+            ),
+            ...nativePRUISelectors,
+          ]
+        : [...nativeSuites],
+    runtimeTimeoutMs: (name === 'pr' ? 8 : 35) * 60 * 1000,
+  };
+}
+
 // Native-sheet and full-content Back contracts below target iOS 27. iOS 26
 // retains ordinary map/photo and calendar-scroll regressions. Ineligibility is
-// reported before execution, never counted as a skipped or passing test.
-export function nativeSuiteEligibility(runtimeVersion) {
+// reported for each requested selector, never counted as skipped or passing.
+export function nativeSuiteEligibility(runtimeVersion, profile = 'full') {
+  const requested = nativeTestProfile(profile).suites;
   const major = Number(runtimeVersion.split('.')[0]);
   assert(
     Number.isInteger(major) && major >= 26,
     'An iOS 26+ runtime is required',
   );
+  const restrictions = [
+    [
+      'ActivityMapUITests/MapRotationUITests',
+      'Retained native-sheet rotation contract',
+    ],
+    [
+      'ActivityMapUITests/ActivityContinuationUITests',
+      'Retained native-sheet continuation fixture',
+    ],
+    [
+      'ActivityMapTests/DetailBackGestureTests',
+      'Native content-pop recognizer delegate contract',
+    ],
+    [
+      'ActivityMapUITests/StatsUITests',
+      'Stats calendar pan and native content Back contract',
+    ],
+  ];
   const ineligibleSuites =
     major < 27
-      ? [
-          {
-            suite: 'ActivityMapUITests/MapRotationUITests',
-            requires: 'iOS 27+',
-            actual: runtimeVersion,
-            reason: 'Retained native-sheet rotation contract',
-          },
-          {
-            suite: 'ActivityMapUITests/ActivityContinuationUITests',
-            requires: 'iOS 27+',
-            actual: runtimeVersion,
-            reason: 'Retained native-sheet continuation fixture',
-          },
-          {
-            suite: 'ActivityMapTests/DetailBackGestureTests',
-            requires: 'iOS 27+',
-            actual: runtimeVersion,
-            reason: 'Native content-pop recognizer delegate contract',
-          },
-          {
-            suite: 'ActivityMapUITests/StatsUITests',
-            requires: 'iOS 27+',
-            actual: runtimeVersion,
-            reason: 'Stats calendar pan and native content Back contract',
-          },
-        ]
+      ? restrictions.flatMap(([restricted, reason]) =>
+          requested
+            .filter(
+              (selector) =>
+                selector === restricted ||
+                selector.startsWith(`${restricted}/`),
+            )
+            .map((suite) => ({
+              suite,
+              requires: 'iOS 27+',
+              actual: runtimeVersion,
+              reason,
+            })),
+        )
       : [];
   return {
-    suites: nativeSuites.filter(
+    suites: requested.filter(
       (suite) => !ineligibleSuites.some((item) => item.suite === suite),
     ),
     ineligibleSuites,
@@ -113,19 +145,36 @@ export function validateNativeSuites(tree, suites = nativeSuites) {
   const flatten = (nodes) =>
     nodes.flatMap((node) => [node, ...flatten(node.children ?? [])]);
   const nodes = flatten(tree.testNodes ?? []);
+  const withoutArguments = (value) => value?.replace(/\(\)$/, '');
   return Object.fromEntries(
     suites.map((suite) => {
-      const name = suite.split('/')[1];
-      const node = nodes.find(
-        (item) =>
-          item.nodeType === 'Test Suite' &&
-          (item.name === name || item.nodeIdentifier === suite),
+      const [target, name, method, ...extra] = suite.split('/');
+      assert(
+        target && name && extra.length === 0 && method !== '',
+        `Invalid native test selector: ${suite}`,
       );
-      const cases = node
-        ? flatten(node.children ?? []).filter(
-            (item) => item.nodeType === 'Test Case',
-          )
-        : [];
+      const classSelector = `${target}/${name}`;
+      const matchingSuites = nodes.filter((item) => {
+        if (item.nodeType !== 'Test Suite') return false;
+        if (item.nodeIdentifierURL)
+          return item.nodeIdentifierURL.endsWith(`/${classSelector}`);
+        if (item.nodeIdentifier?.includes('/'))
+          return item.nodeIdentifier === classSelector;
+        return item.nodeIdentifier === name || item.name === name;
+      });
+      const cases = matchingSuites.flatMap((node) =>
+        flatten(node.children ?? []).filter((item) => {
+          if (item.nodeType !== 'Test Case') return false;
+          if (!method) return true;
+          const identifier = withoutArguments(item.nodeIdentifier);
+          return (
+            identifier === `${name}/${withoutArguments(method)}` ||
+            identifier === `${classSelector}/${withoutArguments(method)}` ||
+            (!identifier &&
+              withoutArguments(item.name) === withoutArguments(method))
+          );
+        }),
+      );
       assert(cases.length > 0, `Missing executed runtime cases for ${suite}`);
       assert(
         cases.every((item) => item.result === 'Passed'),
@@ -140,7 +189,9 @@ export async function runNativeHarness({
   root,
   output,
   simulator = process.env.IOS_SIMULATOR_UDID,
+  profile = process.env.IOS_TEST_PROFILE ?? 'full',
 }) {
+  const selectedProfile = nativeTestProfile(profile);
   assert.equal(
     process.platform,
     'darwin',
@@ -173,7 +224,9 @@ export async function runNativeHarness({
     });
   let ownedSimulator = false;
   const manifest = {
-    suites: nativeSuites,
+    profile: selectedProfile.name,
+    runtimeTimeoutMs: selectedProfile.runtimeTimeoutMs,
+    suites: selectedProfile.suites,
     startedAt: new Date().toISOString(),
     passed: false,
   };
@@ -242,6 +295,7 @@ export async function runNativeHarness({
     );
     const { suites, ineligibleSuites } = nativeSuiteEligibility(
       runtime.version,
+      selectedProfile.name,
     );
     manifest.runtime = {
       identifier: runtime.identifier,
@@ -308,9 +362,9 @@ export async function runNativeHarness({
       {
         cwd: root,
         log: join(output, 'xcodebuild-test.log'),
-        // Fifteen continuation journeys alone took 9m46s on the hosted runner.
-        // Preserve time for the remaining selection, photo and rotation suites.
-        timeoutMs: 25 * 60 * 1000,
+        // PR smoke keeps all unit suites and five focused UI journeys. The
+        // full matrix has its own runtime budget, separate from cold builds.
+        timeoutMs: selectedProfile.runtimeTimeoutMs,
         signal: abort.signal,
         echo: false,
       },
@@ -348,7 +402,7 @@ export async function runNativeHarness({
     manifest.passed = true;
     manifest.passedTests = summary.passedTests;
     console.log(
-      `Native regression passed: ${summary.passedTests} tests, ${suites.length} suites.`,
+      `Native ${selectedProfile.name} regression passed: ${summary.passedTests} tests, ${suites.length} selections.`,
     );
   } catch (error) {
     manifest.error = error.stack ?? String(error);
