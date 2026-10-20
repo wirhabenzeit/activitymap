@@ -52,6 +52,17 @@ struct ActivityContinuationScrollView<Content: View>: View {
     @State private var previousIndicator = ActivityContinuationIndicatorState()
     @State private var previousCueHeight: CGFloat?
     @State private var nextCueHeight: CGFloat?
+    @State private var committed: CommittedCue?
+    @State private var scroll = ActivityContinuationScrollHandle()
+
+    /// The outgoing page keeps the armed cue in its gap while it slides away,
+    /// independently of the continuation, which already names its successor.
+    private struct CommittedCue {
+        let direction: ActivityContinuationDirection
+        let destination: ActivityDetailContinuation.Destination
+        let state: ActivityContinuationIndicatorState
+        let heldBottom: CGFloat
+    }
 
     private var navigation: ActivityDetailContinuation? {
         guard let continuation, continuation.currentID == activityID else { return nil }
@@ -69,18 +80,23 @@ struct ActivityContinuationScrollView<Content: View>: View {
             VStack(spacing: 0) { content() }
                 .padding(.bottom, bottomContentInset)
                 .background(ActivityPreviousRefresh(currentID: activityID, destination: navigation?.isEnabled == true ? navigation?.destination(for: .previous) : nil,
-                    updateIndicator: { previousIndicator = $0 }) {
-                    guard let navigation, navigation.isEnabled, navigation.destination(for: .previous) != nil else { return }
-                    navigation.navigate(.previous)
+                    scroll: scroll, updateIndicator: { previousIndicator = $0 }) {
+                    commit(.previous, state: previousIndicator)
                 })
         }
         .scrollPosition($position)
+        .contentMargins(.bottom, committed?.heldBottom ?? 0, for: .scrollContent)
         .scrollBounceBehavior(navigation?.isEnabled == true ? .always : .basedOnSize, axes: .vertical)
         .overlay(alignment: .top) {
-            indicator(for: .previous, state: previousIndicator)
+            if let committed, committed.direction == .previous { committedIndicator(committed) }
+            else { indicator(for: .previous, state: previousIndicator) }
         }
         .overlay(alignment: .bottom) {
-            indicator(for: .next, state: .init(pull)).padding(.bottom, bottomContentInset)
+            Group {
+                if let committed, committed.direction == .next { committedIndicator(committed) }
+                else { indicator(for: .next, state: .init(pull)) }
+            }
+            .padding(.bottom, bottomContentInset)
         }
         .onScrollGeometryChange(for: ActivityContinuationPull.Geometry.self) {
             .init($0)
@@ -96,9 +112,9 @@ struct ActivityContinuationScrollView<Content: View>: View {
             ActivityContinuationScrollProbe.phaseChanged(phase, offset: context.geometry.contentOffset.y)
             #endif
             pull.configure(identity)
-            if let direction = pull.changePhase(to: phase, geometry: .init(context.geometry)), direction == .next,
-               let navigation, navigation.isEnabled, navigation.destination(for: direction) != nil {
-                navigation.navigate(direction)
+            let released = ActivityContinuationIndicatorState(pull)
+            if pull.changePhase(to: phase, geometry: .init(context.geometry)) == .next {
+                commit(.next, state: released)
             }
         }
         .onChange(of: identity) { _, identity in pull.configure(identity) }
@@ -117,21 +133,53 @@ struct ActivityContinuationScrollView<Content: View>: View {
         .sensoryFeedback(.impact(weight: .light, intensity: 0.6), trigger: pull.hapticGeneration)
     }
 
+    /// Navigates from where the finger left the page. Without the freeze,
+    /// UIKit's bounce-back would snap the gap closed before the push starts.
+    @discardableResult
+    private func commit(_ direction: ActivityContinuationDirection, state: ActivityContinuationIndicatorState) -> Bool {
+        guard let navigation, navigation.isEnabled, let destination = navigation.destination(for: direction) else { return false }
+        var armed = state
+        armed.isArmed = true
+        let held = scroll.freeze()
+        committed = CommittedCue(direction: direction, destination: destination, state: armed,
+                                 heldBottom: direction == .next ? held : 0)
+        navigation.navigate(direction)
+        // A host can still refuse a stale target. A page that remains on screen
+        // after the push would have finished must not stay frozen open.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [scroll] in
+            guard scroll.isOnScreen else { return }
+            self.committed = nil
+            self.previousIndicator = .init()
+            scroll.release()
+        }
+        return true
+    }
+
+    private func committedIndicator(_ committed: CommittedCue) -> some View {
+        sizedCue(direction: committed.direction, destination: committed.destination, state: committed.state)
+    }
+
     @ViewBuilder private func indicator(for direction: ActivityContinuationDirection,
                                         state: ActivityContinuationIndicatorState) -> some View {
         if navigation?.isEnabled == true, state.distance > 0,
            let destination = navigation?.destination(for: direction) {
-            cue(direction: direction, destination: destination, state: state)
-                .fixedSize(horizontal: false, vertical: true)
-                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-                    if direction == .previous { previousCueHeight = height }
-                    else { nextCueHeight = height }
-                }
-                .frame(height: state.distance, alignment: .center)
-                .clipped()
-                .opacity(min(1, state.distance / 24))
-                .allowsHitTesting(false)
+            sizedCue(direction: direction, destination: destination, state: state)
         }
+    }
+
+    private func sizedCue(direction: ActivityContinuationDirection,
+                          destination: ActivityDetailContinuation.Destination,
+                          state: ActivityContinuationIndicatorState) -> some View {
+        cue(direction: direction, destination: destination, state: state)
+            .fixedSize(horizontal: false, vertical: true)
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+                if direction == .previous { previousCueHeight = height }
+                else { nextCueHeight = height }
+            }
+            .frame(height: state.distance, alignment: .center)
+            .clipped()
+            .opacity(min(1, state.distance / 24))
+            .allowsHitTesting(false)
     }
 
     private func cue(direction: ActivityContinuationDirection,
@@ -140,39 +188,70 @@ struct ActivityContinuationScrollView<Content: View>: View {
         let previous = direction == .previous
         let labelOpacity = (previous ? previousCueHeight : nextCueHeight)
             .map { min(1, max(0, (state.distance - $0) / 8)) } ?? 0
-        return HStack(spacing: 12) {
+        // A centred chevron points the way to pull; the ring fills toward the
+        // threshold and becomes solid once releasing would switch.
+        return VStack(spacing: 6) {
             ZStack {
                 Circle().stroke(.secondary.opacity(0.2), lineWidth: 2)
                 Circle().trim(from: 0, to: state.progress)
                     .stroke(AppTheme.accent, style: StrokeStyle(lineWidth: 2, lineCap: .round))
                     .rotationEffect(.degrees(-90))
-                Image(systemName: state.isArmed ? "checkmark" : previous ? "arrow.down" : "arrow.up")
-                    .font(.system(size: 12, weight: .semibold))
+                Circle().fill(AppTheme.accent)
+                    .scaleEffect(state.isArmed ? 1 : 0.5)
+                    .opacity(state.isArmed ? 1 : 0)
+                Image(systemName: previous ? "chevron.down" : "chevron.up")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(state.isArmed ? AnyShapeStyle(.white) : AnyShapeStyle(.secondary))
+                    .symbolEffect(.bounce, value: state.isArmed)
             }
-            .frame(width: 28, height: 28)
-            .scaleEffect(min(1, state.distance / 32))
-            .foregroundStyle(state.isArmed ? AppTheme.accent : .secondary)
+            .frame(width: 30, height: 30)
+            .animation(.smooth(duration: 0.18), value: state.isArmed)
+            .scaleEffect(min(1, state.distance / 34))
             .accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 3) {
-                ZStack(alignment: .leading) {
-                    (previous ? Text("Pull down for previous activity") : Text("Pull up for next activity"))
-                        .opacity(state.isArmed ? 0 : 1)
-                    (previous ? Text("Release for previous activity") : Text("Release for next activity"))
-                        .opacity(state.isArmed ? 1 : 0)
-                }
-                .font(.caption.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
-                Text(destination.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .opacity(labelOpacity)
+            Text(destination.name)
+                .font(.caption.weight(.medium))
+                .foregroundStyle(state.isArmed ? AnyShapeStyle(.primary) : AnyShapeStyle(.secondary))
+                .lineLimit(1)
+                .opacity(labelOpacity)
         }
+        .frame(maxWidth: .infinity)
         .padding(.horizontal, AppTheme.Spacing.large)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(previous ? Text("Previous activity: \(destination.name)") : Text("Next activity: \(destination.name)"))
         .accessibilityValue(state.isArmed ? Text("Release to open") : Text("Keep pulling"))
         .accessibilityIdentifier(previous ? "activity-continuation-previous-cue" : "activity-continuation-cue")
+    }
+}
+
+/// Lets SwiftUI stop the native scroll view where a committed pull left it.
+final class ActivityContinuationScrollHandle {
+    fileprivate weak var view: UIScrollView?
+    fileprivate weak var refreshControl: UIRefreshControl?
+
+    var isOnScreen: Bool { view?.window != nil }
+
+    /// Setting the current offset cancels UIKit's bounce-back animation.
+    /// Returns the bottom overscroll, which only content margins can keep
+    /// open: SwiftUI's next update resets UIKit insets and clamps the offset.
+    /// At the top, the active refresh control's inset holds the gap.
+    func freeze() -> CGFloat {
+        guard let view else { return 0 }
+        view.setContentOffset(view.contentOffset, animated: false)
+        let top = -view.adjustedContentInset.top
+        let bottom = max(top, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
+        return max(0, view.contentOffset.y - bottom)
+    }
+
+    func release() {
+        guard let view else { return }
+        if let refreshControl, refreshControl.isRefreshing { refreshControl.endRefreshing() }
+        let top = -view.adjustedContentInset.top
+        let bottom = max(top, view.contentSize.height - view.bounds.height + view.adjustedContentInset.bottom)
+        let offset = min(max(view.contentOffset.y, top), bottom)
+        if offset != view.contentOffset.y {
+            view.setContentOffset(CGPoint(x: view.contentOffset.x, y: offset), animated: true)
+        }
     }
 }
 
@@ -182,13 +261,16 @@ struct ActivityContinuationScrollView<Content: View>: View {
 private struct ActivityPreviousRefresh: UIViewRepresentable {
     let currentID: Int
     let destination: ActivityDetailContinuation.Destination?
+    let scroll: ActivityContinuationScrollHandle
     let updateIndicator: (ActivityContinuationIndicatorState) -> Void
-    let action: () -> Void
+    /// Returns whether the pull committed to navigating.
+    let action: () -> Bool
 
     func makeUIView(context: Context) -> Attachment { Attachment() }
     func updateUIView(_ view: Attachment, context: Context) {
         view.currentID = currentID
         view.destination = destination
+        view.handle = scroll
         view.action = action
         view.updateIndicator = updateIndicator
         view.attach()
@@ -198,7 +280,8 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
     final class Attachment: UIView {
         var currentID = 0
         var destination: ActivityDetailContinuation.Destination?
-        var action: (() -> Void)?
+        var handle: ActivityContinuationScrollHandle?
+        var action: (() -> Bool)?
         var updateIndicator: ((ActivityContinuationIndicatorState) -> Void)?
         private var lastIndicator = ActivityContinuationIndicatorState()
         private let control = UIRefreshControl()
@@ -229,6 +312,8 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
                 scroll = parent
                 parent.panGestureRecognizer.addTarget(self, action: #selector(panChanged))
             }
+            handle?.view = parent
+            handle?.refreshControl = control
             if destination != nil {
                 if parent.refreshControl !== control { parent.refreshControl = control }
             } else if parent.refreshControl === control {
@@ -278,11 +363,13 @@ private struct ActivityPreviousRefresh: UIViewRepresentable {
                 // sheet must not take over while the finger is still down.
                 DispatchQueue.main.async { [weak self] in
                     guard let self else { return }
+                    // A committed pull keeps its gap, refresh inset included,
+                    // while the outgoing page slides away.
+                    if navigate, self.identity == expected, self.action?() == true { return }
                     // Ending an idle refresh resets native scroll motion too.
                     // Ordinary flicks must leave the scroll view untouched.
                     if self.control.isRefreshing { self.control.endRefreshing() }
                     self.publishIndicator(.init())
-                    if navigate, self.identity == expected { self.action?() }
                 }
             default: break
             }
