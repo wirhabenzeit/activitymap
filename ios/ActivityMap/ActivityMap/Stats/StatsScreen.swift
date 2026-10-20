@@ -123,6 +123,7 @@ private struct StatsDashboardGrid: View, Equatable {
     @Environment(\.statsDetailPresentation) private var detailPresentation
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.statsFocusZoom) private var focusZoom
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
         lhs.store === rhs.store && lhs.dashboard === rhs.dashboard && lhs.sync === rhs.sync
@@ -181,7 +182,9 @@ private struct StatsDashboardGrid: View, Equatable {
     @ViewBuilder private func tile(_ tile: StatsTileDefinition) -> some View {
         let content = dashboardTile(tile, expanded: detailPresentation == .inline && dashboard.expandedTile == tile.id)
             .id(tile.id)
-        if usesDetailNavigation, !reduceMotion, StatsDashboard.expandable(tile.id) {
+        if usesDetailNavigation, !reduceMotion, StatsFocusMotion.current == .zoom, let focusZoom {
+            content.matchedTransitionSource(id: tile.id, in: focusZoom)
+        } else if usesDetailNavigation, !reduceMotion, StatsDashboard.expandable(tile.id) {
             content.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
                 dashboard.tileFrames[tile.id] = frame
             }
@@ -203,7 +206,8 @@ private struct StatsDashboardGrid: View, Equatable {
     /// Pushes without animation over a still of the dashboard, from which the
     /// focus page grows the card. Without a known frame it opens directly.
     private func openFocus(_ id: StatsTileID) {
-        guard !reduceMotion, dashboard.expandedTile == nil, let frame = dashboard.tileFrames[id] else {
+        guard !reduceMotion, StatsFocusMotion.current == .morph, dashboard.expandedTile == nil,
+              let frame = dashboard.tileFrames[id] else {
             dashboard.toggleExpansion(id)
             return
         }

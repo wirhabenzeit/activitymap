@@ -30,6 +30,28 @@ struct StatsFocusEntrance {
     }
 }
 
+/// How a dashboard card opens its focus page. Release builds always morph;
+/// DEBUG measurement journeys can select the system alternatives.
+enum StatsFocusMotion {
+    case morph, push, zoom
+    static let current: Self = {
+        #if DEBUG
+        let argument = ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--stats-focus-motion=") }
+        switch argument?.split(separator: "=").last {
+        case "push": return .push
+        case "zoom": return .zoom
+        default: break
+        }
+        #endif
+        return .morph
+    }()
+}
+
+extension EnvironmentValues {
+    /// The navigation stack's namespace for the system zoom transition.
+    @Entry var statsFocusZoom: Namespace.ID? = nil
+}
+
 /// Lets the page's Back control collapse the card before popping.
 @MainActor final class StatsFocusExit {
     /// Returns false when Back should pop normally.

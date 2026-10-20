@@ -14,6 +14,7 @@ struct AppShell: View {
     @Environment(\.statsDetailPresentation) private var statsDetailPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shellSize: CGSize = .zero
+    @Namespace private var statsZoom
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.verticalSizeClass) private var verticalSizeClass
@@ -174,6 +175,8 @@ struct AppShell: View {
         // Motion uses cross-fade on iOS 27 and standard navigation on iOS 26.
         if reduceMotion, #available(iOS 27.0, *) {
             content.navigationTransition(.crossFade)
+        } else if !reduceMotion, StatsFocusMotion.current == .zoom {
+            content.navigationTransition(.zoom(sourceID: tile.id, in: statsZoom))
         } else {
             content
         }
@@ -203,6 +206,7 @@ struct AppShell: View {
                     filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats) {
                         navigableContent(nativeListHeader: nativeListHeader, sidebarAvailable: sidebarAvailable)
                             .environment(\.browsePaneWidth, contentWidth)
+                            .environment(\.statsFocusZoom, statsZoom)
                             .environment(\.listRootToolbar, usesStatsNavigation ? nil : browseRootToolbar(sidebarAvailable: sidebarAvailable))
                             .environment(\.listRootHeader, toolbarLayout.isCompact && nativeListHeader ? browseRootToolbar(sidebarAvailable: sidebarAvailable) : nil)
                             .environment(\.filtersCollapseForDetail, panelTight && sheets.showsFilters && !panelFloats)
