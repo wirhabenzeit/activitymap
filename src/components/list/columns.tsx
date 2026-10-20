@@ -8,10 +8,13 @@ import { Checkbox } from '~/components/ui/checkbox';
 import {
   useDateFormat,
   useDisplayUnits,
+  useFormattingLocale,
 } from '~/hooks/use-display-preferences';
 import type { ActivityMapCommand } from '~/hooks/use-show-on-map';
+import type { Activity } from '~/lib/activity';
 import { aggregateMetric } from '~/lib/activity-presentation';
 import { isMissing } from '~/lib/activity-presentation';
+import { message } from '~/lib/presentation/messages';
 import {
   formatPaceSeconds,
   formatSpeed,
@@ -19,7 +22,7 @@ import {
   speedDisplayForSports,
   speedLabel,
 } from '~/lib/speed-display';
-import { type Activity, type Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/db/schema';
 import {
   type ActivityField,
   type ActivityValueType,
@@ -56,7 +59,7 @@ function PageSelectionCheckbox({
         if (value && !onlySelected) store.getState().addSelectedActivities(ids);
         else if (!value) store.getState().removeSelectedActivities(ids);
       }}
-      aria-label="Select this page"
+      aria-label={message('list.pageSelection')}
     />
   );
 }
@@ -83,6 +86,7 @@ function columnFromField<K extends ActivityValueType>(
 ): ColumnDef<Features, Activity> {
   const Footer = ({ table }: { table: Table<Features, Activity> }) => {
     const units = useDisplayUnits();
+    const locale = useFormattingLocale();
     const dateFormat = useDateFormat();
     const display = useContext(SpeedDisplayContext);
     const rows = summaryRows(table);
@@ -107,15 +111,16 @@ function columnFromField<K extends ActivityValueType>(
             ).value,
             summaryDisplay,
             units,
+            locale,
           )
         : null;
     const summary =
       paceSummary !== null
         ? `∅${paceSummary}`
         : spec.summary
-          ? spec.summary(values)
+          ? spec.summary(values, locale)
           : reducedValue != null
-            ? `${spec.reducerSymbol ?? ''}${spec.formatter(reducedValue, units, dateFormat)}`
+            ? `${spec.reducerSymbol ?? ''}${spec.formatter(reducedValue, units, dateFormat, locale)}`
             : '—';
     const known = values.filter((v) =>
       id === 'average_speed' && summaryDisplay !== 'speed'
@@ -125,8 +130,12 @@ function columnFromField<K extends ActivityValueType>(
     return (
       <div
         className="w-full text-right"
-        title={`${known} of ${values.length} activities with a recorded value`}
-        aria-label={`${summary}; ${known} of ${values.length} recorded`}
+        title={message('list.recordedValues', { known, total: values.length })}
+        aria-label={message('list.summaryAccessible', {
+          summary,
+          known,
+          total: values.length,
+        })}
       >
         {summary}
         {known < values.length && <span aria-hidden="true"> *</span>}
@@ -138,18 +147,20 @@ function columnFromField<K extends ActivityValueType>(
     id,
     cell: function MetricCell({ getValue }) {
       const units = useDisplayUnits();
+      const locale = useFormattingLocale();
       const dateFormat = useDateFormat();
       const display = useContext(SpeedDisplayContext);
       return (
         <div className="w-full text-right">
           {id === 'average_speed'
-            ? formatSpeed(getValue() as number, display, units)
-            : spec.formatter(getValue() as K, units, dateFormat)}
+            ? formatSpeed(getValue() as number, display, units, locale)
+            : spec.formatter(getValue() as K, units, dateFormat, locale)}
         </div>
       );
     },
     meta: {
-      title: id === 'average_speed' ? 'Average speed / pace' : spec.title,
+      title:
+        id === 'average_speed' ? message('list.averageSpeedPace') : spec.title,
       width: 'minmax(70px, 1fr)',
     },
     header: function MetricHeader({ column }) {
@@ -181,8 +192,14 @@ function WidthModeToggle({ table }: { table: Table<Features, Activity> }) {
       size="sm"
       className="border p-1"
       onClick={() => setWidthMode(table, next)}
-      aria-label={`${label}. Switch to: ${widthModes[next].label.toLowerCase()}`}
-      title={`${label} (click to change)`}
+      aria-label={message('list.width.switch', {
+        current: label,
+        next: widthModes[next].label,
+      })}
+      title={message('list.width.switch', {
+        current: label,
+        next: widthModes[next].label,
+      })}
     >
       <Icon />
     </Button>
@@ -222,29 +239,29 @@ export const columns: ColumnDef<Features, Activity>[] = [
       return (
         <div className="text-xs">
           {scope === 'page'
-            ? 'This page'
+            ? message('list.thisPage')
             : scope === 'all'
-              ? 'Filtered activities'
-              : 'Selected activities'}{' '}
+              ? message('list.filtered')
+              : message('list.selected')}{' '}
           · {rows.length}
           {scope === 'selected' && hidden > 0
-            ? ` · ${hidden} hidden by filters`
+            ? ` · ${message('list.hidden', { count: hidden })}`
             : ''}
           {gaps && (
             <span className="block text-muted-foreground">
-              * = unrecorded values
+              {message('list.unrecorded')}
             </span>
           )}
         </div>
       );
     },
     accessorKey: 'name',
-    meta: { title: 'Name', width: 'minmax(200px, 3fr)' },
+    meta: { title: message('activity.edit.name'), width: 'minmax(200px, 3fr)' },
     header: ({ column, table }) => (
       <DataTableColumnHeader column={column}>
         <div className="flex items-center space-x-2">
           <PageSelectionCheckbox table={table} />
-          <span>Name</span>
+          <span>{message('activity.edit.name')}</span>
           <div className="flex-1 text-right">
             <WidthModeToggle table={table} />
           </div>
@@ -263,18 +280,24 @@ export const columns: ColumnDef<Features, Activity>[] = [
   {
     id: 'description',
     accessorKey: 'description',
-    meta: { title: 'Description', width: 'minmax(200px, 3fr)' },
+    meta: {
+      title: message('activity.edit.description'),
+      width: 'minmax(200px, 3fr)',
+    },
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Description" />
+      <DataTableColumnHeader
+        column={column}
+        title={message('activity.edit.description')}
+      />
     ),
     cell: ({ row }) => <DescriptionCard row={row} />,
   },
   {
     id: 'photos',
     accessorKey: 'photos',
-    meta: { title: 'Photos', width: 'minmax(80px, 1fr)' },
+    meta: { title: message('metric.photos'), width: 'minmax(80px, 1fr)' },
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Photos" />
+      <DataTableColumnHeader column={column} title={message('metric.photos')} />
     ),
     cell: ({ getValue, row }) => {
       const photos = getValue() as Photo[] | undefined;
@@ -286,25 +309,39 @@ export const columns: ColumnDef<Features, Activity>[] = [
   {
     id: 'geometry_state',
     accessorKey: 'geometryState',
-    meta: { title: 'Geometry', width: 'minmax(100px, 1fr)' },
+    meta: {
+      title: message('metric.geometryStatus'),
+      width: 'minmax(100px, 1fr)',
+    },
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Geometry" />
+      <DataTableColumnHeader
+        column={column}
+        title={message('metric.geometryStatus')}
+      />
     ),
     cell: ({ getValue }) => {
       const geometryState = getValue() as Activity['geometryState'];
       return (
-        <div className="w-full text-right">{geometryState ?? 'Unknown'}</div>
+        <div className="w-full text-right">
+          {message(
+            geometryState === 'detailed'
+              ? 'geometry.detailed'
+              : geometryState === 'summary'
+                ? 'geometry.summary'
+                : 'geometry.refreshRequired',
+          )}
+        </div>
       );
     },
   },
   {
     id: 'edit',
     enableSorting: false,
-    meta: { title: 'Edit', width: '40px' },
+    meta: { title: message('action.edit'), width: '40px' },
     header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Edit" />
+      <DataTableColumnHeader column={column} title={message('action.edit')} />
     ),
-    cell: ({ row }) => <EditActivity row={row} trigger={true} />,
+    cell: ({ row }) => <EditActivity activity={row.original} trigger={true} />,
     accessorFn: (row) => row.id,
   },
 ];

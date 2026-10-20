@@ -3,7 +3,10 @@ import SwiftUI
 /// The dashboard owns calculated values and tile choices. This shared surface
 /// owns only title/period/control/content hierarchy; it introduces no analytics.
 struct StatsTileSurface<Controls: View, Content: View>: View {
+    @Environment(\.locale) private var locale
     let title: String
+    var titleResource: LocalizedStringResource? = nil
+    private var heading: BrowseText { titleResource.map(BrowseText.localized) ?? .verbatim(title) }
     let period: String
     var expand: (() -> Void)? = nil
     var expanded = false
@@ -14,10 +17,20 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     @ViewBuilder let content: () -> Content
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
+    @Environment(\.statsExpansionProgress) private var expansion
 
     var body: some View {
         if detailScreen {
-            tileBody.padding(12)
+            // While a focus page grows out of its dashboard card, it starts
+            // with that card's surface and inset; at rest neither remains.
+            let card = 1 - (expansion ?? 1)
+            // The surface stays opaque until the dashboard behind has faded.
+            let surface = min(1, card / 0.6)
+            let shape = RoundedRectangle(cornerRadius: AppTheme.cornerRadius * card)
+            tileBody
+                .padding(12 + (AppTheme.Spacing.large - 12) * card)
+                .background(AppTheme.surface.opacity(surface), in: shape)
+                .overlay(shape.strokeBorder(AppTheme.separator.opacity(0.35 * surface), lineWidth: 0.5))
         } else {
             tileBody
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -28,15 +41,26 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     private var tileBody: some View {
         VStack(alignment: .leading, spacing: AppTheme.Spacing.medium) {
             if detailScreen {
-                ViewThatFits(in: .horizontal) {
-                    HStack { periodLabel; Spacer(minLength: 8); controls() }
-                    VStack(alignment: .leading, spacing: 8) { periodLabel; controls() }
+                VStack(alignment: .leading, spacing: 0) {
+                    // The card's title row hands over to the navigation title.
+                    StatsExpansionReveal(expanded: false, inverted: true) {
+                        HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
+                            BrowseSectionHeading(title: heading)
+                            Spacer(minLength: 0)
+                            BrowseIconLabel(systemImage: "arrow.up.left.and.arrow.down.right", isSelected: false)
+                        }
+                        .frame(minHeight: AppTheme.minimumTarget)
+                    }
+                    ViewThatFits(in: .horizontal) {
+                        HStack { periodLabel; Spacer(minLength: 8); controls() }
+                        VStack(alignment: .leading, spacing: 8) { periodLabel; controls() }
+                    }
                 }
             } else if shortViewportLimit != nil && !typeSize.isAccessibilitySize && !controlsInContent {
                 // iPhone landscape: one header row where the card is wide enough.
                 ViewThatFits(in: .horizontal) {
                     HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
-                        BrowseSectionHeading(title: title).fixedSize()
+                        BrowseSectionHeading(title: heading).fixedSize()
                         periodLabel.fixedSize()
                         Spacer(minLength: 8)
                         controls()
@@ -53,7 +77,7 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     }
     @ViewBuilder private var expandButton: some View {
         if let expand {
-            BrowseIconButton(title: "\(expanded ? "Collapse" : "Expand") \(title)",
+            BrowseIconButton(title: .localized(expanded ? AppMessages.statsCollapseTile(titleResource.map { String(localized: $0) } ?? title, locale: locale) : AppMessages.statsExpandTile(titleResource.map { String(localized: $0) } ?? title, locale: locale)),
                              systemImage: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                              action: expand)
         }
@@ -63,7 +87,7 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
         // gutter between title and period/picker rows on compact cards.
         VStack(alignment: .leading, spacing: typeSize.isAccessibilitySize ? AppTheme.Spacing.small : 0) {
             HStack(alignment: .firstTextBaseline, spacing: AppTheme.Spacing.small) {
-                BrowseSectionHeading(title: title)
+                BrowseSectionHeading(title: heading)
                 Spacer(minLength: 0)
                 expandButton
             }
@@ -96,13 +120,15 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
 }
 
 struct StatsMetricPicker: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
     var title = "Metric"
     let metrics: [StatsMetric]
     @Binding var selection: StatsMetric
 
     var body: some View {
         StatsRangePicker(title: title, ranges: metrics, selection: $selection,
-                         label: { $0 == .count ? "#" : $0.displayUnit },
+                         label: { $0 == .count ? "#" : $0.displayUnit(units: units) },
                          accessibilityLabel: { $0.definition.label })
     }
 }
@@ -273,6 +299,9 @@ struct StatsSummaryValues: View {
 }
 
 struct StatsProjectionSummary: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let pace: StatsPace
     let metric: StatsMetric
     let year: Int
@@ -293,18 +322,22 @@ struct StatsProjectionSummary: View {
                 }.frame(height: 16)
             }.frame(height: 16).accessibilityHidden(true)
             StatsSummaryValues(items: [
-                .init(label: "So far", value: StatsDisplay.measurement(pace.current, metric: metric), color: .primary),
-                .init(label: "Daily average", value: "\(StatsDisplay.dailyRate(metric.displayValue(pace.perDay))) \(metric.displayUnit) / day"),
-                .init(label: String(year - 1), value: pace.lastYear > 0 ? StatsDisplay.measurement(pace.lastYear, metric: metric) : "—", color: .orange),
+                .init(label: "So far", value: StatsDisplay.measurement(pace.current, metric: metric, units: units, locale: locale), color: .primary),
+                .init(label: "Daily average", value: "\(StatsDisplay.dailyRate(metric.displayValue(pace.perDay, units: units), locale: locale)) \(metric.displayUnit(units: units)) / day"),
+                .init(label: String(year - 1), value: pace.lastYear > 0 ? StatsDisplay.measurement(pace.lastYear, metric: metric, units: units, locale: locale) : "—", color: .orange),
             ])
         }
     }
 }
 
 struct StatsSportMixVisual: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let shares: [StatsShare]
     let breakdown: [ActivityCategory: StatsTotals]
     let expanded: Bool
+    @Environment(\.statsExpansionProgress) private var sharedExpansionProgress
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var contentWidth: CGFloat = 0
     var body: some View {
@@ -317,16 +350,20 @@ struct StatsSportMixVisual: View {
                     }
                 }
             }.frame(height: 10).clipShape(RoundedRectangle(cornerRadius: 2)).accessibilityHidden(true)
-            StatsExpansionReveal(expanded: expanded) {
-                if typeSize.isAccessibilitySize || contentWidth < 600 { detailRows }
-                else { ViewThatFits(in: .horizontal) { detailTable.fixedSize(horizontal: true, vertical: false); detailRows } }
+            // Fully compact cards must not retain detail-only accessibility
+            // descendants. Keep the reveal while an inline transition runs.
+            if expanded || (sharedExpansionProgress ?? 0) > 0 {
+                StatsExpansionReveal(expanded: expanded) {
+                    if typeSize.isAccessibilitySize || contentWidth < 600 { detailRows }
+                    else { ViewThatFits(in: .horizontal) { detailTable.fixedSize(horizontal: true, vertical: false); detailRows } }
+                }
             }
             StatsExpansionReveal(expanded: !expanded, inverted: true) {
                 LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible(), alignment: .leading)] : [GridItem(.adaptive(minimum: 140), alignment: .leading)], alignment: .leading, spacing: 6) {
                     ForEach(shares, id: \.sport) { share in
                         HStack(spacing: 4) {
                             Circle().fill(share.sport.color).frame(width: 6, height: 6)
-                            Text("\(share.sport.name) \(StatsDisplay.number(share.share * 100))%")
+                            Text("\(share.sport.name) \(StatsDisplay.number(share.share * 100, locale: locale))%")
                         }.font(.caption2).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
                     }
                 }
@@ -337,11 +374,11 @@ struct StatsSportMixVisual: View {
         VStack(alignment: .leading, spacing: 12) {
             ForEach(shares, id: \.sport) { share in
                 VStack(alignment: .leading, spacing: 8) {
-                    HStack { sportLabel(share.sport); Spacer(); Text("\(StatsDisplay.number(share.share * 100))%").monospacedDigit() }.font(.subheadline.weight(.medium))
+                    HStack { sportLabel(share.sport); Spacer(); Text("\(StatsDisplay.number(share.share * 100, locale: locale))%").monospacedDigit() }.font(.subheadline.weight(.medium))
                     let totals = breakdown[share.sport] ?? StatsTotals()
                     LazyVGrid(columns: typeSize.isAccessibilitySize ? [GridItem(.flexible())] : [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 4) {
-                        detailValue("Moving time", StatsDisplay.measurement(totals.time, metric: .time))
-                        detailValue("Activities", StatsDisplay.number(totals.count))
+                        detailValue("Moving time", StatsDisplay.measurement(totals.time, metric: .time, units: units, locale: locale))
+                        detailValue("Activities", StatsDisplay.number(totals.count, locale: locale))
                     }
                 }
                 Divider()
@@ -352,8 +389,8 @@ struct StatsSportMixVisual: View {
                         let totals = breakdown[share.sport] ?? StatsTotals()
                         VStack(alignment: .leading, spacing: 4) {
                             sportLabel(share.sport).font(.caption.weight(.medium))
-                            detailValue("Distance", StatsDisplay.measurement(totals.distance, metric: .distance))
-                            detailValue("Climb", StatsDisplay.measurement(totals.elevation, metric: .elevation))
+                            detailValue("Distance", StatsDisplay.measurement(totals.distance, metric: .distance, units: units, locale: locale))
+                            detailValue("Climb", StatsDisplay.measurement(totals.elevation, metric: .elevation, units: units, locale: locale))
                         }
                     }
                 }.padding(.top, 8)
@@ -372,16 +409,16 @@ struct StatsSportMixVisual: View {
     }
     private var detailTable: some View {
         Grid(alignment: .leading, horizontalSpacing: 20, verticalSpacing: 10) {
-            GridRow { ForEach(["Sport", "Share", "Activities", StatsMetric.distance.displayUnit, StatsMetric.elevation.displayUnit, "h"], id: \.self) { Text($0).foregroundStyle(.secondary) } }
+            GridRow { ForEach(["Sport", "Share", "Activities", StatsMetric.distance.displayUnit(units: units), StatsMetric.elevation.displayUnit(units: units), "h"], id: \.self) { Text($0).foregroundStyle(.secondary) } }
             ForEach(shares, id: \.sport) { share in
                 let totals = breakdown[share.sport] ?? StatsTotals()
                 GridRow {
                     sportLabel(share.sport)
-                    Text("\(StatsDisplay.number(share.share * 100))%")
-                    Text(StatsDisplay.number(totals.count))
-                    Text(StatsDisplay.value(totals.distance, metric: .distance))
-                    Text(StatsDisplay.value(totals.elevation, metric: .elevation))
-                    Text(StatsDisplay.number(totals.time, decimals: totals.time < 10 ? 1 : 0))
+                    Text("\(StatsDisplay.number(share.share * 100, locale: locale))%")
+                    Text(StatsDisplay.number(totals.count, locale: locale))
+                    Text(StatsDisplay.value(totals.distance, metric: .distance, units: units, locale: locale))
+                    Text(StatsDisplay.value(totals.elevation, metric: .elevation, units: units, locale: locale))
+                    Text(StatsDisplay.number(totals.time, decimals: totals.time < 10 ? 1 : 0, locale: locale))
                 }
             }
         }.font(.caption).monospacedDigit()
@@ -446,7 +483,6 @@ extension EnvironmentValues {
     @Entry var statsFocusChartHeight: Double? = nil
     @Entry var statsTileInspection: StatsTileInspection? = nil
     @Entry var statsDetailPresentation = StatsDetailPresentation.automatic
-    @Entry var statsTransitionNamespace: Namespace.ID? = nil
     @Entry var statsInspectedActivityID: Int? = nil
     @Entry var statsShellNavigation: StatsShellNavigation? = nil
 }

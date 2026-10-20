@@ -8,8 +8,9 @@ import { DataTable } from '~/components/list/data-table';
 import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useListInspection } from '~/hooks/use-list-inspection';
 import { useShowOnMap } from '~/hooks/use-show-on-map';
+import type { Activity } from '~/lib/activity';
 import { groupBy } from '~/lib/utils';
-import { type Activity, type Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/db/schema';
 import { useShallowStore } from '~/store';
 
 export function ActivityListView({
@@ -103,7 +104,7 @@ export function ActivityListView({
         renderDetails={(row) => (
           <ActivityCardContent
             key={row.id}
-            row={row}
+            activity={row.original}
             stickyHeader
             onShowOnMap={showOnMap}
             mapActionVariant={

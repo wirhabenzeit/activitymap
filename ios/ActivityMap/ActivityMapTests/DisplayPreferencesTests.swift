@@ -4,6 +4,25 @@ import Testing
 @testable import ActivityMap
 
 @MainActor struct DisplayPreferencesTests {
+    @Test func isolatedPreferencesNeverLeakIntoOtherRenderers() {
+        let metric = DisplayPreferences(defaults: nil)
+        let imperial = DisplayPreferences(defaults: nil)
+        imperial.units = .imperial
+        imperial.dateFormat = .iso
+        #expect(metric.units == .metric && metric.dateFormat == .system)
+        let english = Locale(identifier: "en_US")
+        let german = Locale(identifier: "de_DE")
+        #expect(Formatters.distance(1609.344, locale: english, units: imperial.units) == "1.0 mi")
+        #expect(Formatters.distance(1609.344, locale: german, units: metric.units) == "1,6 km")
+        #expect(StatsDisplay.value(1.609344, metric: .distance, units: imperial.units, locale: english) == "1")
+        #expect(StatsDisplay.measurement(1.609344, metric: .distance, units: imperial.units, locale: english) == "1 mi")
+        let day = StatsDates.day("2026-10-19")
+        #expect(StatsDisplay.weekday(day, locale: german).hasPrefix("Mo"))
+        #expect(StatsDisplay.weekday(day, locale: english) == "Mon")
+        #expect(Formatters.shortDate(StatsDates.date(day), timeZone: .gmt, locale: german,
+                                     dateFormat: imperial.dateFormat) == "2026-10-19")
+    }
+
     @Test func defaultsPersistenceAndExplicitSystem() throws {
         let name = "DisplayPreferencesTests-\(UUID().uuidString)"
         let defaults = try #require(UserDefaults(suiteName: name))

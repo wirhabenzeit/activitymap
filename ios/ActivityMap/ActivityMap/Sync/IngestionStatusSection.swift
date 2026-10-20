@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct IngestionStatusSection: View {
+    @Environment(\.locale) private var locale
     let session: SyncSession
     let controller: IngestionStatusController
     var stravaImport: StravaImportController? = nil
@@ -20,55 +21,55 @@ struct IngestionStatusSection: View {
                     Task { await stravaImport.start(session) }
                 } label: {
                     HStack {
-                        Label("Fetch from Strava", systemImage: "arrow.down.circle")
+                        Label { Text(AppMessages.statusBrowsingFetchFromStrava(locale: locale)) } icon: { Image(systemName: "arrow.down.circle") }
                         if stravaImport.isStarting || stravaImport.snapshot?.status == .running {
                             Spacer()
-                            ProgressView().accessibilityLabel("Fetching from Strava")
+                            ProgressView().accessibilityLabel(Text(AppMessages.statusBrowsingFetchingFromStrava(locale: locale)))
                         }
                     }
                 }.disabled(!stravaImport.canStart(session))
-                Text("Fetch recent activities, missing details and photos, and more history in the background.")
+                Text(AppMessages.statusBrowsingFetchRecentActivitiesMissingDetailsAndPhotosAndMore(locale: locale))
                     .font(.footnote).foregroundStyle(.secondary)
-                if let message = stravaImport.message ?? stravaImport.progressMessage {
-                    Text(message).font(.footnote).foregroundStyle(.secondary)
+                if let message = stravaImport.message(locale: locale) ?? stravaImport.progressMessage(locale: locale) {
+                    Text(verbatim: message).font(.footnote).foregroundStyle(.secondary)
                         .accessibilityAddTraits(.updatesFrequently)
                 }
                 if stravaImport.retryAt > Date() {
-                    Text("Try again after \(stravaImport.retryAt.formatted(date: .abbreviated, time: .shortened)).")
+                    Text(AppMessages.mutationRetryAfter(stravaImport.retryAt.formatted(date: .abbreviated, time: .shortened), locale: locale))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             if let snapshot {
-                LabeledContent("All activities imported", value: snapshot.history.progress == .complete ? "Yes"
-                    : snapshot.history.progress == .unknown ? "Unknown" : "No")
-                IngestionProgressRow(title: "Details", progress: IngestionPresentation.coverageProgress(
+                LabeledContent(String(localized: AppMessages.statusBrowsingAllActivitiesImported(locale: locale)), value: snapshot.history.progress == .complete ? String(localized: AppMessages.valueYes(locale: locale))
+                    : snapshot.history.progress == .unknown ? String(localized: AppMessages.statusProgressUnknown(locale: locale)) : String(localized: AppMessages.valueNo(locale: locale)))
+                IngestionProgressRow(title: AppMessages.statusSummaryDetails(locale: locale), progress: IngestionPresentation.coverageProgress(
                     snapshot.details.detailed, total: snapshot.history.knownActivityCount))
-                IngestionProgressRow(title: "Photos", progress: IngestionPresentation.coverageProgress(
+                IngestionProgressRow(title: AppMessages.statusSummaryPhotos(locale: locale), progress: IngestionPresentation.coverageProgress(
                     snapshot.photos.activitiesWithStoredPhotos, total: snapshot.photos.activitiesWithPhotos),
-                    emptyLabel: snapshot.photos.activitiesWithPhotos == 0 ? "No photos" : "—")
-                IngestionProgressRow(title: "Streams", progress: IngestionPresentation.coverageProgress(
+                    emptyLabel: snapshot.photos.activitiesWithPhotos == 0 ? String(localized: AppMessages.statusBrowsingNoPhotos(locale: locale)) : "—")
+                IngestionProgressRow(title: AppMessages.statusSummaryStreams(locale: locale), progress: IngestionPresentation.coverageProgress(
                     snapshot.streams.withData + snapshot.streams.withoutData, total: snapshot.history.knownActivityCount))
                 if snapshot.history.scheduling == .blocked || snapshot.details.scheduling == .blocked
                     || snapshot.photos.scheduling == .blocked || snapshot.streams.scheduling == .blocked {
-                    Text("Reconnect Strava from Account to continue importing.")
+                    Text(AppMessages.statusBrowsingReconnectStravaFromAccountToContinueImporting(locale: locale))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             } else {
-                Text(controller.isLoading ? "Checking your import…" : "Import status unavailable. Please try again later.")
+                Text(controller.isLoading ? AppMessages.statusBrowsingCheckingYourImport(locale: locale) : AppMessages.statusBrowsingImportStatusUnavailablePleaseTryAgainLater(locale: locale))
                     .foregroundStyle(.secondary)
             }
         } header: {
-            Text("Strava import status")
+            Text(AppMessages.statusBrowsingStravaImportStatus(locale: locale))
         } footer: {
             VStack(alignment: .leading, spacing: 3) {
                 if snapshot != nil {
-                    Text("Fetched for imported activities. Photos count only activities with photos.")
+                    Text(AppMessages.statusBrowsingFetchedForImportedActivitiesPhotosCountOnlyActivitiesWith(locale: locale))
                 }
                 if stale, let snapshot {
-                    Text("\(!session.verified ? "Offline. " : "")Last known status · \(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened))")
+                    Text(session.verified ? AppMessages.statusBrowsingLastKnown(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened), locale: locale) : AppMessages.statusBrowsingOfflineLastKnown(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened), locale: locale))
                 }
-                if controller.message == "Sign in again to check server import status." {
-                    Text("Sign in again from Account to check status.")
+                if controller.requiresSignIn {
+                    Text(AppMessages.statusBrowsingSignInAgainFromAccountToCheckStatus(locale: locale))
                 }
             }
         }
@@ -76,13 +77,14 @@ struct IngestionStatusSection: View {
 }
 
 private struct IngestionProgressRow: View {
-    let title: String
+    @Environment(\.locale) private var locale
+    let title: LocalizedStringResource
     let progress: IngestionPresentation.CoverageProgress?
     var emptyLabel = "—"
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            LabeledContent(title, value: progress?.percentage ?? emptyLabel)
+            LabeledContent { Text(verbatim: progress?.formattedPercentage(locale: locale) ?? emptyLabel) } label: { Text(title) }
                 .monospacedDigit()
             if let progress {
                 ProgressView(value: Double(progress.completed), total: Double(progress.total))
@@ -91,7 +93,7 @@ private struct IngestionProgressRow: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(title)
-        .accessibilityValue(progress?.percentage ?? emptyLabel)
+        .accessibilityLabel(Text(title))
+        .accessibilityValue(progress?.formattedPercentage(locale: locale) ?? emptyLabel)
     }
 }

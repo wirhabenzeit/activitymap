@@ -3,14 +3,13 @@ import UIKit
 import Observation
 
 struct StatsScreen: View {
+    @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     var sync: SyncController? = nil
     var refresh: () async -> Void = {}
     @State var dashboard = StatsDashboardState()
     @Environment(\.statsShellNavigation) private var shellNavigation
     @Environment(\.statsDetailPresentation) private var detailPresentation
-    @Environment(\.statsTransitionNamespace) private var shellTransitionNamespace
-    @Namespace private var transitionNamespace
     @Environment(\.localStore) private var localStore
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -79,7 +78,7 @@ struct StatsScreen: View {
                         if presentation.hasContent {
                             ForEach(StatsTileGroup.allCases, id: \.self) { group in
                                 VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                                    Text(group.title).font(.title2.weight(.semibold))
+                                    Text(group.titleResource(locale: locale)).font(.title2.weight(.semibold))
                                         .accessibilityAddTraits(.isHeader)
                                     let columns = !typeSize.isAccessibilitySize
                                         && geometry.size.width >= (detailLimit != nil ? 640 : 760) ? 2 : 1
@@ -121,15 +120,12 @@ struct StatsScreen: View {
     }
 
     @ViewBuilder private func detail(_ tile: StatsTileDefinition) -> some View {
-        if reduceMotion {
-            if #available(iOS 27.0, *) {
-                detailContent(tile).navigationTransition(.crossFade)
-            } else {
-                // Standard navigation respects Reduce Motion on iOS 26.
-                detailContent(tile)
-            }
+        if reduceMotion, #available(iOS 27.0, *) {
+            detailContent(tile).navigationTransition(.crossFade)
         } else {
-            detailContent(tile).navigationTransition(.zoom(sourceID: tile.id, in: transitionNamespace))
+            // The focus page grows its own card out of the dashboard; Reduce
+            // Motion uses standard navigation on iOS 26.
+            detailContent(tile)
         }
     }
 
@@ -137,7 +133,9 @@ struct StatsScreen: View {
         let content = dashboardTile(tile, expanded: detailPresentation == .inline && dashboard.expandedTile == tile.id)
             .id(tile.id)
         if usesDetailNavigation, !reduceMotion, StatsDashboard.expandable(tile.id) {
-            content.matchedTransitionSource(id: tile.id, in: shellTransitionNamespace ?? transitionNamespace)
+            content.onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { frame in
+                dashboard.tileFrames[tile.id] = frame
+            }
         } else {
             content
         }
@@ -146,11 +144,26 @@ struct StatsScreen: View {
     private func dashboardTile(_ tile: StatsTileDefinition, expanded: Bool) -> some View {
         StatsDashboardTile(tile: tile, store: store, dashboard: dashboard, expanded: expanded,
                            toggleExpansion: {
-            if usesDetailNavigation { dashboard.toggleExpansion(tile.id) }
+            if usesDetailNavigation { openFocus(tile.id) }
             else {
                 withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) { dashboard.toggleExpansion(tile.id) }
             }
         }, openActivity: { dashboard.inspectedActivityID = $0 })
+    }
+
+    /// Pushes without animation over a still of the dashboard, from which the
+    /// focus page grows the card. Without a known frame it opens directly.
+    private func openFocus(_ id: StatsTileID) {
+        guard !reduceMotion, dashboard.expandedTile == nil, let frame = dashboard.tileFrames[id] else {
+            dashboard.toggleExpansion(id)
+            return
+        }
+        dashboard.focusEntrance = StatsFocusEntrance.capture(tile: id, source: frame, dashboardSource: source)
+        // SwiftUI ignores disablesAnimations for destination pushes. UIKit's
+        // push uses UIView animations; without them it lands in one frame.
+        UIView.setAnimationsEnabled(false)
+        dashboard.toggleExpansion(id)
+        DispatchQueue.main.async { UIView.setAnimationsEnabled(true) }
     }
 
     /// Short viewports (iPhone landscape) get dense tile headers and a cap on
@@ -177,16 +190,16 @@ private struct StatsDetailDestination<Content: View>: View {
     var usesShellHeader = false
     var toolbarTrailing = AnyView(EmptyView())
     var closeInspection: (() -> Bool)? = nil
+    var collapse: (() -> Bool)? = nil
     @ViewBuilder let content: () -> Content
     @Environment(\.dismiss) private var dismiss
     @AppToolbarEnvironment private var toolbarLayout
 
     var body: some View {
-        content()
-        .background(AppTheme.contentBackground)
-        .navigationTitle(title)
-        .navigationBarBackButtonHidden()
-        .appNavigationBar(AppToolbar(
+        // The regular workspace already owns stationary chrome. A single
+        // modifier chain preserves the destination identity during resizing;
+        // visible=false suppresses both native and safe-area detail bars.
+        page.appNavigationBar(AppToolbar(
             leading: AnyView(AppToolbarBackButton(label: backLabel, identifier: "stats-detail-back", action: goBack)),
             principal: AnyView(Text(title).font(.headline).foregroundStyle(.white)
                 .lineLimit(toolbarLayout.isCompact ? 1 : nil)
@@ -194,12 +207,20 @@ private struct StatsDetailDestination<Content: View>: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityAddTraits(.isHeader)
                 .accessibilityIdentifier("stats-detail-title")),
-            trailing: toolbarTrailing), embedded: usesShellHeader)
-        .background(DetailBackGesture())
-        .accessibilityAction(.escape) { goBack() }
+            trailing: toolbarTrailing), visible: !usesShellHeader)
+    }
+    private var page: some View {
+        content()
+            .background(AppTheme.contentBackground)
+            .navigationTitle(title)
+            .navigationBarBackButtonHidden()
+            .environment(\.statsDetailBackAction, goBack)
+            .background(DetailBackGesture())
+            .accessibilityAction(.escape) { goBack() }
     }
     private func goBack() {
-        if closeInspection?() != true { dismiss() }
+        if closeInspection?() == true || collapse?() == true { return }
+        dismiss()
     }
 }
 
@@ -212,16 +233,21 @@ struct StatsDetailScreen: View {
     var sync: SyncController? = nil
     var usesShellHeader = false
     var toolbarTrailing = AnyView(EmptyView())
+    @State private var exit = StatsFocusExit()
 
+    private var backLabel: String {
+        dashboard.inspectedActivityID != nil ? "Back to \(tile.title)" : "Back to Stats dashboard"
+    }
     var body: some View {
         StatsDetailDestination(title: tile.title,
-                               backLabel: dashboard.inspectedActivityID != nil ? "Back to \(tile.title)" : "Back to Stats dashboard",
+                               backLabel: backLabel,
                                usesShellHeader: usesShellHeader, toolbarTrailing: toolbarTrailing, closeInspection: {
             guard dashboard.inspectedActivityID != nil else { return false }
             dashboard.inspectedActivityID = nil
             return true
-        }) {
-            StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync)
+        }, collapse: { exit.collapse?() ?? false }) {
+            StatsDetailContent(store: store, dashboard: dashboard, tile: tile, sync: sync, exit: exit,
+                               showsContentHeading: usesShellHeader, backLabel: backLabel)
         }
     }
 }
@@ -232,7 +258,35 @@ private struct StatsDetailContent: View {
     let dashboard: StatsDashboardState
     let tile: StatsTileDefinition
     var sync: SyncController? = nil
+    let exit: StatsFocusExit
+    var showsContentHeading = false
+    var backLabel = "Back to Stats dashboard"
+    @Environment(\.statsDetailBackAction) private var goBack
+    @Environment(\.locale) private var locale
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.dismiss) private var dismiss
+    /// 0 while the card sits in its dashboard slot, 1 at rest on the page.
+    @State private var entranceProgress: Double
+    /// Retained after opening, so Back can collapse into the same still.
+    @State private var entrance: StatsFocusEntrance?
+    @State private var scrollOffset: CGFloat = 0
+    @State private var collapseScroll: CGFloat = 0
+
+    init(store: ActivityStore, dashboard: StatsDashboardState, tile: StatsTileDefinition,
+         sync: SyncController? = nil, exit: StatsFocusExit,
+         showsContentHeading: Bool = false, backLabel: String = "Back to Stats dashboard") {
+        self.store = store
+        self.dashboard = dashboard
+        self.tile = tile
+        self.sync = sync
+        self.exit = exit
+        self.showsContentHeading = showsContentHeading
+        self.backLabel = backLabel
+        let entrance = dashboard.focusEntrance?.tile == tile.id ? dashboard.focusEntrance : nil
+        _entrance = State(initialValue: entrance)
+        _entranceProgress = State(initialValue: entrance == nil ? 1 : 0)
+    }
 
     private var presentation: StatsPresentation {
         sync.map { StatsPresentation(store: store, sync: $0) }
@@ -252,6 +306,28 @@ private struct StatsDetailContent: View {
         return store.activities.isEmpty ? "No activity history" : "No matching activities"
     }
 
+    private func grow() {
+        exit.collapse = collapse
+        guard entrance != nil, entranceProgress < 1 else { return }
+        dashboard.focusEntrance = nil
+        withAnimation(.smooth(duration: 0.45)) { entranceProgress = 1 }
+    }
+
+    /// Shrinks the card back into its slot, then pops without animation onto
+    /// the identical dashboard. A changed dashboard pops normally instead.
+    private func collapse() -> Bool {
+        guard let entrance, !reduceMotion, entranceProgress == 1,
+              entrance.dashboardSource == StatsDashboardSource(store),
+              dashboard.tileFrames[tile.id] == entrance.source else { return false }
+        collapseScroll = scrollOffset
+        withAnimation(.smooth(duration: 0.4)) { entranceProgress = 0 } completion: {
+            UIView.setAnimationsEnabled(false)
+            dismiss()
+            DispatchQueue.main.async { UIView.setAnimationsEnabled(true) }
+        }
+        return true
+    }
+
     /// Wide, tall pages give the chart about half the height, leaving the
     /// header, controls and legend on screen. Phones keep their sizes.
     private func focusChartHeight(_ size: CGSize) -> Double? {
@@ -262,30 +338,90 @@ private struct StatsDetailContent: View {
 
     var body: some View {
         StatsActivityInspection(store: store, dashboard: dashboard, backLabel: "Back to \(tile.title)") {
-        GeometryReader { geometry in
-            ScrollView {
-                if let emptyTitle {
-                    ContentUnavailableView(emptyTitle, systemImage: "chart.bar")
-                } else {
-                    StatsDashboardTile(tile: tile, store: store, dashboard: dashboard,
-                                       expanded: true, detailScreen: true,
-                                       toggleExpansion: {}, openActivity: { dashboard.inspectedActivityID = $0 })
-                        .environment(\.statsExpansionProgress, 1)
-                        .environment(\.statsDetailHeightLimit,
-                                     geometry.size.height < 480 && !typeSize.isAccessibilitySize
-                                     ? Double(geometry.size.height) - 170 : nil)
-                        .environment(\.statsFocusChartHeight, focusChartHeight(geometry.size))
-                        .transaction { $0.animation = nil }
+            GeometryReader { geometry in
+                ZStack(alignment: .topLeading) {
+                    if let entrance, entranceProgress < 1 {
+                        // Gone before the card turns transparent over it.
+                        StatsFocusBackdrop(entrance: entrance, page: geometry.frame(in: .global))
+                            .opacity(1 - min(1, entranceProgress / 0.6))
+                    }
+                    ScrollView {
+                        if let emptyTitle {
+                            VStack(alignment: .leading, spacing: 0) {
+                                if showsContentHeading { contentHeading }
+                                ContentUnavailableView(emptyTitle, systemImage: "chart.bar")
+                            }
+                        } else {
+                            StatsFocusEntranceTile(progress: entranceProgress, source: entrance?.source,
+                                                   page: geometry.frame(in: .global), scroll: collapseScroll) { progress in
+                                VStack(alignment: .leading, spacing: 0) {
+                                    if showsContentHeading {
+                                        // The heading is part of the same card morph. At the
+                                        // source it takes no space, so the card still starts
+                                        // exactly in its dashboard slot; at rest it scrolls.
+                                        StatsExpansionReveal(expanded: progress > 0.5) { contentHeading }
+                                    }
+                                    // Dashboard wording and control placement until the
+                                    // midpoint, so both ends match the card exactly.
+                                    StatsDashboardTile(tile: tile, store: store, dashboard: dashboard,
+                                                       expanded: progress > 0.5, detailScreen: true,
+                                                       toggleExpansion: {}, openActivity: { dashboard.inspectedActivityID = $0 })
+                                        .environment(\.statsDetailHeightLimit,
+                                                     geometry.size.height < 480 && !typeSize.isAccessibilitySize
+                                                     ? Double(geometry.size.height) - 170 : nil)
+                                        .environment(\.statsFocusChartHeight, focusChartHeight(geometry.size))
+                                        // Controls that change rows at the midpoint glide
+                                        // there instead of jumping a line.
+                                        .animation(entranceProgress < 1 ? .smooth(duration: 0.2) : nil, value: progress > 0.5)
+                                }
+                            }
+                        }
+                    }
+                    .scrollDisabled(entranceProgress < 1)
+                    .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.y + $0.contentInsets.top } action: { _, offset in
+                        if entranceProgress == 1 { scrollOffset = offset }
+                    }
+                    .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
                 }
             }
-            .accessibilityIdentifier("stats-detail-\(tile.id.rawValue)")
         }
-        }
+        .onAppear(perform: grow)
+        // The callback captures this page, which also owns exit. Release it
+        // when the page leaves; grow rebinds it when returning from inspection.
+        .onDisappear { exit.collapse = nil }
         // The shell's pushed root is inactive. The visible destination must
         // own demand when its metric changes; the shared cache reuses values.
         .task(id: request) { await dashboard.load(store: store, request: request) }
-
     }
+
+    private var contentHeading: some View {
+        HStack(alignment: .center, spacing: AppTheme.Spacing.small) {
+            Button { goBack?() } label: {
+                BrowseActionIcon(.back)
+                    .font(.system(size: 20, weight: .medium))
+                    .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .foregroundStyle(AppTheme.accent)
+            .accessibilityLabel(backLabel)
+            .accessibilityIdentifier("stats-detail-back")
+            Text(tile.id.titleResource(locale: locale))
+                .font(.title2.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityAddTraits(.isHeader)
+                .accessibilityIdentifier("stats-detail-title")
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, AppTheme.Spacing.small)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("stats-detail-content-heading")
+    }
+}
+
+extension EnvironmentValues {
+    @Entry var statsDetailBackAction: (() -> Void)? = nil
 }
 
 /// Share the dashboard reference, not a second selection. UIKit's destination

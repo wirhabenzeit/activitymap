@@ -5,7 +5,9 @@ import Observation
 final class StravaImportController {
     private(set) var scope: StoreScope?
     private(set) var snapshot: ActivityMapAPI.StravaImport?
-    private(set) var message: String?
+    private(set) var messageText: PresentationText?
+    var message: String? { message(locale: .current) }
+    func message(locale: Locale) -> String? { messageText?.string(locale: locale) }
     private(set) var isStarting = false
     private(set) var nextCheck = Date.distantPast
     private(set) var retryAt = Date.distantPast
@@ -31,7 +33,7 @@ final class StravaImportController {
     func activate(_ session: SyncSession) {
         generation += 1; revision += 1
         if scope != session.scope { snapshot = nil }
-        scope = session.scope; message = nil; isStarting = false; loading = false
+        scope = session.scope; messageText = nil; isStarting = false; loading = false
         retryAt = defaults.object(forKey: key(session.scope)) as? Date ?? .distantPast
         nextCheck = retryAt > now() ? retryAt : .distantPast
     }
@@ -57,7 +59,7 @@ final class StravaImportController {
             let result = try await load(session)
             try Task.checkCancellation()
             guard current == generation, version == revision, scope == session.scope else { return }
-            snapshot = result; message = nil
+            snapshot = result; messageText = nil
             nextCheck = now().addingTimeInterval(result.status == .running ? 3 : 30)
             retryAt = max(retryAt, result.retryAt ?? .distantPast)
         } catch {
@@ -70,7 +72,7 @@ final class StravaImportController {
         guard canStart(session) else { return }
         revision += 1
         let current = generation
-        isStarting = true; message = nil
+        isStarting = true; messageText = nil
         defer { if current == generation { isStarting = false } }
         do {
             let result = try await submit(session)
@@ -90,34 +92,28 @@ final class StravaImportController {
     }
 
     private func record(_ error: Error, _ session: SyncSession) {
-        message = "Could not check the Strava fetch. Please try again later."
-        var delay: TimeInterval = 30
-        if let failure = error as? APIClient.RequestError {
-            switch failure {
-            case .rateLimited(let seconds, _), .serviceUnavailable(let seconds?, _),
-                 .server(_, _, _, _, _, let seconds?): delay = max(delay, seconds)
-            default: break
-            }
-            if AuthController.isExplicitlyUnauthenticated(failure) {
-                snapshot = nil; message = "Sign in again to fetch from Strava."
-            }
+        messageText = .localized(AppMessages.errorStravaImportCouldNotCheckTheStravaFetchPleaseTry())
+        let facts = APIClient.errorFacts(for: error)
+        let delay = max(30, facts.retryAfter ?? 0)
+        if facts.authenticationRejected {
+            snapshot = nil; messageText = .localized(AppMessages.errorStravaImportSignInAgainToFetchFromStrava())
         }
         retryAt = max(retryAt, now().addingTimeInterval(delay)); nextCheck = retryAt
         defaults.set(retryAt, forKey: key(session.scope))
     }
     private func key(_ scope: StoreScope) -> String { "strava-import.retry.v1." + scope.key }
 
-    var progressMessage: String? {
+    var progressMessage: String? { progressMessage(locale: .current) }
+    func progressMessage(locale: Locale) -> String? {
         guard let run = snapshot else { return nil }
-        let counts = "\(run.summaries) activity summaries fetched · \(run.details) activities updated · \(run.photos) photos fetched"
         if run.status == .idle { return nil }
-        if run.status == .running { return "Fetching from Strava in the background… \(counts)." }
-        if run.status == .interrupted { return "The fetch was interrupted. Saved progress is kept; try again when available. \(counts)." }
-        if run.reason == .accountUnavailable || run.status == .blocked { return "Reconnect Strava from Account to continue fetching." }
-        if run.reason == .rateLimit { return "Strava’s request limit was reached. \(counts)." }
-        if run.reason == .busy { return "Fetching paused while the service is busy. Please try again when available." }
-        if run.status == .failed { return "Could not finish fetching. Saved progress is kept. \(counts)." }
-        if run.status == .deferred { return "This fetch has paused. You can continue with another fetch when available. \(counts)." }
-        return "Fetch finished. \(counts)."
+        if run.status == .running { return String(localized: AppMessages.statusStravaImportRunning(run.summaries, run.details, run.photos, locale: locale)) }
+        if run.status == .interrupted { return String(localized: AppMessages.statusStravaImportInterrupted(run.summaries, run.details, run.photos, locale: locale)) }
+        if run.reason == .accountUnavailable || run.status == .blocked { return String(localized: AppMessages.errorStravaImportReconnectStravaFromAccountToContinueFetching(locale: locale)) }
+        if run.reason == .rateLimit { return String(localized: AppMessages.statusStravaImportRateLimited(run.summaries, run.details, run.photos, locale: locale)) }
+        if run.reason == .busy { return String(localized: AppMessages.errorStravaImportFetchingPausedWhileTheServiceIsBusyPlease(locale: locale)) }
+        if run.status == .failed { return String(localized: AppMessages.statusStravaImportFailed(run.summaries, run.details, run.photos, locale: locale)) }
+        if run.status == .deferred { return String(localized: AppMessages.statusStravaImportDeferred(run.summaries, run.details, run.photos, locale: locale)) }
+        return String(localized: AppMessages.statusStravaImportFinished(run.summaries, run.details, run.photos, locale: locale))
     }
 }

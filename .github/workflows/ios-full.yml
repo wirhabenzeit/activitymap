@@ -1,0 +1,39 @@
+name: Full iOS runtime
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ios-full:
+    runs-on: xcode-27
+    timeout-minutes: 65
+    env:
+      IOS_TEST_PROFILE: full
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Record the toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i iphonesimulator
+      - name: Verify old and new Swift clients decode stream metadata
+        run: |
+          git fetch origin +refs/heads/main:refs/remotes/origin/main --depth=1
+          bash scripts/verify-stream-dtos.sh origin/main
+      - name: Verify compact summary codecs and encoded cache round trips
+        run: bash scripts/verify-compact-stream-codec.sh
+      - name: Run full iOS runtime regressions on an owned simulator
+        run: node scripts/quality/native-harness.mjs
+      - name: Upload native result bundle and test summary
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios-full-runtime-${{ github.run_attempt }}
+          path: output/quality/ios/
+          if-no-files-found: warn
+          retention-days: 7

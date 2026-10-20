@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo } from 'react';
 
+import type { Activity } from '~/lib/activity';
 import { committedSelectionIDs } from '~/lib/browsing-projection';
-import type { Activity } from '~/server/db/schema';
 import { store } from '~/store';
 
 /** Mount exactly once at the browsing library boundary, never in a leaf

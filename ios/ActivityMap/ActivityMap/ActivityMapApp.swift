@@ -2,13 +2,15 @@ import SwiftUI
 
 @main
 struct ActivityMapApp: App {
-    @State private var displayPreferences = DisplayPreferences.shared
+    @State private var displayPreferences = DisplayPreferences()
     private let isTesting = ProcessInfo.processInfo.arguments.contains("--unit-testing")
     private let persistence: Result<LocalStore, Error>
     #if DEBUG
+    private let isActivityActionsUITesting = ProcessInfo.processInfo.arguments.contains("--activity-actions-ui-testing")
     private let isMapRotationUITesting = ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
     private let isMapPhotoUITesting = ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
     private let isListSelectionUITesting = ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing")
+    private let isStatsUITesting = ProcessInfo.processInfo.arguments.contains("--stats-ui-testing")
     #endif
 
     init() {
@@ -20,9 +22,11 @@ struct ActivityMapApp: App {
 
     private static var usesInMemoryPersistence: Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
+        if ProcessInfo.processInfo.arguments.contains("--activity-actions-ui-testing")
+            || ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
             || ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
-            || ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing") { return true }
+            || ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing")
+            || ProcessInfo.processInfo.arguments.contains("--stats-ui-testing") { return true }
         #endif
         return ProcessInfo.processInfo.arguments.contains("--unit-testing")
     }
@@ -30,7 +34,11 @@ struct ActivityMapApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if isMapRotationUITesting {
+            if isActivityActionsUITesting {
+                ActivityActionsUITestFixture()
+            } else if isStatsUITesting {
+                StatsUITestFixture()
+            } else if isMapRotationUITesting {
                 MapRotationUITestFixture(expanded: ProcessInfo.processInfo.arguments.contains("--map-rotation-expanded"))
             } else if isListSelectionUITesting {
                 ListSelectionUITestFixture(standalone: ProcessInfo.processInfo.arguments.contains("--list-standalone"))

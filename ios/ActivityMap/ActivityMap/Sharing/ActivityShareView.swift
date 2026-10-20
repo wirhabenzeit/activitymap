@@ -16,6 +16,7 @@ struct ActivityShareButton<Label: View>: View {
 }
 
 struct SelectionShareButton: View {
+    @Environment(\.locale) private var locale
     let store: ActivityStore
     var onNavigationBar = false
     var body: some View {
@@ -25,8 +26,8 @@ struct SelectionShareButton: View {
                     .frame(width: 44, height: 44).contentShape(Rectangle())
             }
             .foregroundStyle(onNavigationBar ? Color.white : AppTheme.accent)
-            .accessibilityLabel("Share selected activities")
-            .accessibilityHint("Review all \(store.selectedActivityIDs.count) selected activities, including those hidden by filters")
+            .accessibilityLabel(String(localized: AppMessages.sharingShareSelectedActivities(locale: locale)))
+            .accessibilityHint(Text(AppMessages.sharingSelectionHint(store.selectedActivityIDs.count, locale: locale)))
             .accessibilityIdentifier("share-selection")
         }
     }
@@ -35,6 +36,7 @@ struct SelectionShareButton: View {
 /// Map hit results are browse context; group sharing belongs to Combine mode.
 /// An open detail always narrows sharing to that activity, regardless of mode.
 struct MapActivityShareButton: View {
+    @Environment(\.locale) private var locale
     let picker: RoutePicker
     let store: ActivityStore
 
@@ -45,8 +47,8 @@ struct MapActivityShareButton: View {
                     .frame(width: 44, height: 44).contentShape(Rectangle())
             }
             .foregroundStyle(AppTheme.accent)
-            .accessibilityLabel(picker.detailID == nil ? "Share selected activities" : "Share activity")
-            .accessibilityHint(picker.detailID == nil ? "Share the selected group, including activities hidden by filters" : "Share only the activity whose details are open")
+            .accessibilityLabel(picker.detailID == nil ? String(localized: AppMessages.sharingShareSelectedActivities(locale: locale)) : String(localized: AppMessages.actionShareActivity(locale: locale)))
+            .accessibilityHint(picker.detailID == nil ? String(localized: AppMessages.sharingShareTheSelectedGroupIncludingActivitiesHiddenBy(locale: locale)) : String(localized: AppMessages.sharingShareOnlyTheActivityWhoseDetailsAreOpen(locale: locale)))
             .accessibilityIdentifier("map-share")
         }
     }
@@ -65,6 +67,8 @@ extension RoutePicker {
 }
 
 struct ActivityShareView: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    @Environment(\.locale) private var locale
     @State private var model: ActivityShareModel
     @State private var currentTime = Date()
     @Environment(\.activitySharing) private var service
@@ -79,43 +83,43 @@ struct ActivityShareView: View {
             Form {
                 if model.step == .created, let url = model.url, let link = model.created {
                     Section {
-                        ShareLink(item: url) { Label("Share link", systemImage: "square.and.arrow.up") }
+                        ShareLink(item: url) { Label(String(localized: AppMessages.sharingShareLink(locale: locale)), systemImage: "square.and.arrow.up") }
                             .foregroundStyle(AppTheme.accent)
                             .accessibilityIdentifier("share-created-link")
-                        Text(url.absoluteString).font(.caption).textSelection(.enabled)
-                        LabeledContent("Expires", value: link.expiresAt.formatted(date: .abbreviated, time: .shortened))
-                    } header: { Text("Link created") }
-                    footer: { Text("Share or copy it now. The full link is only available until you close this sheet.") }
+                        Text(verbatim: url.absoluteString).font(.caption).textSelection(.enabled)
+                        LabeledContent(String(localized: AppMessages.sharingExpires(locale: locale)), value: link.expiresAt.formatted(date: .abbreviated, time: .shortened))
+                    } header: { Text(String(localized: AppMessages.sharingLinkCreated(locale: locale))) }
+                    footer: { Text(String(localized: AppMessages.sharingShareOrCopyItNowTheFullLink(locale: locale))) }
                 } else {
                     Section {
                         ForEach(model.activities) { activity in
                             VStack(alignment: .leading, spacing: 3) {
-                                Text(activity.name)
-                                Text(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt)).font(.caption).foregroundStyle(.secondary)
+                                Text(verbatim: activity.name)
+                                Text(Formatters.shortDateTime(activity.startDateLocal, timeZone: .gmt, locale: locale, dateFormat: preferences?.dateFormat ?? .system)).font(.caption).foregroundStyle(.secondary)
                             }
                         }
-                    } header: { Text(model.activities.count == 1 ? "1 activity" : "\(model.activities.count) activities") }
-                    footer: { Text("Only these activities are included. Anyone with the link can view them until it expires or you revoke it. Activities marked private in Strava are omitted from the shared map.") }
+                    } header: { Text(AppMessages.selectionCount(model.activities.count, locale: locale)) }
+                    footer: { Text(String(localized: AppMessages.sharingOnlyTheseActivitiesAreIncludedAnyoneWithThe(locale: locale))) }
 
                     Section {
-                        Picker("Expires after", selection: $model.expiresInHours) {
+                        Picker(String(localized: AppMessages.sharingExpiresAfter(locale: locale)), selection: $model.expiresInHours) {
                             ForEach(expiryOptions, id: \.self) { hours in Text(expiryLabel(hours)).tag(hours) }
                         }
-                        Toggle("Show start and finish", isOn: $model.showRouteEnds)
-                    } footer: { Text("The first and last 200 m of each route and elevation profile are hidden unless you choose to show them.") }
+                        Toggle(String(localized: AppMessages.sharingShowStartAndFinish(locale: locale)), isOn: $model.showRouteEnds)
+                    } footer: { Text(String(localized: AppMessages.sharingTheFirstAndLastMOfEachRoute(locale: locale))) }
                     .disabled(model.isBusy)
-                    Section("Shown to recipients") {
-                        Text("Route, elevation profile, name, sport, date and time, distance, moving time, elevation gain and average speed.")
-                        Text("Heart rate, power, calories, social information, descriptions and photos are excluded.")
+                    Section(String(localized: AppMessages.sharingShownToRecipients(locale: locale))) {
+                        Text(String(localized: AppMessages.sharingRouteElevationProfileNameSportDateAndTime(locale: locale)))
+                        Text(String(localized: AppMessages.sharingHeartRatePowerCaloriesSocialInformationDescriptionsAnd(locale: locale)))
                             .foregroundStyle(.secondary)
                     }
-                    if let message = model.scopeError ?? service?.unavailableReason ?? (service == nil ? "Sign in to share activities." : nil) {
+                    if let message = model.scopeError ?? service?.unavailableReason ?? (service == nil ? String(localized: AppMessages.errorSharingSignInToShareActivities(locale: locale)) : nil) {
                         Section { Text(message).foregroundStyle(.secondary) }
                     }
-                    if let error = model.errorMessage {
+                    if let error = model.errorMessage(locale: locale) {
                         Section {
-                            Text(error).foregroundStyle(.red)
-                            if let retry = model.retryAt { Text("Try again after \(retry.formatted(date: .omitted, time: .standard)).") }
+                            Text(verbatim: error).foregroundStyle(.red)
+                            if let retry = model.retryAt { Text(AppMessages.mutationRetryAfter(retry.formatted(date: .omitted, time: .standard), locale: locale)) }
                         }.accessibilityIdentifier("share-error")
                     }
                     Section {
@@ -124,7 +128,7 @@ struct ActivityShareView: View {
                             Task { await model.create(using: service) }
                         } label: {
                             HStack {
-                                Text(model.isBusy ? "Creating…" : "Create link")
+                                Text(model.isBusy ? String(localized: AppMessages.sharingCreating(locale: locale)) : String(localized: AppMessages.sharingCreateLink(locale: locale)))
                                 if model.isBusy { Spacer(); ProgressView() }
                             }
                         }
@@ -134,14 +138,14 @@ struct ActivityShareView: View {
                     }
                 }
                 Section {
-                    NavigationLink("Your links") { ShareLinksListView() }
+                    NavigationLink(String(localized: AppMessages.sharingYourLinks(locale: locale))) { ShareLinksListView() }
                         .disabled(model.isBusy || service?.unavailableReason != nil || service == nil)
                 }
             }
-            .navigationTitle("Share activities")
+            .navigationTitle(String(localized: AppMessages.sharingShareActivities(locale: locale)))
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .confirmationAction) {
-                Button("Done") { dismiss() }.disabled(model.isBusy)
+                Button(String(localized: AppMessages.actionDone(locale: locale))) { dismiss() }.disabled(model.isBusy)
             } }
         }
         .foregroundStyle(Color.primary).tint(AppTheme.accent)
@@ -158,24 +162,25 @@ struct ActivityShareView: View {
     }
 
     private var cannotCreate: Bool { model.scopeError != nil || service == nil || service?.unavailableReason != nil }
-    private func expiryLabel(_ hours: Int) -> String { hours == 1 ? "1 hour" : hours == 24 ? "1 day" : "\(hours / 24) days" }
+    private func expiryLabel(_ hours: Int) -> String { String(localized: hours == 1 ? AppMessages.sharingExpiryHours(hours, locale: locale) : AppMessages.sharingExpiryDays(hours / 24, locale: locale)) }
 }
 
 struct ShareLinksListView: View {
+    @Environment(\.locale) private var locale
     @Environment(\.activitySharing) private var service
     @State private var links: [ActivityMapAPI.ShareLinkSummary]?
-    @State private var errorMessage: String?
+    @State private var errorMessage: PresentationText?
     @State private var busy = false
     @State private var pendingRevocation: ActivityMapAPI.ShareLinkSummary?
 
     var body: some View {
         List {
             if let errorMessage {
-                Text(errorMessage).foregroundStyle(.red)
-                Button("Retry") { Task { await load() } }.disabled(busy)
+                Text(verbatim: errorMessage.string(locale: locale)).foregroundStyle(.red)
+                Button(String(localized: AppMessages.actionRetry(locale: locale))) { Task { await load() } }.disabled(busy)
             }
             if let links {
-                if links.isEmpty { Text("You have no share links.").foregroundStyle(.secondary) }
+                if links.isEmpty { Text(String(localized: AppMessages.sharingYouHaveNoShareLinks(locale: locale))).foregroundStyle(.secondary) }
                 ForEach(links, id: \.id) { link in
                     VStack(alignment: .leading, spacing: 6) {
                         Text("\(link.activityCount) activities").font(.headline)
@@ -183,21 +188,21 @@ struct ShareLinksListView: View {
                         Text("\(link.status.rawValue.capitalized) · expires \(link.expiresAt.formatted(date: .abbreviated, time: .shortened))")
                             .font(.caption).foregroundStyle(.secondary)
                         if link.status == .active && link.expiresAt > .now {
-                            Button("Revoke link", role: .destructive) { pendingRevocation = link }.disabled(busy)
+                            Button(String(localized: AppMessages.sharingRevokeLink(locale: locale)), role: .destructive) { pendingRevocation = link }.disabled(busy)
                         }
                     }.padding(.vertical, 4)
                 }
-            } else if busy { ProgressView("Loading links…") }
+            } else if busy { ProgressView(String(localized: AppMessages.sharingLoadingLinks(locale: locale))) }
         }
-        .navigationTitle("Your links")
+        .navigationTitle(String(localized: AppMessages.sharingYourLinks(locale: locale)))
         .task { await load() }
         .refreshable { await load() }
-        .confirmationDialog("Revoke this link?", isPresented: Binding(
+        .confirmationDialog(String(localized: AppMessages.sharingRevokeThisLink(locale: locale)), isPresented: Binding(
             get: { pendingRevocation != nil }, set: { if !$0 { pendingRevocation = nil } }), titleVisibility: .visible) {
                 if let link = pendingRevocation {
-                    Button("Revoke link", role: .destructive) { Task { await revoke(link) } }
+                    Button(String(localized: AppMessages.sharingRevokeLink(locale: locale)), role: .destructive) { Task { await revoke(link) } }
                 }
-        } message: { Text("Anyone with this link will lose access immediately.") }
+        } message: { Text(String(localized: AppMessages.sharingAnyoneWithThisLinkWillLoseAccessImmediately(locale: locale))) }
     }
 
     private func load() async {
@@ -206,7 +211,7 @@ struct ShareLinksListView: View {
         defer { busy = false }
         do { links = try await service.perform { source, _ in try await source.list() } }
         catch is CancellationError { }
-        catch { errorMessage = "Couldn’t load your links. Check your connection and try again." }
+        catch { errorMessage = .localized(AppMessages.sharingCouldnTLoadYourLinksCheckYourConnection(locale: locale)) }
     }
 
     private func revoke(_ link: ActivityMapAPI.ShareLinkSummary) async {
@@ -219,7 +224,7 @@ struct ShareLinksListView: View {
             await load()
         } catch {
             busy = false
-            errorMessage = "Revocation could not be confirmed. Refresh your links and try again."
+            errorMessage = .localized(AppMessages.sharingRevocationCouldNotBeConfirmedRefreshYourLinks(locale: locale))
         }
     }
 }

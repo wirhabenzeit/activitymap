@@ -46,7 +46,11 @@ final class SyncController {
     private(set) var photos: [Photo] = []
     private(set) var session: SyncSession?
     var firstSummaryCount: Int?
-    var firstSummaryError: String?
+    private(set) var firstSummaryMessage: PresentationText?
+    var firstSummaryError: String? {
+        get { firstSummaryMessage?.string() }
+        set { firstSummaryMessage = newValue.map(PresentationText.verbatim) }
+    }
     private(set) var firstSummaryRetryable = true
     private var pendingFirstSummaryCount: Int?
     private var fetchedInitialSummaries = false
@@ -320,7 +324,7 @@ final class SyncController {
                 guard current == generation else { return }
                 needsCleanup = false
                 status = .expired
-                if importing { firstSummaryError = Self.summaryErrorMessage(error) }
+                if importing { firstSummaryMessage = Self.summaryErrorMessage(error) }
                 return
             }
             // Reload committed pages even on failure: already-applied tombstones
@@ -328,7 +332,8 @@ final class SyncController {
             do { try await loadCache(session, storage: storage, generation: current) }
             catch { if current == generation { clearVisible() } }
             guard current == generation else { return }
-            if case .rateLimited(let delay, _) = error as? APIClient.RequestError {
+            let facts = APIClient.errorFacts(for: error)
+            if case .rateLimited = error as? APIClient.RequestError, let delay = facts.retryAfter {
                 retryAt = now().addingTimeInterval(delay)
                 retryIsRateLimit = true
                 status = deferredStatus
@@ -342,27 +347,26 @@ final class SyncController {
                 status = .failed(String(describing: error))
             }
             if importing {
-                firstSummaryError = Self.summaryErrorMessage(error)
-                if case .server(_, _, _, _, let retryable, _) = error as? APIClient.RequestError {
-                    firstSummaryRetryable = retryable
-                } else { firstSummaryRetryable = true }
+                firstSummaryMessage = Self.summaryErrorMessage(error)
+                firstSummaryRetryable = facts.serverRetryable ?? true
             }
         }
     }
 
-    private static func summaryErrorMessage(_ error: Error) -> String {
+    private static func summaryErrorMessage(_ error: Error) -> PresentationText {
         if case .server(let code, let message, _, _, _, _) = error as? APIClient.RequestError {
-            if code == "strava_not_connected" { return message + " Connect with Strava again in Settings." }
-            if code == "not_authenticated" { return message + " Sign in again to continue." }
-            return message
+            if code == "strava_not_connected" { return .localized(AppMessages.errorFirstSummaryReconnect(message)) }
+            if code == "not_authenticated" { return .localized(AppMessages.errorFirstSummarySignIn(message)) }
+            return .verbatim(message)
         }
-        return String(describing: error)
+        return .verbatim(String(describing: error))
     }
 
     private static func serverRetryDelay(_ error: Error) -> TimeInterval? {
+        let facts = APIClient.errorFacts(for: error)
         switch error as? APIClient.RequestError {
-        case .serviceUnavailable(let delay, _): return delay
-        case .server(_, _, _, _, true, let delay): return delay
+        case .serviceUnavailable: return facts.retryAfter
+        case .server where facts.serverRetryable == true: return facts.retryAfter
         default: return nil
         }
     }

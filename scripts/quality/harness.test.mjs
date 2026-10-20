@@ -22,6 +22,7 @@ import {
   prepareBrowserFixture,
 } from './browser-fixtures.mjs';
 import {
+  browserSuites,
   fixtureEnvironment,
   prepareFixtureWorkspace,
   runBrowserHarness,
@@ -29,8 +30,10 @@ import {
 } from './browser-harness.mjs';
 import { waitForFixtureRoute } from './browser-support.mjs';
 import {
+  nativePRUISelectors,
   nativeSuiteEligibility,
   nativeSuites,
+  nativeTestProfile,
   validateNativeSuites,
   validateNativeSummary,
 } from './native-harness.mjs';
@@ -42,7 +45,7 @@ async function temporary(t) {
   return directory;
 }
 
-test('native runtime eligibility reports iOS 27 native-sheet coverage without skipping iOS 26 cases', () => {
+test('native runtime eligibility reports iOS 27 sheet and content Back coverage while retaining iOS 26 calendar regressions', () => {
   const older = nativeSuiteEligibility('26.2');
   assert.deepEqual(older.ineligibleSuites, [
     {
@@ -57,8 +60,26 @@ test('native runtime eligibility reports iOS 27 native-sheet coverage without sk
       actual: '26.2',
       reason: 'Retained native-sheet continuation fixture',
     },
+    {
+      suite: 'ActivityMapTests/DetailBackGestureTests',
+      requires: 'iOS 27+',
+      actual: '26.2',
+      reason: 'Native content-pop recognizer delegate contract',
+    },
+    {
+      suite: 'ActivityMapUITests/StatsUITests',
+      requires: 'iOS 27+',
+      actual: '26.2',
+      reason: 'Stats calendar pan and native content Back contract',
+    },
   ]);
-  assert.equal(older.suites.length, nativeSuites.length - 2);
+  assert.equal(older.suites.length, nativeSuites.length - 4);
+  assert(older.suites.includes('ActivityMapTests/StatsCalendarLayoutTests'));
+  assert(
+    older.suites.includes('ActivityMapTests/StatsCalendarScrollRenderingTests'),
+  );
+  assert(!older.suites.includes('ActivityMapTests/DetailBackGestureTests'));
+  assert(!older.suites.includes('ActivityMapUITests/StatsUITests'));
   assert(older.suites.includes('ActivityMapUITests/MapPhotoUITests'));
   assert(!older.suites.includes('ActivityMapUITests/MapRotationUITests'));
   assert(
@@ -71,6 +92,75 @@ test('native runtime eligibility reports iOS 27 native-sheet coverage without sk
   });
   assert.throws(() => nativeSuiteEligibility('25.0'), /iOS 26/);
   assert.throws(() => nativeSuiteEligibility('unknown'), /iOS 26/);
+});
+
+test('native profiles retain all unit suites and select exactly the intended PR UI journeys', () => {
+  const pr = nativeTestProfile('pr');
+  const full = nativeTestProfile();
+  const unitSuites = nativeSuites.filter((suite) =>
+    suite.startsWith('ActivityMapTests/'),
+  );
+  const expectedUI = [
+    'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
+    'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
+    'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
+    'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
+    'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
+  ];
+  assert.equal(unitSuites.length, 30);
+  assert.deepEqual(nativePRUISelectors, expectedUI);
+  assert.deepEqual(pr.suites, [...unitSuites, ...expectedUI]);
+  assert.equal(new Set(pr.suites).size, 35);
+  assert.equal(pr.name, 'pr');
+  assert.equal(pr.runtimeTimeoutMs, 8 * 60 * 1000);
+  assert.deepEqual(full.suites, nativeSuites);
+  assert.equal(full.suites.length, 36);
+  assert.equal(full.name, 'full');
+  assert.equal(full.runtimeTimeoutMs, 35 * 60 * 1000);
+  assert.deepEqual(nativeTestProfile('full'), full);
+  for (const name of ['smoke', '', 'FULL', 'unknown'])
+    assert.throws(() => nativeTestProfile(name), /Unknown IOS_TEST_PROFILE/);
+  assert.throws(
+    () => nativeSuiteEligibility('27.0', 'unknown'),
+    /Unknown IOS_TEST_PROFILE/,
+  );
+});
+
+test('native PR eligibility names excluded methods precisely and retains ordinary iOS 26 regressions', () => {
+  const result = nativeSuiteEligibility('26.2', 'pr');
+  const excluded = [
+    ...nativePRUISelectors.filter((selector) =>
+      selector.includes('/ActivityContinuationUITests/'),
+    ),
+    'ActivityMapTests/DetailBackGestureTests',
+    ...nativePRUISelectors.filter((selector) =>
+      selector.includes('/StatsUITests/'),
+    ),
+  ];
+  assert.deepEqual(
+    result.ineligibleSuites.map((item) => item.suite),
+    excluded,
+  );
+  assert(
+    result.ineligibleSuites.every(
+      (item) => item.actual === '26.2' && item.requires === 'iOS 27+',
+    ),
+  );
+  assert.equal(result.suites.length, 30);
+  assert(
+    result.suites.includes(
+      'ActivityMapTests/StatsCalendarScrollRenderingTests',
+    ),
+  );
+  assert(result.suites.includes('ActivityMapTests/StatsCalendarLayoutTests'));
+  assert.deepEqual(
+    result.suites.filter((suite) => suite.startsWith('ActivityMapUITests/')),
+    [nativePRUISelectors[0]],
+  );
+  assert.deepEqual(nativeSuiteEligibility('27.0', 'pr'), {
+    suites: nativeTestProfile('pr').suites,
+    ineligibleSuites: [],
+  });
 });
 
 test('fixture startup drops inherited service credentials and uses an inert database', () => {
@@ -119,11 +209,7 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'tsconfig.json',
     'next.config.js',
     'postcss.config.js',
-    'scripts/verify-list-inspection.mjs',
-    'scripts/verify-stats-focus.mjs',
-    'scripts/verify-account-deletion.mjs',
-    'scripts/verify-presentation.mjs',
-    'scripts/verify-react-ui-reconciliation.mjs',
+    ...Object.values(browserSuites).map((script) => `scripts/${script}`),
     'scripts/fixtures/react-ui-reconciliation.tsx',
     'scripts/quality/browser-support.mjs',
     'scripts/quality/browser-fixtures.mjs',
@@ -277,6 +363,90 @@ test('native suite validation rejects a selected suite with zero runtime cases',
   assert.throws(
     () => validateNativeSuites(tree, ['Target/ExampleTests']),
     /Non-passing/,
+  );
+});
+
+test('native exact method validation cannot count a passing sibling or another target', () => {
+  const tree = {
+    testNodes: [
+      {
+        nodeType: 'Test Suite',
+        name: 'ExampleUITests',
+        nodeIdentifierURL: 'test://com.apple.xcode/App/UITests/ExampleUITests',
+        children: [
+          {
+            nodeType: 'Test Case',
+            name: 'testSibling()',
+            nodeIdentifier: 'ExampleUITests/testSibling()',
+            result: 'Passed',
+          },
+        ],
+      },
+    ],
+  };
+  const selector = 'UITests/ExampleUITests/testRequired';
+  assert.throws(
+    () => validateNativeSuites(tree, [selector]),
+    /Missing executed/,
+  );
+  tree.testNodes[0].children.push({
+    nodeType: 'Test Case',
+    name: 'testRequired()',
+    nodeIdentifier: 'ExampleUITests/testRequired()',
+    result: 'Passed',
+  });
+  assert.deepEqual(validateNativeSuites(tree, [selector]), { [selector]: 1 });
+  assert.deepEqual(validateNativeSuites(tree, [`${selector}()`]), {
+    [`${selector}()`]: 1,
+  });
+  assert.deepEqual(validateNativeSuites(tree, ['UITests/ExampleUITests']), {
+    'UITests/ExampleUITests': 2,
+  });
+  for (const result of ['Failed', 'Skipped', 'Expected Failure']) {
+    tree.testNodes[0].children[1].result = result;
+    assert.throws(() => validateNativeSuites(tree, [selector]), /Non-passing/);
+  }
+  tree.testNodes[0].children[1].result = 'Passed';
+  tree.testNodes[0].nodeIdentifierURL =
+    'test://com.apple.xcode/App/OtherTarget/ExampleUITests';
+  assert.throws(
+    () => validateNativeSuites(tree, [selector]),
+    /Missing executed/,
+  );
+  delete tree.testNodes[0].nodeIdentifierURL;
+  tree.testNodes[0].nodeIdentifier = 'OtherTarget/ExampleUITests';
+  assert.throws(
+    () => validateNativeSuites(tree, [selector]),
+    /Missing executed/,
+  );
+  tree.testNodes[0].nodeIdentifier = 'UITests/ExampleUITests';
+  assert.deepEqual(validateNativeSuites(tree, [selector]), { [selector]: 1 });
+  tree.testNodes[0].nodeIdentifier = 'ExampleUITests';
+  assert.deepEqual(validateNativeSuites(tree, [selector]), { [selector]: 1 });
+});
+
+test('native exact method validation supports test names when xcresult omits identifiers', () => {
+  const tree = {
+    testNodes: [
+      {
+        nodeType: 'Test Suite',
+        name: 'ExampleUITests',
+        children: [
+          { nodeType: 'Test Case', name: 'testRequired()', result: 'Passed' },
+          {
+            nodeType: 'Test Case',
+            name: 'testRequiredElsewhere()',
+            result: 'Passed',
+          },
+        ],
+      },
+    ],
+  };
+  const selector = 'UITests/ExampleUITests/testRequired';
+  assert.deepEqual(validateNativeSuites(tree, [selector]), { [selector]: 1 });
+  assert.throws(
+    () => validateNativeSuites(tree, ['UITests/ExampleUITests/testMissing']),
+    /Missing executed/,
   );
 });
 

@@ -11,22 +11,37 @@ struct StatsPeriodDetail<Curve: View>: View {
     let history: [StatsPeriodHistoryComparison]
     let metric: StatsMetric
     let today: Int
+    var expanded = true
     let openActivity: (Int) -> Void
     @ViewBuilder let curve: () -> Curve
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.statsDetailHeightLimit) private var shortViewportLimit
+    @Environment(\.statsExpansionProgress) private var sharedExpansionProgress
     @State private var width: CGFloat = 0
     private var monthly: Bool { if case .month = rhythm { return true }; return false }
+    private var sideBySide: Bool { expanded && width >= 1000 && !typeSize.isAccessibilitySize }
     var body: some View {
-        VStack(alignment: .leading, spacing: 24) {
-            let layout = width >= 1000 && !typeSize.isAccessibilitySize ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 24))
+        // Gaps live inside the reveals, so a collapsed card keeps its height.
+        VStack(alignment: .leading, spacing: 0) {
+            let layout = sideBySide ? AnyLayout(HStackLayout(alignment: .top, spacing: 24)) : AnyLayout(VStackLayout(alignment: .leading, spacing: 0))
             layout {
                 curve().environment(\.statsFocusChartHeight, width >= 760 ? 320 : 200)
                     .environment(\.statsDetailHeightLimit, width < 760 ? min(shortViewportLimit ?? 200, 200) : shortViewportLimit)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                rhythmView.frame(maxWidth: .infinity, alignment: .leading)
+                if expanded || (sharedExpansionProgress ?? 0) > 0 {
+                    StatsExpansionReveal(expanded: expanded) {
+                        rhythmView.padding(.top, sideBySide ? 0 : 24)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
             }
-            StatsPeriodHistoryTable(rows: history, metric: metric, monthly: monthly)
+            // A zero-height reveal alone leaves its controls in the native
+            // accessibility tree. Mount details only while focused or morphing.
+            if expanded || (sharedExpansionProgress ?? 0) > 0 {
+                StatsExpansionReveal(expanded: expanded) {
+                    StatsPeriodHistoryTable(rows: history, metric: metric, monthly: monthly).padding(.top, 24)
+                }
+            }
         }.onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
     @ViewBuilder private var rhythmView: some View {
@@ -38,6 +53,9 @@ struct StatsPeriodDetail<Curve: View>: View {
 }
 
 private struct StatsMonthRhythmView: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let rhythm: StatsMonthRhythm
     let metric: StatsMetric
     let today: Int
@@ -58,6 +76,7 @@ private struct StatsMonthRhythmView: View {
     private var sports: [ActivityCategory] { ActivityCategory.allCases.filter { sport in rhythm.days.contains { day in day.activities.contains { $0.sport == sport } } } }
     private var offset: Int { rhythm.days.first.map { $0.day - StatsDates.monday($0.day) } ?? 0 }
     private var listsDays: Bool { typeSize.isAccessibilitySize || width < 314 }
+    private var weeks: [Int] { Array(0..<((offset + rhythm.days.count + 6) / 7)) }
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Daily rhythm").font(.headline)
@@ -71,19 +90,36 @@ private struct StatsMonthRhythmView: View {
                     Button { focusedDay = day.day } label: {
                         HStack {
                             VStack(alignment: .leading) {
-                                Text(StatsDisplay.shortDate(day.day))
+                                Text(StatsDisplay.shortDate(day.day, locale: locale))
                                 Text(activityCount(day.activities.count)).font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Text(StatsDisplay.measurement(day.bySport.values.reduce(0, +), metric: metric))
+                            Text(StatsDisplay.measurement(day.bySport.values.reduce(0, +), metric: metric, units: units, locale: locale))
                         }.frame(minHeight: 44)
                     }.buttonStyle(.plain).accessibilityAddTraits(day.day == focusedDay ? .isSelected : [])
                 }
             } else {
-                LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 1), count: 7), spacing: 6) {
-                    ForEach(0..<7, id: \.self) { index in Text(StatsDisplay.weekday(StatsDates.monday(today) + index)).font(.caption2).foregroundStyle(.secondary).accessibilityHidden(true) }
-                    ForEach((-offset)..<0, id: \.self) { _ in Color.clear.frame(height: 60).accessibilityHidden(true) }
-                    ForEach(rhythm.days, id: \.day) { day in dayCell(day) }
+                // Eager rows, not a lazy grid: estimated row heights changed
+                // between layout passes and shook the block while the card grew.
+                VStack(spacing: 6) {
+                    HStack(spacing: 1) {
+                        ForEach(0..<7, id: \.self) { index in
+                            Text(StatsDisplay.weekday(StatsDates.monday(today) + index, locale: locale)).font(.caption2).foregroundStyle(.secondary)
+                                .frame(maxWidth: .infinity).accessibilityHidden(true)
+                        }
+                    }
+                    ForEach(weeks, id: \.self) { week in
+                        HStack(alignment: .top, spacing: 1) {
+                            ForEach(0..<7, id: \.self) { column in
+                                let index = week * 7 + column - offset
+                                if rhythm.days.indices.contains(index) {
+                                    dayCell(rhythm.days[index]).frame(maxWidth: .infinity)
+                                } else {
+                                    Color.clear.frame(maxWidth: .infinity).frame(height: 60).accessibilityHidden(true)
+                                }
+                            }
+                        }
+                    }
                 }
             }
             StatsRhythmLegend(sports: sports)
@@ -93,11 +129,11 @@ private struct StatsMonthRhythmView: View {
             }
             if let selected {
                 Divider()
-                Text(StatsDisplay.date(selected.day)).font(.subheadline.weight(.semibold))
+                Text(StatsDisplay.date(selected.day, locale: locale, dateFormat: preferences?.dateFormat ?? .system)).font(.subheadline.weight(.semibold))
                 if selected.activities.isEmpty { Text("No matching activities on this day.").font(.caption).foregroundStyle(.secondary) }
                 ForEach(Array(selected.activities.enumerated()), id: \.offset) { _, activity in
                     StatsActivityRow(sport: activity.sport, name: activity.name,
-                                     summary: "\(activity.sport.name) · \(StatsDisplay.measurement(activity.value(metric), metric: metric))",
+                                     summary: "\(activity.sport.name) · \(StatsDisplay.measurement(activity.value(metric), metric: metric, units: units, locale: locale))",
                                      open: activity.id.map { id in { openActivity(id) } })
                         .background(activity.id != nil && activity.id == inspectedActivityID ? Color.accentColor.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 8))
                         .accessibilityIdentifier(activity.id.map { "stats-month-activity-\($0)" } ?? "")
@@ -111,7 +147,7 @@ private struct StatsMonthRhythmView: View {
     }
     private var average: String {
         guard let average = rhythm.average else { return "—" }
-        return metric == .count ? StatsDisplay.number(average, decimals: 1) : StatsDisplay.measurement(average, metric: metric)
+        return metric == .count ? StatsDisplay.number(average, decimals: 1, locale: locale) : StatsDisplay.measurement(average, metric: metric, units: units, locale: locale)
     }
     private func activityCount(_ count: Int) -> String { count == 1 ? "1 activity" : "\(count) activities" }
     private func reconcileSelection() {
@@ -142,14 +178,17 @@ private struct StatsMonthRhythmView: View {
         .focused($keyboardDay, equals: day.day)
         .statsDayKeys(day: day.day, first: rhythm.days.first?.day ?? today, last: today,
                       layout: .monthRows, rtl: layoutDirection == .rightToLeft) { keyboardDay = $0 }
-        .accessibilityLabel(StatsDisplay.date(day.day))
-        .accessibilityValue(day.day > today ? "Not yet elapsed" : "\(activityCount(day.activities.count)), \(StatsDisplay.measurement(total, metric: metric))")
+        .accessibilityLabel(StatsDisplay.date(day.day, locale: locale, dateFormat: preferences?.dateFormat ?? .system))
+        .accessibilityValue(day.day > today ? "Not yet elapsed" : "\(activityCount(day.activities.count)), \(StatsDisplay.measurement(total, metric: metric, units: units, locale: locale))")
         .accessibilityAddTraits(day.day == focusedDay ? .isSelected : [])
         .accessibilityIdentifier("stats-month-day-\(day.day)")
     }
 }
 
 private struct StatsYearRhythmView: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let months: [StatsYearMonthRhythm]
     let metric: StatsMetric
     let today: Int
@@ -160,7 +199,7 @@ private struct StatsYearRhythmView: View {
     private var ticks: [Int] { Array(stride(from: 0, to: months.count, by: typeSize.isAccessibilitySize ? max(1, (months.count + 1) / 2) : 1)) }
     private var maximum: Double { max(1, months.flatMap { [$0.current.values.reduce(0, +), $0.previous.values.reduce(0, +)] }.max() ?? 0) * 1.08 }
     private var axisTicks: [Double] { StatsDisplay.axisTicks(maximum: maximum) }
-    private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0]) : 1 }
+    private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0], units: units) : 1 }
     private var year: Int { StatsDates.parts(today).year! }
     private var selectedIndex: Int {
         let start = inspection?.yearMonth ?? selectedMonth
@@ -198,12 +237,12 @@ private struct StatsYearRhythmView: View {
             .chartYScale(domain: 0...maximum)
             .chartXAxis {
                 AxisMarks(values: ticks) { tick in
-                    AxisValueLabel { if let index = tick.as(Int.self), months.indices.contains(index) { Text(StatsDates.date(months[index].start).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated))).font(.caption2) } }
+                    AxisValueLabel { if let index = tick.as(Int.self), months.indices.contains(index) { Text(StatsDates.date(months[index].start).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated))).font(.caption2) } }
                 }
             }.chartYAxis {
                 AxisMarks(position: .leading, values: axisTicks) { tick in
                     AxisGridLine()
-                    AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value), step: axisStep)).font(.caption2) } }
+                    AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value, units: units), step: axisStep, locale: locale)).font(.caption2) } }
                 }
             }.chartXSelection(value: Binding<Double?>(
                 get: { Double(selectedIndex) },
@@ -214,16 +253,16 @@ private struct StatsYearRhythmView: View {
                 let month = months[selectedIndex]
                 Picker("Compare month", selection: monthSelection) {
                     ForEach(Array(months.enumerated()), id: \.offset) { index, month in
-                        Text(StatsDisplay.month(month.start)).tag(index)
+                        Text(StatsDisplay.month(month.start, locale: locale)).tag(index)
                     }
                 }.pickerStyle(.menu)
                 .accessibilityIdentifier("stats-year-rhythm-month")
                 StatsSummaryValues(items: [
-                    .init(label: String(year - 1), value: StatsDisplay.measurement(month.previous.values.reduce(0, +), metric: metric)),
-                    .init(label: String(year), value: StatsDisplay.measurement(month.current.values.reduce(0, +), metric: metric)),
+                    .init(label: String(year - 1), value: StatsDisplay.measurement(month.previous.values.reduce(0, +), metric: metric, units: units, locale: locale)),
+                    .init(label: String(year), value: StatsDisplay.measurement(month.current.values.reduce(0, +), metric: metric, units: units, locale: locale)),
                 ])
                 .accessibilityElement(children: .ignore)
-                .accessibilityLabel("\(StatsDisplay.month(month.start)): \(String(year - 1)), \(StatsDisplay.measurement(month.previous.values.reduce(0, +), metric: metric)); \(String(year)), \(StatsDisplay.measurement(month.current.values.reduce(0, +), metric: metric))")
+                .accessibilityLabel("\(StatsDisplay.month(month.start, locale: locale)): \(String(year - 1)), \(StatsDisplay.measurement(month.previous.values.reduce(0, +), metric: metric, units: units, locale: locale)); \(String(year)), \(StatsDisplay.measurement(month.current.values.reduce(0, +), metric: metric, units: units, locale: locale))")
                 .accessibilityIdentifier("stats-year-rhythm-totals")
                 Text(month.inProgress ? "Current month totals through the same calendar date." : "Completed month totals.")
                     .font(.caption).foregroundStyle(.secondary)
@@ -239,8 +278,8 @@ private struct StatsYearRhythmView: View {
         return RectangleMark(xStart: .value("Month start", start), xEnd: .value("Month end", end),
                        yStart: .value("Lower", low), yEnd: .value("Upper", low + value))
             .foregroundStyle(sport.color.opacity(current ? 1 : 0.4))
-            .accessibilityLabel("\(StatsDisplay.month(month.start)), \(String(current ? year : year - 1)), \(sport.name)\(month.inProgress ? ", through the same date" : "")")
-            .accessibilityValue(StatsDisplay.measurement(value, metric: metric))
+            .accessibilityLabel("\(StatsDisplay.month(month.start, locale: locale)), \(String(current ? year : year - 1)), \(sport.name)\(month.inProgress ? ", through the same date" : "")")
+            .accessibilityValue(StatsDisplay.measurement(value, metric: metric, units: units, locale: locale))
     }
 
 }
@@ -256,6 +295,9 @@ private struct StatsRhythmLegend: View {
 }
 
 private struct StatsPeriodHistoryTable: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let rows: [StatsPeriodHistoryComparison]
     let metric: StatsMetric
     let monthly: Bool
@@ -268,9 +310,9 @@ private struct StatsPeriodHistoryTable: View {
                     GridRow { Text(monthly ? "Month" : "Year").gridColumnAlignment(.leading); Text("Through same date"); Text("Full period") }.fontWeight(.semibold).accessibilityAddTraits(.isHeader)
                     ForEach(rows, id: \.start) { row in
                         GridRow {
-                            Text("\(monthly ? StatsDisplay.month(row.start) : String(StatsDates.parts(row.start).year!))\(row.incomplete && row.fullTotal != nil ? " · partial history" : "")")
-                            Text(StatsDisplay.measurement(row.elapsed, metric: metric))
-                            Text(row.fullTotal.map { StatsDisplay.measurement($0, metric: metric) } ?? "In progress")
+                            Text("\(monthly ? StatsDisplay.month(row.start, locale: locale) : String(StatsDates.parts(row.start).year!))\(row.incomplete && row.fullTotal != nil ? " · partial history" : "")")
+                            Text(StatsDisplay.measurement(row.elapsed, metric: metric, units: units, locale: locale))
+                            Text(row.fullTotal.map { StatsDisplay.measurement($0, metric: metric, units: units, locale: locale) } ?? "In progress")
                         }.accessibilityElement(children: .combine)
                     }
                 }.font(.caption).monospacedDigit().fixedSize(horizontal: true, vertical: false).padding(.vertical, 4)

@@ -2,8 +2,8 @@
 
 import { useMemo } from 'react';
 
+import type { Activity } from '~/lib/activity';
 import { projectActivities } from '~/lib/browsing-projection';
-import type { Activity } from '~/server/db/schema';
 import { useShallowStore } from '~/store';
 
 /** Pure projection: no library observer and no selection writes. */

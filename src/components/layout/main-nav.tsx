@@ -1,16 +1,14 @@
 'use client';
 
-import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+
+import { message } from '~/lib/presentation/messages';
 import { cn } from '~/lib/utils';
 
 export function MainNav() {
   const pathname = usePathname();
-  const router = useRouter();
-
-  const handleNavigation = (path: string) => {
-    router.push(path);
-  };
 
   // Get current view from pathname for highlighting
   const getCurrentView = () => {
@@ -22,12 +20,13 @@ export function MainNav() {
   const currentView = getCurrentView();
 
   return (
-    <div className="ml-2 mr-4 flex">
-      <button
-        aria-label="ActivityMap home"
-        onClick={() => handleNavigation('/')}
+    <div className="mr-4 ml-2 flex">
+      <Link
+        href="/"
+        aria-current={currentView === 'map' ? 'page' : undefined}
+        aria-label={message('navigation.home')}
         className={cn(
-          'hover:text-header-foreground mr-4 flex items-center space-x-2 lg:mr-6',
+          'mr-4 flex min-h-11 items-center space-x-2 hover:text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 lg:mr-6',
           currentView === 'map'
             ? 'text-header-foreground'
             : 'text-header-foreground/60',
@@ -41,30 +40,35 @@ export function MainNav() {
           className="h-6 w-auto"
         />
         <span className="hidden font-bold lg:inline-block">ActivityMap</span>
-      </button>
-      <nav className="flex items-center gap-4 text-sm font-semibold lg:gap-6">
-        <button
-          onClick={() => handleNavigation('/list')}
+      </Link>
+      <nav
+        aria-label={message('navigation.view')}
+        className="flex items-center gap-4 text-sm font-semibold lg:gap-6"
+      >
+        <Link
+          href="/list"
+          aria-current={currentView === 'list' ? 'page' : undefined}
           className={cn(
-            'hover:text-header-foreground',
+            'inline-flex min-h-11 items-center hover:text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4',
             currentView === 'list'
               ? 'text-header-foreground'
               : 'text-header-foreground/60',
           )}
         >
-          List
-        </button>
-        <button
-          onClick={() => handleNavigation('/stats/tiles')}
+          {message('navigation.list')}
+        </Link>
+        <Link
+          href="/stats/tiles"
+          aria-current={currentView === 'stats' ? 'page' : undefined}
           className={cn(
-            'hover:text-header-foreground',
+            'inline-flex min-h-11 items-center hover:text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4',
             currentView === 'stats'
               ? 'text-header-foreground'
               : 'text-header-foreground/60',
           )}
         >
-          Stats
-        </button>
+          {message('navigation.stats')}
+        </Link>
       </nav>
     </div>
   );

@@ -61,17 +61,17 @@ enum ActivitySummaryMetric: String, CaseIterable, Identifiable {
         }
         return value.flatMap { $0.isFinite ? $0 : nil }
     }
-    func formatted(_ value: Double?) -> String {
+    func formatted(_ value: Double?, units: UnitSystem = .metric, locale: Locale = .current) -> String {
         switch self {
-        case .distance: Formatters.distance(value)
+        case .distance: Formatters.distance(value, locale: locale, units: units)
         case .elapsedTime, .movingTime:
             // Aggregate in Double without an overflowing Int sum. Convert only
             // the representable final seconds at the presentation boundary.
-            Formatters.duration(value.flatMap(Int.init(exactly:)))
-        case .elevationGain, .elevationHigh, .elevationLow: Formatters.elevation(value)
-        case .averageSpeed: Formatters.speed(value)
-        case .averagePower, .weightedPower, .maxPower: Formatters.watts(value)
-        case .averageHeartRate, .maxHeartRate: Formatters.heartrate(value)
+            Formatters.duration(value.flatMap(Int.init(exactly:)), locale: locale)
+        case .elevationGain, .elevationHigh, .elevationLow: Formatters.elevation(value, locale: locale, units: units)
+        case .averageSpeed: Formatters.speed(value, locale: locale, units: units)
+        case .averagePower, .weightedPower, .maxPower: Formatters.watts(value, locale: locale)
+        case .averageHeartRate, .maxHeartRate: Formatters.heartrate(value, locale: locale)
         }
     }
 }

@@ -7,18 +7,20 @@ struct AccountSheet: View {
     var sync: SyncController? = nil
     var refresh: (() async -> Void)? = nil
 
+    @Environment(\.locale) private var locale
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var ingestionStatus = IngestionStatusController()
     @State private var stravaImport = StravaImportController()
     @Environment(DisplayPreferences.self) private var injectedPreferences: DisplayPreferences?
-    private var preferences: DisplayPreferences { injectedPreferences ?? .shared }
+    @State private var previewPreferences = DisplayPreferences(defaults: nil)
+    private var preferences: DisplayPreferences { injectedPreferences ?? previewPreferences }
     /// Profile opened while signed out is only a login presentation: once the
     /// connection is verified it closes and returns to the browsing context.
     /// Profile opened for account management stays open (#304).
     @State private var openedForLogin: Bool?
     @State private var confirmDeletion = false
-    @State private var deletionError: String?
+    @State private var deletionError: PresentationText?
     @State private var accountDeleted = false
     @State private var clearingDeletedData = false
 
@@ -38,7 +40,7 @@ struct AccountSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") { dismiss() }
+                    Button(String(localized: AppMessages.actionDone(locale: locale))) { dismiss() }
                         .disabled(auth.deletingAccount || clearingDeletedData)
                 }
             }
@@ -46,13 +48,13 @@ struct AccountSheet: View {
         .preferredColorScheme(preferences.appearance.colorScheme)
         .presentationDetents([.large])
         .interactiveDismissDisabled(auth.deletingAccount || clearingDeletedData)
-        .alert("Delete your account and all ActivityMap data?", isPresented: $confirmDeletion) {
-            Button("Cancel", role: .cancel) {}
-            Button("Permanently delete my account", role: .destructive) {
+        .alert(String(localized: AppMessages.accountNativeDeleteYourAccountAndAllActivityMapData(locale: locale)), isPresented: $confirmDeletion) {
+            Button(String(localized: AppMessages.activityEditCancel(locale: locale)), role: .cancel) {}
+            Button(String(localized: AppMessages.accountConfirmDelete(locale: locale)), role: .destructive) {
                 Task { await deleteAccountAndData() }
             }
         } message: {
-            Text("This can’t be undone. Your original Strava activities stay on Strava. Signing in again creates a new account and starts a fresh import.")
+            Text(String(localized: AppMessages.accountNativeThisCanTBeUndoneYourOriginalStrava(locale: locale)))
         }
         .onAppear {
             if openedForLogin == nil { openedForLogin = destination == .profile && auth.currentUser == nil }
@@ -91,7 +93,7 @@ struct AccountSheet: View {
     // A bare Group loses the list layout when pushed from Settings.
     var accountPage: some View {
         Form { accountContent }
-            .navigationTitle("Account")
+            .navigationTitle(String(localized: AppMessages.navigationAccount(locale: locale)))
             .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -99,23 +101,23 @@ struct AccountSheet: View {
     private var accountContent: some View {
         if accountDeleted {
             Section {
-                Text("Your ActivityMap account has been deleted.")
-                if let deletionError { Text(deletionError).foregroundStyle(.red) }
-                Button(clearingDeletedData ? "Clearing local data…" : "Finish clearing local data") {
+                Text(String(localized: AppMessages.accountDeleted(locale: locale)))
+                if let deletionError { Text(verbatim: deletionError.string(locale: locale)).foregroundStyle(.red) }
+                Button(clearingDeletedData ? String(localized: AppMessages.accountClearing(locale: locale)) : String(localized: AppMessages.accountFinishClearing(locale: locale))) {
                     Task { await deleteAccountAndData() }
                 }.disabled(clearingDeletedData)
             }
         } else {
             profileContent
             if let deletionError {
-                Section { Text(deletionError).foregroundStyle(.red) }
+                Section { Text(verbatim: deletionError.string(locale: locale)).foregroundStyle(.red) }
             }
         }
     }
 
     var aboutPage: some View {
         Form { aboutContent }
-            .navigationTitle("About ActivityMap")
+            .navigationTitle(String(localized: AppMessages.accountNativeAboutActivityMap(locale: locale)))
             .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -125,9 +127,9 @@ struct AccountSheet: View {
         case .signedOut:
             signedOutContent
         case .restoring:
-            progressContent("Checking your session…")
+            progressContent(String(localized: AppMessages.accountNativeCheckingYourSession(locale: locale)))
         case .signingIn:
-            progressContent("Signing in…")
+            progressContent(String(localized: AppMessages.accountNativeSigningIn(locale: locale)))
         case .signedIn(let user):
             signedInContent(user)
         case .sessionRestoreFailed(let message):
@@ -145,7 +147,7 @@ struct AccountSheet: View {
         Section {
             VStack(spacing: 16) {
                 VStack(spacing: 8) {
-                    Text("Connect Strava to see your activities")
+                    Text(String(localized: AppMessages.statusBrowsingConnectStravaToSeeYourActivities(locale: locale)))
                         .font(.headline)
                     Text(StravaConnectCopy.purpose)
                         .font(.subheadline)
@@ -175,9 +177,9 @@ struct AccountSheet: View {
         let limited = user.stravaConnected && StravaPermissionsCopy.isLimited(user.stravaPermissions)
         let needsReconnect = !user.stravaConnected || limited || importNeedsReconnect
         return Group {
-            Section("Account") {
+            Section(String(localized: AppMessages.navigationAccount(locale: locale))) {
                 VStack(alignment: .leading, spacing: 3) {
-                    Text(user.name ?? "Your account")
+                    Text(verbatim: user.name ?? String(localized: AppMessages.accountYourAccount(locale: locale)))
                         .font(.headline)
                     if let email = displayEmail(user.email) {
                         Text(email)
@@ -185,14 +187,14 @@ struct AccountSheet: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-                Text(!user.stravaConnected ? "Strava not connected"
-                    : limited ? "Strava connected with limited access" : "Strava connected")
+                Text(!user.stravaConnected ? String(localized: AppMessages.accountStravaDisconnected(locale: locale))
+                    : limited ? String(localized: AppMessages.accountStravaLimited(locale: locale)) : String(localized: AppMessages.accountStravaConnected(locale: locale)))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 if needsReconnect {
                     Text(limited
                          ? (StravaPermissionsCopy.notes(user.stravaPermissions) + [StravaPermissionsCopy.reconnect]).joined(separator: " ")
-                         : "Connect with Strava again to restore access to your activities.")
+                         : String(localized: AppMessages.accountReconnect(locale: locale)))
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     StravaConnectControls(showsPermissions: false)
@@ -201,23 +203,23 @@ struct AccountSheet: View {
             }
 
             Section {
-                Button("Sign out of ActivityMap", role: .destructive) {
+                Button(String(localized: AppMessages.accountSignOut(locale: locale)), role: .destructive) {
                     Task { await auth.signOut() }
                 }
                 .accessibilityIdentifier("account-sign-out")
                 .disabled(auth.deletingAccount)
             } footer: {
-                Text("Strava stays connected.")
+                Text(String(localized: AppMessages.accountStravaStaysConnected(locale: locale)))
             }
 
             Section {
-                Button(auth.deletingAccount ? "Deleting account…" : "Delete account and data", role: .destructive) {
+                Button(auth.deletingAccount ? String(localized: AppMessages.accountDeleting(locale: locale)) : String(localized: AppMessages.accountDelete(locale: locale)), role: .destructive) {
                     confirmDeletion = true
                 }
                 .disabled(auth.deletingAccount)
                 .accessibilityIdentifier("account-delete")
             } footer: {
-                Text("Permanently delete your ActivityMap account, imported activities, photos and share links. Your original Strava activities stay on Strava.")
+                Text(String(localized: AppMessages.accountNativePermanentlyDeleteYourActivityMapAccountImportedActivitiesPhotos(locale: locale)))
             }
 
         }
@@ -230,7 +232,7 @@ struct AccountSheet: View {
                 try await auth.deleteAccount()
                 accountDeleted = true
             } catch {
-                deletionError = "Couldn’t confirm account deletion. Check your connection and try again."
+                deletionError = .localized(AppMessages.accountNativeCouldnTConfirmAccountDeletionCheckYourConnection(locale: locale))
                 return
             }
         }
@@ -240,7 +242,7 @@ struct AccountSheet: View {
             try await sync?.clearAfterAccountDeletion()
             dismiss()
         } catch {
-            deletionError = "Your account was deleted, but local data could not be cleared. Retry to finish."
+            deletionError = .localized(AppMessages.accountNativeYourAccountWasDeletedButLocalDataCould(locale: locale))
         }
     }
 
@@ -252,9 +254,9 @@ struct AccountSheet: View {
         Group {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Couldn't Verify Your Session")
+                    Text(String(localized: AppMessages.connectVerifyTitle(locale: locale)))
                         .font(.headline)
-                    Text(message)
+                    Text(verbatim: message)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -262,7 +264,7 @@ struct AccountSheet: View {
 
             Section {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Button("Retry") {
+                    Button(String(localized: AppMessages.actionRetry(locale: locale))) {
                         Task { await auth.restoreSession() }
                     }
                     .disabled(auth.restoreRetryAt.map { $0 > context.date } ?? false)
@@ -277,16 +279,16 @@ struct AccountSheet: View {
         Group {
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Text("Sign-Out Failed")
+                    Text(String(localized: AppMessages.accountNativeSignOutFailed(locale: locale)))
                         .font(.headline)
-                    Text(message)
+                    Text(verbatim: message)
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
 
             Section {
-                Button("Try Again") {
+                Button(String(localized: AppMessages.accountNativeTryAgain(locale: locale))) {
                     Task { await auth.signOut() }
                 }
             }
@@ -304,26 +306,26 @@ struct AccountSheet: View {
             accountContent
 
             Section {
-                Picker("Units", selection: $preferences.units) {
+                Picker(String(localized: AppMessages.displayUnits(locale: locale)), selection: $preferences.units) {
                     ForEach(UnitSystem.allCases) { unit in
-                        Text(unit.title).tag(unit)
+                        Text(verbatim: unit.title(locale: locale)).tag(unit)
                     }
                 }
 
-                Picker("Date format", selection: $preferences.dateFormat) {
-                    ForEach(PreferredDateFormat.allCases) { format in Text(format.title).tag(format) }
+                Picker(String(localized: AppMessages.displayDateFormat(locale: locale)), selection: $preferences.dateFormat) {
+                    ForEach(PreferredDateFormat.allCases) { format in Text(verbatim: format.title(locale: locale)).tag(format) }
                 }
 
-                Picker("Appearance", selection: $preferences.appearance) {
+                Picker(String(localized: AppMessages.displayAppearance(locale: locale)), selection: $preferences.appearance) {
                     ForEach(Appearance.allCases) { appearance in
-                        Text(appearance.title).tag(appearance)
+                        Text(verbatim: appearance.title(locale: locale)).tag(appearance)
                     }
                 }
-            } header: { Text("Display") } footer: {
-                Text("Distance, elevation and speed use \(preferences.units == .metric ? "kilometres, metres and km/h" : "miles, feet and mph"). Preferences are saved on this device.")
+            } header: { Text(String(localized: AppMessages.settingsDisplay(locale: locale))) } footer: {
+                Text(preferences.units == .metric ? AppMessages.displayMetricExplanation(locale: locale) : AppMessages.displayImperialExplanation(locale: locale))
             }
-            Section("About") {
-                NavigationLink("About ActivityMap") { aboutPage }
+            Section(String(localized: AppMessages.settingsAbout(locale: locale))) {
+                NavigationLink(String(localized: AppMessages.accountNativeAboutActivityMap(locale: locale))) { aboutPage }
                     .accessibilityIdentifier("settings-about")
             }
         }
@@ -332,13 +334,13 @@ struct AccountSheet: View {
     @ViewBuilder
     private var syncContent: some View {
         if let sync {
-            Section("Sync & data") {
-                LabeledContent("Last device sync", value: sync.lastSyncAt?.formatted(date: .abbreviated, time: .shortened) ?? "Not yet synced")
+            Section(String(localized: AppMessages.settingsSyncData(locale: locale))) {
+                LabeledContent(String(localized: AppMessages.accountNativeLastDeviceSync(locale: locale)), value: sync.lastSyncAt?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: AppMessages.settingsNotSynced(locale: locale)))
                 if let refresh, sync.session != nil {
                     Button {
                         Task { await refresh() }
                     } label: {
-                        Label("Sync now", systemImage: "arrow.clockwise")
+                        Label(String(localized: AppMessages.settingsSyncNow(locale: locale)), systemImage: "arrow.clockwise")
                     }
                         .disabled(!sync.canRefresh)
                 }
@@ -346,7 +348,7 @@ struct AccountSheet: View {
                     Text(syncMessage).font(.footnote).foregroundStyle(.secondary)
                 }
                 if let date = sync.retryNotBefore, date > Date() {
-                    Text("Try again after \(date.formatted(date: .abbreviated, time: .shortened)).")
+                    Text(AppMessages.mutationRetryAfter(date.formatted(date: .abbreviated, time: .shortened), locale: locale))
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
@@ -355,14 +357,14 @@ struct AccountSheet: View {
 
     private var syncMessage: String? {
         switch sync?.status {
-        case .signedOut: "Sign in to sync your activities."
+        case .signedOut: String(localized: AppMessages.settingsSignInToSync(locale: locale))
         case .syncing: "Syncing…"
-        case .offline: "Offline. Sync will resume when you’re back online."
-        case .failed: "Couldn’t sync. Please try again."
-        case .paused: "Sync paused. Tap Sync now to resume."
-        case .expired: "Sign in again from Account to sync your activities."
-        case .disconnected: "Reconnect Strava from Account to sync your activities."
-        case .rateLimited, .retryAfter: "Couldn’t sync. Please try again later."
+        case .offline: String(localized: AppMessages.settingsOfflineSync(locale: locale))
+        case .failed: String(localized: AppMessages.settingsSyncError(locale: locale))
+        case .paused: String(localized: AppMessages.accountNativeSyncPausedTapSyncNowToResume(locale: locale))
+        case .expired: String(localized: AppMessages.accountNativeSignInAgainFromAccountToSyncYour(locale: locale))
+        case .disconnected: String(localized: AppMessages.accountNativeReconnectStravaFromAccountToSyncYourActivities(locale: locale))
+        case .rateLimited, .retryAfter: String(localized: AppMessages.accountNativeCouldnTSyncPleaseTryAgainLater(locale: locale))
         case .ready, nil: nil
         }
     }
@@ -370,12 +372,12 @@ struct AccountSheet: View {
     private var aboutContent: some View {
         Group {
             Section {
-                LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
-                LabeledContent("Build", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—")
+                LabeledContent(String(localized: AppMessages.accountNativeVersion(locale: locale)), value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—")
+                LabeledContent(String(localized: AppMessages.accountNativeBuild(locale: locale)), value: Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—")
             }
 
             Section {
-                Text("Explore your activities on a map, in a list, and through meaningful summaries.")
+                Text(String(localized: AppMessages.accountNativeExploreYourActivitiesOnAMapInA(locale: locale)))
                     .foregroundStyle(.secondary)
             }
         }
@@ -383,9 +385,9 @@ struct AccountSheet: View {
 
     private var title: String {
         switch destination {
-        case .profile: "Account"
-        case .settings: "Settings"
-        case .about: "About"
+        case .profile: String(localized: AppMessages.navigationAccount(locale: locale))
+        case .settings: String(localized: AppMessages.navigationSettings(locale: locale))
+        case .about: String(localized: AppMessages.settingsAbout(locale: locale))
         }
     }
 }

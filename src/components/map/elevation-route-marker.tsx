@@ -4,12 +4,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { memo } from 'react';
 import { Marker } from 'react-map-gl/mapbox';
 
+import type { Activity } from '~/lib/activity';
 import {
   isStreamSummaryCurrent,
   streamSummaryQueryKey,
 } from '~/lib/activity-stream-summary';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
-import type { Activity } from '~/server/db/schema';
 import { useShallowStore } from '~/store';
 import { useElevationCursor } from '~/store/elevation-cursor';
 

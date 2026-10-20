@@ -30,8 +30,7 @@ enum ActivityTableLayout {
             + settings.orderedMetrics.reduce(CGFloat(0)) { $0 + width($1, availableWidth: availableWidth) }
     }
 
-    static func title(_ metric: ActivityListMetric, speedDisplay: SpeedDisplay = .speed) -> String {
-        let units = DisplayPreferences.shared.units
+    static func title(_ metric: ActivityListMetric, speedDisplay: SpeedDisplay = .speed, units: UnitSystem = .metric, locale: Locale = .current) -> String {
         return switch metric {
         case .distance: units.distanceUnit
         case .elapsedTime: "Time"
@@ -43,9 +42,8 @@ enum ActivityTableLayout {
         }
     }
 
-    static func value(_ metric: ActivityListMetric, activity: Activity, speedDisplay: SpeedDisplay = .speed) -> String {
-        let units = DisplayPreferences.shared.units
-        let value = metric.value(for: activity, speedDisplay: speedDisplay)
+    static func value(_ metric: ActivityListMetric, activity: Activity, speedDisplay: SpeedDisplay = .speed, units: UnitSystem = .metric, locale: Locale = .current) -> String {
+        let value = metric.value(for: activity, speedDisplay: speedDisplay, units: units, locale: locale)
         switch metric {
         case .distance: return value.replacingOccurrences(of: " \(units.distanceUnit)", with: "")
         case .elevationGain: return value.replacingOccurrences(of: " \(units.elevationUnit)", with: "")
@@ -56,6 +54,9 @@ enum ActivityTableLayout {
 }
 
 struct ActivityTableHeader: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     var availableWidth: CGFloat = 390
     /// Shorter in iPhone landscape, where vertical space is scarce.
@@ -106,13 +107,13 @@ struct ActivityTableHeader: View {
             ForEach(presentation.settings.orderedMetrics) { metric in
                 Button { sort(metric.field) } label: {
                     HStack(spacing: 2) {
-                        Text(ActivityTableLayout.title(metric, speedDisplay: speedDisplay))
+                        Text(ActivityTableLayout.title(metric, speedDisplay: speedDisplay, units: units, locale: locale))
                         if presentation.settings.sort.field == metric.field { arrow }
                     }
                     .frame(width: ActivityTableLayout.width(metric, availableWidth: availableWidth), height: rowHeight, alignment: .trailing)
                     .contentShape(Rectangle())
                 }
-                .accessibilityLabel("Sort by \(metric.title(speedDisplay: speedDisplay))")
+                .accessibilityLabel("Sort by \(metric.title(speedDisplay: speedDisplay, locale: locale))")
                 .accessibilityValue(presentation.settings.sort.field == metric.field ? presentation.settings.sort.direction.title : "Not sorted")
             }
         }

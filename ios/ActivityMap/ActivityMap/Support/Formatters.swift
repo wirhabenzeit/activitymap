@@ -8,18 +8,15 @@ enum Formatters {
     }()
     static let unknown = "—"
 
-    static func distance(_ meters: Double?, locale: Locale = .current, units: UnitSystem? = nil) -> String {
-        let units = units ?? DisplayPreferences.shared.units
+    static func distance(_ meters: Double?, locale: Locale = .current, units: UnitSystem = .metric) -> String {
         return number(meters.map { $0 / units.distanceScale }, decimals: 1, unit: units.distanceUnit, locale: locale)
     }
 
-    static func elevation(_ meters: Double?, locale: Locale = .current, units: UnitSystem? = nil) -> String {
-        let units = units ?? DisplayPreferences.shared.units
+    static func elevation(_ meters: Double?, locale: Locale = .current, units: UnitSystem = .metric) -> String {
         return number(meters.map { $0 / units.elevationScale }, decimals: 0, unit: units.elevationUnit, locale: locale)
     }
 
-    static func speed(_ metersPerSecond: Double?, locale: Locale = .current, units: UnitSystem? = nil) -> String {
-        let units = units ?? DisplayPreferences.shared.units
+    static func speed(_ metersPerSecond: Double?, locale: Locale = .current, units: UnitSystem = .metric) -> String {
         return number(metersPerSecond.map { $0 / units.speedScale }, decimals: 1, unit: units.speedUnit, locale: locale)
     }
 
@@ -38,9 +35,12 @@ enum Formatters {
         return normalized.formatted(.number.precision(.fractionLength(decimals)).locale(locale)) + " " + unit
     }
 
-    static func duration(_ seconds: Int?) -> String {
+    static func duration(_ seconds: Int?, locale: Locale = .current) -> String {
         guard let seconds, seconds >= 0 else { return unknown }
         let formatter = DateComponentsFormatter()
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.locale = locale
+        formatter.calendar = calendar
         formatter.unitsStyle = .abbreviated
         formatter.allowedUnits = seconds >= 86400 ? [.day, .hour] : [.hour, .minute]
         formatter.zeroFormattingBehavior = .dropAll
@@ -49,12 +49,12 @@ enum Formatters {
 
     /// Pass .gmt for the API's encoded activity-local wall time. Locale still
     /// controls date ordering and the user's 12/24-hour display preference.
-    static func shortDate(_ date: Date, timeZone: TimeZone = .current, locale: Locale = .current, dateFormat: PreferredDateFormat? = nil) -> String {
-        preferredDate(date, timeZone: timeZone, locale: locale, format: dateFormat ?? DisplayPreferences.shared.dateFormat)
+    static func shortDate(_ date: Date, timeZone: TimeZone = .current, locale: Locale = .current, dateFormat: PreferredDateFormat = .system) -> String {
+        preferredDate(date, timeZone: timeZone, locale: locale, format: dateFormat)
     }
 
-    static func shortDateTime(_ date: Date, timeZone: TimeZone = .current, locale: Locale = .current) -> String {
-        preferredDate(date, timeZone: timeZone, locale: locale, format: DisplayPreferences.shared.dateFormat) + " · " + dateString(date, template: "jm", timeZone: timeZone, locale: locale)
+    static func shortDateTime(_ date: Date, timeZone: TimeZone = .current, locale: Locale = .current, dateFormat: PreferredDateFormat = .system) -> String {
+        preferredDate(date, timeZone: timeZone, locale: locale, format: dateFormat) + " · " + dateString(date, template: "jm", timeZone: timeZone, locale: locale)
     }
 
     private static func preferredDate(_ date: Date, timeZone: TimeZone, locale: Locale, format: PreferredDateFormat) -> String {

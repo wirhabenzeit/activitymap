@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct StatsCalendarDetail: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let rolling: StatsCalendarSnapshot
     let years: [Int: StatsCalendarSnapshot]
     let today: Int
@@ -54,8 +57,8 @@ struct StatsCalendarDetail: View {
         let maximum = days.values.map { $0.totals[metric ?? .time] }.max() ?? 0
         VStack(alignment: .leading, spacing: 10) {
             if expanded {
-                Text("\(Text(StatsDisplay.number(Double(days.count))).font(.title2.weight(.semibold))) \(Text("active days").font(.caption).foregroundColor(.secondary))").monospacedDigit()
-                Text("\(StatsDisplay.date(layout.first)) – \(StatsDisplay.date(layout.last))")
+                Text("\(Text(StatsDisplay.number(Double(days.count), locale: locale)).font(.title2.weight(.semibold))) \(Text("active days").font(.caption).foregroundColor(.secondary))").monospacedDigit()
+                Text("\(StatsDisplay.date(layout.first, locale: locale, dateFormat: preferences?.dateFormat ?? .system)) – \(StatsDisplay.date(layout.last, locale: locale, dateFormat: preferences?.dateFormat ?? .system))")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             } else {
                 ViewThatFits(in: .horizontal) {
@@ -63,7 +66,7 @@ struct StatsCalendarDetail: View {
                     VStack(alignment: .leading, spacing: 4) { activeDays(days.count); summaryControls }
                 }
                 .accessibilityIdentifier("stats-calendar-summary-header")
-                Text("\(StatsDisplay.number(Double(days.count) / Double(layout.last - layout.first + 1) * 100))% of days in the last \(layout.weeks.count) weeks")
+                Text("\(StatsDisplay.number(Double(days.count) / Double(layout.last - layout.first + 1) * 100, locale: locale))% of days in the last \(layout.weeks.count) weeks")
                     .font(.caption).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
             }
             calendar(layout: layout, days: days, maximum: maximum)
@@ -83,7 +86,7 @@ struct StatsCalendarDetail: View {
     }
 
     private func activeDays(_ count: Int) -> some View {
-        Text("\(Text(StatsDisplay.number(Double(count))).font(.title3.weight(.semibold))) \(Text("active days").font(.caption).foregroundColor(.secondary))")
+        Text("\(Text(StatsDisplay.number(Double(count), locale: locale)).font(.title3.weight(.semibold))) \(Text("active days").font(.caption).foregroundColor(.secondary))")
             .monospacedDigit().fixedSize(horizontal: true, vertical: true)
     }
     private func select(_ day: Int) {
@@ -101,7 +104,7 @@ struct StatsCalendarDetail: View {
         return HStack(alignment: .top, spacing: 4) {
             VStack(spacing: 2) {
                 ForEach(0..<7, id: \.self) { row in
-                    Text(StatsDisplay.weekday(StatsDates.monday(today) + row))
+                    Text(StatsDisplay.weekday(StatsDates.monday(today) + row, locale: locale))
                         .font(.caption2).foregroundStyle(.secondary)
                         .frame(width: weekdayWidth, height: side, alignment: .leading)
                 }
@@ -109,7 +112,10 @@ struct StatsCalendarDetail: View {
             .padding(.top, header + 4)
             .accessibilityHidden(true)
             if expanded {
-                ScrollView(.horizontal) {
+                StatsCalendarHistoryScroll(restoredWeek: visibleWeek.wrappedValue,
+                    initialWeek: StatsDates.monday(layout.last), saveWeek: { week in
+                    visibleWeek.wrappedValue = week
+                }) {
                     LazyHStack(alignment: .top, spacing: 2) {
                         ForEach(layout.weeks, id: \.self) { week in
                             weekColumn(week, layout: layout, days: days, maximum: maximum, header: header)
@@ -119,9 +125,6 @@ struct StatsCalendarDetail: View {
                     .scrollTargetLayout()
                     .padding(.horizontal, 4).padding(.vertical, 4)
                 }
-                .scrollPosition(id: visibleWeek, anchor: .leading)
-                .defaultScrollAnchor(.trailing)
-                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
                 .frame(height: header + rowsHeight + 20)
                 .accessibilityLabel("Activity calendar history")
                 .accessibilityIdentifier("stats-calendar-history")
@@ -155,7 +158,7 @@ struct StatsCalendarDetail: View {
                 Color.clear.frame(width: side, height: header)
                 if showMonth && hasLabelRoom {
                     VStack(alignment: .leading, spacing: 0) {
-                        Text(StatsDates.date(labelDay).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)))
+                        Text(StatsDates.date(labelDay).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated)))
                         if expanded || StatsDates.parts(labelDay).month == 1 { Text(String(StatsDates.parts(labelDay).year!)) }
                     }
                     .font(.caption2).foregroundStyle(.secondary).fixedSize()
@@ -227,7 +230,7 @@ struct StatsCalendarDetail: View {
             HStack(spacing: 8) {
                 Text("0")
                 LinearGradient(colors: [emptyColor, heatColor], startPoint: .leading, endPoint: .trailing).frame(width: 64, height: 8)
-                Text(StatsDisplay.measurement(maximum, metric: metric))
+                Text(StatsDisplay.measurement(maximum, metric: metric, units: units, locale: locale))
             }.font(.caption2).foregroundStyle(.secondary).accessibilityElement(children: .combine)
         }
     }
@@ -237,15 +240,15 @@ struct StatsCalendarDetail: View {
         return maximum > 0 ? heatColor.opacity(0.12 + 0.88 * data.totals[metric] / maximum) : emptyColor
     }
     private func dayDescription(_ day: Int, data: StatsCalendarDay?) -> String {
-        let date = "\(StatsDisplay.weekday(day)), \(StatsDisplay.date(day))"
+        let date = "\(StatsDisplay.weekday(day, locale: locale)), \(StatsDisplay.date(day, locale: locale, dateFormat: preferences?.dateFormat ?? .system))"
         guard let data else { return "\(date): No matching activities" }
-        return "\(date): \(data.mixed ? "Multiple sports" : data.dominantSport.name), \(StatsDisplay.measurement(data.totals[metric ?? .time], metric: metric ?? .time))"
+        return "\(date): \(data.mixed ? "Multiple sports" : data.dominantSport.name), \(StatsDisplay.measurement(data.totals[metric ?? .time], metric: metric ?? .time, units: units, locale: locale))"
     }
     private func dayDetails(_ day: Int, data: StatsCalendarDay?) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Divider()
             HStack(alignment: .firstTextBaseline) {
-                Text(StatsDisplay.date(day)).font(.subheadline.weight(.semibold))
+                Text(StatsDisplay.date(day, locale: locale, dateFormat: preferences?.dateFormat ?? .system)).font(.subheadline.weight(.semibold))
                 Spacer()
                 Button("Close") { focusedDay = nil }.font(.caption).frame(minHeight: 44).accessibilityLabel("Close day details")
             }
@@ -255,7 +258,7 @@ struct StatsCalendarDetail: View {
                     ForEach(Array(data.activities.enumerated()), id: \.offset) { index, activity in
                         if index > 0 { Divider() }
                         StatsActivityRow(sport: activity.sport, name: activity.name,
-                                         summary: "\(activity.sport.name) · \(StatsDisplay.measurement(activity.value(.distance), metric: .distance)) · \(StatsDisplay.measurement(activity.value(.elevation), metric: .elevation)) · \(StatsDisplay.measurement(activity.value(.time), metric: .time))",
+                                         summary: "\(activity.sport.name) · \(StatsDisplay.measurement(activity.value(.distance), metric: .distance, units: units, locale: locale)) · \(StatsDisplay.measurement(activity.value(.elevation), metric: .elevation, units: units, locale: locale)) · \(StatsDisplay.measurement(activity.value(.time), metric: .time, units: units, locale: locale))",
                                          open: activity.id.map { id in { openActivity(id) } })
                             .background(activity.id != nil && activity.id == inspectedActivityID ? Color.accentColor.opacity(0.1) : .clear, in: RoundedRectangle(cornerRadius: 8))
                             .accessibilityIdentifier(activity.id.map { "stats-calendar-activity-\($0)" } ?? "")
@@ -263,6 +266,52 @@ struct StatsCalendarDetail: View {
                 }
             } else { Text("No matching activities on this day.").font(.caption) }
         }
+    }
+}
+
+/// Scroll-position updates belong to this leaf, not the calendar's history,
+/// summaries, legend and selected-day rows. Keep its content as a value so a
+/// new visible week does not rebuild those values during a drag or deceleration.
+struct StatsCalendarHistoryScroll<Content: View>: View {
+    let restoredWeek: Int?
+    let initialWeek: Int
+    var saveWeek: (Int?) -> Void
+    let content: Content
+    @State private var week: Int?
+
+    init(restoredWeek: Int?, initialWeek: Int, saveWeek: @escaping (Int?) -> Void,
+         @ViewBuilder content: () -> Content) {
+        self.restoredWeek = restoredWeek
+        self.initialWeek = initialWeek
+        self.saveWeek = saveWeek
+        self.content = content()
+        _week = State(initialValue: restoredWeek ?? initialWeek)
+    }
+
+    var body: some View {
+        ScrollView(.horizontal) { content }
+            .scrollPosition(id: $week, anchor: .leading)
+            .defaultScrollAnchor(.trailing)
+            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+            .onAppear {
+                // The default trailing viewport does not necessarily write a
+                // scroll-position ID. Retain its explicit trailing week before
+                // a first day selection can become a fallback restore anchor.
+                if restoredWeek == nil { saveWeek(week) }
+            }
+            .onScrollPhaseChange { _, phase in
+                // Persist only a settled anchor. Observing every intermediate
+                // week on the shared inspection invalidated the whole calendar.
+                if phase == .idle, restoredWeek != week { saveWeek(week) }
+            }
+            .onDisappear {
+                // A Back action may remove the view during deceleration.
+                if restoredWeek != week { saveWeek(week) }
+            }
+            .onChange(of: restoredWeek) { _, restored in
+                let target = restored ?? initialWeek
+                if week != target { week = target }
+            }
     }
 }
 

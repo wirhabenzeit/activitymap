@@ -304,17 +304,18 @@ final class AuthController: NSObject {
         guard let error = error as? APIClient.RequestError else {
             return "Something went wrong while checking your session. Try again."
         }
+        let facts = error.facts
         switch error {
         case .transport:
             return "ActivityMap couldn’t be reached. Check your connection and try again."
-        case .rateLimited(let retryAfter, _):
-            return "ActivityMap is busy. Try again \(retryPhrase(retryAfter))."
-        case .serviceUnavailable(let retryAfter, let requestID):
-            return "ActivityMap is temporarily unavailable. Try again \(retryPhrase(retryAfter))."
-                + (requestID.map { " Reference: \($0)" } ?? "")
-        case .server(_, _, let status, let requestID, _, let retryAfter) where status == 429 || status >= 500:
-            return "ActivityMap is temporarily unavailable. Try again \(retryPhrase(retryAfter))."
-                + (requestID.map { " Reference: \($0)" } ?? "")
+        case .rateLimited:
+            return "ActivityMap is busy. Try again \(retryPhrase(facts.retryAfter))."
+        case .serviceUnavailable:
+            return "ActivityMap is temporarily unavailable. Try again \(retryPhrase(facts.retryAfter))."
+                + (facts.requestID.map { " Reference: \($0)" } ?? "")
+        case .server(_, _, let status, _, _, _) where status == 429 || status >= 500:
+            return "ActivityMap is temporarily unavailable. Try again \(retryPhrase(facts.retryAfter))."
+                + (facts.requestID.map { " Reference: \($0)" } ?? "")
         case .schemaVersionMismatch:
             return "This version of ActivityMap needs an update to check your session."
         default:
@@ -324,12 +325,7 @@ final class AuthController: NSObject {
 
     /// The server's `Retry-After`, if it sent one. Never invented here.
     static func retryAfter(_ error: Error) -> TimeInterval? {
-        switch error as? APIClient.RequestError {
-        case .rateLimited(let retryAfter, _): retryAfter
-        case .serviceUnavailable(let retryAfter, _): retryAfter
-        case .server(_, _, _, _, _, let retryAfter): retryAfter
-        default: nil
-        }
+        APIClient.errorFacts(for: error).retryAfter
     }
 
     private static func retryPhrase(_ retryAfter: TimeInterval?) -> String {
@@ -411,12 +407,7 @@ final class AuthController: NSObject {
     /// rather than private, like `APIClient.decodeResult`, so it can be
     /// exercised directly against crafted errors without a live server.
     static func isExplicitlyUnauthenticated(_ error: Error) -> Bool {
-        if case .unexpectedStatus(401) = error as? APIClient.RequestError { return true }
-        guard case .server(let code, _, let status, _, _, _) = error as? APIClient.RequestError
-        else {
-            return false
-        }
-        return status == 401 || code == "not_authenticated"
+        APIClient.errorFacts(for: error).authenticationRejected
     }
 
     // MARK: - ASWebAuthenticationSession

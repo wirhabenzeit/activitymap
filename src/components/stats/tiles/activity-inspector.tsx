@@ -14,6 +14,7 @@ import {
 } from '~/components/list/inspection';
 import { ListDetailTransition } from '~/components/list/list-detail-transition';
 import { useShowOnMap } from '~/hooks/use-show-on-map';
+import type { Activity } from '~/lib/activity';
 import {
   browsingHistoryServerSnapshot,
   browsingHistorySnapshot,
@@ -21,7 +22,6 @@ import {
   openActivityInspection,
   subscribeBrowsingHistory,
 } from '~/lib/browsing-history';
-import { type Activity } from '~/server/db/schema';
 import { statsTiles } from '~/settings/stats-tiles.generated';
 import { useShallowStore } from '~/store';
 import { applyFilters } from '~/store/filter';

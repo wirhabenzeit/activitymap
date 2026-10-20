@@ -262,7 +262,8 @@ private struct MapRotationPresentationProbe: UIViewRepresentable {
             if let panel { presentations.insert(ObjectIdentifier(panel)) }
             let map = descendants(window).first { $0 is MapView }
             let visibleDetailID = store.selectedTab == .list ? store.inspectedActivityID : picker.detailID
-            let detailScroll = visibleDetailID == nil ? nil : findDetailScroll(in: panel ?? root)
+            let detailScrolls = visibleDetailID == nil ? [] : detailScrollCandidates(in: panel ?? root)
+            let detailScroll = findDetailScroll(among: detailScrolls)
             let navigation = panel.flatMap { allControllers($0).compactMap { $0 as? UINavigationController }.first }
             let detailOffset = detailScroll?.contentOffset.y ?? 0
 
@@ -283,7 +284,14 @@ private struct MapRotationPresentationProbe: UIViewRepresentable {
             let geometry = "\(orientation)|\(window.bounds)|\(frame)|\(scrollFrame)|\(scroll?.contentOffset ?? .zero)|\(visibleDetailID ?? -1)|\(detailOffset)|\(detailMaximum)"
             // Opposite landscape orientations have equal bounds; require a
             // fresh half-second of stable samples after either rotation.
-            stableSamples = geometry == priorGeometry && !transitioning && scroll?.isDragging != true && scroll?.isDecelerating != true
+            // A neighbour push keeps the outgoing page's offset frozen while it
+            // slides away; settle only once it has left the window.
+            // Nested controllers revisit the same views, so count distinct pages.
+            let pushing = detailScroll.map { page in
+                Set(detailScrolls.filter { $0.bounds.height >= page.bounds.height * 0.5 && $0.contentSize.height > $0.bounds.height }
+                    .map(ObjectIdentifier.init)).count > 1
+            } ?? false
+            stableSamples = geometry == priorGeometry && !transitioning && !pushing && scroll?.isDragging != true && scroll?.isDecelerating != true
                 && detailScroll?.isDragging != true && detailScroll?.isDecelerating != true
                 ? stableSamples + 1 : 0
             priorGeometry = geometry
@@ -384,13 +392,16 @@ private struct MapRotationPresentationProbe: UIViewRepresentable {
             return vertical.count == 1 ? vertical.first : nil
         }
 
-        private func findDetailScroll(in controller: UIViewController) -> UIScrollView? {
+        private func detailScrollCandidates(in controller: UIViewController) -> [UIScrollView] {
             let views = allControllers(controller).compactMap(\.viewIfLoaded).flatMap(descendants)
             // The detail marker is a public, app-owned UIKit root. List's
             // destination uses SwiftUI's AX identifier, which can be virtual.
             let detailRoot = views.first { $0.accessibilityIdentifier == "map-results-navigation-detail" }
-            let candidates = (detailRoot.map(descendants) ?? views).compactMap { $0 as? UIScrollView }
+            return (detailRoot.map(descendants) ?? views).compactMap { $0 as? UIScrollView }
                 .filter { $0 !== resultsScroll && $0.window != nil && $0.bounds.height > 0 && $0.bounds.width > 0 }
+        }
+
+        private func findDetailScroll(among candidates: [UIScrollView]) -> UIScrollView? {
             if let marked = candidates.first(where: { $0.accessibilityIdentifier == "activity-detail-scroll" }) { return marked }
             return candidates.filter { $0.contentSize.height > $0.bounds.height }
                 .max { $0.bounds.height < $1.bounds.height }

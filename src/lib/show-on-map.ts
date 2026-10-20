@@ -1,7 +1,9 @@
 import type { StoreApi } from 'zustand';
+
+import type { Activity } from '~/lib/activity';
 import type { RootState } from '~/store';
-import type { Activity } from '~/server/db/schema';
 import { applyFilters } from '~/store/filter';
+
 import { routeBounds, routeCoordinates } from './route-framing';
 
 /** Explicit filter clearing must happen before activating the destination. */

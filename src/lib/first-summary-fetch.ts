@@ -3,6 +3,7 @@ import { type QueryClient, queryOptions } from '@tanstack/react-query';
 import { activitySummaryFetchResultSchema } from '~/contracts/v1/activity-mutations';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
+import { message } from '~/lib/presentation/messages';
 import type { BrowserSyncStatus } from '~/lib/sync/browser-status';
 import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
 import { requestLibrarySync } from '~/lib/sync/library-sync';
@@ -29,23 +30,23 @@ async function fetchSummaries(signal: AbortSignal): Promise<number> {
     });
   } catch (error) {
     if (signal.aborted) throw error;
-    throw new FirstSummaryFetchError(
-      'Could not connect to ActivityMap. Check your connection and try again.',
-    );
+    throw new FirstSummaryFetchError(message('error.firstSummary.connection'));
   }
   const body: unknown = await response.json().catch(() => null);
   if (!response.ok) {
     const parsed = errorEnvelopeSchema.safeParse(body);
     const failure = parsed.success ? parsed.data.error : null;
-    const recovery =
+    const reason =
+      failure?.message ??
+      message('error.firstSummary.http', { status: response.status });
+    const displayMessage =
       failure?.code === 'strava_not_connected'
-        ? ' Connect with Strava again in Settings.'
+        ? message('error.firstSummary.reconnect', { reason })
         : response.status === 401
-          ? ' Sign in again to continue.'
-          : '';
+          ? message('error.firstSummary.signIn', { reason })
+          : reason;
     throw new FirstSummaryFetchError(
-      (failure?.message ??
-        `Activity import failed (HTTP ${response.status}).`) + recovery,
+      displayMessage,
       failure?.retryable ?? (response.status === 429 || response.status >= 500),
       response.headers.has('retry-after') || response.status === 429
         ? retryDeadline(response.headers)
@@ -57,7 +58,7 @@ async function fetchSummaries(signal: AbortSignal): Promise<number> {
   );
   if (!parsed.success)
     throw new FirstSummaryFetchError(
-      'The server returned an invalid activity import response. Please try again.',
+      message('error.firstSummary.invalidResponse'),
     );
   return parsed.data.data;
 }
@@ -122,7 +123,7 @@ export function firstSummaryFetchOptions(
       } catch (error) {
         if (signal.aborted) throw error;
         throw new FirstSummaryFetchError(
-          'Your activities were saved, but could not be downloaded. Check your connection and retry.',
+          message('error.firstSummary.download'),
         );
       }
       return count;

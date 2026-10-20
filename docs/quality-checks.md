@@ -13,7 +13,8 @@ explicit disposable Postgres service.
 | `pnpm test:browser:install`            | Provision the lockfile-matched Playwright Chromium; append `--with-deps` on Linux                                                 |
 | `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
 | `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
-| `pnpm test:ios`                        | Build and run the twenty-one selected iOS suites on an owned simulator                                                            |
+| `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all 30 selected unit/app-hosted suites and five real UI smoke methods on iOS 27                       |
+| `pnpm test:ios`                        | Build and run the full 36-suite native selection, including all 33 selected real UI methods, on iOS 27                            |
 | `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
 | `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
 | `pnpm format:check src/path.ts`        | Check explicit files                                                                                                              |
@@ -72,71 +73,128 @@ writes. Broader acceptance remains tracked in #198, #227, #229 and #387.
 
 ## Native runtime
 
-The `xcode-27` CI runner and local Xcode 27+ run `node scripts/quality/native-harness.mjs`
-(`pnpm test:ios` is an alias). No web dependency install is needed for this script.
-The wrapper creates an iPhone 17 Pro on the newest available iOS 26+ runtime, boots
-it, and deletes only that owned device on completion/failure. Set `IOS_DEVICE_NAME`
-to another installed device type, or explicitly set `IOS_SIMULATOR_UDID` to reuse
-an existing device; supplied devices are never shut down or deleted. Do not run
-multiple harnesses against the same simulator or DerivedData directory.
+The `xcode-27` runner and local Xcode 27+ run
+`node scripts/quality/native-harness.mjs` (`pnpm test:ios` is an alias). No web
+dependency install is needed. `IOS_TEST_PROFILE` selects `pr` or `full`; the
+local default is `full`, and any other value fails before a simulator is created.
 
-The bounded suite is:
+Pull-request CI and pushes to main explicitly use `IOS_TEST_PROFILE=pr` when
+native-related files change. A cheap Ubuntu diff check covers iOS sources, shared
+fixtures/catalogs, contracts/OpenAPI, stream codecs, native/testflight tooling and
+the relevant workflows. Web-only changes skip the native app job; an unavailable
+or invalid comparison conservatively runs it. This builds the real app and runs all 30 selected unit/app-hosted suites plus five
+real UI smoke methods on iOS 27:
 
-- `AdaptiveInspectionTests`: native push/panel transitions and retained hidden List details.
-- `BrowsingReconciliationTests`: cached-empty recovery, route eligibility and shared browsing actions.
-- `PresentationTests`, `DisplayPreferencesTests`, `StravaConnectTests`: semantic catalog, preference and connection policies.
-- `StatsPresentationPolicyTests`, `StatsScopeTests`, `StatsDashboardTests`, `StatsFixtureTests`, `StatsCalendarLayoutTests`: comparison/formatting parity, scope, chart identities and keyboard/calendar layout.
+- Native GPX sharing, repeated cancellation and departure cleanup:
+  `ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture`.
+- List previous-activity pull:
+  `ActivityContinuationUITests/testListTopPullOpensPrevious`.
+- Map next-activity pull:
+  `ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop`.
+- Stats intentional content/native-edge Back:
+  `StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack`.
+- Standard Sport mix compact content, explicit expansion and focused controls:
+  `StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable`.
 
-- `ActivityFilterTests`: filtering, date/locale parsing and reset behavior.
-- `ActivityStoreSelectionTests`: selection/reconciliation contracts.
-- `SelectionFixtureTests`: shared selection fixtures.
-- `MapPhotoTests`: photo availability, payloads and shared fixture parity.
-- `MapResultsTests`, `ActivityContinuationTests`: result navigation and pull threshold/direction policies.
-- `PhotoGalleryTests`: gallery state and image request/cache behavior.
-- `MapPhotoUITests`: four real XCUI map/photo interactions using the offline app fixture.
-- `MapRotationUITests`: retained native sheets, detail content and detents across rotation.
-- `ActivityContinuationUITests`: fifteen real previous/next, inertia, content Back, header and action journeys.
-- `ListSelectionUITests`: real List push/Back and phone rotation, with selection controls restricted to the visible list; also covers standalone hosting and adjacent inspection when run on iPad.
+This is a smoke boundary, not the complete UI matrix. The
+[Full iOS runtime workflow](../.github/workflows/ios-full.yml) is manually
+requested with **Actions → Full iOS runtime → Run workflow**, selecting the
+branch or tag to test. It explicitly uses `IOS_TEST_PROFILE=full`, runs the same
+30 unit/app-hosted suites and all six selected UI suites (36 suites and 33 UI
+methods in total on iOS 27), and has no automatic schedule. Run either profile
+locally with:
 
-`xcodebuild build-for-testing` has an eighteen-minute cold-build budget, followed
-by `xcodebuild test-without-building` with a separate twenty-five-minute runtime budget.
-The first CI cold build took about eleven and a half minutes and exhausted the
-former combined allowance as tests launched; separate phases preserve the test
-allowance and identify which phase failed. Parallel execution is disabled, with
-90/180-second default/maximum per-test allowances. Boot readiness has a
-three-minute budget; the whole CI job has fifty-five minutes, including setup and
-artifact upload. The expanded continuation suite took 9m46s on the hosted runner;
-all fifteen cases passed, but the former twelve-minute runtime limit interrupted
-the next suite. The larger allowance retains all suites and per-test limits.
-The wrapper records the toolchain, validates a positive passing test count, zero
-failures/skips, and a positive number of passing cases in every selected suite.
-`ACTIVITYMAP_API_BASE_URL`/Mapbox build settings use inert fixture values.
-`MapPhotoUITests` launches the dedicated in-memory, offline app fixture; app-hosted
-suites launch the ordinary app with the inert URL and supply isolated stores and
-fixtures within their tests. `IOS_DERIVED_DATA` can reuse a
-caller-owned build cache; otherwise `.quality/ios-derived` is retained for later runs.
+```sh
+IOS_TEST_PROFILE=pr pnpm test:ios
+IOS_TEST_PROFILE=full pnpm test:ios
+```
 
-Evidence in `output/quality/ios/<timestamp>/` includes separate
-`xcodebuild-build.log` and `xcodebuild-test.log` files, toolchain, boot logs,
-summary, per-test tree and `Results.xcresult`. Open the result bundle in
-Xcode for attachments and failures. CI uploads browser and native evidence even
-when a job fails. The separate `swift-client` job remains compile-only and is
-labelled accordingly.
+The shared unit/app-hosted selection covers:
 
-The suite deliberately excludes broad app-hosted SwiftUI accessibility traversal
-checks: that host can yield an empty AX tree, so it cannot substitute for XCUI.
-The retired rendered map/photo checks were replaced by `MapPhotoUITests` in #425.
-List selection visibility and Back retention now use `ListSelectionUITests` for the same reason.
-The same host limitation was reproduced with unchanged action views in #427:
-three `RenderedActivityActionTests` methods (eight parameter cases) failed at
-their first AX lookup, while the controller/file suite passed 19 methods and
-35 parameter executions. Those rendered checks remain excluded and are not
-reported as passed by this harness.
-Other rendered suites and device-only touch/VoiceOver acceptance remain outside
-this smoke boundary; failures there are not silently treated as passing here.
-Pending photo-pipeline/sync-integrity suites from #422/#423 and filter/GPX
-regressions from #426/#427 can be added after those changes land; this base does
-not contain them.
+- `AdaptiveInspectionTests`, `BrowsingReconciliationTests`: native push/panel
+  retention, cached-empty recovery, route eligibility and browsing actions.
+- `StatsPresentationPolicyTests`, `StatsScopeTests`, `StatsDashboardTests`,
+  `StatsFixtureTests`, `StatsCalendarLayoutTests`,
+  `StatsCalendarScrollRenderingTests`: comparison/formatting parity, scope,
+  chart/calendar layout and retained scroll/rendering behavior.
+- `DetailBackGestureTests`: horizontal scroll ownership and Back arbitration.
+- `APIErrorFactsTests`, `AuthRecoveryTests`, `ActivityEditingTests`,
+  `ActivitySharingTests`: structured errors, recovery and activity mutations.
+- `SyncControllerTests`, `IngestionStatusTests`, `StravaImportTests`,
+  `StreamsAPITests`, `StreamSummaryLoaderTests`, `StreamSummarySyncTests`,
+  `SpeedDisplayTests`: sync/import/stream lifecycle and display policies.
+- `PresentationTests`, `DisplayPreferencesTests`, `StravaConnectTests`:
+  semantic catalog, preference and connection policies.
+- `ActivityFilterTests`, `ActivityStoreSelectionTests`, `SelectionFixtureTests`:
+  filtering, selection/reconciliation and shared fixture contracts.
+- `MapPhotoTests`, `MapResultsTests`, `ActivityContinuationTests`,
+  `PhotoGalleryTests`: photo availability, result navigation, continuation,
+  gallery state and image request/cache behavior.
+
+The full UI selection additionally exercises every method in
+`ActivityActionUITests`, `StatsUITests`, `MapPhotoUITests`, `MapRotationUITests`,
+`ActivityContinuationUITests` and `ListSelectionUITests`. It includes the
+seven-state activity action matrix, cached-elevation GPX export, compact/focused
+Stats and calendar panning/anchor retention, map/photo interactions, sheet
+rotation, all fifteen continuation journeys and List selection/Back behavior.
+Those additional journeys are not certified by a passing PR smoke run.
+
+| Limit                                       | PR profile | Full profile |
+| ------------------------------------------- | ---------- | ------------ |
+| Cold `build-for-testing`                    | 18 minutes | 18 minutes   |
+| `test-without-building`                     | 8 minutes  | 35 minutes   |
+| CI job, including setup and artifact upload | 35 minutes | 65 minutes   |
+
+Both profiles retain three-minute simulator boot readiness, disabled parallel
+test execution, and enabled per-test timeouts configured with a 90-second default
+and a 180-second maximum. XCTest rounds execution allowances up to whole minutes;
+the maximum caps a test's preferred allowance rather than granting extra time to
+every test. See [Apple's allowance documentation](https://developer.apple.com/documentation/xctest/xctestcase/executiontimeallowance).
+The wrapper requires a positive passing count, zero failures/skips, positive
+passing cases in every selected suite and execution of each selected PR method.
+An interrupted or failed full run is not counted as passing coverage.
+
+Before the profile split and Sport mix test-helper correction, the full selection
+passed locally on 20 October 2026 with Xcode 27.1 and an iPhone 18 Pro / iOS 27.0 simulator: 261 logical tests,
+376 runtime executions across 36 suites, including all 32 UI methods, with zero
+failures or skips. Evidence is
+`/private/tmp/activitymap-full-native-46d4b3d8/Results.xcresult`. The hosted run
+on the same native sources failed the Sport mix scroll-reachability assertion
+and then exceeded the former 25-minute whole-test budget; that run is not a full
+pass. Its reveal helper compared content against the scroll view’s full frame
+and repeatedly scrolled an expansion control farther behind the navigation bar.
+The helper now excludes the obstructing navigation bar from its viewport;
+standard and large-text Sport mix run independently with the same assertions.
+The standard journey is retained in PR smoke coverage. Full coverage remains
+available through the manual workflow after merge.
+
+The wrapper creates an iPhone 17 Pro on the newest available iOS 26+ runtime,
+boots it, and deletes only that owned device on completion/failure. Counts above
+refer to iOS 27; older-runtime eligibility is recorded explicitly, and ineligible
+checks are not counted as passing or skipped. Set `IOS_DEVICE_NAME` to another
+installed device type, or explicitly set `IOS_SIMULATOR_UDID` to reuse an existing
+device; supplied devices are never shut down or deleted. Do not run multiple
+harnesses against the same simulator or DerivedData directory.
+`IOS_DERIVED_DATA` can reuse a caller-owned build cache; otherwise
+`.quality/ios-derived` is retained for later runs.
+
+Build settings use inert API/Mapbox fixture values. UI journeys launch DEBUG-only
+offline app fixtures; app-hosted suites supply isolated stores and fixtures within
+their tests. Both workflows retain stream DTO compatibility and compact-codec
+prechecks. Evidence in `output/quality/ios/<timestamp>/` records the profile and
+selection, separate `xcodebuild-build.log` and `xcodebuild-test.log`, toolchain,
+boot logs, summary, per-test tree and `Results.xcresult`. Open the bundle in Xcode
+for attachments and failures. Both workflows upload evidence even when a job
+fails. The separate `swift-client` job remains compile-only.
+
+The selection deliberately excludes broad app-hosted SwiftUI accessibility
+traversal checks: that host can yield an empty AX tree and cannot substitute for
+XCUI. The retired rendered map/photo, List and action-row checks were replaced
+with real UI automation. No accessibility assertion is replaced by OCR. Other
+rendered suites and physical-device touch/VoiceOver acceptance remain separate;
+failures there are not silently treated as passing here. Pending broader
+photo-pipeline/sync-integrity and filter/GPX suites remain outside this selected
+boundary.
 
 ## Formatting policy
 

@@ -29,6 +29,49 @@ function deferred() {
   return { promise, resolve };
 }
 
+void test('committed responses serialize after an old download and before the next delta', async () => {
+  const client = new QueryClient();
+  const entered = deferred();
+  const release = deferred();
+  const events: string[] = [];
+  let runs = 0;
+  const stop = registerLibrarySync(client, 'auth:alice', async () => {
+    events.push(`download-${++runs}`);
+    if (runs === 1) {
+      entered.resolve();
+      await release.promise;
+    }
+  });
+  const first = requestLibrarySync(client, 'auth:alice');
+  await entered.promise;
+  const second = requestLibrarySync(client, 'auth:alice', async () => {
+    events.push('committed-response');
+  });
+  release.resolve();
+  await Promise.all([first, second]);
+  assert.deepEqual(events, ['download-1', 'committed-response', 'download-2']);
+  stop();
+  client.clear();
+});
+
+void test('failed response persistence does not wedge subsequent ordinary sync', async () => {
+  const client = new QueryClient();
+  let runs = 0;
+  const stop = registerLibrarySync(client, 'auth:alice', async () => {
+    runs++;
+  });
+  await assert.rejects(
+    requestLibrarySync(client, 'auth:alice', async () => {
+      throw new Error('disk full');
+    }),
+    /disk full/,
+  );
+  await requestLibrarySync(client, 'auth:alice');
+  assert.equal(runs, 1);
+  stop();
+  client.clear();
+});
+
 void test('requests during an old download await a follow-up that sees the mutation', async () => {
   const client = new QueryClient();
   const entered = deferred();

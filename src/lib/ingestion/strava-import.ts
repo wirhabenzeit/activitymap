@@ -1,21 +1,37 @@
 import type { StravaImportDTO } from '~/contracts/v1/strava-import';
+import { message } from '~/lib/presentation/messages';
 
-export function stravaImportMessage(run: StravaImportDTO): string | null {
-  const counts = `${run.summaries} activity summaries fetched · ${run.details} activities updated · ${run.photos} photos fetched`;
+export function stravaImportMessage(
+  run: StravaImportDTO,
+  locale?: string,
+): string | null {
+  const counts = {
+    summaries: run.summaries,
+    details: run.details,
+    photos: run.photos,
+  };
   if (run.status === 'idle') return null;
   if (run.status === 'running')
-    return `Fetching from Strava in the background… ${counts}.`;
+    return message('status.stravaImport.running', counts, locale);
   if (run.status === 'interrupted')
-    return `The fetch was interrupted. Saved progress is kept; try again when available. ${counts}.`;
+    return message('status.stravaImport.interrupted', counts, locale);
   if (run.reason === 'account_unavailable' || run.status === 'blocked')
-    return 'Reconnect Strava from Account to continue fetching.';
+    return message(
+      'error.stravaImport.reconnectStravaFromAccountToContinueFetching',
+      undefined,
+      locale,
+    );
   if (run.reason === 'rate_limit')
-    return `Strava’s request limit was reached. ${counts}.`;
+    return message('status.stravaImport.rateLimited', counts, locale);
   if (run.reason === 'busy')
-    return 'Fetching paused while the service is busy. Please try again when available.';
+    return message(
+      'error.stravaImport.fetchingPausedWhileTheServiceIsBusyPlease',
+      undefined,
+      locale,
+    );
   if (run.status === 'failed')
-    return `Could not finish fetching. Saved progress is kept. ${counts}.`;
+    return message('status.stravaImport.failed', counts, locale);
   if (run.status === 'deferred')
-    return `This fetch has paused. You can continue with another fetch when available. ${counts}.`;
-  return `Fetch finished. ${counts}.`;
+    return message('status.stravaImport.deferred', counts, locale);
+  return message('status.stravaImport.finished', counts, locale);
 }

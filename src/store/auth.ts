@@ -1,7 +1,9 @@
 import { type StateCreator } from 'zustand';
-import { type RootState } from './index';
+
 import type { CurrentUserDTO } from '~/server/db/dto';
+
 import { resetBrowsingContext } from './browsing';
+import { type RootState } from './index';
 
 export type InitialAuth = {
   currentUser: CurrentUserDTO | null;
@@ -13,6 +15,8 @@ export type InitialAuth = {
 };
 
 export type AuthState = {
+  /** In-memory lifetime used to fence asynchronous account work. Never persisted. */
+  authSession: number;
   user: CurrentUserDTO | undefined;
   isInitialized: boolean;
   isGuest: boolean;
@@ -36,6 +40,7 @@ export const createAuthSlice: StateCreator<
   AuthSlice
 > = (set) => ({
   // Initial state
+  authSession: 0,
   user: undefined,
   isInitialized: false,
   isGuest: false,
@@ -49,12 +54,19 @@ export const createAuthSlice: StateCreator<
   initializeAuth: (auth) => {
     set((state) => {
       const nextUser = auth.currentUser ?? undefined;
-      if (
+      const accountChanged =
         state.user?.id !== nextUser?.id ||
         state.isGuest !== Boolean(auth.guestMode) ||
         JSON.stringify(state.guestMode) !==
-          JSON.stringify(auth.guestMode ?? { type: null })
+          JSON.stringify(auth.guestMode ?? { type: null });
+      if (
+        !state.isInitialized ||
+        accountChanged ||
+        state.user?.stravaConnected !== nextUser?.stravaConnected
       ) {
+        state.authSession += 1;
+      }
+      if (accountChanged) {
         resetBrowsingContext();
         state.combineSelections = false;
         state.onlySelected = false;

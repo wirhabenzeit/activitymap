@@ -1,6 +1,9 @@
 import SwiftUI
 
 struct StatsRecordsDetail: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let current: StatsRecords
     let allTime: StatsRecords
     let best30: [StatsMetric: StatsBestDays]
@@ -53,11 +56,11 @@ struct StatsRecordsDetail: View {
             StatsDetailGrid(expanded: expanded, compactColumns: typeSize.isAccessibilitySize ? 1 : 4) {
                 ForEach(metrics, id: \.self) { metric in
                     VStack(alignment: .leading, spacing: 4) {
-                        recordValue(title(metric), records.activities[metric].map { StatsDisplay.measurement($0.value, metric: metric) } ?? "—")
+                        recordValue(title(metric), records.activities[metric].map { StatsDisplay.measurement($0.value, metric: metric, units: units, locale: locale) } ?? "—")
                         // Collapsed, say when and in which sport; expanded rows give the full detail.
                         StatsExpansionReveal(expanded: !expanded, inverted: true) {
                             if let record = records.activities[metric] {
-                                Text("\(record.sport.name) · \(StatsDisplay.shortDate(record.day))").font(.caption).foregroundStyle(.secondary)
+                                Text("\(record.sport.name) · \(StatsDisplay.shortDate(record.day, locale: locale))").font(.caption).foregroundStyle(.secondary)
                             }
                         }
                         StatsExpansionReveal(expanded: expanded) {
@@ -69,18 +72,18 @@ struct StatsRecordsDetail: View {
                                 }.buttonStyle(.plain).font(.subheadline)
                                 .accessibilityIdentifier("stats-record-\(metric.rawValue)-\(id)")
                             } else { Text(record.name).font(.subheadline) }
-                            Text("\(record.sport.name) · \(StatsDisplay.date(record.day))").font(.caption).foregroundStyle(.secondary)
+                            Text("\(record.sport.name) · \(StatsDisplay.date(record.day, locale: locale, dateFormat: preferences?.dateFormat ?? .system))").font(.caption).foregroundStyle(.secondary)
                           }
                         }
                     }.fixedSize(horizontal: false, vertical: true)
                 }
                 VStack(alignment: .leading, spacing: 4) {
-                    recordValue("Biggest week", records.biggestWeek.map { StatsDisplay.measurement($0.value, metric: .distance) } ?? "—")
+                    recordValue("Biggest week", records.biggestWeek.map { StatsDisplay.measurement($0.value, metric: .distance, units: units, locale: locale) } ?? "—")
                     StatsExpansionReveal(expanded: !expanded, inverted: true) {
-                        if let week = records.biggestWeek { Text("Week of \(StatsDisplay.shortDate(week.weekStart))").font(.caption).foregroundStyle(.secondary) }
+                        if let week = records.biggestWeek { Text("Week of \(StatsDisplay.shortDate(week.weekStart, locale: locale))").font(.caption).foregroundStyle(.secondary) }
                     }
                     StatsExpansionReveal(expanded: expanded) {
-                        if let week = records.biggestWeek { Text("Week of \(StatsDisplay.date(week.weekStart))").font(.caption).foregroundStyle(.secondary) }
+                        if let week = records.biggestWeek { Text("Week of \(StatsDisplay.date(week.weekStart, locale: locale, dateFormat: preferences?.dateFormat ?? .system))").font(.caption).foregroundStyle(.secondary) }
                     }
                 }
             }
@@ -96,12 +99,12 @@ struct StatsRecordsDetail: View {
                         if let best = best30[metric] {
                             VStack(alignment: .leading, spacing: 4) {
                                 ViewThatFits(in: .horizontal) {
-                                    HStack { Text(metric.definition.label); Spacer(); Text(best.total > 0 ? StatsDisplay.measurement(best.total, metric: metric) : "—").monospacedDigit() }
-                                    VStack(alignment: .leading) { Text(metric.definition.label); Text(StatsDisplay.measurement(best.total, metric: metric)).monospacedDigit() }
+                                    HStack { Text(metric.definition.label); Spacer(); Text(best.total > 0 ? StatsDisplay.measurement(best.total, metric: metric, units: units, locale: locale) : "—").monospacedDigit() }
+                                    VStack(alignment: .leading) { Text(metric.definition.label); Text(StatsDisplay.measurement(best.total, metric: metric, units: units, locale: locale)).monospacedDigit() }
                                 }
                                 if best.total > 0 {
-                                    Text("\(StatsDisplay.date(best.start)) – \(StatsDisplay.date(best.end))").foregroundStyle(.secondary)
-                                    Text("Last 30 days: \(StatsDisplay.measurement(best.current, metric: metric)) · \(StatsDisplay.number(best.current / best.total * 100))% of best").foregroundStyle(.secondary)
+                                    Text("\(StatsDisplay.date(best.start, locale: locale, dateFormat: preferences?.dateFormat ?? .system)) – \(StatsDisplay.date(best.end, locale: locale, dateFormat: preferences?.dateFormat ?? .system))").foregroundStyle(.secondary)
+                                    Text("Last 30 days: \(StatsDisplay.measurement(best.current, metric: metric, units: units, locale: locale)) · \(StatsDisplay.number(best.current / best.total * 100, locale: locale))% of best").foregroundStyle(.secondary)
                                 } else { Text("No \(metric.definition.label.lowercased()) recorded this year.").foregroundStyle(.secondary) }
                             }.font(.caption).fixedSize(horizontal: false, vertical: true)
                             if metric != .elevation { Divider() }
@@ -128,8 +131,8 @@ struct StatsRecordsDetail: View {
                         if let id = record.activityID {
                             Button { openActivity(id) } label: {
                                 rankedRow(rank: rank, name: name.isEmpty ? record.sport.name : name,
-                                          detail: "\(record.sport.name) · \(StatsDisplay.date(record.day))",
-                                          value: StatsDisplay.measurement(record.value, metric: metric))
+                                          detail: "\(record.sport.name) · \(StatsDisplay.date(record.day, locale: locale, dateFormat: preferences?.dateFormat ?? .system))",
+                                          value: StatsDisplay.measurement(record.value, metric: metric, units: units, locale: locale))
                             }
                             .buttonStyle(.plain)
                             .padding(.horizontal, 4)
@@ -138,8 +141,8 @@ struct StatsRecordsDetail: View {
                             .accessibilityIdentifier("stats-record-\(period)-\(metric.rawValue)-\(id)")
                         } else {
                             rankedRow(rank: rank, name: name.isEmpty ? record.sport.name : name,
-                                      detail: "\(record.sport.name) · \(StatsDisplay.date(record.day))",
-                                      value: StatsDisplay.measurement(record.value, metric: metric))
+                                      detail: "\(record.sport.name) · \(StatsDisplay.date(record.day, locale: locale, dateFormat: preferences?.dateFormat ?? .system))",
+                                      value: StatsDisplay.measurement(record.value, metric: metric, units: units, locale: locale))
                         }
                     }
                 }
@@ -151,9 +154,9 @@ struct StatsRecordsDetail: View {
                 if weeks.isEmpty { Text("No record yet").font(.caption).foregroundStyle(.secondary) }
                 ForEach(Array(weeks.enumerated()), id: \.offset) { index, week in
                     rankedRow(rank: weeks.firstIndex { $0.value == week.value } ?? index,
-                              name: "Week of \(StatsDisplay.date(week.weekStart))",
+                              name: "Week of \(StatsDisplay.date(week.weekStart, locale: locale, dateFormat: preferences?.dateFormat ?? .system))",
                               detail: period == "currentYear" ? "Distance within this year" : "Total distance",
-                              value: StatsDisplay.measurement(week.value, metric: .distance))
+                              value: StatsDisplay.measurement(week.value, metric: .distance, units: units, locale: locale))
                 }
             }
         }.frame(maxWidth: .infinity, alignment: .topLeading)

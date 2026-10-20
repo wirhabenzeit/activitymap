@@ -10,6 +10,7 @@ import type { FeatureCollection } from 'geojson';
 import { useEffect, useMemo } from 'react';
 
 import { toActivityDTO } from '~/contracts/v1/activity';
+import type { Activity } from '~/lib/activity';
 import { createFeature } from '~/lib/activity-utils';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { libraryQueryState } from '~/lib/sync/library-query-state';
@@ -20,7 +21,7 @@ import {
   getPublicActivities,
   getPublicUserActivities,
 } from '~/server/db/actions';
-import type { Activity } from '~/server/db/schema';
+import type { Activity as LegacyActivity } from '~/server/db/schema';
 import { useShallowStore } from '~/store';
 
 import { useLibrarySnapshot } from './use-library-snapshot';
@@ -33,7 +34,7 @@ const getCachedGuestActivities = async (
   (await getCachedActivityDTOs(scope)).map(dtoToActivity);
 const upsertCachedGuestActivities = (
   scope: string,
-  activities: Activity[],
+  activities: LegacyActivity[],
 ): Promise<void> => upsertActivityDTOs(scope, activities.map(toActivityDTO));
 
 const selectActivities = (data: InfiniteData<Activity[], number>) =>

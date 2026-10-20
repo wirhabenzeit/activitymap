@@ -35,6 +35,7 @@ try {
   evidence = await recordBrowserEvidence(context, { base, output });
   const errors = [];
   const page = await context.newPage();
+  page.on('dialog', (prompt) => prompt.accept());
   page.on('pageerror', (error) => errors.push(error.message));
   const load = async () => {
     await page.goto(new URL('/react-ui-reconciliation-test', base).href);
@@ -71,6 +72,26 @@ try {
       );
     }
   };
+  const popupFits = async (name) => {
+    const listbox = page.getByRole('listbox');
+    await listbox.evaluate((element) =>
+      Promise.all(
+        element
+          .getAnimations({ subtree: true })
+          .map((animation) => animation.finished.catch(() => undefined)),
+      ),
+    );
+    const bounds = await listbox.boundingBox();
+    const viewport = page.viewportSize();
+    assert(
+      bounds &&
+        bounds.x >= 0 &&
+        bounds.y >= 0 &&
+        bounds.x + bounds.width <= viewport.width &&
+        bounds.y + bounds.height <= viewport.height,
+      `${name} choices must fit the viewport: ${JSON.stringify(bounds)}`,
+    );
+  };
   await load();
   for (const viewport of [
     { width: 844, height: 390 },
@@ -96,17 +117,11 @@ try {
       'Edit actions stay fixed while fields scroll',
     );
     // Opening is insufficient: an option can be visible but covered by the dialog.
-    const sport = dialog.getByRole('combobox', { name: 'Sport type' });
+    const sport = dialog.getByRole('combobox', { name: 'Sport' });
     await sport.click();
     const run = page.getByRole('option', { name: 'Run', exact: true });
     await run.scrollIntoViewIfNeeded();
-    await run.evaluate((element) =>
-      Promise.all(
-        element
-          .getAnimations()
-          .map((animation) => animation.finished.catch(() => undefined)),
-      ),
-    );
+    await popupFits('Sport');
     assert(
       await run.evaluate((element) => {
         const rect = element.getBoundingClientRect();
@@ -165,13 +180,7 @@ try {
     await expiry.click();
     const oneDay = page.getByRole('option', { name: '1 day', exact: true });
     await oneDay.scrollIntoViewIfNeeded();
-    await oneDay.evaluate((element) =>
-      Promise.all(
-        element
-          .getAnimations()
-          .map((animation) => animation.finished.catch(() => undefined)),
-      ),
-    );
+    await popupFits('Share expiry');
     assert(
       await oneDay.evaluate((element) => {
         const rect = element.getBoundingClientRect();

@@ -200,6 +200,1371 @@ nonisolated enum AppMessages {
     static func stateSelectedActiveRoute(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("state.selectedActiveRoute", defaultValue: "Selected. Active on map", table: "Presentation", locale: locale, comment: "Accessibility value for a selected activity that is also the active map route.")
     }
+    static func activityEditTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.title", defaultValue: "Edit activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditName(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.name", defaultValue: "Name", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.description", defaultValue: "Description", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditSport(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.sport", defaultValue: "Sport", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditSave(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.save", defaultValue: "Save changes", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditSaving(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.saving", defaultValue: "Saving to Strava…", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditCancel(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.cancel", defaultValue: "Cancel", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditDiscard(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.discard", defaultValue: "Discard changes", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditKeepEditing(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.keepEditing", defaultValue: "Keep editing", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditDiscardQuestion(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.discardQuestion", defaultValue: "Discard your changes?", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditClose(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.close", defaultValue: "Close Edit activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditNamePlaceholder(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.namePlaceholder", defaultValue: "Activity name", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditChooseSport(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.chooseSport", defaultValue: "Choose a sport", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditFindSport(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.findSport", defaultValue: "Find a sport", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditFooter(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.footer", defaultValue: "Changes are saved to Strava", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditSavedAnnouncement(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.savedAnnouncement", defaultValue: "Activity saved to Strava", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditSavingAnnouncement(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.savingAnnouncement", defaultValue: "Saving to Strava", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditSubtitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.subtitle", defaultValue: "Change name, sport or description", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditValidationName(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.validationName", defaultValue: "Enter an activity name.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditValidationDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.validationDescription", defaultValue: "The description is too long.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditValidationSport(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.validationSport", defaultValue: "Choose a valid sport.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityDetailsTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.details.title", defaultValue: "Activity details", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityPhotos(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.photos", defaultValue: "Activity photos", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityGroupTimeSpeed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.group.timeSpeed", defaultValue: "Time & speed", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityGroupTimePace(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.group.timePace", defaultValue: "Time & pace", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityGroupElevation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.group.elevation", defaultValue: "Elevation", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityGroupPower(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.group.power", defaultValue: "Power", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityGroupHeartRate(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.group.heartRate", defaultValue: "Heart rate", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityGroupEnergy(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.group.energy", defaultValue: "Energy", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityGroupSocial(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.group.social", defaultValue: "Social", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityGroupActivity(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.group.activity", defaultValue: "Activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func metricShortMinimum(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.short.minimum", defaultValue: "Minimum", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func metricShortMaximum(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.short.maximum", defaultValue: "Maximum", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func metricShortAverage(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.short.average", defaultValue: "Average", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func metricShortWeightedAverage(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.short.weightedAverage", defaultValue: "Weighted average", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func metricShortCalories(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.short.calories", defaultValue: "Calories", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionsMore(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("actions.more", defaultValue: "More activity actions", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionEdit(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.edit", defaultValue: "Edit", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionShareActivity(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.shareActivity", defaultValue: "Share activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionOpenInStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.openInStrava", defaultValue: "Open in Strava", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionOpeningStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.openingStrava", defaultValue: "Opening Strava…", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionRefresh(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.refresh", defaultValue: "Refresh from Strava", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionClearSelection(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.clearSelection", defaultValue: "Clear selection", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionCollapse(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.collapse", defaultValue: "Collapse activity details", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionPreviousActivity(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.previousActivity", defaultValue: "Previous activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionNextActivity(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.nextActivity", defaultValue: "Next activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionOk(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.ok", defaultValue: "OK", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionDone(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.done", defaultValue: "Done", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionContinue(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.continue", defaultValue: "Continue", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionRetry(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.retry", defaultValue: "Retry", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func actionClearFilters(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.clearFilters", defaultValue: "Clear filters", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityActionShowOnMapHint(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.showOnMapHint", defaultValue: "Select this activity and frame its route", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityActionNoRoute(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.noRoute", defaultValue: "This activity has no GPS route", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityActionShareHint(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.shareHint", defaultValue: "Create an expiring link to its map", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityActionStravaHint(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.stravaHint", defaultValue: "View the original activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityActionOpenFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.openFailed", defaultValue: "Couldn’t open Strava", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityActionShareGPXFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.shareGPXFailed", defaultValue: "Couldn’t share GPX", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationSuccessTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.success.title", defaultValue: "Activity saved", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationSuccessDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.success.description", defaultValue: "Your changes have been saved to Strava.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationRefreshTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.refresh.title", defaultValue: "Activity refreshed", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationRefreshDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.refresh.description", defaultValue: "Activity details and photos are up to date.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationPartialTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.partial.title", defaultValue: "Activity refreshed; photos pending", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationPartialDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.partial.description", defaultValue: "Activity details were saved. Photos could not be refreshed; try refreshing again later.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationCacheFailureTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.cacheFailure.title", defaultValue: "Saved to Strava; local update pending", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationCacheFailureDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.cacheFailure.description", defaultValue: "The remote change succeeded. Your local library could not be updated; sync again to load the saved activity.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationErrorTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.error.title", defaultValue: "Couldn’t save activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationErrorDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.error.description", defaultValue: "Your changes could not be saved. Try again.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationMap(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.map", defaultValue: "Map", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationList(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.list", defaultValue: "List", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationStats(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.stats", defaultValue: "Stats", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationAccount(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.account", defaultValue: "Account", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationFilters(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.filters", defaultValue: "Filters", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationSettings(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.settings", defaultValue: "Settings", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationCategories(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.categories", defaultValue: "Categories", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationView(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.view", defaultValue: "View", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationExpanded(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.expanded", defaultValue: "Expanded", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationCollapsed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.collapsed", defaultValue: "Collapsed", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func valueNotRecorded(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("value.notRecorded", defaultValue: "Not recorded", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationRequestID(_ requestID: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.requestID", defaultValue: "Request ID: \(requestID)", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func mutationRetryAfter(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.retryAfter", defaultValue: "Try again after \(time).", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityMetricAccessibility(_ group: String, _ metric: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.metric.accessibility", defaultValue: "\(group), \(metric)", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityPosition(_ position: Int, _ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.position", defaultValue: "\(position) of \(count)", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationCurrentView(_ view: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.currentView", defaultValue: "View: \(view)", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func navigationActiveFilters(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.activeFilters", defaultValue: "Filters, \(count) active", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditNameLength(_ maximum: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.nameLength", defaultValue: "Use no more than \(maximum) characters for the activity name.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func activityEditDescriptionLength(_ maximum: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.descriptionLength", defaultValue: "Use no more than \(maximum) characters for the description.", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+    }
+    static func statusProgressNotStarted(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.progress.notStarted", defaultValue: "Not started", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusProgressInProgress(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.progress.inProgress", defaultValue: "Partially available", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusProgressComplete(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.progress.complete", defaultValue: "Covered", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusProgressUnknown(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.progress.unknown", defaultValue: "Unknown", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSchedulingIdle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.scheduling.idle", defaultValue: "No work pending", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSchedulingScheduled(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.scheduling.scheduled", defaultValue: "Automatic processing scheduled", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSchedulingWaiting(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.scheduling.waiting", defaultValue: "Waiting to retry", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSchedulingBlocked(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.scheduling.blocked", defaultValue: "Reconnect Strava to continue", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSchedulingDisabled(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.scheduling.disabled", defaultValue: "Background processing is disabled on the server", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSchedulingStalled(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.scheduling.stalled", defaultValue: "Background processing has stopped reporting; contact support if this continues", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSchedulingNotScheduled(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.scheduling.notScheduled", defaultValue: "No automatic refresh is scheduled", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSchedulingUnknown(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.scheduling.unknown", defaultValue: "No background run has been recorded", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonRateLimited(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.rateLimited", defaultValue: "Strava request limit reached; processing will resume on a later run", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonTimeBudget(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.timeBudget", defaultValue: "More work remains for the next scheduled run", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonCredentialsUnavailable(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.credentialsUnavailable", defaultValue: "Reconnect Strava to continue", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonUnauthorized(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.unauthorized", defaultValue: "Strava rejected the connection; reconnect Strava", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonUpstreamError(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.upstreamError", defaultValue: "Strava could not be reached", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonInvalidResponse(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.invalidResponse", defaultValue: "Strava returned data that could not be read", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonDetailFailures(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.detailFailures", defaultValue: "Some activity details could not be fetched and will be retried", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonPhotoRefreshFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.photoRefreshFailed", defaultValue: "Photo metadata could not be refreshed", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonHistoryFetchFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.historyFetchFailed", defaultValue: "Activity history could not be fetched", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonPersistenceFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.persistenceFailed", defaultValue: "The server could not save the update", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusReasonInternalError(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.reason.internalError", defaultValue: "The server could not finish processing", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusOutcomeSucceeded(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.outcome.succeeded", defaultValue: "Last run succeeded", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusOutcomePartial(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.outcome.partial", defaultValue: "Last run partly succeeded", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusOutcomeDeferred(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.outcome.deferred", defaultValue: "Last run deferred", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusOutcomeFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.outcome.failed", defaultValue: "Last run failed", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusOutcomeBlocked(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.outcome.blocked", defaultValue: "Last run blocked", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusPipelineHistory(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.pipeline.history", defaultValue: "Activity history", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusPipelineDetails(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.pipeline.details", defaultValue: "Activity details", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusPipelineStreams(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.pipeline.streams", defaultValue: "Streams & charts", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusPipelinePhotos(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.pipeline.photos", defaultValue: "Photo metadata", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSummaryHistory(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.summary.history", defaultValue: "History", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSummaryDetails(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.summary.details", defaultValue: "Details", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSummaryStreams(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.summary.streams", defaultValue: "Streams", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusSummaryPhotos(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.summary.photos", defaultValue: "Photos", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactReconnect(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.reconnect", defaultValue: "Reconnect", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactPaused(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.paused", defaultValue: "Paused", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactNeedsAttention(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.needsAttention", defaultValue: "Needs attention", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactScheduleUnknown(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.scheduleUnknown", defaultValue: "Schedule unknown", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactWaiting(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.waiting", defaultValue: "Waiting", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactRefreshPending(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.refreshPending", defaultValue: "Refresh pending", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactChecking(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.checking", defaultValue: "Checking", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactQueued(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.queued", defaultValue: "Queued", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactImporting(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.importing", defaultValue: "Importing", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactReady(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.ready", defaultValue: "Ready", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactUnknown(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.unknown", defaultValue: "Unknown", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusCompactNotStarted(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.compact.notStarted", defaultValue: "Not started", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusOutcomeWithReason(_ outcome: String, _ reason: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.outcome.withReason", defaultValue: "\(outcome): \(reason)", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusHistoryUnknown(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.historyUnknown", defaultValue: "\(count) activities imported · Strava total not yet known", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusHistoryComplete(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.historyComplete", defaultValue: "\(count) activities imported · full history discovered", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusDetailsCounts(_ fetched: Int, _ awaiting: Int, _ invalidated: Int, _ retrying: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.detailsCounts", defaultValue: "\(fetched) fetched · \(awaiting) awaiting first fetch · \(invalidated) awaiting refresh · \(retrying) of these waiting to retry", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusStreamsCounts(_ withData: Int, _ withoutData: Int, _ queued: Int, _ waiting: Int, _ blocked: Int, _ failed: Int, _ summaries: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.streamsCounts", defaultValue: "\(withData) with data · \(withoutData) with no sensor data · \(queued) queued · \(waiting) waiting · \(blocked) blocked · \(failed) failed. \(summaries) chart summaries available.", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusPhotosCounts(_ current: Int, _ total: Int, _ refresh: Int, _ unknown: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.photosCounts", defaultValue: "\(current) of \(total) activities with photos checked · \(refresh) awaiting refresh · \(unknown) not checked. \(photos) photo records; image downloads are separate.", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusHistorySummary(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.historySummary", defaultValue: "\(count) imported", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusHistorySummaryUnknown(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.historySummaryUnknown", defaultValue: "\(count) imported · total unknown", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusDetailsSummary(_ count: Int, _ total: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.detailsSummary", defaultValue: "\(count) of \(total) ready", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusStreamsSummary(_ count: Int, _ total: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.streamsSummary", defaultValue: "\(count) of \(total) checked", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusPhotosSummary(_ count: Int, _ total: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.photosSummary", defaultValue: "\(count) of \(total) activities have photos available", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusNoPhotos(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.noPhotos", defaultValue: "No photos reported", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func statusPhotosUnknown(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.photosUnknown", defaultValue: "Photo availability not reported by this server", table: "Presentation", locale: locale, comment: "Import coverage and recovery status. This is server scheduling state; keep the distinction between coverage, scheduled work and retry availability.")
+    }
+    static func navigationHome(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.home", defaultValue: "ActivityMap home", table: "Presentation", locale: locale, comment: "Accessible name of the app mark which navigates to the Map.")
+    }
+    static func metricKudos(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.kudos", defaultValue: "Kudos", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricComments(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.comments", defaultValue: "Comments", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricAchievements(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.achievements", defaultValue: "Achievements", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricPhotos(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.photos", defaultValue: "Photos", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricCommute(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.commute", defaultValue: "Commute", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricPrivate(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.private", defaultValue: "Private", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricIndoor(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.indoor", defaultValue: "Indoor", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricManual(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.manual", defaultValue: "Manual", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricFlagged(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.flagged", defaultValue: "Flagged", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func metricGeometryStatus(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.geometryStatus", defaultValue: "Geometry status", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func geometrySummary(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("geometry.summary", defaultValue: "Summary", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func geometryDetailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("geometry.detailed", defaultValue: "Detailed", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func geometryRefreshRequired(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("geometry.refreshRequired", defaultValue: "Refresh required", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func valueYes(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("value.yes", defaultValue: "Yes", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func valueNo(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("value.no", defaultValue: "No", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func activitySummary(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.summary", defaultValue: "Activity summary", table: "Presentation", locale: locale, comment: "Activity detail measurement or recorded context flag. Recorded false remains No; missing is separate from false.")
+    }
+    static func activityActionNamed(_ action: String, _ name: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.named", defaultValue: "\(action): \(name)", table: "Presentation", locale: locale, comment: "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments.")
+    }
+    static func activityActionUnavailable(_ action: String, _ name: String, _ reason: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.unavailable", defaultValue: "\(action): \(name). \(reason)", table: "Presentation", locale: locale, comment: "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments.")
+    }
+    static func actionActiveOnMap(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.activeOnMap", defaultValue: "Active on map", table: "Presentation", locale: locale, comment: "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments.")
+    }
+    static func mutationRefreshErrorTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.refreshError.title", defaultValue: "Couldn’t refresh activity", table: "Presentation", locale: locale, comment: "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments.")
+    }
+    static func mutationRefreshErrorDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.refreshError.description", defaultValue: "Activity details could not be refreshed from Strava. Try again.", table: "Presentation", locale: locale, comment: "Activity action accessible name or refresh recovery. Activity name and server reason are verbatim arguments.")
+    }
+    static func statusBrowsingPauseSync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.pauseSync", defaultValue: "Pause sync", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingTheseActivitiesHaveNoGPSRoutes(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.theseActivitiesHaveNoGPSRoutes", defaultValue: "These activities have no GPS routes", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingClearFilters(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.clearFilters", defaultValue: "Clear filters", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingCouldnTLoadActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.couldnTLoadActivities", defaultValue: "Couldn’t load activities", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingLoadingWasPausedRetryToFinishDownloadingYourLibrary(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.loadingWasPausedRetryToFinishDownloadingYourLibrary", defaultValue: "Loading was paused. Retry to finish downloading your library.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingSyncFailedSavedActivitiesAvailable(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.syncFailedSavedActivitiesAvailable", defaultValue: "Sync failed · saved activities available", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingReadingYourSavedSessionAndActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.readingYourSavedSessionAndActivities", defaultValue: "Reading your saved session and activities.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingConnectingToStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.connectingToStrava", defaultValue: "Connecting to Strava…", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingNoActivitiesInYourLibrary(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.noActivitiesInYourLibrary", defaultValue: "No activities in your library", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingStravaIsDisconnected(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.stravaIsDisconnected", defaultValue: "Strava is disconnected", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingActivitySyncPaused(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.activitySyncPaused", defaultValue: "Activity sync paused", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingViewActivitiesInList(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.viewActivitiesInList", defaultValue: "View activities in List", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingYourLibraryIsStillSavedClearFiltersOrChange(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.yourLibraryIsStillSavedClearFiltersOrChange", defaultValue: "Your library is still saved. Clear filters or change a restriction to see activities.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingSyncingSavedActivitiesAvailable(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.syncingSavedActivitiesAvailable", defaultValue: "Syncing · saved activities available", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingConnectWithStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.connectWithStrava", defaultValue: "Connect with Strava", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingActivitySyncComplete(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.activitySyncComplete", defaultValue: "Activity sync complete", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingOfflineNoCompletedActivityCache(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.offlineNoCompletedActivityCache", defaultValue: "Offline · no completed activity cache", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingLastSyncAndStravaReconciliationAreSeparateChecks(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.lastSyncAndStravaReconciliationAreSeparateChecks", defaultValue: "Last sync and Strava reconciliation are separate checks.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingConnectToTheInternetAndRetryToFinishLoading(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.connectToTheInternetAndRetryToFinishLoading", defaultValue: "Connect to the internet and retry to finish loading your library.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingSyncDidNotCompleteRetryOrReviewSyncDetails(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.syncDidNotCompleteRetryOrReviewSyncDetails", defaultValue: "Sync did not complete. Retry, or review Sync Details for the error.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingRetryIsAvailableAfterTheServerSRequestedWait(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.retryIsAvailableAfterTheServerSRequestedWait", defaultValue: "Retry is available after the server’s requested wait. Sync Details shows the exact time.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingNoActivitiesMatchYourFilters(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.noActivitiesMatchYourFilters", defaultValue: "No activities match your filters", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingYourSavedActivityDataRemainsAvailableReconnectToSync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.yourSavedActivityDataRemainsAvailableReconnectToSync", defaultValue: "Your saved activity data remains available. Reconnect to sync changes.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingYourSavedLibraryIsStillReadableRetryToLoad(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.yourSavedLibraryIsStillReadableRetryToLoad", defaultValue: "Your saved library is still readable. Retry to load changes.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingKeepBrowsingWhileChangesAreDownloaded(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.keepBrowsingWhileChangesAreDownloaded", defaultValue: "Keep browsing while changes are downloaded.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingYourSignInHasExpired(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.yourSignInHasExpired", defaultValue: "Your sign-in has expired", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingConnectWithStravaAgainToRestoreAccessToYour(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.connectWithStravaAgainToRestoreAccessToYour", defaultValue: "Connect with Strava again to restore access to your activities.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingSyncWaitingForTheServer(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.syncWaitingForTheServer", defaultValue: "Sync waiting for the server", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingApproveOrCancelInTheStravaSheetToContinue(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.approveOrCancelInTheStravaSheetToContinue", defaultValue: "Approve or cancel in the Strava sheet to continue.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingPreparingActivityData(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.preparingActivityData", defaultValue: "Preparing activity data", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingTheFirstSyncDownloadsActivityAndPhotoMetadataYou(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.theFirstSyncDownloadsActivityAndPhotoMetadataYou", defaultValue: "The first sync downloads activity and photo metadata. You can pause and retry.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingYourSavedLibraryIsStillReadableRetryWhenYou(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.yourSavedLibraryIsStillReadableRetryWhenYou", defaultValue: "Your saved library is still readable. Retry when you’re ready.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingTheCompletedSyncContainsNoActivitiesRecordAnActivity(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.theCompletedSyncContainsNoActivitiesRecordAnActivity", defaultValue: "The completed sync contains no activities. Record an activity in Strava, then sync again.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingLoadingYourActivityLibrary(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.loadingYourActivityLibrary", defaultValue: "Loading your activity library", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingOfflineBrowsingSavedActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.offlineBrowsingSavedActivities", defaultValue: "Offline · browsing saved activities", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingConnectWithStravaAgainToLoadYourActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.connectWithStravaAgainToLoadYourActivities", defaultValue: "Connect with Strava again to load your activities.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingConnectStravaToSeeYourActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.connectStravaToSeeYourActivities", defaultValue: "Connect Strava to see your activities", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingSyncWaitingSavedActivitiesAvailable(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.syncWaitingSavedActivitiesAvailable", defaultValue: "Sync waiting · saved activities available", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingRetrySync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.retrySync", defaultValue: "Retry sync", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingNoRoutesMessage(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.noRoutesMessage", defaultValue: "\(count) filtered activities remain available in the list, including their measurements and known photo metadata.", table: "Presentation", locale: locale, comment: "Map empty-state explanation. The activities remain inspectable in List when they have no route.")
+    }
+    static func statusBrowsingSeparateSyncAndReconciliationTimes(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.separateSyncAndReconciliationTimes", defaultValue: "Sync and reconciliation times", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingStravaReconciliation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.stravaReconciliation", defaultValue: "Strava reconciliation", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingLastSuccessfulSync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.lastSuccessfulSync", defaultValue: "Last successful sync", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingActivityData(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.activityData", defaultValue: "Activity data", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingRetryAvailableAfter(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.retryAvailableAfter", defaultValue: "Retry available after", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingSavedPhotoInformationDoesNotMeanThePhotoItself(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.savedPhotoInformationDoesNotMeanThePhotoItself", defaultValue: "Saved photo information does not mean the photo itself is downloaded. Opening a photo may require a connection.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingASuccessfulSyncCopiesServerChangesStravaReconciliationSays(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.aSuccessfulSyncCopiesServerChangesStravaReconciliationSays", defaultValue: "A successful sync copies server changes. Strava reconciliation says when the server last checked Strava. Older or unreported dates do not expire a valid sign-in or remove saved activities.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingNoCompletedSync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.noCompletedSync", defaultValue: "No completed sync", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingNotReportedByServer(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.notReportedByServer", defaultValue: "Not reported by server", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingNoPhotos(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.noPhotos", defaultValue: "No photos", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingSignInAgainFromAccountToCheckStatus(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.signInAgainFromAccountToCheckStatus", defaultValue: "Sign in again from Account to check status.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingFetchFromStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.fetchFromStrava", defaultValue: "Fetch from Strava", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingStravaImportStatus(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.stravaImportStatus", defaultValue: "Strava import status", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingImportStatusUnavailablePleaseTryAgainLater(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.importStatusUnavailablePleaseTryAgainLater", defaultValue: "Import status unavailable. Please try again later.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingCheckingYourImport(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.checkingYourImport", defaultValue: "Checking your import…", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingFetchingFromStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.fetchingFromStrava", defaultValue: "Fetching from Strava", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingFetchedForImportedActivitiesPhotosCountOnlyActivitiesWith(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.fetchedForImportedActivitiesPhotosCountOnlyActivitiesWith", defaultValue: "Fetched for imported activities. Photos count only activities with photos.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingFetchRecentActivitiesMissingDetailsAndPhotosAndMore(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.fetchRecentActivitiesMissingDetailsAndPhotosAndMore", defaultValue: "Fetch recent activities, missing details and photos, and more history in the background.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingAllActivitiesImported(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.allActivitiesImported", defaultValue: "All activities imported", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingReconnectStravaFromAccountToContinueImporting(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.reconnectStravaFromAccountToContinueImporting", defaultValue: "Reconnect Strava from Account to continue importing.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
+    }
+    static func statusBrowsingKnownPhotos(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.knownPhotos", defaultValue: "\(count) known photos", table: "Presentation", locale: locale, comment: "Complete import status message with date/count supplied by the platform.")
+    }
+    static func statusBrowsingLastKnown(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.lastKnown", defaultValue: "Last known status · \(time)", table: "Presentation", locale: locale, comment: "Complete import status message with date/count supplied by the platform.")
+    }
+    static func statusBrowsingOfflineLastKnown(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.offlineLastKnown", defaultValue: "Offline. Last known status · \(time)", table: "Presentation", locale: locale, comment: "Complete import status message with date/count supplied by the platform.")
+    }
+    static func statsGroupNow(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.group.now", defaultValue: "Now", table: "Presentation", locale: locale, comment: "Stats dashboard section heading.")
+    }
+    static func statsGroupThisYear(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.group.thisYear", defaultValue: "This year", table: "Presentation", locale: locale, comment: "Stats dashboard section heading.")
+    }
+    static func statsGroupPatterns(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.group.patterns", defaultValue: "Patterns", table: "Presentation", locale: locale, comment: "Stats dashboard section heading.")
+    }
+    static func statsMetricCount(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.metric.count", defaultValue: "Activities", table: "Presentation", locale: locale, comment: "Stats aggregate metric label; stored values remain SI and unit preference is independent.")
+    }
+    static func statsMetricDistance(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.metric.distance", defaultValue: "Distance", table: "Presentation", locale: locale, comment: "Stats aggregate metric label; stored values remain SI and unit preference is independent.")
+    }
+    static func statsMetricElevation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.metric.elevation", defaultValue: "Elevation", table: "Presentation", locale: locale, comment: "Stats aggregate metric label; stored values remain SI and unit preference is independent.")
+    }
+    static func statsMetricTime(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.metric.time", defaultValue: "Moving time", table: "Presentation", locale: locale, comment: "Stats aggregate metric label; stored values remain SI and unit preference is independent.")
+    }
+    static func statsTileThisWeek(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.thisWeek", defaultValue: "This week", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleThisWeek(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.thisWeek", defaultValue: "Metric", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileMonthVsLastMonth(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.monthVsLastMonth", defaultValue: "This month", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleMonthVsLastMonth(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.monthVsLastMonth", defaultValue: "Metric", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileWeeklyVolume(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.weeklyVolume", defaultValue: "Training volume", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleWeeklyVolume(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.weeklyVolume", defaultValue: "Metric", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileYearToDate(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.yearToDate", defaultValue: "Year to date", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleYearToDate(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.yearToDate", defaultValue: "Metric", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileYearPace(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.yearPace", defaultValue: "Year-end projection", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleYearPace(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.yearPace", defaultValue: "Metric", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileRecords(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.records", defaultValue: "Records", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsTileTotals(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.totals", defaultValue: "Totals", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleTotals(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.totals", defaultValue: "Metric", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileActivityCalendar(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.activityCalendar", defaultValue: "Activity calendar", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleActivityCalendar(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.activityCalendar", defaultValue: "Colour by", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileConsistency(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.consistency", defaultValue: "Consistency", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleConsistency(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.consistency", defaultValue: "Range", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileSportMix(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.sportMix", defaultValue: "Sport mix", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleSportMix(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.sportMix", defaultValue: "Range", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileDistanceVsElevation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.distanceVsElevation", defaultValue: "Hilliness", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsTileTypicalWeek(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.typicalWeek", defaultValue: "Typical week", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsTileBest30Days(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.best30Days", defaultValue: "Best 30 days", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleBest30Days(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.best30Days", defaultValue: "Metric", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsTileRestDays(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.restDays", defaultValue: "Rest days", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsTileSpeedTrend(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.speedTrend", defaultValue: "Speed trend", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
+    static func statsToggleSpeedTrend(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.speedTrend", defaultValue: "Range", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func listPageSelection(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.pageSelection", defaultValue: "Select this page", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listAverageSpeedPace(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.averageSpeedPace", defaultValue: "Average speed / pace", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listThisPage(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.thisPage", defaultValue: "This page", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listFiltered(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.filtered", defaultValue: "Filtered activities", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listSelected(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.selected", defaultValue: "Selected activities", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listUnrecorded(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.unrecorded", defaultValue: "* = unrecorded values", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listWidthFit(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.width.fit", defaultValue: "Fit width", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listWidthPinned(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.width.pinned", defaultValue: "Pinned columns", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listWidthFree(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.width.free", defaultValue: "Free scrolling", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func activityActionConnectStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.action.connectStrava", defaultValue: "Connect Strava to change this activity", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func metricLocalDateTime(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("metric.localDateTime", defaultValue: "Local date & time", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listActivityID(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.activityID", defaultValue: "Activity ID", table: "Presentation", locale: locale, comment: "List presentation preference or activity command availability; native column names may use contextual variants while meaning remains stable.")
+    }
+    static func listRecordedValues(_ known: Int, _ total: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.recordedValues", defaultValue: "\(known) of \(total) activities with a recorded value", table: "Presentation", locale: locale, comment: "Complete list summary/accessibility sentence. Counts are interpolated once by the platform locale.")
+    }
+    static func listSummaryAccessible(_ summary: String, _ known: Int, _ total: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.summaryAccessible", defaultValue: "\(summary); \(known) of \(total) recorded", table: "Presentation", locale: locale, comment: "Complete list summary/accessibility sentence. Counts are interpolated once by the platform locale.")
+    }
+    static func listWidthSwitch(_ current: String, _ next: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.width.switch", defaultValue: "\(current). Switch to: \(next)", table: "Presentation", locale: locale, comment: "Complete list summary/accessibility sentence. Counts are interpolated once by the platform locale.")
+    }
+    static func listHidden(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("list.hidden", defaultValue: "\(count) hidden by filters", table: "Presentation", locale: locale, comment: "Complete list summary/accessibility sentence. Counts are interpolated once by the platform locale.")
+    }
+    static func statsExpandTile(_ title: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.expandTile", defaultValue: "Expand \(title)", table: "Presentation", locale: locale, comment: "Accessible action name. Expanded/collapsed state is semantic, independent of displayed title.")
+    }
+    static func statsCollapseTile(_ title: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.collapseTile", defaultValue: "Collapse \(title)", table: "Presentation", locale: locale, comment: "Accessible action name. Expanded/collapsed state is semantic, independent of displayed title.")
+    }
+    static func navigationCloseFilters(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.closeFilters", defaultValue: "Close filters", table: "Presentation", locale: locale, comment: "Accessible action name. Expanded/collapsed state is semantic, independent of displayed title.")
+    }
+    static func navigationToggleFilters(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("navigation.toggleFilters", defaultValue: "Toggle filters", table: "Presentation", locale: locale, comment: "Accessible action name. Expanded/collapsed state is semantic, independent of displayed title.")
+    }
+    static func activityGpxNoRoute(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.noRoute", defaultValue: "No GPS route", table: "Presentation", locale: locale, comment: "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure.")
+    }
+    static func activityGpxWithElevation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.withElevation", defaultValue: "Route with elevation", table: "Presentation", locale: locale, comment: "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure.")
+    }
+    static func activityGpxRouteOnly(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.routeOnly", defaultValue: "Route only", table: "Presentation", locale: locale, comment: "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure.")
+    }
+    static func activityGpxShareHint(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.shareHint", defaultValue: "Share the saved route as a GPX file", table: "Presentation", locale: locale, comment: "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure.")
+    }
+    static func activityGpxUnavailableHint(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.unavailableHint", defaultValue: "This activity has no GPS route to export", table: "Presentation", locale: locale, comment: "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure.")
+    }
+    static func activityGpxExportFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.exportFailed", defaultValue: "Couldn’t export GPX", table: "Presentation", locale: locale, comment: "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure.")
+    }
+    static func activityGpxCreateFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.createFailed", defaultValue: "The GPX file couldn’t be created. Please try again.", table: "Presentation", locale: locale, comment: "Offline GPX export availability. Sampled route elevation is distinct from detailed/raw recorded elevations; an unavailable route is not a retryable network failure.")
+    }
+    static func settingsClose(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.close", defaultValue: "Close Settings", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsDescription(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.description", defaultValue: "Web sync, Strava import status and display preferences.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsSections(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.sections", defaultValue: "Settings sections", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsSyncData(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.syncData", defaultValue: "Sync & data", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsDisplay(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.display", defaultValue: "Display", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsAbout(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.about", defaultValue: "About", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsSignInToSync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.signInToSync", defaultValue: "Sign in to sync your activities.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsOfflineSync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.offlineSync", defaultValue: "Offline. Sync will resume when you’re back online.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsSyncing(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.syncing", defaultValue: "Syncing…", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsSyncError(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.syncError", defaultValue: "Couldn’t sync. Please try again.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsLastWebSync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.lastWebSync", defaultValue: "Last web sync", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsNotSynced(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.notSynced", defaultValue: "Not yet synced", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsSyncNow(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.syncNow", defaultValue: "Sync now", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsSignInStatus(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.signInStatus", defaultValue: "Sign in to see your import status.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsGoToAccount(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.goToAccount", defaultValue: "Go to Account", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsImportError(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.importError", defaultValue: "Couldn’t start the import. Please try again.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsCoverageExplanation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.coverageExplanation", defaultValue: "Fetched for imported activities. Photos count only activities with photos.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsProgressName(_ category: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.progressName", defaultValue: "\(category) fetched", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsRetryAfter(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.retryAfter", defaultValue: "Try again after \(time).", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsTagline(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.tagline", defaultValue: "Your activities, on a map and beyond.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountDeleted(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.deleted", defaultValue: "Your ActivityMap account has been deleted.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountCleanupFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.cleanupFailed", defaultValue: "Couldn’t clear this browser’s offline data. Retry to finish.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountClearing(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.clearing", defaultValue: "Clearing local data…", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountFinishClearing(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.finishClearing", defaultValue: "Finish clearing local data", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountYourAccount(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.yourAccount", defaultValue: "Your account", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountConnectToSee(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.connectToSee", defaultValue: "Connect Strava to see your activities.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountStravaDisconnected(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.stravaDisconnected", defaultValue: "Strava not connected", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountStravaLimited(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.stravaLimited", defaultValue: "Strava connected with limited access", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountStravaConnected(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.stravaConnected", defaultValue: "Strava connected", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountReconnect(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.reconnect", defaultValue: "Connect with Strava again to restore access to your activities.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountSigningOut(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.signingOut", defaultValue: "Signing out…", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountSignOut(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.signOut", defaultValue: "Sign out of ActivityMap", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountSignOutFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.signOutFailed", defaultValue: "Couldn’t sign out. Please try again.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountStravaStaysConnected(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.stravaStaysConnected", defaultValue: "Strava stays connected.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountDelete(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.delete", defaultValue: "Delete account and data", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountDeleteExplanation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.deleteExplanation", defaultValue: "Permanently delete your ActivityMap account, imported activities, photos and share links. Your original Strava activities stay on Strava. Signing in again creates a new account and starts a fresh import.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountDeleteQuestion(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.deleteQuestion", defaultValue: "Delete your account and all ActivityMap data? This can’t be undone.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountDeleting(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.deleting", defaultValue: "Deleting account…", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountConfirmDelete(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.confirmDelete", defaultValue: "Permanently delete my account", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountOnlineToDelete(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.onlineToDelete", defaultValue: "Go online to delete your account.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func accountDeleteFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.deleteFailed", defaultValue: "Couldn’t confirm account deletion. Please try again.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayAppearance(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.appearance", defaultValue: "Appearance", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displaySystem(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.system", defaultValue: "System", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayLight(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.light", defaultValue: "Light", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayDark(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.dark", defaultValue: "Dark", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayUnits(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.units", defaultValue: "Units", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayMetric(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.metric", defaultValue: "Metric", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayImperial(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.imperial", defaultValue: "Imperial", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayDateFormat(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.dateFormat", defaultValue: "Date format", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayDayFirst(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.dayFirst", defaultValue: "Day first (31.12.2026)", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayMonthFirst(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.monthFirst", defaultValue: "Month first (12/31/2026)", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func displayIso(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.iso", defaultValue: "ISO (2026-12-31)", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func errorEditConnectWithStravaAgainInSettingsAndAllow(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.connectWithStravaAgainInSettingsAndAllow", defaultValue: "Connect with Strava again in Settings and allow ActivityMap to edit activities.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditKeepTheNameWithinCharacters(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.keepTheNameWithinCharacters", defaultValue: "Keep the name within 255 characters.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditConnectStravaAgainToEditThisActivity(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.connectStravaAgainToEditThisActivity", defaultValue: "Connect Strava again to edit this activity.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditSavingWasInterruptedCheckStravaAndSyncBefore(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.savingWasInterruptedCheckStravaAndSyncBefore", defaultValue: "Saving was interrupted. Check Strava and sync before trying again.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditKeepTheDescriptionWithinCharacters(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.keepTheDescriptionWithinCharacters", defaultValue: "Keep the description within 10,000 characters.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditTheSaveCouldNotBeConfirmedYourDraft(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.theSaveCouldNotBeConfirmedYourDraft", defaultValue: "The save could not be confirmed. Your draft is kept. Check Strava and sync before trying again.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditTheServerIsUnavailableYourDraftIsKept(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.theServerIsUnavailableYourDraftIsKept", defaultValue: "The server is unavailable. Your draft is kept.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditStravaAcceptedYourChangesButThisDeviceCould(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.stravaAcceptedYourChangesButThisDeviceCould", defaultValue: "Strava accepted your changes, but this device could not apply them. Close this editor and sync before editing again.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditStravaIsBusyYourDraftIsKeptTry(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.stravaIsBusyYourDraftIsKeptTry", defaultValue: "Strava is busy. Your draft is kept; try again after the time below.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditTheSaveCouldNotBeConfirmedCloseThis(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.theSaveCouldNotBeConfirmedCloseThis", defaultValue: "The save could not be confirmed. Close this editor and sync before editing again.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditSignInAgainToEditThisActivity(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.signInAgainToEditThisActivity", defaultValue: "Sign in again to edit this activity.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditSignInToEditThisActivity(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.signInToEditThisActivity", defaultValue: "Sign in to edit this activity.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditReconnectAndSyncBeforeSavingToStravaYour(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.reconnectAndSyncBeforeSavingToStravaYour", defaultValue: "Reconnect and sync before saving to Strava. Your draft stays here.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditEnterAnActivityName(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.enterAnActivityName", defaultValue: "Enter an activity name.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorSharingALinkCanShareUpToActivitiesChoose(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.sharing.aLinkCanShareUpToActivitiesChoose", defaultValue: "A link can share up to 200 activities. Choose a smaller selection.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorSharingSelectAtLeastOneActivityToShare(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.sharing.selectAtLeastOneActivityToShare", defaultValue: "Select at least one activity to share.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorSharingTooManyRequestsTryAgainAfterTheTime(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.sharing.tooManyRequestsTryAgainAfterTheTime", defaultValue: "Too many requests. Try again after the time below.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorSharingCreationCouldNotBeConfirmedCheckYourLinks(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.sharing.creationCouldNotBeConfirmedCheckYourLinks", defaultValue: "Creation could not be confirmed. Check Your links before creating another link.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorSharingTheServerReturnedAnInvalidShareLink(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.sharing.theServerReturnedAnInvalidShareLink", defaultValue: "The server returned an invalid share link.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorSharingSignInToShareActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.sharing.signInToShareActivities", defaultValue: "Sign in to share activities.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorSharingReconnectAndSyncBeforeSharingActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.sharing.reconnectAndSyncBeforeSharingActivities", defaultValue: "Reconnect and sync before sharing activities.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorImportStatusServerImportStatusIsNotAvailableShowingThe(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.importStatus.serverImportStatusIsNotAvailableShowingThe", defaultValue: "Server import status is not available. Showing the last known snapshot when available.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorImportStatusOfflineOrSessionNotVerifiedShowingTheLast(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.importStatus.offlineOrSessionNotVerifiedShowingTheLast", defaultValue: "Offline or session not verified. Showing the last known server status when available.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorImportStatusSignInAgainToCheckServerImportStatus(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.importStatus.signInAgainToCheckServerImportStatus", defaultValue: "Sign in again to check server import status.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorStravaImportFetchingPausedWhileTheServiceIsBusyPlease(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.stravaImport.fetchingPausedWhileTheServiceIsBusyPlease", defaultValue: "Fetching paused while the service is busy. Please try again when available.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorStravaImportReconnectStravaFromAccountToContinueFetching(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.stravaImport.reconnectStravaFromAccountToContinueFetching", defaultValue: "Reconnect Strava from Account to continue fetching.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorStravaImportCouldNotCheckTheStravaFetchPleaseTry(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.stravaImport.couldNotCheckTheStravaFetchPleaseTry", defaultValue: "Could not check the Strava fetch. Please try again later.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorStravaImportSignInAgainToFetchFromStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.stravaImport.signInAgainToFetchFromStrava", defaultValue: "Sign in again to fetch from Strava.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
+    }
+    static func errorEditServerReconciliation(_ reason: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.edit.serverReconciliation", defaultValue: "\(reason) Close this editor and sync before editing again.", table: "Presentation", locale: locale, comment: "Server error plus a complete local recovery instruction. Server reason is verbatim; do not retry an uncertain write.")
+    }
+    static func statusStravaImportRunning(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.stravaImport.running", defaultValue: "Fetching from Strava in the background… Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
+    }
+    static func statusStravaImportInterrupted(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.stravaImport.interrupted", defaultValue: "The fetch was interrupted. Saved progress is kept; try again when available. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
+    }
+    static func statusStravaImportRateLimited(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.stravaImport.rateLimited", defaultValue: "Strava’s request limit was reached. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
+    }
+    static func statusStravaImportFailed(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.stravaImport.failed", defaultValue: "Could not finish fetching. Saved progress is kept. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
+    }
+    static func statusStravaImportDeferred(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.stravaImport.deferred", defaultValue: "This fetch has paused. You can continue with another fetch when available. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
+    }
+    static func statusStravaImportFinished(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.stravaImport.finished", defaultValue: "Fetch finished. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
+    }
+    static func activityEditSaveNative(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.edit.saveNative", defaultValue: "Save", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorStravaImportCheckFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.stravaImport.checkFailed", defaultValue: "Could not check the Strava fetch. Please try again later.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorStravaImportWaitCheck(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.stravaImport.waitCheck", defaultValue: "Please wait before checking again.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorStravaImportWaitStart(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.stravaImport.waitStart", defaultValue: "Please wait before trying again.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorFirstSummaryConnection(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.firstSummary.connection", defaultValue: "Could not connect to ActivityMap. Check your connection and try again.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorFirstSummaryInvalidResponse(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.firstSummary.invalidResponse", defaultValue: "The server returned an invalid activity import response. Please try again.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorFirstSummaryDownload(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.firstSummary.download", defaultValue: "Your activities were saved, but could not be downloaded. Check your connection and retry.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorImportStatusNotSupported(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.importStatus.notSupported", defaultValue: "Server import status is not available on this server yet.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorImportStatusSignIn(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.importStatus.signIn", defaultValue: "Sign in again to check server import status.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorImportStatusFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.importStatus.failed", defaultValue: "Could not check server import status. Your last known status is shown when available.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
+    }
+    static func errorFirstSummaryHttp(_ status: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.firstSummary.http", defaultValue: "Activity import failed (HTTP \(status)).", table: "Presentation", locale: locale, comment: "Complete activity import error/recovery with a verbatim server reason. HTTP status is diagnostic context.")
+    }
+    static func errorFirstSummaryReconnect(_ reason: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.firstSummary.reconnect", defaultValue: "\(reason) Connect with Strava again in Settings.", table: "Presentation", locale: locale, comment: "Complete activity import error/recovery with a verbatim server reason. HTTP status is diagnostic context.")
+    }
+    static func errorFirstSummarySignIn(_ reason: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.firstSummary.signIn", defaultValue: "\(reason) Sign in again to continue.", table: "Presentation", locale: locale, comment: "Complete activity import error/recovery with a verbatim server reason. HTTP status is diagnostic context.")
+    }
+    static func accountNativeCouldnTSyncPleaseTryAgainLater(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.couldnTSyncPleaseTryAgainLater", defaultValue: "Couldn’t sync. Please try again later.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeDeleteYourAccountAndAllActivityMapData(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.deleteYourAccountAndAllActivityMapData", defaultValue: "Delete your account and all ActivityMap data?", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeSignInAgainFromAccountToSyncYour(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.signInAgainFromAccountToSyncYour", defaultValue: "Sign in again from Account to sync your activities.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeTryAgain(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.tryAgain", defaultValue: "Try again", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeAboutActivityMap(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.aboutActivityMap", defaultValue: "About ActivityMap", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeSigningIn(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.signingIn", defaultValue: "Signing in…", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeCouldnTConfirmAccountDeletionCheckYourConnection(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.couldnTConfirmAccountDeletionCheckYourConnection", defaultValue: "Couldn’t confirm account deletion. Check your connection and try again.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeVersion(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.version", defaultValue: "Version", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeThisCanTBeUndoneYourOriginalStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.thisCanTBeUndoneYourOriginalStrava", defaultValue: "This can’t be undone. Your original Strava activities stay on Strava. Signing in again creates a new account and starts a fresh import.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeSignOutFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.signOutFailed", defaultValue: "Sign-out failed", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeYourAccountWasDeletedButLocalDataCould(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.yourAccountWasDeletedButLocalDataCould", defaultValue: "Your account was deleted, but local data could not be cleared. Retry to finish.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativePermanentlyDeleteYourActivityMapAccountImportedActivitiesPhotos(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.permanentlyDeleteYourActivityMapAccountImportedActivitiesPhotos", defaultValue: "Permanently delete your ActivityMap account, imported activities, photos and share links. Your original Strava activities stay on Strava.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeSyncPausedTapSyncNowToResume(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.syncPausedTapSyncNowToResume", defaultValue: "Sync paused. Tap Sync now to resume.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeBuild(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.build", defaultValue: "Build", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeLastDeviceSync(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.lastDeviceSync", defaultValue: "Last device sync", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeCheckingYourSession(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.checkingYourSession", defaultValue: "Checking your session…", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeExploreYourActivitiesOnAMapInA(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.exploreYourActivitiesOnAMapInA", defaultValue: "Explore your activities on a map, in a list, and through meaningful summaries.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func accountNativeReconnectStravaFromAccountToSyncYourActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("account.native.reconnectStravaFromAccountToSyncYourActivities", defaultValue: "Reconnect Strava from Account to sync your activities.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingRouteElevationProfileNameSportDateAndTime(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.routeElevationProfileNameSportDateAndTime", defaultValue: "Route, elevation profile, name, sport, date and time, distance, moving time, elevation gain and average speed.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingShownToRecipients(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.shownToRecipients", defaultValue: "Shown to recipients", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingShareOrCopyItNowTheFullLink(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.shareOrCopyItNowTheFullLink", defaultValue: "Share or copy it now. The full link is only available until you close this sheet.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingCreateLink(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.createLink", defaultValue: "Create link", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingCreating(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.creating", defaultValue: "Creating…", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingShareOnlyTheActivityWhoseDetailsAreOpen(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.shareOnlyTheActivityWhoseDetailsAreOpen", defaultValue: "Share only the activity whose details are open", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingTheFirstAndLastMOfEachRoute(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.theFirstAndLastMOfEachRoute", defaultValue: "The first and last 200 m of each route and elevation profile are hidden unless you choose to show them.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingExpires(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.expires", defaultValue: "Expires", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingShareTheSelectedGroupIncludingActivitiesHiddenBy(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.shareTheSelectedGroupIncludingActivitiesHiddenBy", defaultValue: "Share the selected group, including activities hidden by filters", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingCouldnTLoadYourLinksCheckYourConnection(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.couldnTLoadYourLinksCheckYourConnection", defaultValue: "Couldn’t load your links. Check your connection and try again.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingLoadingLinks(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.loadingLinks", defaultValue: "Loading links…", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingHeartRatePowerCaloriesSocialInformationDescriptionsAnd(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.heartRatePowerCaloriesSocialInformationDescriptionsAnd", defaultValue: "Heart rate, power, calories, social information, descriptions and photos are excluded.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingLinkCreated(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.linkCreated", defaultValue: "Link created", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingShowStartAndFinish(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.showStartAndFinish", defaultValue: "Show start and finish", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingRevokeLink(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.revokeLink", defaultValue: "Revoke link", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingShareActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.shareActivities", defaultValue: "Share activities", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingAnyoneWithThisLinkWillLoseAccessImmediately(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.anyoneWithThisLinkWillLoseAccessImmediately", defaultValue: "Anyone with this link will lose access immediately.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingYourLinks(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.yourLinks", defaultValue: "Your links", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingRevocationCouldNotBeConfirmedRefreshYourLinks(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.revocationCouldNotBeConfirmedRefreshYourLinks", defaultValue: "Revocation could not be confirmed. Refresh your links and try again.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingExpiresAfter(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.expiresAfter", defaultValue: "Expires after", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingShareLink(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.shareLink", defaultValue: "Share link", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingShareSelectedActivities(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.shareSelectedActivities", defaultValue: "Share selected activities", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingRevokeThisLink(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.revokeThisLink", defaultValue: "Revoke this link?", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingYouHaveNoShareLinks(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.youHaveNoShareLinks", defaultValue: "You have no share links.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func sharingOnlyTheseActivitiesAreIncludedAnyoneWithThe(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.onlyTheseActivitiesAreIncludedAnyoneWithThe", defaultValue: "Only these activities are included. Anyone with the link can view them until it expires or you revoke it. Activities marked private in Strava are omitted from the shared map.", table: "Presentation", locale: locale, comment: "App-owned account/settings or activity-sharing interface. Native controls keep their existing availability, cancellation and privacy behavior. User names, activity names, links, server details and diagnostics are verbatim.")
+    }
+    static func displayMetricExplanation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.metricExplanation", defaultValue: "Distance, elevation and speed use kilometres, metres and km/h. Preferences are saved on this device.", table: "Presentation", locale: locale, comment: "Complete explanation of a saved display-unit choice, independent of locale and SI storage.")
+    }
+    static func displayImperialExplanation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("display.imperialExplanation", defaultValue: "Distance, elevation and speed use miles, feet and mph. Preferences are saved on this device.", table: "Presentation", locale: locale, comment: "Complete explanation of a saved display-unit choice, independent of locale and SI storage.")
+    }
+    static func sharingExpiryHours(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.expiryHours", defaultValue: "\(count) hours", table: "Presentation", locale: locale, comment: "Complete sharing duration or accessibility hint with a grammatical zero/one/many count.")
+    }
+    static func sharingExpiryDays(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.expiryDays", defaultValue: "\(count) days", table: "Presentation", locale: locale, comment: "Complete sharing duration or accessibility hint with a grammatical zero/one/many count.")
+    }
+    static func sharingSelectionHint(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.selectionHint", defaultValue: "Review all \(count) selected activities, including those hidden by filters", table: "Presentation", locale: locale, comment: "Complete sharing duration or accessibility hint with a grammatical zero/one/many count.")
+    }
+    static func activityRowSubtitle(_ sport: String, _ date: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.row.subtitle", defaultValue: "\(sport) · \(date)", table: "Presentation", locale: locale, comment: "Complete activity identification subtitle/accessibility value. Sport name and activity-local formatted wall time are supplied verbatim. Active route state stays distinct from selection.")
+    }
+    static func activityRowAccessible(_ sport: String, _ date: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.row.accessible", defaultValue: "\(sport), \(date).", table: "Presentation", locale: locale, comment: "Complete activity identification subtitle/accessibility value. Sport name and activity-local formatted wall time are supplied verbatim. Active route state stays distinct from selection.")
+    }
+    static func activityRowActiveAccessible(_ sport: String, _ date: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.row.activeAccessible", defaultValue: "\(sport), \(date). Active on map.", table: "Presentation", locale: locale, comment: "Complete activity identification subtitle/accessibility value. Sport name and activity-local formatted wall time are supplied verbatim. Active route state stays distinct from selection.")
+    }
+    static func errorActivityInvalidResponse(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.activity.invalidResponse", defaultValue: "Strava may have accepted this request, but the saved activity response could not be read. Refresh from Strava before saving again.", table: "Presentation", locale: locale, comment: "An uncertain mutation response must be reconciled before another write; preserve the difference between request failure and remote success with unreadable response.")
+    }
+    static func errorActivityRequestFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("error.activity.requestFailed", defaultValue: "The activity request could not be completed.", table: "Presentation", locale: locale, comment: "An uncertain mutation response must be reconciled before another write; preserve the difference between request failure and remote success with unreadable response.")
+    }
+    static func mutationUnconfirmedTitle(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("mutation.unconfirmed.title", defaultValue: "Couldn’t confirm the saved activity", table: "Presentation", locale: locale, comment: "Successful HTTP response had invalid activity data. The remote write may have succeeded; refresh before resubmitting.")
+    }
+    static func statusFirstSummaryLoading(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.firstSummary.loading", defaultValue: "Loading your recent activities…", table: "Presentation", locale: locale, comment: "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim.")
+    }
+    static func statusFirstSummaryFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.firstSummary.failed", defaultValue: "Could not load your recent activities", table: "Presentation", locale: locale, comment: "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim.")
+    }
+    static func statusFirstSummaryEmpty(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.firstSummary.empty", defaultValue: "No activities found in Strava", table: "Presentation", locale: locale, comment: "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim.")
+    }
+    static func statusFirstSummaryReady(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.firstSummary.ready", defaultValue: "Your recent activities are ready", table: "Presentation", locale: locale, comment: "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim.")
+    }
+    static func statusFirstSummaryEmptyMessage(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.firstSummary.emptyMessage", defaultValue: "New activities will appear here after you record them in Strava.", table: "Presentation", locale: locale, comment: "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim.")
+    }
+    static func statusActivitiesSyncing(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.activitiesSyncing", defaultValue: "Syncing activities", table: "Presentation", locale: locale, comment: "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim.")
+    }
+    static func activityGpxNoGeometry(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.noGeometry", defaultValue: "This activity has no GPS route to export.", table: "Presentation", locale: locale, comment: "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim.")
+    }
+    static func activityGpxInvalidCoordinate(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.gpx.invalidCoordinate", defaultValue: "The saved route contains invalid coordinates. Sync the activity and try again.", table: "Presentation", locale: locale, comment: "Initial native activity import status or GPX export recovery. Preserve already committed progress; local/remote error details remain verbatim.")
+    }
+    static func statusFirstSummaryCount(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.firstSummary.count", defaultValue: "\(count) activities fetched. Older history, details and photos continue in the background.", table: "Presentation", locale: locale, comment: "Complete initial-summary import result. Zero has its own empty-library explanation. History, details and photos continue independently.")
+    }
 }
 
 nonisolated enum SportPresentation {
@@ -302,6 +1667,13 @@ nonisolated enum NativeActionID: String, CaseIterable {
     case select
     case activate
     case exportGPX
+    case edit
+    case shareActivity
+    case openInStrava
+    case refresh
+    case clearSelection
+    case previousActivity
+    case nextActivity
 }
 
 nonisolated enum ActionPresentation {
@@ -322,6 +1694,13 @@ nonisolated enum ActionPresentation {
         case "select": (AppMessages.actionSelect(locale: locale), "square", false)
         case "activate": (AppMessages.actionActivate(locale: locale), "location", false)
         case "exportGPX": (AppMessages.actionExportGPXNative(locale: locale), "square.and.arrow.up", false)
+        case "edit": (AppMessages.actionEdit(locale: locale), "pencil", false)
+        case "shareActivity": (AppMessages.actionShareActivity(locale: locale), "square.and.arrow.up", false)
+        case "openInStrava": (AppMessages.actionOpenInStrava(locale: locale), "arrow.up.right.square", false)
+        case "refresh": (AppMessages.actionRefresh(locale: locale), "arrow.clockwise", false)
+        case "clearSelection": (AppMessages.actionClearSelection(locale: locale), "xmark", false)
+        case "previousActivity": (AppMessages.actionPreviousActivity(locale: locale), "chevron.up", false)
+        case "nextActivity": (AppMessages.actionNextActivity(locale: locale), "chevron.down", false)
         default: nil
         }
     }

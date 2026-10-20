@@ -11,6 +11,36 @@ The SwiftUI client supports mobile sign-in and local-first activity synchronizat
 
 Swift Package Manager pins the Mapbox dependency in `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
 
+## Activity action accessibility tests
+
+`ActivityMapUITests/ActivityActionUITests` exercises the production scrolling
+activity detail through the real accessibility automation interface. Run it on
+an iPhone and an iPad simulator with the same command below, replacing the
+suite name with `ActivityMapUITests/ActivityActionUITests`.
+
+Its three journeys cover seven layouts/states (standard, accessibility3 text,
+no GPS, summary geometry, dark, landscape and RTL), meaningful action names,
+disabled route reasons, 44-point targets, ordering after recorded details,
+native GPX sharing, repeated cancellation, leaving detail during sharing,
+iPad popover anchoring, cached sampled elevation and summary invalidation.
+The sampled-elevation journey asserts the actual exported XML and zero stream
+requests. Fixture telemetry observes real export files and the native share
+presenter while UIKit hides background accessibility during its modal.
+
+The DEBUG-only fixture uses synthetic activities, an in-memory store and
+isolated display preferences. It does not restore authentication or download
+anything. It writes only synthetic diagnostics to a unique temporary path
+provided by the test. The full native profile includes all three journeys. The
+PR profile selects the native sharing/cancellation journey alongside all selected
+API error-fact, editing, sync and display-preference suites.
+
+These journeys replace `RenderedActivityActionTests`' hosted accessibility
+traversal: the iOS 27 hosted tree omitted all SwiftUI nodes even though screenshots
+showed the complete rows. No accessibility assertion is skipped or replaced by
+OCR. Verify three executed UI tests and zero failures/skips in the result bundle.
+This simulator evidence supports #387; it does not certify live VoiceOver or
+physical-device acceptance.
+
 ## Map photo UI tests
 
 The three map-photo interaction journeys run in `ActivityMapUITests/MapPhotoUITests`
@@ -142,7 +172,7 @@ Worktrees have no ignored `Local.xcconfig`, so the script takes `MAPBOX_ACCESS_T
 
 Running the plain `ActivityMap` scheme on a device from Xcode builds `page.dominik.activitymap`, which replaces the TestFlight app. Use the script instead.
 
-Stats opens chart detail as a focus page using the full available content width beside filters (#353), zooming the tapped tile into the page; Reduce Motion cross-fades. On iPhone, Back and the chart title take over the single blue native header, with Filters available and account access kept on the dashboard; Back restores the Map/List/Stats controls and dashboard scroll position. Regular iPad windows retain the global shell header, with Back and the chart title above the focused content. The filter panel and header stay stationary during expansion and Back; only the chart content column participates in the zoom. The dashboard stays mounted, and Back restores its scroll position, metric choices and cached calculations. Regular windows retain the 52pt filter rail across Map, List, Stats and Stats focus; the filter button expands it into a 320pt panel. The panel sits beside one-column content and floats over List plus detail when needed. Opening List detail collapses an expanded column to the rail; closing detail leaves it collapsed (#354). Windows below 760pt and accessibility text sizes use the filter sheet, including while focused. A focused Stats page stays open through resizing until Back or a destination switch. Explicit inline preview hosts retain the original expansion layout.
+Stats opens chart detail as a focus page using the full available content width beside filters (#353), growing the tapped card into the page in place: one chart widens, gains its detail controls and takes on sport colours on a single clock, and Back shrinks it into its dashboard slot. Reduce Motion cross-fades. On iPhone, Back and the chart title take over the single blue native header, with Filters available and account access kept on the dashboard; Back restores the Map/List/Stats controls and dashboard scroll position. Regular iPad windows retain the global shell header, with Back and the chart title above the focused content. The filter panel and header stay stationary during expansion and Back; only the chart content column participates in the zoom. The dashboard stays mounted, and Back restores its scroll position, metric choices and cached calculations. Regular windows retain the 52pt filter rail across Map, List, Stats and Stats focus; the filter button expands it into a 320pt panel. The panel sits beside one-column content and floats over List plus detail when needed. Opening List detail collapses an expanded column to the rail; closing detail leaves it collapsed (#354). Windows below 760pt and accessibility text sizes use the filter sheet, including while focused. A focused Stats page stays open through resizing until Back or a destination switch. Explicit inline preview hosts retain the original expansion layout.
 
 Pushed List details replace the browsing header with a single native blue Back/title/Previous/Next bar. Back restores the browsing header. Side-by-side List details on iPad retain the browsing header. Wherever the filter rail or panel is shown, List keeps the full-width browsing header above it like Map and Stats; a pushed detail's Back/title bar then sits in the List column below it.
 
@@ -290,7 +320,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-Required iOS CI compiles the app and Swift Testing target with `build-for-testing` against a generic simulator destination; it does not boot a simulator or execute these runtime tests. Run the tests locally before review using the command above. This keeps slow simulator startup and native Mapbox rendering out of the required PR checks. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
+Required iOS CI builds the app and runs the selected unit/app-hosted suites plus five real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
 
@@ -329,6 +359,8 @@ Web fixture injection is enabled only in a development build, using the producti
 The native shell now exposes Map, List and Stats. Stats retains its scroll position and tile choices while switching destinations, using the fixture-backed engine described in [the calculation handoff](../../docs/native-stats-engine.md). Its ten tiles follow Now → This year → Patterns. Metric/range switches, rolling calendar colours, animated chart expansion, touch inspection and accessible chart values are available. Loading, no history, no matches and cached/error-with-content states use the existing scoped sync presentation.
 
 Stats uses non-date activity filters and tile-owned periods. Reset activity filters preserves the Map/List date range and selection. Normal dashboard entry performs metadata calculations only, without requesting streams, photos or route geometry. Expanded volume grouping, scrollable weekday-row calendar history, current/prior-period comparison bands, and record/calendar/hilliness activity drill-down are included. The compact calendar fits recent week columns to its width and text size, places the active-day count beside its colour switch, and preserves square cells and month cutouts. Expanded history uses lazy columns, retains its visible week and day, and keeps day details below the grid so selection does not shift the timeline. Final device/accessibility certification remains #228.
+
+Wide dashboards keep the same compact Sport mix summary as phones; per-sport measurements require explicit expansion. On iPad, the workspace owns the single fixed header, while expanded tile identity and Back scroll with the detail content. Calendar pans own their horizontal scroll region instead of competing with full-content Back; deliberate edge Back remains available. The calendar keeps intermediate week positions in a scrolling leaf, retaining the initial, settled and departing viewport without rebuilding all history during each pan.
 
 The retired Calendar/Timeline/Progress prototype screens have been removed. See [dashboard review](../../docs/ios-stats-dashboard-review.md) for scope, captures and validation.
 
@@ -446,7 +478,45 @@ Swift Charts chooses round distance ticks automatically. Native chart selection 
 
 ## Bounded runtime regression command
 
-Run `pnpm test:ios` (or `node scripts/quality/native-harness.mjs` without web dependencies) from the repository root with Xcode 27. It owns a fresh simulator, executes six selected suites, requires nonzero passing results with no skipped tests, and saves logs plus an xcresult bundle. See [Quality checks](../../docs/quality-checks.md) for suite boundaries, timeouts, artifacts, and explicit existing-simulator reuse. Broader rendered and physical-device acceptance remains separate.
+Run from the repository root with Xcode 27; no web dependencies are needed for
+`node scripts/quality/native-harness.mjs`:
+
+```sh
+IOS_TEST_PROFILE=pr pnpm test:ios
+IOS_TEST_PROFILE=full pnpm test:ios
+```
+
+The local default is `full`. On iOS 27, `pr` builds the real app and runs all 30
+selected unit/app-hosted suites plus five real UI smoke methods: native GPX
+sharing/cancellation, List previous pull, Map next pull, Stats content/edge
+Back and standard Sport mix compact/expanded content. Pull-request CI and pushes
+to main select this profile only for native,
+shared contract/fixture or native tooling/workflow changes; unavailable diffs run
+it conservatively. Web-only changes skip the native app job. It has an
+18-minute cold-build limit, eight-minute test limit and 35-minute job limit.
+This is not the full UI matrix.
+
+The full profile runs 36 selected suites, including all 33 UI methods, with the
+same 18-minute build limit, a 35-minute test limit and a 65-minute manual CI job.
+Request it through [Full iOS runtime](../../.github/workflows/ios-full.yml) in
+Actions, choosing the branch or tag; it has no automatic schedule. Per-test
+allowances remain configured at 90 seconds by default and 180 seconds maximum
+in both profiles. The wrapper owns a fresh simulator, requires positive passing
+results with zero failures/skips for the selected boundary, and saves logs plus
+an xcresult bundle. Interrupted full runs do not count as passing coverage.
+
+Before the profile split and Sport mix test-helper correction, the full selection
+passed locally on 20 October 2026: 261 logical tests / 376 runtime executions
+across 36 suites, including the then-32 UI methods, with zero failures or skips,
+on an iPhone 18 Pro / iOS 27.0 simulator using Xcode 27.1. The hosted run failed
+the Sport mix scroll-reachability assertion before
+exceeding the former 25-minute whole-test budget and is not a full pass. The
+helper now accounts for navigation-bar obstruction, and standard/large-text
+Sport mix run independently with the same assertions; standard remains in PR
+smoke coverage. See
+[Quality checks](../../docs/quality-checks.md) for exact smoke methods, suite
+boundaries, evidence, timeouts and explicit existing-simulator reuse. Broader
+rendered and physical-device acceptance remains separate.
 
 ## Photo request and decode pipeline
 

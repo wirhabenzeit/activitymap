@@ -9,9 +9,9 @@ enum AppTab: CaseIterable, Hashable {
 
     var title: String {
         switch self {
-        case .map: "Map"
-        case .list: "List"
-        case .stats: "Stats"
+        case .map: String(localized: AppMessages.navigationMap())
+        case .list: String(localized: AppMessages.navigationList())
+        case .stats: String(localized: AppMessages.navigationStats())
         }
     }
 }

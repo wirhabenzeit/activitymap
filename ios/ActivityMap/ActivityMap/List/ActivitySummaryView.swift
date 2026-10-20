@@ -2,6 +2,9 @@ import SwiftUI
 
 /// A scrollable result row, never a fixed footer that steals map/list space.
 struct ActivitySummaryView: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var allMetricsExpanded = false
@@ -88,7 +91,7 @@ struct ActivitySummaryView: View {
     }
     private func metricView(_ metric: ActivitySummaryMetric, summary: ActivitySummary, alwaysShowCoverage: Bool) -> some View {
         let aggregate = summary[metric]
-        let formatted = metric.formatted(aggregate.value)
+        let formatted = metric.formatted(aggregate.value, units: units, locale: locale)
         let coverage = summary.activityCount == 0 ? "No activities in this scope" : "Recorded in \(aggregate.knownCount) of \(summary.activityCount) activities"
         return VStack(alignment: .leading, spacing: 4) {
             Text(metric.title).font(.caption).foregroundStyle(.secondary)

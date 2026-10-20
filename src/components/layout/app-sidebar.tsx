@@ -5,25 +5,25 @@ import * as React from 'react';
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
-  SidebarMenu,
   SidebarHeader,
+  SidebarMenu,
   useSidebar,
-  SidebarFooter,
 } from '~/components/ui/sidebar';
+import { message } from '~/lib/presentation/messages';
 
 import {
+  BinaryFilter,
+  CategoryFilter,
   InequalityFilter,
   MonthPicker,
-  CategoryFilter,
-  BinaryFilter,
   ResetFilters,
   SearchFilter,
   SelectedActivitiesFilter,
 } from './sidebar/filters';
-
 import { UserSettings } from './sidebar/user';
 
 export function AppSidebar() {
@@ -38,13 +38,15 @@ export function AppSidebar() {
       )}
       <SidebarContent className="overflow-x-hidden">
         <SidebarGroup>
-          <SidebarGroupLabel>Categories</SidebarGroupLabel>
+          <SidebarGroupLabel>
+            {message('navigation.categories')}
+          </SidebarGroupLabel>
           <SidebarGroupContent>
             <CategoryFilter />
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>Filters</SidebarGroupLabel>
+          <SidebarGroupLabel>{message('navigation.filters')}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SearchFilter />

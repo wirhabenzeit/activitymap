@@ -18,6 +18,9 @@ struct StatsChartPoint: Identifiable {
 }
 
 struct StatsSeriesChart: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     enum Axis { case date, day, year }
     enum Style { case bars, lines, volume, consistency }
     let points: [StatsChartPoint]
@@ -33,7 +36,7 @@ struct StatsSeriesChart: View {
 
     private var maximum: Double { style == .consistency ? 7 : max(1, points.compactMap(\.value).max() ?? 1, band?.points.map(\.high).max() ?? 0) * 1.08 }
     private var axisTicks: [Double] { StatsDisplay.axisTicks(maximum: maximum) }
-    private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0]) : 1 }
+    private var axisStep: Double { axisTicks.count > 1 ? metric.displayValue(axisTicks[1] - axisTicks[0], units: units) : 1 }
     private var selected: [StatsChartPoint] {
         guard let selectedX, let closest = points.min(by: { abs($0.x - selectedX) < abs($1.x - selectedX) }) else { return [] }
         return points.filter { $0.x == closest.x }
@@ -41,16 +44,16 @@ struct StatsSeriesChart: View {
     private var series: [String] { points.reduce(into: []) { if !$0.contains($1.seriesID) { $0.append($1.seriesID) } } }
     private func label(_ x: Int) -> String {
         switch axis {
-        case .date: StatsDisplay.date(x)
+        case .date: StatsDisplay.date(x, locale: locale, dateFormat: preferences?.dateFormat ?? .system)
         case .day: "Day \(x)"
-        case .year: StatsDates.date(StatsDates.start(year: 2000) + x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
+        case .year: StatsDates.date(StatsDates.start(year: 2000) + x).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
         }
     }
     private func value(_ point: StatsChartPoint) -> String {
         guard let value = point.value else { return "Not yet elapsed" }
-        if style == .consistency { return "\(StatsDisplay.number(value)) active days" }
-        if point.role == .hilliness { return "\(StatsDisplay.number(value)) m / km" }
-        return StatsDisplay.measurement(value, metric: metric)
+        if style == .consistency { return "\(StatsDisplay.number(value, locale: locale)) active days" }
+        if point.role == .hilliness { return "\(StatsDisplay.number(value, locale: locale)) m / km" }
+        return StatsDisplay.measurement(value, metric: metric, units: units, locale: locale)
     }
 
     var body: some View {
@@ -124,7 +127,7 @@ struct StatsSeriesChart: View {
                     AxisMarks(values: comparisonTicks) { value in
                         AxisValueLabel {
                             if let x = value.as(Int.self) {
-                                Text(axis == .day ? "\(x)" : StatsDates.date(StatsDates.start(year: 2000) + x).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated))).font(.caption2)
+                                Text(axis == .day ? "\(x)" : StatsDates.date(StatsDates.start(year: 2000) + x).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated))).font(.caption2)
                             }
                         }
                     }
@@ -149,7 +152,7 @@ struct StatsSeriesChart: View {
                 if style == .consistency { AxisMarks(position: .leading, values: [0, 7]) }
                 else { AxisMarks(position: .leading, values: axisTicks) { tick in
                     AxisGridLine()
-                    AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value), step: axisStep)).font(.caption2) } }
+                    AxisValueLabel { if let value = tick.as(Double.self) { Text(StatsDisplay.compactAxis(metric.displayValue(value, units: units), step: axisStep, locale: locale)).font(.caption2) } }
                 } }
             }
             .chartLegend(position: .bottom, alignment: .leading) {
@@ -175,10 +178,10 @@ struct StatsSeriesChart: View {
     private var bandDescription: String {
         guard let band else { return "Historical band needs 2 completed periods" }
         let kind = band.monthly ? "5th–95th percentile" : "Minimum–maximum"
-        return "\(kind) of \(band.count) completed \(band.monthly ? "months" : "years"), \(StatsDisplay.date(band.first)) to \(StatsDisplay.date(band.last)). Current period excluded."
+        return "\(kind) of \(band.count) completed \(band.monthly ? "months" : "years"), \(StatsDisplay.date(band.first, locale: locale, dateFormat: preferences?.dateFormat ?? .system)) to \(StatsDisplay.date(band.last, locale: locale, dateFormat: preferences?.dateFormat ?? .system)). Current period excluded."
     }
     private func bandValue(_ point: StatsComparisonBand.Point) -> String {
-        "\(StatsDisplay.measurement(point.low, metric: metric)) to \(StatsDisplay.measurement(point.high, metric: metric)), \(point.count) \(band?.monthly == true ? "months" : "years")"
+        "\(StatsDisplay.measurement(point.low, metric: metric, units: units, locale: locale)) to \(StatsDisplay.measurement(point.high, metric: metric, units: units, locale: locale)), \(point.count) \(band?.monthly == true ? "months" : "years")"
     }
     @ChartContentBuilder private var historicalArea: some ChartContent {
         if let band {
@@ -241,7 +244,7 @@ struct StatsSeriesChart: View {
     }
     private func shortAxisLabel(_ x: Int) -> String {
         let day = axis == .year ? StatsDates.start(year: 2000) + x : x
-        return StatsDates.date(day).formatted(Date.FormatStyle(calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
+        return StatsDates.date(day).formatted(Date.FormatStyle(locale: locale, calendar: StatsDates.calendar, timeZone: .gmt).month(.abbreviated).day())
     }
 }
 
@@ -249,6 +252,9 @@ struct StatsSeriesChart: View {
 /// A categorical x axis centres every label under its bar; numeric axes draw
 /// labels to the trailing side of their ticks.
 struct StatsPeriodBars: View {
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    @Environment(\.locale) private var locale
     let points: [StatsChartPoint]
     let expanded: Bool
     /// Short axis label, e.g. "Mon" or "Nov".
@@ -303,7 +309,7 @@ struct StatsPeriodBars: View {
                 AxisGridLine()
                 AxisValueLabel {
                     if let y = value.as(Double.self).map(axisValue) {
-                        Text(StatsDisplay.compactAxis(y, step: axisStep)).font(.caption2)
+                        Text(StatsDisplay.compactAxis(y, step: axisStep, locale: locale)).font(.caption2)
                     }
                 }
             }

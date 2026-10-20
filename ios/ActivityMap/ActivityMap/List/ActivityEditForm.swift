@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 
 struct ActivityEditForm: View {
+    @Environment(\.locale) private var locale
     @State private var model: ActivityEditModel
     let service: ActivityEditingService
     @Environment(\.dismiss) private var dismiss
@@ -46,11 +47,11 @@ struct ActivityEditForm: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("Name").font(.caption).foregroundStyle(.secondary)
-                        TextField("Activity name", text: $model.name, axis: .vertical)
+                        Text(AppMessages.activityEditName(locale: locale)).font(.caption).foregroundStyle(.secondary)
+                        TextField(text: $model.name, axis: .vertical) { Text(AppMessages.activityEditNamePlaceholder(locale: locale)) }
                             .focused($focusedField, equals: .name)
                             .font(.body).foregroundStyle(Color.primary)
-                            .accessibilityLabel("Name")
+                            .accessibilityLabel(Text(AppMessages.activityEditName(locale: locale)))
                             .accessibilityIdentifier("activity-edit-name")
                     }
                     .padding(.vertical, 4)
@@ -60,46 +61,46 @@ struct ActivityEditForm: View {
                         HStack(spacing: 12) {
                             BrowseSportSymbol(category: model.sport.category)
                             VStack(alignment: .leading, spacing: 3) {
-                                Text("Sport").font(.caption).foregroundStyle(.secondary)
-                                Text(model.sport.editingTitle).font(.body).foregroundStyle(Color.primary)
+                                Text(AppMessages.activityEditSport(locale: locale)).font(.caption).foregroundStyle(.secondary)
+                                Text(verbatim: model.sport.editingTitle).font(.body).foregroundStyle(Color.primary)
                             }
                             Spacer(minLength: 0)
                         }
                         .padding(.vertical, 4)
                     }
                     .accessibilityElement(children: .ignore)
-                    .accessibilityLabel("Sport")
+                    .accessibilityLabel(Text(AppMessages.activityEditSport(locale: locale)))
                     .accessibilityValue(model.sport.editingTitle)
-                    .accessibilityHint("Choose a sport")
+                    .accessibilityHint(Text(AppMessages.activityEditChooseSport(locale: locale)))
                     .accessibilityIdentifier("activity-edit-sport")
-                } header: { Text("Activity") }
-                Section("Description") {
-                    TextField("Description", text: $model.description, axis: .vertical)
+                } header: { Text(AppMessages.activityGroupActivity(locale: locale)) }
+                Section {
+                    TextField(text: $model.description, axis: .vertical) { Text(AppMessages.activityEditDescription(locale: locale)) }
                         .focused($focusedField, equals: .description)
                         .lineLimit(3...8)
                         .foregroundStyle(Color.primary)
-                        .accessibilityLabel("Description")
+                        .accessibilityLabel(Text(AppMessages.activityEditDescription(locale: locale)))
                         .accessibilityIdentifier("activity-edit-description")
-                }
+                } header: { Text(AppMessages.activityEditDescription(locale: locale)) }
                 Section {
-                    if let message = model.validationMessage {
-                        Text(message).foregroundStyle(.red).accessibilityIdentifier("activity-edit-validation")
+                    if let message = model.validationMessage(locale: locale) {
+                        Text(verbatim: message).foregroundStyle(.red).accessibilityIdentifier("activity-edit-validation")
                     }
-                    if let reason = service.unavailableReason { Text(reason).foregroundStyle(.secondary) }
-                    if let message = model.errorMessage {
-                        Text(message).foregroundStyle(.red).accessibilityIdentifier("activity-edit-error")
+                    if let reason = service.unavailableReason(locale: locale) { Text(reason).foregroundStyle(.secondary) }
+                    if let message = model.errorMessage(locale: locale) {
+                        Text(verbatim: message).foregroundStyle(.red).accessibilityIdentifier("activity-edit-error")
                     }
                     if let retryAt = model.retryAt, retryAt > Date() {
-                        Text("Try again after \(retryAt.formatted(date: .omitted, time: .standard)).")
+                        Text(AppMessages.mutationRetryAfter(retryAt.formatted(date: .omitted, time: .standard), locale: locale))
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 } footer: {
-                    Label("Changes are saved to Strava", systemImage: "arrow.up.circle")
+                    Label { Text(AppMessages.activityEditFooter(locale: locale)) } icon: { Image(systemName: "arrow.up.circle") }
                         .font(.footnote).foregroundStyle(.secondary)
                 }
             }
             .foregroundStyle(Color.primary)
-            .navigationTitle("Edit activity")
+            .navigationTitle(Text(AppMessages.activityEditTitle(locale: locale)))
             .navigationBarTitleDisplayMode(.inline)
             .toolbarBackground(AppTheme.contentBackground, for: .navigationBar)
             .toolbarBackgroundVisibility(.visible, for: .navigationBar)
@@ -107,7 +108,7 @@ struct ActivityEditForm: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button(role: .cancel, action: cancel) {
-                        Text("Cancel").font(.body)
+                        Text(AppMessages.activityEditCancel(locale: locale)).font(.body)
                             .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                             .frame(minHeight: 44)
                     }
@@ -126,12 +127,13 @@ struct ActivityEditForm: View {
                         Task {
                             await model.save(using: service)
                             if model.didSave {
-                                UIAccessibility.post(notification: .announcement, argument: "Activity saved to Strava")
+                                UIAccessibility.post(notification: .announcement, argument: String(localized: AppMessages.activityEditSavedAnnouncement(locale: locale)))
                                 dismiss()
                             }
                         }
                     } label: {
-                        Text("Save")
+                        Text(AppMessages.activityEditSaveNative(locale: locale))
+                            .accessibilityLabel(Text(AppMessages.activityEditSave(locale: locale)))
                             .font(.body.weight(.semibold))
                             .lineLimit(1).fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(canSave ? Color.white : Color.primary)
@@ -146,9 +148,9 @@ struct ActivityEditForm: View {
                     .accessibilityIdentifier("activity-edit-save")
                 }.sharedBackgroundVisibility(.hidden)
             }
-            .confirmationDialog("Discard your changes?", isPresented: $showsDiscardConfirmation, titleVisibility: .visible) {
-                Button("Discard changes", role: .destructive) { dismiss() }
-                Button("Keep editing", role: .cancel) {}
+            .confirmationDialog(Text(AppMessages.activityEditDiscardQuestion(locale: locale)), isPresented: $showsDiscardConfirmation, titleVisibility: .visible) {
+                Button(role: .destructive) { dismiss() } label: { Text(AppMessages.activityEditDiscard(locale: locale)) }
+                Button(role: .cancel) {} label: { Text(AppMessages.activityEditKeepEditing(locale: locale)) }
             }
             .interactiveDismissDisabled(model.isDirty || model.isSaving)
             .accessibilityAction(.escape) { cancel() }
@@ -160,7 +162,7 @@ struct ActivityEditForm: View {
             Color.black.opacity(0.18).ignoresSafeArea()
             VStack(spacing: 16) {
                 ProgressView().controlSize(.large).tint(AppTheme.accent)
-                Text("Saving to Strava…")
+                Text(AppMessages.activityEditSaving(locale: locale))
                     .font(.headline).foregroundStyle(Color.primary)
                     .multilineTextAlignment(.center)
             }
@@ -170,14 +172,14 @@ struct ActivityEditForm: View {
             .shadow(color: .black.opacity(0.12), radius: 16, y: 6)
             .padding(24)
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel("Saving to Strava")
+            .accessibilityLabel(Text(AppMessages.activityEditSavingAnnouncement(locale: locale)))
             .accessibilityAddTraits(.isModal)
             .accessibilityIdentifier("activity-edit-saving-overlay")
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .contentShape(Rectangle())
         .ignoresSafeArea()
-        .onAppear { UIAccessibility.post(notification: .announcement, argument: "Saving to Strava") }
+        .onAppear { UIAccessibility.post(notification: .announcement, argument: String(localized: AppMessages.activityEditSavingAnnouncement(locale: locale))) }
     }
 
     private var canSave: Bool { model.canSave(now: currentTime) && service.unavailableReason == nil }
@@ -190,6 +192,7 @@ struct ActivityEditForm: View {
 }
 
 struct ActivityEditSportPicker: View {
+    @Environment(\.locale) private var locale
     @Binding var sport: SportType
     @Environment(\.dismiss) private var dismiss
     @State private var search = ""
@@ -208,7 +211,7 @@ struct ActivityEditSportPicker: View {
                                 dismiss()
                             } label: {
                                 HStack {
-                                    Text(choice.editingTitle).foregroundStyle(Color.primary)
+                                    Text(verbatim: choice.editingTitle).foregroundStyle(Color.primary)
                                     Spacer()
                                     if choice == sport {
                                         Image(systemName: "checkmark").foregroundStyle(AppTheme.accent)
@@ -225,8 +228,8 @@ struct ActivityEditSportPicker: View {
                 }
             }
         }
-        .searchable(text: $search, prompt: "Find a sport")
-        .navigationTitle("Sport")
+        .searchable(text: $search, prompt: Text(AppMessages.activityEditFindSport(locale: locale)))
+        .navigationTitle(Text(AppMessages.activityEditSport(locale: locale)))
         .navigationBarTitleDisplayMode(.inline)
         .foregroundStyle(Color.primary)
         .tint(AppTheme.accent)
