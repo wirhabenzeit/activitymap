@@ -11,6 +11,7 @@ struct StatsUITestFixture: View {
 
     init() {
         MapboxOptions.accessToken = "pk.offline-test"
+        PerfProbe.install()
         let today = StatsDates.localToday()
         let sports: [SportType] = [.ride, .run, .hike, .swim]
         // Relative dates remain representative when the suite runs after the

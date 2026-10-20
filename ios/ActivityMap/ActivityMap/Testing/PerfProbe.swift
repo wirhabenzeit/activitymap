@@ -2,6 +2,7 @@
 import Foundation
 import QuartzCore
 import UIKit
+import os
 
 /// Main-thread cost of one scripted gesture, for before/after comparisons in
 /// the simulator. Enabled only by `--perf-probe`; the UI test resets and dumps
@@ -22,6 +23,9 @@ enum PerfProbe {
     private static let ticker = Ticker()
     /// True between reset and dump; fixture probes pause their own sampling.
     private(set) static var measuring = false
+    /// Marks each measured window in Instruments' Points of Interest track.
+    private static let signposter = OSSignposter(subsystem: "page.dominik.activitymap.perf", category: .pointsOfInterest)
+    private static var window: OSSignpostIntervalState?
 
     /// Counts one body evaluation of `name` while measuring.
     static func count(_ name: String) {
@@ -74,10 +78,14 @@ enum PerfProbe {
         lastTimestamp = nil
         started = CACurrentMediaTime()
         measuring = true
+        window.map { signposter.endInterval("Measured gesture", $0) }
+        window = signposter.beginInterval("Measured gesture")
     }
 
     static func dump() {
         measuring = false
+        window.map { signposter.endInterval("Measured gesture", $0) }
+        window = nil
         guard let path = ProcessInfo.processInfo.environment["ACTIVITYMAP_PERF_PATH"] else { return }
         let report: [String: Any] = [
             "durationMs": (CACurrentMediaTime() - started) * 1000,

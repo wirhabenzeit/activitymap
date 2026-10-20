@@ -21,6 +21,63 @@ final class ResponsivenessUITests: XCTestCase {
         try await scrubJourney(list: false)
     }
 
+    func testStatsFocusMorph() async throws { try await statsJourney(motion: "morph") }
+
+    /// Control: a tap on the dashboard's empty side padding, so the cost of
+    /// XCTest's own event synthesis can be separated from a transition.
+    func testStatsNullTap() async throws {
+        let report = FileManager.default.temporaryDirectory.appendingPathComponent("perf-\(UUID().uuidString).json")
+        let app = XCUIApplication()
+        app.launchArguments = ["--stats-ui-testing", "--stats-ui-scenario=standard", "--perf-probe",
+                               "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launchEnvironment["ACTIVITYMAP_PERF_PATH"] = report.path
+        app.launch()
+        defer { app.terminate() }
+        let dashboard = app.scrollViews["stats-dashboard"]
+        XCTAssertTrue(dashboard.waitForExistence(timeout: 15), app.debugDescription)
+        try await Task.sleep(for: .seconds(2))
+        let padding = CGPoint(x: dashboard.frame.minX + 4, y: dashboard.frame.midY)
+        try await measure(app, report: report, name: "stats-null-tap", settle: 1.5) {
+            coordinate(app, padding).tap()
+        }
+    }
+
+    /// Opens and closes a chart and the calendar, measuring each transition.
+    private func statsJourney(motion: String) async throws {
+        for (title, slug) in [("Training volume", "volume"), ("Activity calendar", "calendar")] {
+            continueAfterFailure = false
+            XCUIDevice.shared.orientation = .portrait
+            let report = FileManager.default.temporaryDirectory.appendingPathComponent("perf-\(UUID().uuidString).json")
+            let app = XCUIApplication()
+            app.launchArguments = ["--stats-ui-testing", "--stats-ui-scenario=standard", "--perf-probe",
+                                   "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+            app.launchEnvironment["ACTIVITYMAP_PERF_PATH"] = report.path
+            app.launch()
+            let dashboard = app.scrollViews["stats-dashboard"]
+            XCTAssertTrue(dashboard.waitForExistence(timeout: 15), app.debugDescription)
+            let expand = app.buttons["Expand \(title)"]
+            XCTAssertTrue(expand.waitForExistence(timeout: 15), app.debugDescription)
+            for _ in 0..<8 where !(expand.isHittable && dashboard.frame.insetBy(dx: 0, dy: 80).contains(expand.frame)) {
+                drag(app, from: CGPoint(x: dashboard.frame.midX, y: dashboard.frame.maxY - 120),
+                     to: CGPoint(x: dashboard.frame.midX, y: dashboard.frame.maxY - 420))
+            }
+            // Let every tile finish calculating before the transition starts.
+            try await Task.sleep(for: .seconds(2))
+            let open = CGPoint(x: expand.frame.midX, y: expand.frame.midY)
+            try await measure(app, report: report, name: "stats-\(motion)-open-\(slug)", settle: 1.5) {
+                coordinate(app, open).tap()
+            }
+            let back = app.buttons.matching(identifier: "stats-detail-back").allElementsBoundByIndex.first(where: \.isHittable)
+            let backButton = try XCTUnwrap(back, "The focus page must show Back: \(app.debugDescription)")
+            let close = CGPoint(x: backButton.frame.midX, y: backButton.frame.midY)
+            try await measure(app, report: report, name: "stats-\(motion)-close-\(slug)", settle: 1.5) {
+                coordinate(app, close).tap()
+            }
+            XCTAssertTrue(expand.waitForExistence(timeout: 5) && expand.isHittable, "Back must return to the dashboard")
+            app.terminate()
+        }
+    }
+
     private func scrollJourney(list: Bool) async throws {
         let (app, report) = launch(list: list)
         defer { app.terminate() }
@@ -85,13 +142,14 @@ final class ResponsivenessUITests: XCTestCase {
         }
     }
 
-    private func measure(_ app: XCUIApplication, report: URL, name: String, gestures: () -> Void) async throws {
+    private func measure(_ app: XCUIApplication, report: URL, name: String, settle: Double = 0.5,
+                         gestures: () -> Void) async throws {
         try await Task.sleep(for: .seconds(1))
         try? FileManager.default.removeItem(at: report)
         post("activitymap.perf.reset")
         try await Task.sleep(for: .milliseconds(300))
         gestures()
-        try await Task.sleep(for: .milliseconds(500))
+        try await Task.sleep(for: .seconds(settle))
         post("activitymap.perf.dump")
         let deadline = Date().addingTimeInterval(5)
         while !FileManager.default.fileExists(atPath: report.path), Date() < deadline {

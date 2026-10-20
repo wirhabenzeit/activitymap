@@ -20,7 +20,11 @@ struct StatsDashboardTile: View {
     private var units: UnitSystem { preferences?.units ?? .metric }
     @Environment(\.locale) private var locale
     let tile: StatsTileDefinition
-    @Binding var option: StatsToggleOption?
+    /// A value rather than a binding: SwiftUI cannot compare closure-backed
+    /// bindings, so holding one re-ran every tile, charts included, on each
+    /// environment update while a focus page opened above the dashboard.
+    let option: StatsToggleOption?
+    private let selectOption: (StatsToggleOption?) -> Void
     let displayed: StatsDashboardFace?
     let today: Int
     let expanded: Bool
@@ -29,6 +33,24 @@ struct StatsDashboardTile: View {
     var openActivity: (Int) -> Void = { _ in }
     var detailScreen = false
     var inspection: StatsTileInspection? = nil
+
+    init(tile: StatsTileDefinition, option: Binding<StatsToggleOption?>, displayed: StatsDashboardFace?,
+         today: Int, expanded: Bool, filtered: Bool, toggleExpansion: @escaping () -> Void,
+         openActivity: @escaping (Int) -> Void = { _ in }, detailScreen: Bool = false,
+         inspection: StatsTileInspection? = nil, volumeRange: StatsHistoryRange = .weeks) {
+        self.tile = tile
+        self.option = option.wrappedValue
+        selectOption = { option.wrappedValue = $0 }
+        self.displayed = displayed
+        self.today = today
+        self.expanded = expanded
+        self.filtered = filtered
+        self.toggleExpansion = toggleExpansion
+        self.openActivity = openActivity
+        self.detailScreen = detailScreen
+        self.inspection = inspection
+        _volumeRange = State(initialValue: volumeRange)
+    }
 
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
@@ -85,6 +107,9 @@ struct StatsDashboardTile: View {
     }
 
     var body: some View {
+        #if DEBUG
+        let _ = PerfProbe.count("StatsDashboardTile")
+        #endif
         StatsTileSurface(title: tile.title, titleResource: tile.id.titleResource(locale: locale), period: period,
                          expand: StatsDashboard.expandable(tile.id) ? toggleExpansion : nil,
                          expanded: expanded, compactHeader: pilot, detailScreen: detailScreen,
@@ -123,13 +148,13 @@ struct StatsDashboardTile: View {
             if metrics.count == toggle.options.count {
                 StatsMetricPicker(title: "\(tile.title): \(toggle.label)", metrics: metrics, selection: Binding(
                     get: { option.flatMap { StatsMetric(rawValue: $0.rawValue) } ?? .distance },
-                    set: { option = StatsToggleOption(rawValue: $0.rawValue) }
+                    set: { selectOption(StatsToggleOption(rawValue: $0.rawValue)) }
                 ))
             } else {
                 StatsRangePicker(title: "\(tile.title): \(toggle.label)", ranges: toggle.options,
                     selection: Binding(
                         get: { option ?? toggle.options[0] },
-                        set: { option = $0 }
+                        set: { selectOption($0) }
                     ), label: { value in
                         if let metric = StatsMetric(rawValue: value.rawValue) {
                             metric == .count ? "#" : metric.displayUnit(units: units)

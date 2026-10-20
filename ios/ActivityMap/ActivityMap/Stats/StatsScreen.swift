@@ -3,7 +3,6 @@ import UIKit
 import Observation
 
 struct StatsScreen: View {
-    @Environment(\.locale) private var locale
     @Bindable var store: ActivityStore
     var sync: SyncController? = nil
     var refresh: () async -> Void = {}
@@ -72,45 +71,9 @@ struct StatsScreen: View {
                                     active: detailPresentation == .inline || dashboard.expandedTile == nil,
                                     registersNavigation: detailPresentation == .inline,
                                     backLabel: "Back to Stats dashboard") {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
-                        if presentation.hasContent {
-                            ForEach(StatsTileGroup.allCases, id: \.self) { group in
-                                VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
-                                    Text(group.titleResource(locale: locale)).font(.title2.weight(.semibold))
-                                        .accessibilityAddTraits(.isHeader)
-                                    let columns = !typeSize.isAccessibilitySize
-                                        && geometry.size.width >= (detailLimit != nil ? 640 : 760) ? 2 : 1
-                                    StatsAnimatedSection(tiles: StatsDashboard.tiles.filter { $0.group == group },
-                                                         expandedTile: detailPresentation == .inline ? dashboard.expandedTile : nil,
-                                                         columns: columns) { definition in
-                                        tile(definition)
-                                    }
-                                }
-                            }
-                        } else if let empty = presentation.empty {
-                            BrowsingEmptyView(state: empty, recover: { recovery in
-                                if recovery == .clearFilters { store.resetStatsActivityFilters() }
-                            }, scrolls: false)
-                        }
-                    }
-                    .padding(12)
-                }
-                .environment(\.statsDetailHeightLimit, detailLimit)
-                .environment(\.statsAvailableWidth, geometry.size.width)
-                // Only inline expansion needs to observe this selection.
-                // On iPhone, that dependency needlessly invalidated the
-                // compact dashboard before UIKit could push the detail page.
-                .onChange(of: detailPresentation == .inline ? dashboard.expandedTile : nil) { _, id in
-                    guard detailPresentation == .inline, detailLimit != nil, let id else { return }
-                    withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
-                        proxy.scrollTo(id, anchor: .top)
-                    }
-                }
-            }
-            .background(AppTheme.contentBackground)
-            .accessibilityIdentifier("stats-dashboard")
+                StatsDashboardGrid(store: store, dashboard: dashboard, sync: sync, hasLocalStore: localStore != nil,
+                                   width: geometry.size.width, detailLimit: detailLimit)
+                    .equatable()
             }
         }
     }
@@ -127,6 +90,92 @@ struct StatsScreen: View {
             // Motion uses standard navigation on iOS 26.
             detailContent(tile)
         }
+    }
+
+    /// Short viewports (iPhone landscape) get dense tile headers and a cap on
+    /// expanded visuals: the room left once that header, the tile's own
+    /// controls and the scroll padding are on screen. Taller viewports keep
+    /// each tile's natural detail height.
+    ///
+    /// Only while Stats is shown: restructuring the hidden dashboard during a
+    /// rotation can swallow Mapbox's resize completion, leaving the retained
+    /// map at its interim size so later fits land off-centre.
+    private func detailHeightLimit(viewport: CGFloat) -> Double? {
+        guard store.selectedTab == .stats, viewport < 480, !typeSize.isAccessibilitySize else { return nil }
+        return Double(viewport) - 170
+    }
+
+}
+
+/// The dashboard's tiles behind a comparable boundary. StatsScreen's
+/// GeometryReader re-runs whenever its frame moves (a push slides this page),
+/// the focus selection changes or a parent rebuilds. Tiles carry bindings and
+/// closures SwiftUI cannot compare, so without this boundary each pass
+/// re-rendered all ten tiles and their charts beneath an opening focus page.
+private struct StatsDashboardGrid: View, Equatable {
+    let store: ActivityStore
+    let dashboard: StatsDashboardState
+    let sync: SyncController?
+    let hasLocalStore: Bool
+    let width: CGFloat
+    let detailLimit: Double?
+    @Environment(\.locale) private var locale
+    @Environment(\.statsDetailPresentation) private var detailPresentation
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.store === rhs.store && lhs.dashboard === rhs.dashboard && lhs.sync === rhs.sync
+            && lhs.hasLocalStore == rhs.hasLocalStore && lhs.width == rhs.width && lhs.detailLimit == rhs.detailLimit
+    }
+
+    private var presentation: StatsPresentation {
+        if let sync { return StatsPresentation(store: store, sync: sync) }
+        return StatsPresentation(store: store, preparing: hasLocalStore)
+    }
+    private var source: StatsDashboardSource { StatsDashboardSource(store) }
+    private var usesDetailNavigation: Bool { detailPresentation != .inline }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+                    if presentation.hasContent {
+                        ForEach(StatsTileGroup.allCases, id: \.self) { group in
+                            VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {
+                                Text(group.titleResource(locale: locale)).font(.title2.weight(.semibold))
+                                    .accessibilityAddTraits(.isHeader)
+                                let columns = !typeSize.isAccessibilitySize
+                                    && width >= (detailLimit != nil ? 640 : 760) ? 2 : 1
+                                StatsAnimatedSection(tiles: StatsDashboard.tiles.filter { $0.group == group },
+                                                     expandedTile: detailPresentation == .inline ? dashboard.expandedTile : nil,
+                                                     columns: columns) { definition in
+                                    tile(definition)
+                                }
+                            }
+                        }
+                    } else if let empty = presentation.empty {
+                        BrowsingEmptyView(state: empty, recover: { recovery in
+                            if recovery == .clearFilters { store.resetStatsActivityFilters() }
+                        }, scrolls: false)
+                    }
+                }
+                .padding(12)
+            }
+            .environment(\.statsDetailHeightLimit, detailLimit)
+            .environment(\.statsAvailableWidth, width)
+            // Only inline expansion needs to observe this selection.
+            // On iPhone, that dependency needlessly invalidated the
+            // compact dashboard before UIKit could push the detail page.
+            .onChange(of: detailPresentation == .inline ? dashboard.expandedTile : nil) { _, id in
+                guard detailPresentation == .inline, detailLimit != nil, let id else { return }
+                withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.25)) {
+                    proxy.scrollTo(id, anchor: .top)
+                }
+            }
+        }
+        .background(AppTheme.contentBackground)
+        .accessibilityIdentifier("stats-dashboard")
     }
 
     @ViewBuilder private func tile(_ tile: StatsTileDefinition) -> some View {
@@ -165,20 +214,6 @@ struct StatsScreen: View {
         dashboard.toggleExpansion(id)
         DispatchQueue.main.async { UIView.setAnimationsEnabled(true) }
     }
-
-    /// Short viewports (iPhone landscape) get dense tile headers and a cap on
-    /// expanded visuals: the room left once that header, the tile's own
-    /// controls and the scroll padding are on screen. Taller viewports keep
-    /// each tile's natural detail height.
-    ///
-    /// Only while Stats is shown: restructuring the hidden dashboard during a
-    /// rotation can swallow Mapbox's resize completion, leaving the retained
-    /// map at its interim size so later fits land off-centre.
-    private func detailHeightLimit(viewport: CGFloat) -> Double? {
-        guard store.selectedTab == .stats, viewport < 480, !typeSize.isAccessibilitySize else { return nil }
-        return Double(viewport) - 170
-    }
-
 }
 
 /// Keep the blue chrome outside UIKit's rounded, shadowed page transition.
