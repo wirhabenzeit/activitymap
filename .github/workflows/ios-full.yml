@@ -9,7 +9,7 @@ permissions:
 jobs:
   ios-full:
     runs-on: xcode-27
-    timeout-minutes: 65
+    timeout-minutes: 75
     env:
       IOS_TEST_PROFILE: full
     steps:

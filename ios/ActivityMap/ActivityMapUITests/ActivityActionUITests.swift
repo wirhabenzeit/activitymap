@@ -7,41 +7,49 @@ import XCTest
 final class ActivityActionUITests: XCTestCase {
     private var diagnosticsURL: URL?
 
-    func testActionRowsExposeNamesAvailabilityOrderingAndTouchTargets() async throws {
+    // Each launch configuration gets its own execution allowance and result.
+    // Seven app launches must not share one two-minute XCTest deadline.
+    func testStandardActionRows() async throws { try await assertActionRows("standard") }
+    func testLargeTextActionRows() async throws { try await assertActionRows("large-text") }
+    func testNoGPSActionRows() async throws { try await assertActionRows("no-gps") }
+    func testSummaryActionRows() async throws { try await assertActionRows("summary") }
+    func testDarkActionRows() async throws { try await assertActionRows("dark") }
+    func testLandscapeActionRows() async throws { try await assertActionRows("landscape") }
+    func testRTLActionRows() async throws { try await assertActionRows("rtl") }
+
+    private func assertActionRows(_ scenario: String) async throws {
         continueAfterFailure = false
-        for scenario in ["standard", "large-text", "no-gps", "summary", "dark", "landscape", "rtl"] {
-            XCUIDevice.shared.orientation = scenario == "landscape" ? .landscapeLeft : .portrait
-            let app = launch(scenario)
-            defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
-            _ = try await state { $0.ready }
-            let scroll = app.scrollViews["activity-actions-detail-scroll"]
-            XCTAssertTrue(scroll.waitForExistence(timeout: 10), app.debugDescription)
-            let export = app.buttons["activity-export-gpx"]
-            reveal(export, in: scroll, app: app)
-            let strava = app.buttons["activity-open-in-strava"]
-            XCTAssertTrue(strava.exists && export.exists, app.debugDescription)
-            XCTAssertTrue(strava.label.hasPrefix("Open in Strava"), strava.label)
-            XCTAssertTrue(export.label.hasPrefix("Export GPX"), export.label)
-            XCTAssertGreaterThanOrEqual(strava.frame.height, 44)
-            XCTAssertGreaterThanOrEqual(export.frame.height, 44)
-            XCTAssertGreaterThanOrEqual(export.frame.width, 44)
-            XCTAssertLessThanOrEqual(export.frame.width, app.frame.width)
-            XCTAssertTrue(strava.isEnabled)
-            XCTAssertEqual(export.isEnabled, scenario != "no-gps")
-            XCTAssertTrue(export.label.contains(scenario == "no-gps" ? "No GPS route" : "Route only"), export.label)
-            XCTAssertTrue(scroll.frame.intersection(app.frame).insetBy(dx: -1, dy: -1).contains(export.frame),
-                          "The complete final action must be reachable: \(export.frame), \(scroll.frame)")
-            XCTAssertFalse(app.staticTexts["ACTIVITY ACTIONS"].exists)
-            XCTAssertFalse(app.staticTexts["Activity actions"].exists)
-            if scenario != "large-text" && scenario != "landscape" {
-                let geometry = app.descendants(matching: .any).matching(identifier: "activity-metric-geometry").firstMatch
-                XCTAssertTrue(geometry.exists, app.debugDescription)
-                XCTAssertTrue(geometry.label.contains("Activity, Geometry status"), geometry.label)
-                XCTAssertLessThan(geometry.frame.maxY, strava.frame.minY,
-                                  "Action rows must follow the final measurement group")
-            }
-            capture(app, "Activity actions \(scenario)")
+        XCUIDevice.shared.orientation = scenario == "landscape" ? .landscapeLeft : .portrait
+        let app = launch(scenario)
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        _ = try await state { $0.ready }
+        let scroll = app.scrollViews["activity-actions-detail-scroll"]
+        XCTAssertTrue(scroll.waitForExistence(timeout: 10), app.debugDescription)
+        let export = app.buttons["activity-export-gpx"]
+        reveal(export, in: scroll, app: app)
+        let strava = app.buttons["activity-open-in-strava"]
+        XCTAssertTrue(strava.exists && export.exists, app.debugDescription)
+        XCTAssertTrue(strava.label.hasPrefix("Open in Strava"), strava.label)
+        XCTAssertTrue(export.label.hasPrefix("Export GPX"), export.label)
+        XCTAssertGreaterThanOrEqual(strava.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(export.frame.height, 44)
+        XCTAssertGreaterThanOrEqual(export.frame.width, 44)
+        XCTAssertLessThanOrEqual(export.frame.width, app.frame.width)
+        XCTAssertTrue(strava.isEnabled)
+        XCTAssertEqual(export.isEnabled, scenario != "no-gps")
+        XCTAssertTrue(export.label.contains(scenario == "no-gps" ? "No GPS route" : "Route only"), export.label)
+        XCTAssertTrue(scroll.frame.intersection(app.frame).insetBy(dx: -1, dy: -1).contains(export.frame),
+                      "The complete final action must be reachable: \(export.frame), \(scroll.frame)")
+        XCTAssertFalse(app.staticTexts["ACTIVITY ACTIONS"].exists)
+        XCTAssertFalse(app.staticTexts["Activity actions"].exists)
+        if scenario != "large-text" && scenario != "landscape" {
+            let geometry = app.descendants(matching: .any).matching(identifier: "activity-metric-geometry").firstMatch
+            XCTAssertTrue(geometry.exists, app.debugDescription)
+            XCTAssertTrue(geometry.label.contains("Activity, Geometry status"), geometry.label)
+            XCTAssertLessThan(geometry.frame.maxY, strava.frame.minY,
+                              "Action rows must follow the final measurement group")
         }
+        capture(app, "Activity actions \(scenario)")
     }
 
     func testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture() async throws {
