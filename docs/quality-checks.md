@@ -14,7 +14,7 @@ explicit disposable Postgres service.
 | `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
 | `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
 | `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all 30 selected unit/app-hosted suites and five real UI smoke methods on iOS 27                       |
-| `pnpm test:ios`                        | Build and run the full 36-suite native selection, including all 33 selected real UI methods, on iOS 27                            |
+| `pnpm test:ios`                        | Build and run the full 36-suite native selection, including all 39 selected real UI methods, on iOS 27                            |
 | `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
 | `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
 | `pnpm format:check src/path.ts`        | Check explicit files                                                                                                              |
@@ -100,7 +100,7 @@ This is a smoke boundary, not the complete UI matrix. The
 [Full iOS runtime workflow](../.github/workflows/ios-full.yml) is manually
 requested with **Actions → Full iOS runtime → Run workflow**, selecting the
 branch or tag to test. It explicitly uses `IOS_TEST_PROFILE=full`, runs the same
-30 unit/app-hosted suites and all six selected UI suites (36 suites and 33 UI
+30 unit/app-hosted suites and all six selected UI suites (36 suites and 39 UI
 methods in total on iOS 27), and has no automatic schedule. Run either profile
 locally with:
 
@@ -142,8 +142,8 @@ Those additional journeys are not certified by a passing PR smoke run.
 | Limit                                       | PR profile | Full profile |
 | ------------------------------------------- | ---------- | ------------ |
 | Cold `build-for-testing`                    | 18 minutes | 18 minutes   |
-| `test-without-building`                     | 8 minutes  | 35 minutes   |
-| CI job, including setup and artifact upload | 35 minutes | 65 minutes   |
+| `test-without-building`                     | 8 minutes  | 45 minutes   |
+| CI job, including setup and artifact upload | 35 minutes | 75 minutes   |
 
 Both profiles retain three-minute simulator boot readiness, disabled parallel
 test execution, and enabled per-test timeouts configured with a 90-second default
@@ -153,6 +153,15 @@ every test. See [Apple's allowance documentation](https://developer.apple.com/do
 The wrapper requires a positive passing count, zero failures/skips, positive
 passing cases in every selected suite and execution of each selected PR method.
 An interrupted or failed full run is not counted as passing coverage.
+
+The action accessibility matrix has seven independent UI methods (standard,
+large text, no GPS, summary, dark, landscape and RTL), each retaining the same
+assertions and its own per-test deadline. The former single method exhausted
+XCTest's rounded two-minute allowance during its fifth app launch on the hosted
+runner. The 20 October full run also reached its old 35-minute runtime cap during
+the last Stats method. The full profile now has 45 minutes for runtime and a
+75-minute workflow budget covering the separate cold build, simulator startup
+and artifact upload. PR smoke and individual-test deadlines are unchanged.
 
 Before the profile split and Sport mix test-helper correction, the full selection
 passed locally on 20 October 2026 with Xcode 27.1 and an iPhone 18 Pro / iOS 27.0 simulator: 261 logical tests,

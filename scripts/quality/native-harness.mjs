@@ -66,7 +66,9 @@ export function nativeTestProfile(name = 'full') {
             ...nativePRUISelectors,
           ]
         : [...nativeSuites],
-    runtimeTimeoutMs: (name === 'pr' ? 8 : 35) * 60 * 1000,
+    // The complete hosted UI matrix reached the old 35-minute cap during its
+    // last method. Keep per-test deadlines and give the full matrix headroom.
+    runtimeTimeoutMs: (name === 'pr' ? 8 : 45) * 60 * 1000,
   };
 }
 

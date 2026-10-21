@@ -49,7 +49,12 @@ struct AppShell: View {
     }
 
     private var nativeStatsHeader: Bool { usesStatsNavigation && sizeClass == .compact }
-    private var nativeMapHeader: Bool { usesStatsNavigation && sizeClass == .compact }
+    // Compact Map chrome belongs above the retained navigation host. An inset
+    // inside that host can remain visible in AX but lose its hit region when
+    // UIKit rotates the results sheet. Portrait keeps its native navigation bar.
+    private var nativeMapHeader: Bool {
+        usesStatsNavigation && sizeClass == .compact && !toolbarLayout.isCompact
+    }
 
     var body: some View {
         browsingContent.overlay {

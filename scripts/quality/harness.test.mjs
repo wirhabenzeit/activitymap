@@ -116,7 +116,7 @@ test('native profiles retain all unit suites and select exactly the intended PR 
   assert.deepEqual(full.suites, nativeSuites);
   assert.equal(full.suites.length, 36);
   assert.equal(full.name, 'full');
-  assert.equal(full.runtimeTimeoutMs, 35 * 60 * 1000);
+  assert.equal(full.runtimeTimeoutMs, 45 * 60 * 1000);
   assert.deepEqual(nativeTestProfile('full'), full);
   for (const name of ['smoke', '', 'FULL', 'unknown'])
     assert.throws(() => nativeTestProfile(name), /Unknown IOS_TEST_PROFILE/);
