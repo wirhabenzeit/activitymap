@@ -1,15 +1,17 @@
 'use client';
 
+import { ArrowLeft, X } from 'lucide-react';
 import {
   AnimatePresence,
   motion,
   useIsPresent,
   useReducedMotion,
 } from 'motion/react';
-import { ArrowLeft, X } from 'lucide-react';
-import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
+import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
+
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
+
 import { type DetailPresentation } from './inspection';
 
 interface DetailPageProps {
@@ -83,12 +85,17 @@ function DetailPage({
           : 'left-0',
       )}
       data-detail-presentation={presentation}
+      // A transform string, unlike `x`, runs as a compositor animation, so
+      // mounting the detail content cannot stall the push.
       initial={{
-        x: reducedMotion ? 0 : '100%',
+        transform: `translateX(${reducedMotion ? 0 : 100}%)`,
         opacity: reducedMotion ? 0 : 1,
       }}
-      animate={{ x: 0, opacity: 1 }}
-      exit={{ x: reducedMotion ? 0 : '100%', opacity: reducedMotion ? 0 : 1 }}
+      animate={{ transform: 'translateX(0%)', opacity: 1 }}
+      exit={{
+        transform: `translateX(${reducedMotion ? 0 : 100}%)`,
+        opacity: reducedMotion ? 0 : 1,
+      }}
       transition={{
         duration: reducedMotion ? 0 : 0.28,
         ease: [0.22, 0.75, 0.25, 1],
@@ -188,7 +195,7 @@ export function ListDetailTransition({
         inert={open && !panel}
         aria-hidden={open && !panel}
         animate={{
-          x: open && !panel && !reducedMotion ? '-16%' : 0,
+          transform: `translateX(${open && !panel && !reducedMotion ? -16 : 0}%)`,
           opacity: open && !panel ? 0.4 : 1,
         }}
         transition={{
