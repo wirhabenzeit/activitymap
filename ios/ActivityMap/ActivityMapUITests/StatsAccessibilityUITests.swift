@@ -208,12 +208,22 @@ extension StatsUITests {
             viewport = CGRect(x: viewport.minX, y: top, width: viewport.width, height: max(0, viewport.maxY - top))
         }
         for _ in 0..<18 {
+            var delta = -viewport.height * 0.6
             if element.exists {
                 let frame = element.frame
                 if !frame.isEmpty && viewport.insetBy(dx: -1, dy: -1).contains(frame) && element.isHittable { return }
-                if !frame.isEmpty && frame.minY < viewport.minY { scroll.swipeDown(); continue }
+                if !frame.isEmpty {
+                    if frame.minY < viewport.minY { delta = min(viewport.height * 0.6, viewport.minY - frame.minY + 12) }
+                    else { delta = -min(viewport.height * 0.6, max(24, frame.maxY - viewport.maxY + 12)) }
+                }
             }
-            scroll.swipeUp()
+            // A full fling can leap over a 44pt target in short landscape
+            // viewports and oscillate forever. Drag only the measured gap and
+            // hold at the endpoint so inertia cannot undo the reveal.
+            let startY = delta < 0 ? viewport.maxY - viewport.height * 0.15 : viewport.minY + viewport.height * 0.15
+            let start = app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: viewport.midX, dy: startY))
+            start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: delta)),
+                        withVelocity: .slow, thenHoldForDuration: 0.2)
         }
         XCTFail("Control was not reachable in \(viewport): frame=\(element.frame), hittable=\(element.isHittable), scroll=\(scroll.frame)\n\(app.debugDescription)")
     }
