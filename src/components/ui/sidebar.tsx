@@ -25,6 +25,9 @@ const SIDEBAR_WIDTH = '16rem';
 const SIDEBAR_WIDTH_MOBILE = '18rem';
 const SIDEBAR_WIDTH_ICON = '3rem';
 const SIDEBAR_KEYBOARD_SHORTCUT = 'b';
+// Sidebar panels and their content slide together with this timing.
+const panelSlide =
+  'transition-transform duration-250 ease-[cubic-bezier(0.22,0.75,0.25,1)] motion-reduce:transition-none';
 
 type SidebarContext = {
   state: 'expanded' | 'collapsed';
@@ -298,6 +301,8 @@ const Sidebar = React.forwardRef<
                 'relative h-svh w-(--sidebar-width-icon) bg-transparent',
               )}
             />
+            {/* Like the desktop panel: full width, sliding on the compositor,
+                with the icon rail counter-sliding so it stays put. */}
             <div
               ref={mobileRef}
               role={openMobile ? 'dialog' : undefined}
@@ -307,40 +312,56 @@ const Sidebar = React.forwardRef<
               }
               data-filter-overlay={openMobile || undefined}
               className={cn(
-                'fixed inset-y-0 z-50 h-dvh',
-                side === 'left' ? 'left-0' : 'right-0',
-                'flex',
-                variant === 'floating' || variant === 'inset'
-                  ? 'p-2'
-                  : 'group-data-[side=left]:border-r group-data-[side=right]:border-l',
+                'fixed inset-y-0 z-50 flex h-dvh overflow-hidden',
+                panelSlide,
+                side === 'left'
+                  ? 'left-0 group-data-[collapsible=icon]:-translate-x-(--sidebar-collapse-offset)'
+                  : 'right-0 group-data-[collapsible=icon]:translate-x-(--sidebar-collapse-offset)',
+                variant === 'sidebar' &&
+                  'bg-sidebar group-data-[side=left]:border-r group-data-[side=right]:border-l',
                 className,
               )}
-              style={{
-                width: openMobile ? SIDEBAR_WIDTH_MOBILE : SIDEBAR_WIDTH_ICON,
-              }}
+              style={
+                {
+                  width: SIDEBAR_WIDTH_MOBILE,
+                  '--sidebar-collapse-offset': `calc(${SIDEBAR_WIDTH_MOBILE} - var(--sidebar-width-icon))`,
+                } as React.CSSProperties
+              }
               {...props}
             >
               <div
-                data-sidebar="sidebar"
-                className="flex h-full w-full flex-col overflow-hidden bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm"
-                style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+                className={cn(
+                  'h-full w-full shrink-0 group-data-[collapsible=icon]:w-(--sidebar-width-icon)',
+                  panelSlide,
+                  side === 'left'
+                    ? 'group-data-[collapsible=icon]:translate-x-(--sidebar-collapse-offset)'
+                    : 'ml-auto group-data-[collapsible=icon]:-translate-x-(--sidebar-collapse-offset)',
+                  (variant === 'floating' || variant === 'inset') && 'p-2',
+                )}
               >
-                {/* Add top padding on mobile to account for header */}
-                <div className="h-14 w-full" />
-                {openMobile && (
-                  <div className="flex items-center justify-between px-3">
-                    <span className="font-medium">Filters</span>
+                <div
+                  data-sidebar="sidebar"
+                  className="relative flex h-full w-full flex-col overflow-hidden bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow-sm"
+                  style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+                >
+                  {/* Add top padding on mobile to account for header */}
+                  <div className="h-14 w-full" />
+                  {/* Touch closes from the header trigger or the backdrop.
+                      Keyboard and screen-reader users get this control,
+                      which only shows while it has keyboard focus. */}
+                  {openMobile && (
                     <Button
                       variant="ghost"
                       size="icon"
                       aria-label={message('navigation.closeFilters')}
                       onClick={() => setOpenMobile(false)}
+                      className="pointer-events-none absolute top-16 right-2 z-10 bg-sidebar opacity-0 focus-visible:pointer-events-auto focus-visible:opacity-100"
                     >
                       <X className="size-4" aria-hidden="true" />
                     </Button>
-                  </div>
-                )}
-                {children}
+                  )}
+                  {children}
+                </div>
               </div>
             </div>
           </div>
@@ -348,7 +369,7 @@ const Sidebar = React.forwardRef<
           {/* Overlay that appears when expanded */}
           <div
             className={cn(
-              'fixed top-14 right-0 bottom-0 left-0 z-40 bg-black/80 transition-opacity duration-300',
+              'fixed top-14 right-0 bottom-0 left-0 z-40 bg-black/80 transition-opacity duration-250 ease-[cubic-bezier(0.22,0.75,0.25,1)] motion-reduce:transition-none',
               openMobile ? 'opacity-100' : 'pointer-events-none opacity-0',
             )}
             onClick={() => setOpenMobile(false)}
@@ -388,7 +409,8 @@ const Sidebar = React.forwardRef<
             reveals or hides the labels. */}
         <div
           className={cn(
-            'fixed inset-y-0 z-10 h-svh w-(--sidebar-width) overflow-hidden transition-transform duration-250 ease-[cubic-bezier(0.22,0.75,0.25,1)] motion-reduce:transition-none',
+            'fixed inset-y-0 z-10 h-svh w-(--sidebar-width) overflow-hidden',
+            panelSlide,
             side === 'left'
               ? 'left-0 group-data-[collapsible=icon]:-translate-x-(--sidebar-collapse-offset) group-data-[collapsible=offcanvas]:-translate-x-full'
               : 'right-0 group-data-[collapsible=icon]:translate-x-(--sidebar-collapse-offset) group-data-[collapsible=offcanvas]:translate-x-full',
@@ -409,7 +431,8 @@ const Sidebar = React.forwardRef<
         >
           <div
             className={cn(
-              'h-full w-full shrink-0 transition-transform duration-250 ease-[cubic-bezier(0.22,0.75,0.25,1)] motion-reduce:transition-none',
+              'h-full w-full shrink-0',
+              panelSlide,
               'group-data-[collapsible=icon]:w-[calc(var(--sidebar-width)-var(--sidebar-collapse-offset))]',
               side === 'left'
                 ? 'group-data-[collapsible=icon]:translate-x-(--sidebar-collapse-offset)'
