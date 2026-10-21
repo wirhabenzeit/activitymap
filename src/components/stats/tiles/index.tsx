@@ -15,6 +15,8 @@ import {
   Activity,
   type CSSProperties,
   type ReactNode,
+  memo,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -67,7 +69,20 @@ const shownTiles: ShownTile[] = statsTiles.flatMap((tile) => {
   return view ? [{ tile, view }] : [];
 });
 
+const groupTiles = new Map(
+  statsTileGroups.map((group) => [
+    group.id,
+    shownTiles.filter(({ tile }) => tile.group === group.id),
+  ]),
+);
+
+const expandableTiles = shownTiles.filter(({ view }) => view.expandable);
+
 const toggleOf = (tile: StatsTile) => ('toggle' in tile ? tile.toggle : null);
+
+type TileOptions = Partial<Record<StatsTileID, string>>;
+const optionOf = (options: TileOptions, tile: StatsTile) =>
+  options[tile.id] ?? toggleOf(tile)?.options[0];
 
 export default function StatsTiles() {
   const { query, activities, scope, reset } = useStatsActivities();
@@ -205,14 +220,21 @@ export function StatsTileGrid({
     'stats:calendarDay',
     null,
   );
-  const calendar = {
-    selectedDay: calendarDay,
-    setSelectedDay: setCalendarDay,
-  };
-  const optionFor = (tile: StatsTile) =>
-    options[tile.id] ?? toggleOf(tile)?.options[0];
-  const changeOption = (id: StatsTileID, option: string) =>
-    setOptions((previous) => ({ ...previous, [id]: option }));
+  // Opening a focus only changes which surface is visible. Keep every tile's
+  // props referentially stable so the memoized cards and hidden focus views
+  // skip re-rendering their charts while the transition is captured and runs.
+  const tileContext: TileContext = useMemo(
+    () => ({
+      ...context,
+      calendar: { selectedDay: calendarDay, setSelectedDay: setCalendarDay },
+    }),
+    [context, calendarDay, setCalendarDay],
+  );
+  const changeOption = useCallback(
+    (id: StatsTileID, option: string) =>
+      setOptions((previous) => ({ ...previous, [id]: option })),
+    [setOptions],
+  );
 
   useLayoutEffect(() => {
     const previous = previousID.current;
@@ -269,13 +291,11 @@ export function StatsTileGrid({
                       <BentoGroup
                         key={group.id}
                         title={group.title}
-                        tiles={shownTiles.filter(
-                          ({ tile }) => tile.group === group.id,
-                        )}
+                        tiles={groupTiles.get(group.id) ?? []}
                         width={width - 2 * padding}
-                        context={{ ...context, calendar }}
+                        context={tileContext}
                         activeID={activeID}
-                        optionFor={optionFor}
+                        options={options}
                         onOption={changeOption}
                         onExpand={open}
                       />
@@ -285,42 +305,25 @@ export function StatsTileGrid({
               }}
             </Measure>
           </div>
-          {shownTiles
-            .filter(({ view }) => view.expandable)
-            .map(({ tile, view }) => (
-              <Activity
-                key={tile.id}
-                mode={activeID === tile.id ? 'visible' : 'hidden'}
-              >
-                <div className="absolute inset-0 bg-background">
-                  <TileFocusView
-                    tile={tile}
-                    view={view}
-                    context={{
-                      ...context,
-                      calendar,
-                      focusWidth,
-                      focusChartHeight: Math.max(
-                        150,
-                        Math.min(
-                          focusWidth >= 760
-                            ? 400
-                            : tile.id === 'monthVsLastMonth' ||
-                                tile.id === 'yearToDate'
-                              ? 200
-                              : 300,
-                          focusHeight * 0.48,
-                          focusHeight - 220,
-                        ),
-                      ),
-                    }}
-                    option={optionFor(tile)}
-                    onOption={(option) => changeOption(tile.id, option)}
-                    onBack={close}
-                  />
-                </div>
-              </Activity>
-            ))}
+          {expandableTiles.map(({ tile, view }) => (
+            <Activity
+              key={tile.id}
+              mode={activeID === tile.id ? 'visible' : 'hidden'}
+            >
+              <div className="absolute inset-0 bg-background">
+                <TileFocusSurface
+                  tile={tile}
+                  view={view}
+                  context={tileContext}
+                  focusWidth={focusWidth}
+                  focusHeight={focusHeight}
+                  option={optionOf(options, tile)}
+                  onOption={changeOption}
+                  onBack={close}
+                />
+              </div>
+            </Activity>
+          ))}
         </>
       )}
     </Measure>
@@ -329,13 +332,63 @@ export function StatsTileGrid({
 
 const { regular, compact, narrow, gap } = statsTileLayout;
 
-function BentoGroup({
+const TileFocusSurface = memo(function TileFocusSurface({
+  tile,
+  view,
+  context,
+  focusWidth,
+  focusHeight,
+  option,
+  onOption,
+  onBack,
+}: {
+  tile: StatsTile;
+  view: TileView;
+  context: TileContext;
+  focusWidth: number;
+  focusHeight: number;
+  option: string | undefined;
+  onOption: (id: StatsTileID, option: string) => void;
+  onBack: () => void;
+}) {
+  const focusContext = useMemo(
+    () => ({
+      ...context,
+      focusWidth,
+      focusChartHeight: Math.max(
+        150,
+        Math.min(
+          focusWidth >= 760
+            ? 400
+            : tile.id === 'monthVsLastMonth' || tile.id === 'yearToDate'
+              ? 200
+              : 300,
+          focusHeight * 0.48,
+          focusHeight - 220,
+        ),
+      ),
+    }),
+    [context, focusWidth, focusHeight, tile.id],
+  );
+  return (
+    <TileFocusView
+      tile={tile}
+      view={view}
+      context={focusContext}
+      option={option}
+      onOption={(next) => onOption(tile.id, next)}
+      onBack={onBack}
+    />
+  );
+});
+
+const BentoGroup = memo(function BentoGroup({
   title,
   tiles,
   width,
   context,
   activeID,
-  optionFor,
+  options,
   onOption,
   onExpand,
 }: {
@@ -344,7 +397,7 @@ function BentoGroup({
   width: number;
   context: TileContext;
   activeID: StatsTileID | null;
-  optionFor: (tile: StatsTile) => string | undefined;
+  options: TileOptions;
   onOption: (id: StatsTileID, option: string) => void;
   onExpand: (id: StatsTileID) => void;
 }) {
@@ -398,26 +451,22 @@ function BentoGroup({
               key={tile.id}
               tile={tile}
               view={view}
-              context={{
-                ...context,
-                inlineDetails: tile.id === 'sportMix' && width >= 760,
-              }}
+              context={context}
+              inlineDetails={tile.id === 'sportMix' && width >= 760}
               large={'primary' in tile && tile.primary}
               focused={tile.id === activeID}
-              option={optionFor(tile)}
-              onOption={(option) => onOption(tile.id, option)}
-              onExpand={() => onExpand(tile.id)}
-              style={{
-                gridColumn: `${placement.column} / span ${placement.columns}`,
-                gridRow: `${placement.row} / span ${placement.rows}`,
-              }}
+              option={optionOf(options, tile)}
+              onOption={onOption}
+              onExpand={onExpand}
+              gridColumn={`${placement.column} / span ${placement.columns}`}
+              gridRow={`${placement.row} / span ${placement.rows}`}
             />
           );
         })}
       </div>
     </section>
   );
-}
+});
 
 function Headline({
   summary,
@@ -454,27 +503,38 @@ function Headline({
   );
 }
 
-function TileCard({
+const TileCard = memo(function TileCard({
   tile,
   view,
-  context,
+  context: sharedContext,
+  inlineDetails,
   large,
   focused,
   option,
-  onOption,
-  onExpand,
-  style,
+  onOption: onTileOption,
+  onExpand: onTileExpand,
+  gridColumn,
+  gridRow,
 }: {
   tile: StatsTile;
   view: TileView;
   context: TileContext;
+  inlineDetails: boolean;
   large: boolean;
   focused: boolean;
   option: string | undefined;
-  onOption: (option: string) => void;
-  onExpand: () => void;
-  style: CSSProperties;
+  onOption: (id: StatsTileID, option: string) => void;
+  onExpand: (id: StatsTileID) => void;
+  gridColumn: string;
+  gridRow: string;
 }) {
+  const context = useMemo(
+    () => ({ ...sharedContext, inlineDetails }),
+    [sharedContext, inlineDetails],
+  );
+  const onOption = (next: string) => onTileOption(tile.id, next);
+  const onExpand = () => onTileExpand(tile.id);
+  const style: CSSProperties = { gridColumn, gridRow };
   const toggle = toggleOf(tile);
   const summary = view.summary(context, option);
   const headlineControls = Boolean(view.headlineControls && summary && toggle);
@@ -539,7 +599,7 @@ function TileCard({
       </div>
     </section>
   );
-}
+});
 
 export function TileFocusView({
   tile,
