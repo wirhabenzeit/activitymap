@@ -13,6 +13,7 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
     var compactHeader = false
     var detailScreen = false
     var controlsInContent = false
+    var expandIdentifier: String? = nil
     @ViewBuilder let controls: () -> Controls
     @ViewBuilder let content: () -> Content
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -80,6 +81,7 @@ struct StatsTileSurface<Controls: View, Content: View>: View {
             BrowseIconButton(title: .localized(expanded ? AppMessages.statsCollapseTile(titleResource.map { String(localized: $0) } ?? title, locale: locale) : AppMessages.statsExpandTile(titleResource.map { String(localized: $0) } ?? title, locale: locale)),
                              systemImage: expanded ? "arrow.down.right.and.arrow.up.left" : "arrow.up.left.and.arrow.down.right",
                              action: expand)
+                .accessibilityIdentifier(expandIdentifier ?? "stats-expand-\(title)")
         }
     }
     private var header: some View {

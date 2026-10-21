@@ -496,7 +496,7 @@ it conservatively. Web-only changes skip the native app job. It has an
 18-minute cold-build limit, eight-minute test limit and 35-minute job limit.
 This is not the full UI matrix.
 
-The full profile runs 36 selected suites, including all 39 UI methods, with the
+The full profile runs 36 selected suites, including all 53 UI methods, with the
 same 18-minute build limit, a 45-minute test limit and a 75-minute manual CI job.
 The seven action-matrix configurations run as independent methods so each has
 its own result and execution allowance.

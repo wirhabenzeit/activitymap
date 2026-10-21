@@ -4,142 +4,13 @@ import MapboxMaps
 import Testing
 @testable import ActivityMap
 
+// UIKit/state/geometry checks stay app-hosted. AX labels, targets, selection and
+// activation are tested by StatsAccessibilityUITests in a real automation session;
+// iOS 27 does not vend SwiftUI's AX children to an ordinary hosted test process.
 @MainActor @Suite(.serialized) struct RenderedStatsDashboardTests {
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_COMPARISON"] == "1"))
-    func captureListAndStatsNavigationMotion() async throws {
-        try await statsWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
-        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let landscape = ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_LANDSCAPE"] == "1"
-        if landscape {
-            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeLeft))
-            try await statsWait { scene.interfaceOrientation.isLandscape }
-        }
-        defer { if landscape { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) } }
-        let library = try GalleryLibrary.load()
-        let store = ActivityStore(activities: library.activities,
-                                  listPresentation: ActivityListPresentation(defaults: nil))
-        store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-07")), timeZone: .gmt)
-        store.selectedTab = .list
-        let state = StatsDashboardState()
-        await StatsDashboardTests.load(state, store)
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
-        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
-        let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
-            .environment(\.statsDetailPresentation, .navigation)
-            .environment(\.horizontalSizeClass, .compact)
-            .environment(\.verticalSizeClass, landscape ? .compact : .regular)
-            .environment(\.colorScheme, ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_DARK"] == "1" ? .dark : .light)
-            .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)),
-            size: landscape ? scene.coordinateSpace.bounds.size : CGSize(width: 402, height: 874))
-        defer { host.close() }
-        try await statsWait { host.descendants(UICollectionView.self).first?.visibleCells.isEmpty == false }
-        let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_OUTPUT"]
-                            ?? "/tmp/activitymap-detail-motion-comparison")
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        try Data().write(to: directory.appendingPathComponent("ready"))
-        // An external simctl compositor recording starts before these actions.
-        // No snapshots or forced layouts run during the measured transitions.
-        let deadline = Date().addingTimeInterval(60)
-        while !FileManager.default.fileExists(atPath: directory.appendingPathComponent("recording").path), Date() < deadline {
-            try await Task.sleep(for: .milliseconds(100))
-        }
-        try #require(FileManager.default.fileExists(atPath: directory.appendingPathComponent("recording").path))
-        try await Task.sleep(for: .seconds(2))
-        var results: [[String: Any]] = []
-        let activity = try #require(store.listedActivities.first)
-        for mode in ["list", "stats"] {
-            store.selectedTab = mode == "list" ? .list : .stats
-            try await Task.sleep(for: .seconds(1))
-            let controllers = host.controllers(UINavigationController.self)
-            let navigation = try #require(mode == "list" ? controllers.last : controllers.first)
-            for repetition in 0..<2 {
-                for direction in ["push", "back"] {
-                    let probe = StatsNavigationStartProbe(navigation: navigation)
-                    let actionTime = Date().timeIntervalSince1970
-                    probe.begin()
-                    if direction == "push" {
-                        if mode == "list" { store.inspect(activity.id) }
-                        else { state.toggleExpansion(.weeklyVolume) }
-                    } else { navigation.popViewController(animated: true) }
-                    try await Task.sleep(for: .milliseconds(1400))
-                    probe.end()
-                    try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (direction == "push" ? 2 : 1) }
-                    results.append(["mode": mode, "direction": direction, "repetition": repetition,
-                                    "actionTime": actionTime, "samples": probe.samples,
-                                    "viewportWidth": host.host.view.bounds.width,
-                                    "viewportHeight": host.host.view.bounds.height,
-                                    "safeAreaTop": host.host.view.safeAreaInsets.top,
-                                    "navigationControllerCount": controllers.count])
-                    try await Task.sleep(for: .milliseconds(350))
-                }
-            }
-        }
-        try JSONSerialization.data(withJSONObject: ["results": results, "activityCount": library.activities.count,
-            "capture": "Same production AppShell, viewport and library; compositor recording plus display-link presentation geometry; no snapshots or forced layout during motion."],
-            options: [.prettyPrinted, .sortedKeys]).write(to: directory.appendingPathComponent("motion.json"))
-        try Data().write(to: directory.appendingPathComponent("done"))
-        try await Task.sleep(for: .seconds(1))
-    }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_EXPANSION_FRAMES"] == "1"),
-          arguments: ["volume-expand", "volume-collapse", "month-expand", "month-collapse"])
-    func captureExpansionFrames(scenario: String) async throws {
-        let tile: StatsTileID = scenario.hasPrefix("month") ? .monthVsLastMonth : .weeklyVolume
-        let collapsing = scenario.hasSuffix("collapse")
-        let library = try GalleryLibrary.load()
-        let store = ActivityStore(activities: library.activities,
-                                  listPresentation: ActivityListPresentation(defaults: nil))
-        store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-04")), timeZone: .gmt)
-        store.selectedTab = .stats
-        let state = StatsDashboardState()
-        await StatsDashboardTests.load(state, store)
-        if collapsing { state.toggleExpansion(tile) }
-        let host = try StatsDashboardHarness(root: StatsScreen(store: store, dashboard: state)
-            .environment(\.statsDetailPresentation, .inline)
-            .environment(\.colorScheme, .light)
-            .environment(\.locale, Locale(identifier: "de_CH")),
-            size: CGSize(width: 820, height: 1180))
-        defer { host.close() }
-        try await Task.sleep(for: .milliseconds(300))
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let renderer = UIGraphicsImageRenderer(bounds: host.host.view.bounds, format: format)
-        func snapshot() -> UIImage {
-            // Read the current presentation without forcing a layout/commit.
-            renderer.image { _ in host.host.view.drawHierarchy(in: host.host.view.bounds, afterScreenUpdates: false) }
-        }
-        var frames: [(Double, Double, UIImage)] = [(-1, 0, snapshot())]
-        let start = CACurrentMediaTime()
-        withAnimation(.easeInOut(duration: 0.25)) { state.toggleExpansion(tile) }
-        // Keep images in memory during the animation; PNG encoding/file IO happens afterwards.
-        // Actual timestamps and capture costs are recorded rather than claiming exact frame cadence.
-        for target in stride(from: 0.0, through: 700.0, by: 25.0) {
-            let remaining = target / 1000 - (CACurrentMediaTime() - start)
-            // Always yield a display interval: catching up with synchronous
-            // snapshots would starve SwiftUI's commits and freeze the animation.
-            try await Task.sleep(for: .seconds(max(remaining, 1.0 / 60)))
-            let before = CACurrentMediaTime()
-            let image = snapshot()
-            frames.append(((before - start) * 1000, (CACurrentMediaTime() - before) * 1000, image))
-        }
-        let path = ProcessInfo.processInfo.environment["ACTIVITYMAP_EXPANSION_OUTPUT"] ?? "/tmp/activitymap-expansion-frames"
-        let directory = URL(fileURLWithPath: path).appendingPathComponent(scenario)
-        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
-        var metadata: [[String: Any]] = []
-        for (index, frame) in frames.enumerated() {
-            let file = String(format: "frame-%02d.png", index)
-            try #require(frame.2.pngData()).write(to: directory.appendingPathComponent(file))
-            metadata.append(["file": file, "elapsedMs": frame.0, "captureMs": frame.1])
-        }
-        let manifest: [String: Any] = ["frames": metadata, "durationMs": 250, "width": 820, "height": 1180,
-            "activityCount": library.activities.count, "reportingDay": "2026-10-04",
-            "capture": "Continuous snapshots of production StatsScreen in a rendered simulator host; state preloaded; no forced layout; actual elapsed capture times."]
-        try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
-            .write(to: directory.appendingPathComponent("frames.json"))
-        #expect(state.expandedTile == (collapsing ? nil : tile) && frames.count == 30)
-    }
+
+
 
     @Test(arguments: ["phone", "landscape", "large-text"])
     func phoneNavigationKeepsContentPosition(variant: String) async throws {
@@ -164,7 +35,6 @@ import Testing
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(400))
         let navigation = try #require(host.contentNavigation())
-        #expect(host.shellAccountButton() != nil)
         #expect(navigation.isNavigationBarHidden == (variant == "landscape"),
                 "The compact landscape dashboard and focus share app chrome; portrait retains native chrome")
         let root = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[0].view)
@@ -172,8 +42,6 @@ import Testing
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
         let rootOffset = root.contentOffset.y
         try await Task.sleep(for: .milliseconds(100))
-        let account = try #require(host.shellAccountButton())
-        let accountFrame = host.host.view.convert(account.accessibilityFrame, from: nil)
         let format = UIGraphicsImageRendererFormat()
         format.scale = 1
         let renderer = UIGraphicsImageRenderer(bounds: host.host.view.bounds, format: format)
@@ -199,14 +67,6 @@ import Testing
                 var sample: [String: Any] = ["elapsedMs": (before - start) * 1000,
                     "captureMs": (CACurrentMediaTime() - before) * 1000,
                     "transitioning": navigation.transitionCoordinator != nil]
-                if let account = host.shellAccountButton(),
-                   !account.accessibilityFrame.isEmpty {
-                    let frame = host.host.view.convert(account.accessibilityFrame, from: nil)
-                    sample["accountCenterX"] = frame.midX
-                    sample["accountCenterY"] = frame.midY
-                    sample["accountWidth"] = frame.width
-                    sample["accountHeight"] = frame.height
-                }
                 if phase == "push", navigation.viewControllers.count == 2 {
                     detailController = navigation.viewControllers[1]
                 }
@@ -252,9 +112,6 @@ import Testing
             }
             try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (phase == "push" ? 2 : 1) }
             if phase == "push" {
-                #expect(host.shellAccountButton() == nil,
-                        "The focused chart leaves account access on the dashboard")
-                #expect(host.shellControl(label: "Filters") != nil)
                 #expect(navigation.topViewController?.navigationItem.title == "Training volume")
                 if variant == "landscape" {
                     #expect(navigation.isNavigationBarHidden)
@@ -269,12 +126,8 @@ import Testing
                 #expect(host.controllers(UINavigationController.self).filter {
                     !$0.isNavigationBarHidden && $0.navigationBar.window != nil
                 }.count == (variant == "landscape" ? 0 : 1))
-            } else {
-                let settledAccount = try #require(host.shellAccountButton())
-                let settledFrame = host.host.view.convert(settledAccount.accessibilityFrame, from: nil)
-                #expect(abs(settledFrame.midX - accountFrame.midX) < 1 && abs(settledFrame.midY - accountFrame.midY) < 1,
-                        "Returning restores the overview's profile button at its original position")
             }
+
             try host.capture("phone-single-stats-header-\(variant)-\(phase)")
             let gesture = try #require(navigation.interactivePopGestureRecognizer)
             if phase == "push" {
@@ -305,7 +158,6 @@ import Testing
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         try host.capture("phone-header-detail")
-        #expect(host.shellAccountButton() == nil && host.shellControl(label: "Filters") != nil)
         sheets.showsFilters = true
         try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
         #expect(state.expandedTile == .weeklyVolume && navigation.viewControllers.count == 2)
@@ -314,7 +166,6 @@ import Testing
         try await statsWait { host.host.presentedViewController == nil }
         navigation.popViewController(animated: true)
         try await statsWait { state.expandedTile == nil && navigation.transitionCoordinator == nil }
-        #expect(host.shellAccountButton() != nil)
         sheets.accountDestination = .settings
         try await statsWait { host.host.presentedViewController != nil && host.host.presentedViewController?.isBeingPresented == false }
         try host.capture("phone-header-root-settings", presented: true)
@@ -324,120 +175,9 @@ import Testing
 
     /// Opt-in simulator review: cancel a short edge swipe, then press the
     /// actual Back button. Observe UIKit's real interactive coordinator.
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_HEADER_INTERACTION"] == "1"))
-    func reviewPhoneStatsHeaderGestures() async throws {
-        let store = ActivityStore(activities: try GalleryLibrary.load().activities,
-                                  listPresentation: ActivityListPresentation(defaults: nil))
-        store.selectedTab = .stats
-        let state = StatsDashboardState()
-        await StatsDashboardTests.load(state, store)
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
-        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
-        let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
-            .environment(\.statsDetailPresentation, .navigation)
-            .environment(\.horizontalSizeClass, .compact)
-            .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)),
-            size: CGSize(width: 402, height: 874))
-        defer { host.close() }
-        try await Task.sleep(for: .milliseconds(500))
-        let navigation = try #require(host.contentNavigation())
-        let root = try #require(host.descendants(UIScrollView.self).first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
-        root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
-        let offset = root.contentOffset.y
-        withAnimation(.default) { state.toggleExpansion(.weeklyVolume) }
-        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
-        try host.capture("phone-header-interaction-detail")
-        var observedInteraction = false, cancelledInteraction = false
-        let deadline = Date().addingTimeInterval(180)
-        while state.expandedTile != nil, Date() < deadline {
-            if !observedInteraction, let transition = navigation.transitionCoordinator, transition.isInteractive {
-                observedInteraction = true
-                transition.notifyWhenInteractionChanges { context in
-                    cancelledInteraction = context.isCancelled
-                    #expect(context.isCancelled, "The review starts with a cancelled short edge swipe")
-                    #expect(state.expandedTile == .weeklyVolume)
-                }
-            }
-            try await Task.sleep(for: .milliseconds(16))
-        }
-        try await statsWait { navigation.viewControllers.count == 1 && navigation.transitionCoordinator == nil }
-        #expect(observedInteraction && cancelledInteraction)
-        #expect(state.expandedTile == nil && abs(root.contentOffset.y - offset) < 1)
-        #expect(host.shellAccountButton() != nil)
-        try host.capture("phone-header-interaction-back")
-    }
 
-    @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_NAVIGATION_LATENCY"] == "1"))
-    func measurePhoneNavigationStart() async throws {
-        try await statsWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
-        let library = try GalleryLibrary.load()
-        let store = ActivityStore(activities: library.activities,
-                                  listPresentation: ActivityListPresentation(defaults: nil))
-        store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-07")), timeZone: .gmt)
-        store.selectedTab = .stats
-        let state = StatsDashboardState()
-        await StatsDashboardTests.load(state, store)
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
-        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
-        let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
-            .environment(\.statsDetailPresentation, .navigation)
-            .environment(\.horizontalSizeClass, .compact)
-            .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)),
-            size: CGSize(width: 402, height: 874))
-        defer { host.close() }
-        try await Task.sleep(for: .milliseconds(500))
-        let navigation = try #require(host.contentNavigation())
-        var results: [[String: Any]] = []
-        // No snapshots or forced layouts while measuring. The display link
-        // observes UIKit's presentation layer, rather than its target frame.
-        for tile in [StatsTileID.weeklyVolume, .monthVsLastMonth, .yearToDate, .records] {
-            for repetition in 0..<3 {
-                for direction in ["push", "back"] {
-                    let probe = StatsNavigationStartProbe(navigation: navigation)
-                    let calculations = store.stats.calculationCount
-                    probe.begin()
-                    if direction == "push" {
-                        withAnimation(.default) { state.toggleExpansion(tile) }
-                    } else if repetition < 2 {
-                        withAnimation(.default) { state.expandedTile = nil }
-                    } else {
-                        navigation.popViewController(animated: true)
-                    }
-                    let actionMs = (CACurrentMediaTime() - probe.start) * 1000
-                    try await Task.sleep(for: .milliseconds(1200))
-                    probe.end()
-                    try await statsWait { navigation.viewControllers.count == (direction == "push" ? 2 : 1) && navigation.transitionCoordinator == nil }
-                    let rootStart = probe.samples.first { $0["rootX"] != nil }?["rootX"]
-                    let firstMotion = probe.samples.first { sample in
-                        if direction == "back", let rootStart, let x = sample["rootX"], abs(x - rootStart) > 1 { return true }
-                        guard let x = sample["x"] else { return false }
-                        return direction == "push" ? x < 401 : x > 1
-                    }
-                    let times = probe.samples.compactMap { $0["elapsedMs"] }
-                    let gaps = zip(times, times.dropFirst()).map { $1 - $0 }
-                    let end = probe.samples.last { $0["transitioning"] == 1 }?["elapsedMs"] ?? 0
-                    results.append(["tile": tile.rawValue, "repetition": repetition, "direction": direction,
-                        "backAction": repetition < 2 ? "selection binding" : "UIKit pop",
-                        "actionMs": actionMs, "firstDisplayMs": times.first ?? 0,
-                        "firstVisibleMovementMs": firstMotion?["elapsedMs"] as Any? ?? NSNull(),
-                        "lastTransitionSampleMs": end,
-                        "maxDisplayGapMs": gaps.max() ?? 0,
-                        "newCalculations": store.stats.calculationCount - calculations,
-                        "samples": probe.samples])
-                    print("Stats navigation \(tile.rawValue) #\(repetition) \(direction): firstDisplay=\(Int(times.first ?? 0))ms, firstMovement=\(firstMotion?["elapsedMs"].map { String(Int($0)) } ?? "not observed")ms, end=\(Int(end))ms, maxGap=\(Int(gaps.max() ?? 0))ms")
-                }
-                try await Task.sleep(for: .milliseconds(100))
-            }
-        }
-        let output = ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_NAVIGATION_LATENCY_OUTPUT"] ?? "/tmp/activitymap-stats-navigation-latency.json"
-        try JSONSerialization.data(withJSONObject: ["activityCount": library.activities.count, "results": results,
-            "capture": "Production shell, preloaded Stats; time from Expand/Back action to first display-link observation of movement, including ancestor presentation transforms. Callback timestamps are an upper bound on visibility when the main thread is busy; no snapshots or forced layout. Simulator comparison, not a physical-device latency budget."],
-            options: [.prettyPrinted, .sortedKeys]).write(to: URL(fileURLWithPath: output))
-    }
+
+
 
     @Test
     func chartGeometryFollowsExpansionAndNeighborReflow() async throws {
@@ -553,30 +293,7 @@ import Testing
         }
     }
 
-    @Test func compactMetricChoicesKeepTouchTargetsAndAccessibleSelection() async throws {
-        try await statsWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
-        let selection = StatsPickerReviewSelection()
-        let host = try StatsDashboardHarness(root: StatsMetricPicker(title: "Training volume: Metric",
-            metrics: [.distance, .time, .elevation], selection: Binding(
-                get: { selection.metric }, set: { selection.metric = $0 }
-            )).padding(), size: CGSize(width: 320, height: 120))
-        defer { host.close() }
-        try await Task.sleep(for: .milliseconds(150))
-        let distance = try #require(host.shellControl(label: "Distance"))
-        let time = try #require(host.shellControl(label: "Moving time"))
-        #expect(distance.accessibilityTraits.contains(.selected))
-        #expect(!time.accessibilityTraits.contains(.selected))
-        for label in ["Distance", "Moving time", "Elevation"] {
-            let choice = try #require(host.shellControl(label: label))
-            #expect(choice.accessibilityFrame.width >= 44)
-            #expect(choice.accessibilityFrame.height >= 44)
-        }
-        #expect(time.accessibilityActivate())
-        try await statsWait { selection.metric == .time }
-        try await Task.sleep(for: .milliseconds(100))
-        #expect(try #require(host.shellControl(label: "Moving time")).accessibilityTraits.contains(.selected))
-        #expect(!(try #require(host.shellControl(label: "Distance"))).accessibilityTraits.contains(.selected))
-    }
+    // compactMetricChoicesKeepTouchTargetsAndAccessibleSelection is exercised by StatsAccessibilityUITests.
 
     @Test(arguments: ["phone", "phone-dark", "small-large-text", "tablet", "landscape"])
     func dashboardRendersRealTilesAndRetainsMetricState(variant: String) async throws {
@@ -841,7 +558,7 @@ import Testing
             }
             try await Task.sleep(for: .milliseconds(100))
             let detailScroll = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[1].view).first { $0.bounds.height > 100 })
-            #expect(host.shellAccountButton() == nil && navigation.topViewController?.navigationItem.title == StatsDashboard.tiles.first { $0.id == id }?.title)
+            #expect(navigation.topViewController?.navigationItem.title == StatsDashboard.tiles.first { $0.id == id }?.title)
             #expect(detailScroll !== root, "The tile opens in its own scrolling destination")
             #expect(detailScroll.contentSize.width <= detailScroll.bounds.width + 1)
             #expect(abs(root.contentSize.height - height) < 1, "Opening detail never resizes the dashboard")
@@ -980,8 +697,6 @@ import Testing
         inspection.volumeRange = .months
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
-        #expect((host.shellAccountButton() != nil) == (scenario != "phone"),
-                "Compact focus pages keep Settings on the dashboard; iPad retains the workspace header")
         sheets.showsFilters = true
         if sidebar {
             try await statsWait { host.descendants(UITextField.self).count == 1 }
@@ -996,14 +711,13 @@ import Testing
         try host.capture("stats-focus-filters-\(scenario)", presented: !sidebar)
         sheets.showsFilters = false
         if !sidebar { try await statsWait { host.host.presentedViewController == nil } }
-        try await statsWait { host.shellControl(label: "No matching activities") != nil }
-        #expect(host.shellControl(label: "Calculating…") == nil,
-                "An empty filter is a completed result, not a calculation still in progress")
+        try await statsWait { store.statsActivities.isEmpty }
+        #expect(StatsPresentation(store: store, preparing: false).state == .noMatches)
         #expect(state.option(.weeklyVolume) == .time && inspection.volumeRange == .months)
         store.resetStatsActivityFilters()
         try await statsWait { state.result(.weeklyVolume, source: StatsDashboardSource(store)) != nil
-            && host.shellControl(label: "No matching activities") == nil }
-        #expect(host.shellControl(label: "Calculating…") == nil)
+            && !store.statsActivities.isEmpty }
+        #expect(StatsPresentation(store: store, preparing: false).state == .ready)
         #expect(state.expandedTile == .weeklyVolume && state.option(.weeklyVolume) == .time)
         #expect(state.inspection(.weeklyVolume) === inspection && inspection.volumeRange == .months)
         try host.capture("stats-focus-shell-\(scenario)")
@@ -1182,6 +896,7 @@ import Testing
             sync.setSession(SyncFixtures.session(), storage: storage)
             await sync.refresh()
         }
+        let transportState = sync.status
         store.selectedTab = .stats
         let host = try StatsDashboardHarness(root: StatsScreen(store: store, sync: sync, dashboard: state),
                                             size: CGSize(width: 402, height: 874))
@@ -1191,16 +906,16 @@ import Testing
         state.toggleExpansion(.weeklyVolume)
         try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         store.searchText = "No matching activity"
-        try await statsWait { host.shellControl(label: "No matching activities") != nil }
-        #expect(StatsPresentation(store: store, sync: sync).state == (failedRefresh ? .error : .cached))
-        #expect(host.shellControl(label: "Calculating…") == nil)
+        try await statsWait { store.statsActivities.isEmpty }
+        #expect(StatsPresentation(store: store, sync: sync).state == .noMatches)
+        #expect(StatsPresentation(store: store, sync: sync).historyComplete && sync.status == transportState)
         store.resetStatsActivityFilters()
         try await statsWait { state.result(.weeklyVolume, source: StatsDashboardSource(store)) != nil
-            && host.shellControl(label: "No matching activities") == nil }
+            && !store.statsActivities.isEmpty }
         #expect(state.expandedTile == .weeklyVolume)
         store.activities = []
-        try await statsWait { host.shellControl(label: "No activity history") != nil }
-        #expect(host.shellControl(label: "Calculating…") == nil)
+        try await statsWait { store.activities.isEmpty && !StatsPresentation(store: store, sync: sync).hasContent }
+        #expect(StatsPresentation(store: store, sync: sync).state == .noHistory && sync.status == transportState)
     }
 
     @Test func realOfflineFailureAndAuthorizationTransitionsKeepTruthfulContent() async throws {
@@ -1360,10 +1075,6 @@ import Testing
     try #require(condition(), "Stats rendering did not reach the expected state")
 }
 
-@MainActor @Observable private final class StatsPickerReviewSelection {
-    var metric = StatsMetric.distance
-}
-
 @MainActor private final class StatsDashboardHarness<Content: View> {
     let window: UIWindow
     let oldWindow: UIWindow?
@@ -1386,28 +1097,6 @@ import Testing
             ((controller as? T).map { [$0] } ?? []) + controller.children.flatMap(visit)
         }
         return visit(host)
-    }
-    func shellAccountButton() -> NSObject? {
-        shellControl(label: "Settings")
-    }
-    func shellControl(label: String) -> NSObject? {
-        var visited: Set<ObjectIdentifier> = []
-        func visit(_ object: NSObject) -> NSObject? {
-            guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
-            if object.accessibilityLabel == label, !object.accessibilityFrame.isEmpty { return object }
-            let count = object.accessibilityElementCount()
-            if count > 0, count < 1000 {
-                for index in 0..<count {
-                    if let child = object.accessibilityElement(at: index) as? NSObject,
-                       let found = visit(child) { return found }
-                }
-            }
-            if let view = object as? UIView {
-                for child in view.subviews { if let found = visit(child) { return found } }
-            }
-            return nil
-        }
-        return visit(host.view)
     }
     func contentNavigation() -> UINavigationController? {
         controllers(UINavigationController.self).first
@@ -1526,9 +1215,7 @@ extension RenderedStatsDashboardTests {
         try await Task.sleep(for: .milliseconds(300))
         let outer = try #require(host.descendants(UIScrollView.self).first)
         #expect(outer.contentSize.width <= outer.bounds.width + 1)
-        if tileID == .sportMix && width < 600 {
-            #expect(host.shellControl(label: "Distance and climb") != nil, "Phone Sport mix should disclose secondary totals even when a small table could fit")
-        }
+        // The compact disclosure's AX presence is checked by StatsUITests.
         try host.capture("parity-support-\(tileID.rawValue)-\(Int(width))")
     }
 
@@ -1556,60 +1243,9 @@ extension RenderedStatsDashboardTests {
         }
     }
 
-    @Test func monthRhythmKeepsZeroAndMissingActivityDaysVisible() async throws {
-        let today = StatsDates.day("2026-10-10")
-        let engine = StatsEngine(activities: [
-            .init(id: 1, name: "Flat run", sport: .run, start: StatsDates.date(today - 2), distance: 5000, movingTime: 1800, elevation: 0),
-            .init(id: 2, name: "Unmeasured run", sport: .run, start: StatsDates.date(today - 1), distance: 5000, movingTime: 1800, elevation: nil),
-        ])
-        let host = try StatsDashboardHarness(root: ScrollView {
-            StatsPeriodDetail(rhythm: .month(engine.monthActivityRhythm(today: today, metric: .elevation)),
-                              history: [], metric: .elevation, today: today, openActivity: { _ in }) { EmptyView() }.padding(16)
-        }, size: CGSize(width: 402, height: 1000))
-        defer { host.close() }
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(host.shellControl(label: "Run") != nil, "A sport with only zero/missing values still needs a legend")
-        #expect(host.shellControl(label: "Dots mark activities with zero or no recorded value.") != nil)
-        try host.capture("follow-up-month-zero-missing")
-        // Accessibility sizes list days with counts instead of drawing dots.
-        let listed = try StatsDashboardHarness(root: ScrollView {
-            StatsPeriodDetail(rhythm: .month(engine.monthActivityRhythm(today: today, metric: .elevation)),
-                              history: [], metric: .elevation, today: today, openActivity: { _ in }) { EmptyView() }.padding(16)
-        }.environment(\.dynamicTypeSize, .accessibility3), size: CGSize(width: 402, height: 1000))
-        defer { listed.close() }
-        try await Task.sleep(for: .milliseconds(200))
-        #expect(listed.shellControl(label: "Dots mark activities with zero or no recorded value.") == nil)
-    }
+    // monthRhythmKeepsZeroAndMissingActivityDaysVisible is exercised by StatsAccessibilityUITests.
 
-    @Test func yearRhythmReadsExactMonthTotalsAndRetainsSelection() async throws {
-        let today = StatsDates.day("2026-10-10")
-        let engine = StatsEngine(activities: [
-            .init(id: 1, name: "October", sport: .run, start: StatsDates.date(StatsDates.day("2026-10-02")), distance: 20000, movingTime: 7200, elevation: 0),
-            .init(id: 2, name: "Previous October", sport: .run, start: StatsDates.date(StatsDates.day("2025-10-02")), distance: 10000, movingTime: 3600, elevation: 0),
-            .init(id: 3, name: "August", sport: .ride, start: StatsDates.date(StatsDates.day("2026-08-02")), distance: 45000, movingTime: 10800, elevation: 0),
-            .init(id: 4, name: "Previous August", sport: .ride, start: StatsDates.date(StatsDates.day("2025-08-02")), distance: 30000, movingTime: 7200, elevation: 0),
-        ])
-        let inspection = StatsTileInspection()
-        for metric in [StatsMetric.distance, .time] {
-            let host = try StatsDashboardHarness(root: ScrollView {
-                StatsPeriodDetail(rhythm: .year(engine.yearMonthlyRhythm(today: today, metric: metric)),
-                                  history: [], metric: metric, today: today, openActivity: { _ in }) { EmptyView() }
-                    .padding(16)
-            }.environment(\.statsTileInspection, inspection), size: CGSize(width: 402, height: 1000))
-            defer { host.close() }
-            try await Task.sleep(for: .milliseconds(200))
-            let start = inspection.yearMonth ?? StatsDates.day("2026-10-01")
-            let initialPrevious = StatsDisplay.measurement(metric == .distance ? 10 : 2, metric: metric)
-            let initialCurrent = StatsDisplay.measurement(metric == .distance ? 20 : 3, metric: metric)
-            #expect(host.shellControl(label: "\(StatsDisplay.month(start)): 2025, \(initialPrevious); 2026, \(initialCurrent)") != nil)
-            inspection.yearMonth = StatsDates.day("2026-08-01")
-            try await Task.sleep(for: .milliseconds(100))
-            let previous = StatsDisplay.measurement(metric == .distance ? 30 : 2, metric: metric)
-            let current = StatsDisplay.measurement(metric == .distance ? 45 : 3, metric: metric)
-            #expect(host.shellControl(label: "\(StatsDisplay.month(inspection.yearMonth!)): 2025, \(previous); 2026, \(current)") != nil)
-            try host.capture("follow-up-year-exact-\(metric.rawValue)")
-        }
-    }
+    // yearRhythmReadsExactMonthTotalsAndRetainsSelection is exercised by StatsAccessibilityUITests.
 
     private static func coloredRhythmPixels(_ image: UIImage) -> Int {
         guard let source = image.cgImage else { return 0 }
@@ -1638,5 +1274,258 @@ extension RenderedStatsDashboardTests {
             }
         }
         return StatsEngine(activities: activities)
+    }
+}
+
+// Capture/latency probes remain opt-in and are not part of the regression gate.
+@MainActor @Suite(.serialized) struct StatsNavigationDiagnosticsTests {
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_COMPARISON"] == "1"))
+    func captureListAndStatsNavigationMotion() async throws {
+        try await statsWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        let landscape = ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_LANDSCAPE"] == "1"
+        if landscape {
+            scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeLeft))
+            try await statsWait { scene.interfaceOrientation.isLandscape }
+        }
+        defer { if landscape { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) } }
+        let library = try GalleryLibrary.load()
+        let store = ActivityStore(activities: library.activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-07")), timeZone: .gmt)
+        store.selectedTab = .list
+        let state = StatsDashboardState()
+        await StatsDashboardTests.load(state, store)
+        let previousToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = previousToken }
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
+            .environment(\.statsDetailPresentation, .navigation)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.verticalSizeClass, landscape ? .compact : .regular)
+            .environment(\.colorScheme, ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_DARK"] == "1" ? .dark : .light)
+            .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)),
+            size: landscape ? scene.coordinateSpace.bounds.size : CGSize(width: 402, height: 874))
+        defer { host.close() }
+        try await statsWait { host.descendants(UICollectionView.self).first?.visibleCells.isEmpty == false }
+        let directory = URL(fileURLWithPath: ProcessInfo.processInfo.environment["ACTIVITYMAP_DETAIL_MOTION_OUTPUT"]
+                            ?? "/tmp/activitymap-detail-motion-comparison")
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data().write(to: directory.appendingPathComponent("ready"))
+        // An external simctl compositor recording starts before these actions.
+        // No snapshots or forced layouts run during the measured transitions.
+        let deadline = Date().addingTimeInterval(60)
+        while !FileManager.default.fileExists(atPath: directory.appendingPathComponent("recording").path), Date() < deadline {
+            try await Task.sleep(for: .milliseconds(100))
+        }
+        try #require(FileManager.default.fileExists(atPath: directory.appendingPathComponent("recording").path))
+        try await Task.sleep(for: .seconds(2))
+        var results: [[String: Any]] = []
+        let activity = try #require(store.listedActivities.first)
+        for mode in ["list", "stats"] {
+            store.selectedTab = mode == "list" ? .list : .stats
+            try await Task.sleep(for: .seconds(1))
+            let controllers = host.controllers(UINavigationController.self)
+            let navigation = try #require(mode == "list" ? controllers.last : controllers.first)
+            for repetition in 0..<2 {
+                for direction in ["push", "back"] {
+                    let probe = StatsNavigationStartProbe(navigation: navigation)
+                    let actionTime = Date().timeIntervalSince1970
+                    probe.begin()
+                    if direction == "push" {
+                        if mode == "list" { store.inspect(activity.id) }
+                        else { state.toggleExpansion(.weeklyVolume) }
+                    } else { navigation.popViewController(animated: true) }
+                    try await Task.sleep(for: .milliseconds(1400))
+                    probe.end()
+                    try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (direction == "push" ? 2 : 1) }
+                    results.append(["mode": mode, "direction": direction, "repetition": repetition,
+                                    "actionTime": actionTime, "samples": probe.samples,
+                                    "viewportWidth": host.host.view.bounds.width,
+                                    "viewportHeight": host.host.view.bounds.height,
+                                    "safeAreaTop": host.host.view.safeAreaInsets.top,
+                                    "navigationControllerCount": controllers.count])
+                    try await Task.sleep(for: .milliseconds(350))
+                }
+            }
+        }
+        try JSONSerialization.data(withJSONObject: ["results": results, "activityCount": library.activities.count,
+            "capture": "Same production AppShell, viewport and library; compositor recording plus display-link presentation geometry; no snapshots or forced layout during motion."],
+            options: [.prettyPrinted, .sortedKeys]).write(to: directory.appendingPathComponent("motion.json"))
+        try Data().write(to: directory.appendingPathComponent("done"))
+        try await Task.sleep(for: .seconds(1))
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_EXPANSION_FRAMES"] == "1"),
+          arguments: ["volume-expand", "volume-collapse", "month-expand", "month-collapse"])
+    func captureExpansionFrames(scenario: String) async throws {
+        let tile: StatsTileID = scenario.hasPrefix("month") ? .monthVsLastMonth : .weeklyVolume
+        let collapsing = scenario.hasSuffix("collapse")
+        let library = try GalleryLibrary.load()
+        let store = ActivityStore(activities: library.activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-04")), timeZone: .gmt)
+        store.selectedTab = .stats
+        let state = StatsDashboardState()
+        await StatsDashboardTests.load(state, store)
+        if collapsing { state.toggleExpansion(tile) }
+        let host = try StatsDashboardHarness(root: StatsScreen(store: store, dashboard: state)
+            .environment(\.statsDetailPresentation, .inline)
+            .environment(\.colorScheme, .light)
+            .environment(\.locale, Locale(identifier: "de_CH")),
+            size: CGSize(width: 820, height: 1180))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(300))
+        let format = UIGraphicsImageRendererFormat()
+        format.scale = 1
+        let renderer = UIGraphicsImageRenderer(bounds: host.host.view.bounds, format: format)
+        func snapshot() -> UIImage {
+            // Read the current presentation without forcing a layout/commit.
+            renderer.image { _ in host.host.view.drawHierarchy(in: host.host.view.bounds, afterScreenUpdates: false) }
+        }
+        var frames: [(Double, Double, UIImage)] = [(-1, 0, snapshot())]
+        let start = CACurrentMediaTime()
+        withAnimation(.easeInOut(duration: 0.25)) { state.toggleExpansion(tile) }
+        // Keep images in memory during the animation; PNG encoding/file IO happens afterwards.
+        // Actual timestamps and capture costs are recorded rather than claiming exact frame cadence.
+        for target in stride(from: 0.0, through: 700.0, by: 25.0) {
+            let remaining = target / 1000 - (CACurrentMediaTime() - start)
+            // Always yield a display interval: catching up with synchronous
+            // snapshots would starve SwiftUI's commits and freeze the animation.
+            try await Task.sleep(for: .seconds(max(remaining, 1.0 / 60)))
+            let before = CACurrentMediaTime()
+            let image = snapshot()
+            frames.append(((before - start) * 1000, (CACurrentMediaTime() - before) * 1000, image))
+        }
+        let path = ProcessInfo.processInfo.environment["ACTIVITYMAP_EXPANSION_OUTPUT"] ?? "/tmp/activitymap-expansion-frames"
+        let directory = URL(fileURLWithPath: path).appendingPathComponent(scenario)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        var metadata: [[String: Any]] = []
+        for (index, frame) in frames.enumerated() {
+            let file = String(format: "frame-%02d.png", index)
+            try #require(frame.2.pngData()).write(to: directory.appendingPathComponent(file))
+            metadata.append(["file": file, "elapsedMs": frame.0, "captureMs": frame.1])
+        }
+        let manifest: [String: Any] = ["frames": metadata, "durationMs": 250, "width": 820, "height": 1180,
+            "activityCount": library.activities.count, "reportingDay": "2026-10-04",
+            "capture": "Continuous snapshots of production StatsScreen in a rendered simulator host; state preloaded; no forced layout; actual elapsed capture times."]
+        try JSONSerialization.data(withJSONObject: manifest, options: [.prettyPrinted, .sortedKeys])
+            .write(to: directory.appendingPathComponent("frames.json"))
+        #expect(state.expandedTile == (collapsing ? nil : tile) && frames.count == 30)
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_HEADER_INTERACTION"] == "1"))
+    func reviewPhoneStatsHeaderGestures() async throws {
+        let store = ActivityStore(activities: try GalleryLibrary.load().activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.selectedTab = .stats
+        let state = StatsDashboardState()
+        await StatsDashboardTests.load(state, store)
+        let token = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = token }
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
+            .environment(\.statsDetailPresentation, .navigation)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)),
+            size: CGSize(width: 402, height: 874))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(500))
+        let navigation = try #require(host.contentNavigation())
+        let root = try #require(host.descendants(UIScrollView.self).first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
+        root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
+        let offset = root.contentOffset.y
+        withAnimation(.default) { state.toggleExpansion(.weeklyVolume) }
+        try await statsWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
+        try host.capture("phone-header-interaction-detail")
+        var observedInteraction = false, cancelledInteraction = false
+        let deadline = Date().addingTimeInterval(180)
+        while state.expandedTile != nil, Date() < deadline {
+            if !observedInteraction, let transition = navigation.transitionCoordinator, transition.isInteractive {
+                observedInteraction = true
+                transition.notifyWhenInteractionChanges { context in
+                    cancelledInteraction = context.isCancelled
+                    #expect(context.isCancelled, "The review starts with a cancelled short edge swipe")
+                    #expect(state.expandedTile == .weeklyVolume)
+                }
+            }
+            try await Task.sleep(for: .milliseconds(16))
+        }
+        try await statsWait { navigation.viewControllers.count == 1 && navigation.transitionCoordinator == nil }
+        #expect(observedInteraction && cancelledInteraction)
+        #expect(state.expandedTile == nil && abs(root.contentOffset.y - offset) < 1)
+        try host.capture("phone-header-interaction-back")
+    }
+
+    @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_NAVIGATION_LATENCY"] == "1"))
+    func measurePhoneNavigationStart() async throws {
+        try await statsWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
+        let library = try GalleryLibrary.load()
+        let store = ActivityStore(activities: library.activities,
+                                  listPresentation: ActivityListPresentation(defaults: nil))
+        store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-07")), timeZone: .gmt)
+        store.selectedTab = .stats
+        let state = StatsDashboardState()
+        await StatsDashboardTests.load(state, store)
+        let previousToken = MapboxOptions.accessToken
+        MapboxOptions.accessToken = "pk.offline-test"
+        defer { MapboxOptions.accessToken = previousToken }
+        let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
+        let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
+            .environment(\.statsDetailPresentation, .navigation)
+            .environment(\.horizontalSizeClass, .compact)
+            .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##)),
+            size: CGSize(width: 402, height: 874))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(500))
+        let navigation = try #require(host.contentNavigation())
+        var results: [[String: Any]] = []
+        // No snapshots or forced layouts while measuring. The display link
+        // observes UIKit's presentation layer, rather than its target frame.
+        for tile in [StatsTileID.weeklyVolume, .monthVsLastMonth, .yearToDate, .records] {
+            for repetition in 0..<3 {
+                for direction in ["push", "back"] {
+                    let probe = StatsNavigationStartProbe(navigation: navigation)
+                    let calculations = store.stats.calculationCount
+                    probe.begin()
+                    if direction == "push" {
+                        withAnimation(.default) { state.toggleExpansion(tile) }
+                    } else if repetition < 2 {
+                        withAnimation(.default) { state.expandedTile = nil }
+                    } else {
+                        navigation.popViewController(animated: true)
+                    }
+                    let actionMs = (CACurrentMediaTime() - probe.start) * 1000
+                    try await Task.sleep(for: .milliseconds(1200))
+                    probe.end()
+                    try await statsWait { navigation.viewControllers.count == (direction == "push" ? 2 : 1) && navigation.transitionCoordinator == nil }
+                    let rootStart = probe.samples.first { $0["rootX"] != nil }?["rootX"]
+                    let firstMotion = probe.samples.first { sample in
+                        if direction == "back", let rootStart, let x = sample["rootX"], abs(x - rootStart) > 1 { return true }
+                        guard let x = sample["x"] else { return false }
+                        return direction == "push" ? x < 401 : x > 1
+                    }
+                    let times = probe.samples.compactMap { $0["elapsedMs"] }
+                    let gaps = zip(times, times.dropFirst()).map { $1 - $0 }
+                    let end = probe.samples.last { $0["transitioning"] == 1 }?["elapsedMs"] ?? 0
+                    results.append(["tile": tile.rawValue, "repetition": repetition, "direction": direction,
+                        "backAction": repetition < 2 ? "selection binding" : "UIKit pop",
+                        "actionMs": actionMs, "firstDisplayMs": times.first ?? 0,
+                        "firstVisibleMovementMs": firstMotion?["elapsedMs"] as Any? ?? NSNull(),
+                        "lastTransitionSampleMs": end,
+                        "maxDisplayGapMs": gaps.max() ?? 0,
+                        "newCalculations": store.stats.calculationCount - calculations,
+                        "samples": probe.samples])
+                    print("Stats navigation \(tile.rawValue) #\(repetition) \(direction): firstDisplay=\(Int(times.first ?? 0))ms, firstMovement=\(firstMotion?["elapsedMs"].map { String(Int($0)) } ?? "not observed")ms, end=\(Int(end))ms, maxGap=\(Int(gaps.max() ?? 0))ms")
+                }
+                try await Task.sleep(for: .milliseconds(100))
+            }
+        }
+        let output = ProcessInfo.processInfo.environment["ACTIVITYMAP_STATS_NAVIGATION_LATENCY_OUTPUT"] ?? "/tmp/activitymap-stats-navigation-latency.json"
+        try JSONSerialization.data(withJSONObject: ["activityCount": library.activities.count, "results": results,
+            "capture": "Production shell, preloaded Stats; time from Expand/Back action to first display-link observation of movement, including ancestor presentation transforms. Callback timestamps are an upper bound on visibility when the main thread is busy; no snapshots or forced layout. Simulator comparison, not a physical-device latency budget."],
+            options: [.prettyPrinted, .sortedKeys]).write(to: URL(fileURLWithPath: output))
     }
 }
