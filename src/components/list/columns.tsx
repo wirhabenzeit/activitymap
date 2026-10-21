@@ -165,13 +165,14 @@ function columnFromField<K extends ActivityValueType>(
     },
     header: function MetricHeader({ column }) {
       const display = useContext(SpeedDisplayContext);
+      // Icon-only like the other metrics; the label (speed vs pace) is the
+      // tooltip and accessible name rather than text that wraps the header.
+      const label = id === 'average_speed' ? speedLabel(display) : spec.title;
       return (
-        <DataTableColumnHeader
-          column={column}
-          title={id === 'average_speed' ? speedLabel(display) : undefined}
-        >
-          <div className="flex w-full justify-end">
-            {spec.Icon && <spec.Icon className="h-4 w-4" />}
+        <DataTableColumnHeader column={column}>
+          <div className="flex w-full justify-end" title={label}>
+            {spec.Icon && <spec.Icon className="h-4 w-4" aria-hidden="true" />}
+            <span className="sr-only">{label}</span>
           </div>
         </DataTableColumnHeader>
       );
