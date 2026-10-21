@@ -14,7 +14,7 @@ explicit disposable Postgres service.
 | `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
 | `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
 | `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all 30 selected unit/app-hosted suites and five real UI smoke methods on iOS 27                       |
-| `pnpm test:ios`                        | Build and run the full 36-suite native selection, including all 39 selected real UI methods, on iOS 27                            |
+| `pnpm test:ios`                        | Build and run the full 36-suite native selection, including all 53 selected real UI methods, on iOS 27                            |
 | `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
 | `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
 | `pnpm format:check src/path.ts`        | Check explicit files                                                                                                              |
@@ -100,7 +100,7 @@ This is a smoke boundary, not the complete UI matrix. The
 [Full iOS runtime workflow](../.github/workflows/ios-full.yml) is manually
 requested with **Actions → Full iOS runtime → Run workflow**, selecting the
 branch or tag to test. It explicitly uses `IOS_TEST_PROFILE=full`, runs the same
-30 unit/app-hosted suites and all six selected UI suites (36 suites and 39 UI
+30 unit/app-hosted suites and all six selected UI suites (36 suites and 53 UI
 methods in total on iOS 27), and has no automatic schedule. Run either profile
 locally with:
 

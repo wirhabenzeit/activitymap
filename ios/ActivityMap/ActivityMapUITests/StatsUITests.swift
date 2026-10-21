@@ -91,7 +91,10 @@ final class StatsUITests: XCTestCase {
         // Wide focus uses the full table; compact focus discloses its
         // secondary distance/climb values below the activity totals.
         let extraTotals = detail.buttons["Distance and climb"]
-        if extraTotals.exists { reveal(extraTotals, in: detail, app: app) }
+        if UIDevice.current.userInterfaceIdiom == .phone && scenario == "standard" {
+            reveal(extraTotals, in: detail, app: app)
+            XCTAssertTrue(extraTotals.isHittable, "Compact focus must disclose secondary distance/climb totals")
+        } else if extraTotals.exists { reveal(extraTotals, in: detail, app: app) }
         capture("Expanded Sport mix \(scenario)")
     }
 
@@ -151,6 +154,50 @@ final class StatsUITests: XCTestCase {
         XCTAssertTrue(finalActivity.isHittable, "Vertical scrolling must reach the final real activity")
         XCTAssertTrue(reopened.exists && reopened.isHittable, "Vertical scrolling must keep calendar detail open")
         capture("Calendar selected day after vertical scrolling")
+    }
+
+    func testCalendarMetricChangesRetainSelectionAndActivityInspection() throws {
+        continueAfterFailure = false
+        let app = launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let detail = openCalendar(app), history = calendarHistory(app)
+        reveal(history, in: detail, app: app)
+        let visible = visibleDays(history, app: app).sorted()
+        let day = try XCTUnwrap(visible.isEmpty ? nil : visible[visible.count / 2])
+        let selected = app.buttons["stats-calendar-day-\(day)"]
+        selected.tap()
+        let before = visibleDays(history, app: app)
+        for label in ["Distance", "Moving time", "Elevation", "Sport"] {
+            let choice = detail.buttons[label]
+            reveal(choice, in: detail, app: app)
+            choice.tap()
+            reveal(history, in: detail, app: app)
+            XCTAssertTrue(selected.isSelected, "Metric changes retain the inspected day")
+            XCTAssertEqual(visibleDays(history, app: app), before, "Metric changes must not reposition history")
+        }
+        let today = app.buttons["stats-calendar-day-\(fixtureToday())"]
+        reveal(history, in: detail, app: app)
+        for _ in 0..<4 where !visibleDays(history, app: app).contains(fixtureToday()) {
+            pan(history, app: app, toEarlier: false)
+        }
+        XCTAssertTrue(visibleDays(history, app: app).contains(fixtureToday()), "Today must be fully visible before querying its hit point")
+        XCTAssertTrue(today.isHittable)
+        today.tap()
+        let activity = detail.buttons["stats-calendar-activity-9001"]
+        reveal(activity, in: detail, app: app)
+        activity.tap()
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            let close = app.buttons["Close activity details"]
+            XCTAssertTrue(close.waitForExistence(timeout: 10), app.debugDescription)
+            close.tap()
+            XCTAssertTrue(close.waitForNonExistence(timeout: 10))
+        } else {
+            let back = app.buttons["stats-activity-back"]
+            XCTAssertTrue(back.waitForExistence(timeout: 10), app.debugDescription)
+            XCTAssertEqual(back.label, "Back to Activity calendar")
+            back.tap()
+        }
+        XCTAssertTrue(detail.isHittable)
     }
 
     func testCalendarRetainsIntentionalContentAndNativeEdgeBack() throws {
@@ -275,8 +322,10 @@ final class StatsUITests: XCTestCase {
         for _ in 0..<18 {
             if element.exists {
                 let frame = element.frame
-                if element.isHittable,
-                   viewport.contains(frame) || visibility.chrome.contains(where: { $0.contains(frame) }) { return }
+                // Offscreen lazy cells can throw when queried for hittability.
+                // Establish a real visible frame before asking for a hit point.
+                if !frame.isEmpty, (viewport.contains(frame) || visibility.chrome.contains(where: { $0.contains(frame) })),
+                   element.isHittable { return }
                 if !frame.isEmpty, frame.minY < viewport.minY { scroll.swipeDown(); continue }
             }
             scroll.swipeUp()

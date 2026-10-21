@@ -113,7 +113,8 @@ struct StatsDashboardTile: View {
         StatsTileSurface(title: tile.title, titleResource: tile.id.titleResource(locale: locale), period: period,
                          expand: StatsDashboard.expandable(tile.id) ? toggleExpansion : nil,
                          expanded: expanded, compactHeader: pilot, detailScreen: detailScreen,
-                         controlsInContent: tile.id == .activityCalendar && !expanded) {
+                         controlsInContent: tile.id == .activityCalendar && !expanded,
+                         expandIdentifier: "stats-expand-\(tile.id.rawValue)") {
             if !headlineControls || displayed == nil { controls }
         } content: {
             if let displayed {
