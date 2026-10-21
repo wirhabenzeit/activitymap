@@ -210,7 +210,7 @@ extension StatsUITests {
         for _ in 0..<18 {
             if element.exists {
                 let frame = element.frame
-                if element.isHittable && viewport.insetBy(dx: -1, dy: -1).contains(frame) { return }
+                if !frame.isEmpty && viewport.insetBy(dx: -1, dy: -1).contains(frame) && element.isHittable { return }
                 if !frame.isEmpty && frame.minY < viewport.minY { scroll.swipeDown(); continue }
             }
             scroll.swipeUp()

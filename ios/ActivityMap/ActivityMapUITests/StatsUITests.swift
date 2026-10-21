@@ -177,7 +177,10 @@ final class StatsUITests: XCTestCase {
         }
         let today = app.buttons["stats-calendar-day-\(fixtureToday())"]
         reveal(history, in: detail, app: app)
-        for _ in 0..<4 where !today.isHittable { pan(history, app: app, toEarlier: false) }
+        for _ in 0..<4 where !visibleDays(history, app: app).contains(fixtureToday()) {
+            pan(history, app: app, toEarlier: false)
+        }
+        XCTAssertTrue(visibleDays(history, app: app).contains(fixtureToday()), "Today must be fully visible before querying its hit point")
         XCTAssertTrue(today.isHittable)
         today.tap()
         let activity = detail.buttons["stats-calendar-activity-9001"]
@@ -319,8 +322,10 @@ final class StatsUITests: XCTestCase {
         for _ in 0..<18 {
             if element.exists {
                 let frame = element.frame
-                if element.isHittable,
-                   viewport.contains(frame) || visibility.chrome.contains(where: { $0.contains(frame) }) { return }
+                // Offscreen lazy cells can throw when queried for hittability.
+                // Establish a real visible frame before asking for a hit point.
+                if !frame.isEmpty, (viewport.contains(frame) || visibility.chrome.contains(where: { $0.contains(frame) })),
+                   element.isHittable { return }
                 if !frame.isEmpty, frame.minY < viewport.minY { scroll.swipeDown(); continue }
             }
             scroll.swipeUp()
