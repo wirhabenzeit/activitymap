@@ -217,6 +217,12 @@ extension StatsUITests {
                     else { delta = -min(viewport.height * 0.6, max(24, frame.maxY - viewport.maxY + 12)) }
                 }
             }
+            // Tall viewports need ordinary paging to reach distant sections
+            // with accessibility text. Keep precision dragging for short windows.
+            if viewport.height >= 480 {
+                if delta > 0 { scroll.swipeDown() } else { scroll.swipeUp() }
+                continue
+            }
             // A full fling can leap over a 44pt target in short landscape
             // viewports and oscillate forever. Drag only the measured gap and
             // hold at the endpoint so inertia cannot undo the reveal.
