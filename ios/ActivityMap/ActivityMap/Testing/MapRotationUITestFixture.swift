@@ -33,6 +33,8 @@ struct MapRotationUITestFixture: View {
     @State private var picker: RoutePicker
     @State private var profileSetupStarted = false
     @State private var profileSetupError: String?
+    @State private var editController: SyncController?
+    @State private var editSetupStarted = false
     private var includesProfiles: Bool {
         ProcessInfo.processInfo.arguments.contains("--activity-continuation-profile")
     }
@@ -94,6 +96,28 @@ struct MapRotationUITestFixture: View {
                     .frame(width: 74, height: 10).padding(4).allowsHitTesting(false)
             }
             .task {
+                if ProcessInfo.processInfo.arguments.contains("--activity-edit-filter-ui-testing") {
+                    guard !editSetupStarted else { return }
+                    editSetupStarted = true
+                    do {
+                        let source = try FilteredActivityEditUITestSource()
+                        let controller = SyncController(activities: store, source: { _ in source },
+                            summarySource: { _ in source }, storedSummarySource: { _ in source },
+                            editSource: { _ in source }, invalidate: { _ in })
+                        editController = controller
+                        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+                        controller.setSession(.init(user: .init(id: "filtered-edit", name: "Filtered edit fixture",
+                            email: nil, image: nil, athleteID: "42", stravaConnected: true, stravaPermissions: nil,
+                            authentication: .init(method: .bearer, sessionExpiresAt: .now.addingTimeInterval(86400))),
+                            token: "offline-ui-fixture", deployment: URL(string: "https://example.invalid")!, verified: true),
+                            storage: storage)
+                        await controller.refresh()
+                        store.searchText = "unnamed"
+                        store.replaceSelection(with: [3])
+                        picker.reconcile(with: store)
+                    } catch { profileSetupError = String(describing: error) }
+                    return
+                }
                 guard includesProfiles, !profileSetupStarted else { return }
                 profileSetupStarted = true
                 do {
@@ -102,6 +126,58 @@ struct MapRotationUITestFixture: View {
                     profileSetupError = String(describing: error)
                 }
             }
+    }
+}
+
+/// Exercise real edit persistence/filter reconciliation without any server or
+/// Strava writes. The same synthetic source owns bootstrap and saved revisions.
+private actor FilteredActivityEditUITestSource: SyncPageSource, ActivityEditSource, CompactSummarySource, StoredSummarySource {
+    private var activities: [ActivityMapAPI.Activity]
+
+    init() throws {
+        activities = try [1, 2, 3].map { id in
+            try Self.activity(id: String(id), name: id == 1 ? "Other ride" : "Unnamed ride \(id)", updated: "2026-10-01T12:00:00Z")
+        }
+    }
+
+    private nonisolated static func activity(id: String, name: String, updated: String) throws -> ActivityMapAPI.Activity {
+        let fields: [String: Any] = [
+            "id": id, "athlete": "42", "name": name, "sport_type": "Ride", "timezone": "UTC",
+            "start_date": "2026-10-01T09:00:00Z", "start_date_local": "2026-10-01T09:00:00Z",
+            "distance": 1000, "elapsed_time": 600, "moving_time": 600, "total_elevation_gain": 10,
+            "map_polyline": "_p~iF~ps|U_ulLnnqC_mqNvxq`@", "geometry_state": "detailed", "last_updated": updated,
+        ]
+        return try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.Activity.self,
+            from: JSONSerialization.data(withJSONObject: fields))
+    }
+
+    func bootstrap(resource: ActivityMapAPI.SyncResource, cursor: String?) throws -> ActivityMapAPI.SyncBootstrapPage {
+        let retention = ActivityMapAPI.SyncRetentionMeta(retentionDays: 30, cursorValidUntil: .now.addingTimeInterval(86400))
+        let freshness = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: .now)
+        if resource == .activities {
+            return .activities(.init(items: activities, nextCursor: nil, snapshotCursor: "filtered-edit", retention: retention, freshness: freshness))
+        }
+        return .photos(.init(items: [], nextCursor: nil, snapshotCursor: nil, retention: retention, freshness: freshness))
+    }
+
+    func changes(cursor: String) throws -> ActivityMapAPI.SyncChangesPage {
+        .init(items: [], nextCursor: cursor,
+            retention: .init(retentionDays: 30, cursorValidUntil: .now.addingTimeInterval(86400)),
+            freshness: .init(lastSummaryReconciledAt: .now))
+    }
+
+    func update(activityID: String, fields: ActivityMapAPI.UpdateActivityRequest) throws -> ActivityMapAPI.Activity {
+        let updated = try Self.activity(id: activityID, name: fields.name ?? "Unnamed ride \(activityID)", updated: "2026-10-21T12:00:00Z")
+        activities = activities.map { $0.id == activityID ? updated : $0 }
+        return updated
+    }
+
+    func summary(activityID: String, mode: StreamFetchMode) throws -> APIClient.Response<ActivityMapAPI.ActivityCompactStreamSummary> {
+        throw APIClient.RequestError.transport("Offline edit fixture")
+    }
+
+    func storedSummaryBatch(activityIDs: [String]) throws -> APIClient.Response<ActivityMapAPI.ActivityCompactStreamSummaries> {
+        throw APIClient.RequestError.transport("Offline edit fixture")
     }
 }
 

@@ -42,6 +42,7 @@ struct ListScreen: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             BrowseListFooter(store: store)
         }
+        .modifier(ActivityRowEditorPresenter(store: store))
     }
 
     private func activityList(width: CGFloat, inspectedID: Int?) -> some View {

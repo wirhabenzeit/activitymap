@@ -66,6 +66,7 @@ struct RoutePickerSheet: View {
         .accessibilityAction(.escape) {
             if detail != nil { picker.showResults() }
         }
+        .modifier(ActivityRowEditorPresenter(store: store))
     }
 
     @ViewBuilder private var results: some View {

@@ -94,6 +94,9 @@ struct MapScreen: View {
             }
 
         }
+        // Editors and search sheets own keyboard avoidance. Resizing the map
+        // behind them can change results detents or replace the iOS 26 host.
+        .ignoresSafeArea(.keyboard)
         .alert("Route selection", isPresented: Binding(
             get: { picker.errorMessage != nil },
             set: { if !$0 { picker.errorMessage = nil } }

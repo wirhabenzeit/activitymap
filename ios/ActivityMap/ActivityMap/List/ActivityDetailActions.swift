@@ -8,6 +8,7 @@ struct ActivityDetailActions: View {
     var editing: ActivityEditingService? = nil
     var summaries: StreamSummaryLoader? = nil
     @Environment(\.activityDetailOverMap) private var overMap
+    @Environment(\.editActivityRow) private var editActivity
     var exportStore: ActivityStore? = nil
     @State private var workflow = ActivityGPXExportController()
     @State private var stravaTask: Task<Void, Never>?
@@ -27,7 +28,12 @@ struct ActivityDetailActions: View {
         VStack(alignment: .leading, spacing: 8) {
             VStack(spacing: 0) {
                 if let editing {
-                    Button { isEditing = true } label: {
+                    Button {
+                        // A save can filter this detail out and pop its page.
+                        // Keep the editor on the browsing screen in that case.
+                        if let editActivity { editActivity(activity) }
+                        else { isEditing = true }
+                    } label: {
                         row(title: Text(AppMessages.activityEditTitle(locale: locale)), subtitle: Text(AppMessages.activityEditSubtitle(locale: locale)), icon: ActionPresentation.glyph(.edit),
                             trailing: "chevron.right", busy: false)
                     }
