@@ -43,10 +43,15 @@ export function ActivityMapAction({
       variant={compact ? 'ghost' : 'secondary'}
       disabled={!hasRoute}
       className={cn(
-        'min-h-11 shrink-0 gap-1.5',
-        labelled ? 'px-3' : 'size-11 p-0',
-        !compact &&
-          'bg-header-background/10 text-header-background hover:bg-header-background/15',
+        'shrink-0 gap-1.5',
+        // Compact rows follow the table density; the row itself stays the
+        // primary click target, so the button matches its row-action siblings.
+        compact
+          ? 'h-6 w-8 p-0 text-muted-foreground'
+          : [
+              'min-h-11 bg-header-background/10 text-header-background hover:bg-header-background/15',
+              labelled ? 'px-3' : 'size-11 p-0',
+            ],
       )}
       onClick={() => onShowOnMap(activity, variant)}
       aria-label={
