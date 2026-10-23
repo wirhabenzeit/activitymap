@@ -1,4 +1,4 @@
-import { Camera, Map } from 'lucide-react';
+import { Camera, Map, Mountain } from 'lucide-react';
 import { useState } from 'react';
 
 import { MapControlIconButton } from '~/components/map/map-control-icon-button';
@@ -47,6 +47,9 @@ export function LayerSwitcher() {
     setBaseMap,
     showPhotos,
     togglePhotos,
+    showVisitedPlaces,
+    toggleVisitedPlaces,
+    canShowPlaces,
   } = useShallowStore((state) => ({
     overlayMaps: state.overlayMaps,
     baseMap: state.baseMap,
@@ -54,6 +57,9 @@ export function LayerSwitcher() {
     setBaseMap: state.setBaseMap,
     showPhotos: state.showPhotos,
     togglePhotos: state.togglePhotos,
+    showVisitedPlaces: state.showVisitedPlaces,
+    toggleVisitedPlaces: state.toggleVisitedPlaces,
+    canShowPlaces: !state.isGuest && !!state.user?.stravaConnected,
   }));
 
   return (
@@ -64,6 +70,20 @@ export function LayerSwitcher() {
         </MapControlIconButton>
       </DropdownMenuTrigger>
       <PreferenceMenuContent className="w-56">
+        {process.env.NODE_ENV === 'development' && canShowPlaces && (
+          <>
+            <DropdownMenuLabel>Visited places</DropdownMenuLabel>
+            <PreferenceMenuCheckboxItem
+              checked={showVisitedPlaces}
+              onCheckedChange={toggleVisitedPlaces}
+              className="gap-2"
+            >
+              <Mountain className="h-4 w-4" aria-hidden="true" />
+              Show visited places
+            </PreferenceMenuCheckboxItem>
+            <DropdownMenuSeparator />
+          </>
+        )}
         <DropdownMenuLabel>Activity photos</DropdownMenuLabel>
         <PreferenceMenuCheckboxItem
           checked={showPhotos}

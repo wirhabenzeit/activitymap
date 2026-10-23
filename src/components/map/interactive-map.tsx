@@ -59,6 +59,7 @@ import {
 } from '~/lib/route-framing';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { cn, groupBy } from '~/lib/utils';
+import { VISITED_PLACES_HIT_LAYER } from '~/lib/visited-places';
 import { activityFields } from '~/settings/activity';
 import { categorySettings } from '~/settings/category';
 import {
@@ -71,6 +72,8 @@ import { store } from '~/store';
 import { useShallowStore } from '~/store';
 
 import { ElevationRouteMarker } from './elevation-route-marker';
+import { LivePlacesPanel } from './live-places-panel';
+import { VisitedPlacesLayer } from './visited-places-layer';
 
 const skyLayer: SkyLayer = {
   id: 'sky',
@@ -267,6 +270,7 @@ export default function InteractiveMap() {
     threeDim,
     toggleThreeDim,
     showPhotos,
+    showVisitedPlaces,
     compactList,
     uploadedGeoJson,
     isGuest,
@@ -288,6 +292,7 @@ export default function InteractiveMap() {
     hydrateMapState: state.hydrateMapState,
     threeDim: state.threeDim,
     showPhotos: state.showPhotos,
+    showVisitedPlaces: state.showVisitedPlaces,
     toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
     uploadedGeoJson: state.uploadedGeoJson,
@@ -557,6 +562,12 @@ export default function InteractiveMap() {
   // Collect all interactive layer IDs from active overlays
   const activeInteractiveLayerIds = useMemo(() => {
     const ids: string[] = ['routeLayerBG', 'routeLayerBGsel']; // Default interactive layers
+    if (
+      process.env.NODE_ENV === 'development' &&
+      summaryUserId &&
+      showVisitedPlaces
+    )
+      ids.push(VISITED_PLACES_HIT_LAYER);
 
     overlays.forEach((mapName) => {
       const mapSetting = getOverlayMapSetting(mapName);
@@ -570,7 +581,7 @@ export default function InteractiveMap() {
     });
 
     return ids;
-  }, [overlays]);
+  }, [overlays, summaryUserId, showVisitedPlaces]);
 
   const overlayMapComponents = useMemo(
     () => (
@@ -884,6 +895,14 @@ export default function InteractiveMap() {
           visibleIDs={visibleIDSet}
         />
         {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}
+        {process.env.NODE_ENV === 'development' &&
+          !isGuest &&
+          showVisitedPlaces && (
+            <VisitedPlacesLayer
+              visibleIDs={visibleIDs}
+              highlighted={highlighted}
+            />
+          )}
       </ReactMapGL>
       {selected.length > 0 && (
         <div
@@ -928,6 +947,9 @@ export default function InteractiveMap() {
               }
             />
           }
+          {process.env.NODE_ENV === 'development' && !isGuest && (
+            <LivePlacesPanel />
+          )}
           {selected.length > 0 && (
             <DataTable
               key={pickCount}

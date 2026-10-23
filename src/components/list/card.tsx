@@ -61,6 +61,7 @@ import { ElevationChart } from './elevation-chart';
 import { PhotoLightbox } from './photo';
 import { RouteDetailsContent } from './route-details-content';
 import { type Features } from './table-extensions';
+import { VisitedPlaces } from './visited-places';
 
 interface ActivityCardContentProps {
   activity: Activity;
@@ -402,6 +403,9 @@ export function ActivityCardContent({
           elevation={elevationProfile}
           description={activity.description}
         >
+          {process.env.NODE_ENV === 'development' &&
+            !isGuest &&
+            stravaConnected && <VisitedPlaces activityId={activityId} />}
           <ActivityDetailStats
             activity={activity}
             photos={

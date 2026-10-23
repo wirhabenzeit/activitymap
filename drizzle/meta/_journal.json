@@ -162,6 +162,20 @@
       "when": 1792249637711,
       "tag": "0022_manual-strava-import",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792691887351,
+      "tag": "0023_activity-places",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792705202759,
+      "tag": "0024_places-proximity-visits",
+      "breakpoints": true
     }
   ]
 }

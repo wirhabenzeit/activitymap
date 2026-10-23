@@ -16,8 +16,10 @@ import { Toaster } from '~/components/ui/toaster';
 import { BrowsingProvider } from '~/hooks/use-browsing-library';
 import { auth } from '~/lib/auth';
 import { QueryProvider } from '~/providers/query-provider';
+import { localPlacesEnabled } from '~/server/config/local-places';
 import { toCurrentUserDTO } from '~/server/db/dto';
 import { getAccountInternal, getUserInternal } from '~/server/db/internal';
+import { createAccountsRepository } from '~/server/repositories/accounts';
 import type { InitialAuth } from '~/store/auth';
 
 /**
@@ -47,7 +49,18 @@ export default async function AppShellLayout({
   // issue #116.
   if (session?.user?.id) {
     const user = await getUserInternal(session.user.id);
-    const account = user ? await getAccountInternal({ userId: user.id }) : null;
+    // The local places experiment renders stored data without refreshing Strava.
+    // Keep the deployed credential lifecycle unchanged.
+    const storedAccount = localPlacesEnabled()
+      ? await createAccountsRepository().findStravaAccount({
+          userId: user.id,
+          accountId: String(user.athlete_id),
+        })
+      : await getAccountInternal({ userId: user.id });
+    const account =
+      storedAccount?.revokedAt || storedAccount?.scheduledErasureAt
+        ? null
+        : storedAccount;
     initialAuth.currentUser = user ? toCurrentUserDTO(user, account) : null;
   }
 

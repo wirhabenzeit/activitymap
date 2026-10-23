@@ -1,12 +1,14 @@
+import { type LngLatBounds, type ViewState } from 'react-map-gl/mapbox';
 import { type StateCreator } from 'zustand';
-import { type RootState } from './index';
-import { type ViewState, type LngLatBounds } from 'react-map-gl/mapbox';
+
 import {
   baseMaps,
-  overlayMaps,
-  defaultMapPosition,
   defaultMapBounds,
+  defaultMapPosition,
+  overlayMaps,
 } from '~/settings/map';
+
+import { type RootState } from './index';
 
 export type MapState = {
   baseMap: keyof typeof baseMaps;
@@ -15,12 +17,14 @@ export type MapState = {
   bbox: LngLatBounds;
   threeDim: boolean;
   showPhotos: boolean;
+  showVisitedPlaces: boolean;
   uploadedGeoJson: GeoJSON.FeatureCollection | null;
   routeFitRequest: { id: string; activityIDs: number[] } | null;
 };
 
 export type MapActions = {
   togglePhotos: () => void;
+  toggleVisitedPlaces: () => void;
   setBaseMap: (key: keyof typeof baseMaps) => void;
   toggleOverlayMap: (key: keyof typeof overlayMaps) => void;
   toggleThreeDim: () => void;
@@ -56,10 +60,15 @@ export const createMapSlice: StateCreator<
   bbox: defaultMapBounds,
   threeDim: false,
   showPhotos: false,
+  showVisitedPlaces: true,
   uploadedGeoJson: null,
   routeFitRequest: null,
 
   // Actions
+  toggleVisitedPlaces: () =>
+    set((state) => {
+      state.showVisitedPlaces = !state.showVisitedPlaces;
+    }),
   requestRouteFit: (activityIDs) =>
     set((state) => {
       state.routeFitRequest = {
