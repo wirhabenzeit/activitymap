@@ -1,23 +1,20 @@
 import type { SVGProps } from 'react';
 
-import { PLACE_SYMBOL_PATHS, type PlaceKind } from '~/lib/place-symbols';
+import { PLACE_SYMBOLS, type PlaceKind } from '~/lib/place-symbols';
 
 export function PlaceSymbol({
   kind,
   ...props
 }: SVGProps<SVGSVGElement> & { kind: PlaceKind }) {
+  const glyph = PLACE_SYMBOLS[kind];
   return (
     <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={1.8}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      viewBox={'0 0 ' + glyph.width + ' ' + glyph.height}
+      fill="currentColor"
       aria-hidden="true"
       {...props}
     >
-      <path d={PLACE_SYMBOL_PATHS[kind]} />
+      <path d={glyph.path} />
     </svg>
   );
 }

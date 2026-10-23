@@ -4,6 +4,8 @@ Selecting activities on the web map automatically matches their stored GPS again
 the active Switzerland/Austria/Italy catalogue. Opening a route detail also asks
 for its matches. Matched peaks, passes and huts appear on the map; route details
 show interactive peak, pass and hut symbols directly on the elevation profile.
+The filled symbols use Font Awesome 6 Solid: mountain for peaks, road for passes,
+and house-chimney for huts. Place labels continue to identify passes as passes.
 There is no duplicate place list. Hover, keyboard focus or a tap reveals the name.
 Repeated encounters
 retain separate distances. A place shared by selected routes has one map marker.
