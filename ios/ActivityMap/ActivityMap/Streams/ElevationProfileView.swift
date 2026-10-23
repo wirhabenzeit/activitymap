@@ -19,11 +19,20 @@ struct ElevationProfileView: View {
         let cached: CachedStreamSummary
         let profile: ElevationProfile?
     }
+    private struct PlaceDemand: Equatable {
+        let activityID: Int
+        let relevant: Bool
+        let session: Int?
+    }
     private struct Demand: Equatable {
         let activityID: Int
         let relevant: Bool
         let sessionRevision: Int?
         let retry: Int
+    }
+    private var places: [ProfilePlace] {
+        guard let profile, let cached else { return [] }
+        return ProfilePlace.project(store.activityPlaces?.result(String(activityID)), onto: profile, metadata: cached.metadata)
     }
     private var loader: StreamSummaryLoader? { store.streamSummaries }
     private var cached: CachedStreamSummary? { loader?.currentSummary(for: String(activityID)) }
@@ -54,7 +63,7 @@ struct ElevationProfileView: View {
         VStack(alignment: .leading, spacing: 8) {
             Group {
                 if let profile {
-                    ElevationPlot(profile: profile, compact: compact, selectedX: $selectedDistance) { point in
+                    ElevationPlot(profile: profile, compact: compact, selectedX: $selectedDistance, places: places, placesLoader: store.activityPlaces, activityID: String(activityID), onMap: store.selectedTab == .map) { point in
                         guard let point else { clearCursor(); return }
                         guard isRelevant, let cached else { return }
                         let next = ElevationCursor(owner: owner, activityID: activityID, cached: cached, point: point)
@@ -82,6 +91,10 @@ struct ElevationProfileView: View {
             }
         }
         .accessibilityIdentifier("elevation-profile")
+        .task(id: PlaceDemand(activityID: activityID, relevant: isRelevant, session: store.activityPlaces?.sessionRevision)) {
+            store.activityPlaces?.demand(isRelevant ? [String(activityID)] : [], owner: owner, priority: String(activityID))
+        }
+        .onDisappear { store.activityPlaces?.release(owner) }
         .task(id: Demand(activityID: activityID, relevant: isRelevant,
                          sessionRevision: loader?.sessionRevision, retry: retry)) {
             guard isRelevant, let loader else { clearCursor(); return }
@@ -211,6 +224,12 @@ struct ElevationPlot: View {
     let profile: ElevationProfile
     var compact = false
     @Binding var selectedX: Double?
+    var places: [ProfilePlace] = []
+    var placesLoader: ActivityPlacesLoader?
+    var activityID = ""
+    var onMap = false
+    @State private var presentedPlace: ProfilePlace?
+
     var onSelection: (ElevationProfile.Point?) -> Void = { _ in }
     var onDrag: (Bool) -> Void = { _ in }
     @State private var accessibleSampleID: Int?
@@ -253,7 +272,7 @@ struct ElevationPlot: View {
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)
             .frame(minHeight: 24)
-            ElevationChart(profile: profile, units: units, marker: marker) { gestureSelection.wrappedValue = $0 }
+            ElevationChart(profile: profile, units: units, marker: marker, places: places, focusedPlaceID: placesLoader?.focus?.placeID, choosePlace: choose) { gestureSelection.wrappedValue = $0 }
                 .equatable()
             .frame(height: compact ? reservedHeight * 0.75 - 32 : chartHeight)
             .accessibilityElement(children: .ignore)
@@ -269,6 +288,14 @@ struct ElevationPlot: View {
                 }
             }
             .accessibilityAction(named: "Clear selected sample") { select(nil) }
+            .accessibilityActions {
+                ForEach(places) { entry in
+                    Button("\(entry.place.name), \(profile.distanceLabel(entry.distance, units: units))") { choose(entry) }
+                }
+            }
+        }
+        .popover(item: $presentedPlace) { entry in
+            MatchedPlaceCard(place: entry.place).presentationCompactAdaptation(.popover)
         }
         .frame(minHeight: compact ? reservedHeight * 0.75 : reservedHeight, alignment: .top)
         .onChange(of: units) { _, _ in select(nil) }
@@ -278,7 +305,13 @@ struct ElevationPlot: View {
             if marker.point != point { marker.point = point }
         }
         .onChange(of: hasGestureSelection) { _, selecting in onDrag(selecting) }
-        .onDisappear { select(nil); onSelection(nil); onDrag(false) }
+        .onChange(of: places) { _, _ in presentedPlace = nil }
+        .onDisappear { presentedPlace = nil; select(nil); onSelection(nil); onDrag(false) }
+    }
+    private func choose(_ entry: ProfilePlace) {
+        select(nil)
+        if onMap { placesLoader?.focus = PlaceFocus(activityID: activityID, placeID: entry.place.id, revealOnMap: true) }
+        else { presentedPlace = entry }
     }
     private func select(_ point: ElevationProfile.Point?) {
         accessibleSampleID = point?.id
@@ -298,11 +331,14 @@ private struct ElevationChart: View, Equatable {
     let profile: ElevationProfile
     let units: UnitSystem
     let marker: ElevationMarker
+    var places: [ProfilePlace] = []
+    var focusedPlaceID: String?
+    var choosePlace: (ProfilePlace) -> Void = { _ in }
     /// Chart x value under the finger, or nil once it lifts.
     let select: (Double?) -> Void
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.profile == rhs.profile && lhs.units == rhs.units && lhs.marker === rhs.marker
+        lhs.profile == rhs.profile && lhs.units == rhs.units && lhs.marker === rhs.marker && lhs.places == rhs.places && lhs.focusedPlaceID == rhs.focusedPlaceID
     }
 
     var body: some View {
@@ -332,6 +368,16 @@ private struct ElevationChart: View, Equatable {
                         let x = min(max(0, location.x - plot.minX), plot.width)
                         select(proxy.value(atX: x, as: Double.self))
                     })
+                ForEach(places) { entry in
+                    if let x = proxy.position(forX: entry.distance / profile.distanceDivisor(units: units)),
+                       let y = proxy.position(forY: entry.altitude / units.elevationScale) {
+                        Button { choosePlace(entry) } label: {
+                            MatchedPlaceSymbol(place: entry.place, active: focusedPlaceID == entry.place.id).frame(width: 44, height: 44).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .position(x: plot.minX + x, y: plot.minY + y)
+                    }
+                }
             }
         }
     }

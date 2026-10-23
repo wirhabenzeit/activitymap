@@ -1,8 +1,6 @@
 #!/usr/bin/env -S tsx
-import { createShareLinkRequestSchema, createdShareLinkDTOSchema, shareLinkSummaryDTOSchema, shareLinkListDTOSchema, revokeShareLinkRequestSchema, revokeShareLinkResultSchema } from '../src/contracts/v1/share-links';
-
 /**
- * Generates the Swift wire types the iOS client decodes, from the same Zod
+ * Generates the Swift wire types the iOS client decodes, from the same shared Zod
  * schemas the Route Handlers validate against.
  *
  * The chain is Zod -> JSON Schema -> Swift, using the identical
@@ -27,23 +25,20 @@ import { createShareLinkRequestSchema, createdShareLinkDTOSchema, shareLinkSumma
  *  - Discriminated unions become a Swift enum, and the discriminator itself is
  *    omitted from each variant struct because the case already encodes it.
  */
-
 import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { z } from 'zod';
-import { deleteAccountRequestSchema, deleteAccountResultSchema } from '../src/contracts/v1/account-deletion';
 
-import { compactStreamSummarySchema } from '../src/lib/streams/compact-summary';
-import { streamSummarySchema } from '../src/server/strava/stream-summary';
-import { authenticationDTOSchema } from '../src/contracts/v1/auth';
-import { streamTypeSchema, streamFreshnessSchema, streamFetchStatusSchema, streamFailureCodeSchema,
-  activityCompactStreamSummaryDTOSchema, activityCompactStreamSummariesDTOSchema,
-  activityStreamSummaryDTOSchema, activityStreamSummariesDTOSchema,
-  streamMetadataSchema, timeStreamSchema, distanceStreamSchema, latlngStreamSchema, altitudeStreamSchema,
-  wattsStreamSchema, heartrateStreamSchema, rawStreamsDTOSchema, activityStreamsDTOSchema,
-} from '../src/contracts/v1/activity-streams';
+import {
+  activityPlacesResponseSchema,
+  matchedPlaceSchema,
+} from '../src/contracts/activity-places';
+import {
+  deleteAccountRequestSchema,
+  deleteAccountResultSchema,
+} from '../src/contracts/v1/account-deletion';
 import {
   activityDTOSchema,
   geometryStateSchema,
@@ -53,16 +48,26 @@ import {
   activityRefreshResultSchema,
   updateActivityRequestSchema,
 } from '../src/contracts/v1/activity-mutations';
-import { photoDTOSchema } from '../src/contracts/v1/photo';
-import { currentUserDTOSchema } from '../src/contracts/v1/user';
 import {
-  syncBootstrapPageDTOSchema,
-  syncChangeItemDTOSchema,
-  syncChangesPageDTOSchema,
-  syncFreshnessMetaSchema,
-  syncResourceSchema,
-  syncRetentionMetaSchema,
-} from '../src/contracts/v1/sync';
+  activityCompactStreamSummariesDTOSchema,
+  activityCompactStreamSummaryDTOSchema,
+  activityStreamSummariesDTOSchema,
+  activityStreamSummaryDTOSchema,
+  activityStreamsDTOSchema,
+  altitudeStreamSchema,
+  distanceStreamSchema,
+  heartrateStreamSchema,
+  latlngStreamSchema,
+  rawStreamsDTOSchema,
+  streamFailureCodeSchema,
+  streamFetchStatusSchema,
+  streamFreshnessSchema,
+  streamMetadataSchema,
+  streamTypeSchema,
+  timeStreamSchema,
+  wattsStreamSchema,
+} from '../src/contracts/v1/activity-streams';
+import { authenticationDTOSchema } from '../src/contracts/v1/auth';
 import { errorEnvelopeSchema } from '../src/contracts/v1/error';
 import {
   historyFreshnessSchema,
@@ -84,8 +89,32 @@ import {
   mobileSessionListDTOSchema,
   revokeSessionRequestSchema,
 } from '../src/contracts/v1/mobile-auth';
+import { photoDTOSchema } from '../src/contracts/v1/photo';
 import { SCHEMA_VERSION } from '../src/contracts/v1/primitives';
-import { stravaImportDTOSchema, stravaImportStatusSchema, stravaImportReasonSchema } from '../src/contracts/v1/strava-import';
+import {
+  createShareLinkRequestSchema,
+  createdShareLinkDTOSchema,
+  revokeShareLinkRequestSchema,
+  revokeShareLinkResultSchema,
+  shareLinkListDTOSchema,
+  shareLinkSummaryDTOSchema,
+} from '../src/contracts/v1/share-links';
+import {
+  stravaImportDTOSchema,
+  stravaImportReasonSchema,
+  stravaImportStatusSchema,
+} from '../src/contracts/v1/strava-import';
+import {
+  syncBootstrapPageDTOSchema,
+  syncChangeItemDTOSchema,
+  syncChangesPageDTOSchema,
+  syncFreshnessMetaSchema,
+  syncResourceSchema,
+  syncRetentionMetaSchema,
+} from '../src/contracts/v1/sync';
+import { currentUserDTOSchema } from '../src/contracts/v1/user';
+import { compactStreamSummarySchema } from '../src/lib/streams/compact-summary';
+import { streamSummarySchema } from '../src/server/strava/stream-summary';
 import { sportTypes } from '../src/server/strava/types';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
@@ -103,6 +132,8 @@ const INDENT = '    ';
  * order in the output file.
  */
 const registeredSchemas: [string, z.ZodType][] = [
+  ['MatchedPlace', matchedPlaceSchema],
+  ['ActivityPlaces', activityPlacesResponseSchema],
   ['CreateShareLinkRequest', createShareLinkRequestSchema],
   ['CreatedShareLink', createdShareLinkDTOSchema],
   ['ShareLinkSummary', shareLinkSummaryDTOSchema],
@@ -114,10 +145,14 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['StreamFetchStatus', streamFetchStatusSchema],
   ['StreamFailureCode', streamFailureCodeSchema],
   ['StreamMetadata', streamMetadataSchema],
-  ['TimeStream', timeStreamSchema], ['DistanceStream', distanceStreamSchema],
-  ['LatlngStream', latlngStreamSchema], ['AltitudeStream', altitudeStreamSchema],
-  ['WattsStream', wattsStreamSchema], ['HeartrateStream', heartrateStreamSchema],
-  ['RawStreams', rawStreamsDTOSchema], ['ActivityStreams', activityStreamsDTOSchema],
+  ['TimeStream', timeStreamSchema],
+  ['DistanceStream', distanceStreamSchema],
+  ['LatlngStream', latlngStreamSchema],
+  ['AltitudeStream', altitudeStreamSchema],
+  ['WattsStream', wattsStreamSchema],
+  ['HeartrateStream', heartrateStreamSchema],
+  ['RawStreams', rawStreamsDTOSchema],
+  ['ActivityStreams', activityStreamsDTOSchema],
   ['StreamSummary', streamSummarySchema],
   ['ActivityStreamSummary', activityStreamSummaryDTOSchema],
   ['ActivityStreamSummaries', activityStreamSummariesDTOSchema],
@@ -172,6 +207,17 @@ const enumKey = (values: readonly string[]): string =>
   JSON.stringify([...values].sort());
 
 const inlineEnumNames = new Map<string, string>([
+  [enumKey(['peak', 'pass', 'hut']), 'PlaceKind'],
+  [
+    enumKey([
+      'complete',
+      'missing_streams',
+      'uncovered',
+      'partial',
+      'unavailable',
+    ]),
+    'ActivityPlacesStatus',
+  ],
   [enumKey(['active', 'expired', 'revoked']), 'ShareLinkStatus'],
   [enumKey(['activity', 'photo']), 'EntityType'],
   [enumKey(['upsert', 'delete']), 'ChangeOperation'],
@@ -190,6 +236,7 @@ const inlineEnumNames = new Map<string, string>([
  * the name is derived mechanically, which is correct but often clumsy.
  */
 const nestedObjectNames = new Map<string, string>([
+  ['MatchedPlace.visits[]', 'PlaceVisit'],
   ['ErrorEnvelope.error', 'ErrorBody'],
   ['IngestionHistory.reconciliation', 'IngestionReconciliation'],
   ['CurrentUser.stravaPermissions', 'StravaPermissions'],
@@ -210,17 +257,85 @@ const capitalize = (value: string): string =>
  * are backtick-escaped rather than assumed safe.
  */
 const swiftKeywords = new Set([
-  'Any', 'Protocol', 'Self', 'Type', 'as', 'associatedtype', 'associativity',
-  'break', 'case', 'catch', 'class', 'continue', 'convenience', 'default',
-  'defer', 'deinit', 'didSet', 'do', 'dynamic', 'else', 'enum', 'extension',
-  'fallthrough', 'false', 'fileprivate', 'final', 'for', 'func', 'get', 'guard',
-  'if', 'import', 'in', 'indirect', 'infix', 'init', 'inout', 'internal', 'is',
-  'lazy', 'left', 'let', 'mutating', 'nil', 'none', 'nonmutating', 'open',
-  'operator', 'optional', 'override', 'postfix', 'precedence', 'prefix',
-  'private', 'protocol', 'public', 'repeat', 'required', 'rethrows', 'return',
-  'right', 'self', 'set', 'static', 'struct', 'subscript', 'super', 'switch',
-  'throw', 'throws', 'true', 'try', 'typealias', 'unowned', 'var', 'weak',
-  'where', 'while', 'willSet',
+  'Any',
+  'Protocol',
+  'Self',
+  'Type',
+  'as',
+  'associatedtype',
+  'associativity',
+  'break',
+  'case',
+  'catch',
+  'class',
+  'continue',
+  'convenience',
+  'default',
+  'defer',
+  'deinit',
+  'didSet',
+  'do',
+  'dynamic',
+  'else',
+  'enum',
+  'extension',
+  'fallthrough',
+  'false',
+  'fileprivate',
+  'final',
+  'for',
+  'func',
+  'get',
+  'guard',
+  'if',
+  'import',
+  'in',
+  'indirect',
+  'infix',
+  'init',
+  'inout',
+  'internal',
+  'is',
+  'lazy',
+  'left',
+  'let',
+  'mutating',
+  'nil',
+  'none',
+  'nonmutating',
+  'open',
+  'operator',
+  'optional',
+  'override',
+  'postfix',
+  'precedence',
+  'prefix',
+  'private',
+  'protocol',
+  'public',
+  'repeat',
+  'required',
+  'rethrows',
+  'return',
+  'right',
+  'self',
+  'set',
+  'static',
+  'struct',
+  'subscript',
+  'super',
+  'switch',
+  'throw',
+  'throws',
+  'true',
+  'try',
+  'typealias',
+  'unowned',
+  'var',
+  'weak',
+  'where',
+  'while',
+  'willSet',
 ]);
 
 const escapeSwiftIdentifier = (name: string): string =>
@@ -285,7 +400,8 @@ function registerNestedObject(schema: JSONSchema, path: string): string {
   const override = nestedObjectNames.get(path);
   const [owner, property] = path.split('.');
   const name =
-    override ?? `${owner ?? ''}${capitalize(swiftPropertyName(property ?? ''))}`;
+    override ??
+    `${owner ?? ''}${capitalize(swiftPropertyName(property ?? ''))}`;
 
   const existing = pendingNestedObjects.find((entry) => entry.name === name);
   if (!existing) {
@@ -509,10 +625,7 @@ function emitUnion(typeName: string, variants: JSONSchema[]): string {
   let discriminatorKey: string | undefined;
 
   for (const variant of variants) {
-    const properties = (variant.properties ?? {}) as Record<
-      string,
-      JSONSchema
-    >;
+    const properties = (variant.properties ?? {}) as Record<string, JSONSchema>;
     const constEntries = Object.entries(properties).filter(
       ([, property]) => typeof property.const === 'string',
     );
@@ -526,7 +639,10 @@ function emitUnion(typeName: string, variants: JSONSchema[]): string {
       throw new Error(`Union ${typeName} variants disagree on discriminator.`);
     }
     discriminatorKey = key;
-    discriminators.set(property.const as string, `${typeName}${capitalize(swiftCaseName(property.const as string))}`);
+    discriminators.set(
+      property.const as string,
+      `${typeName}${capitalize(swiftCaseName(property.const as string))}`,
+    );
   }
 
   if (!discriminatorKey) {
@@ -551,11 +667,17 @@ function emitUnion(typeName: string, variants: JSONSchema[]): string {
   const lines: string[] = [];
   lines.push(`${INDENT}enum ${typeName}: Decodable, Hashable, Sendable {`);
   for (const [value, variantName] of discriminators) {
-    lines.push(`${INDENT}${INDENT}case ${swiftCaseName(value)}(${variantName})`);
+    lines.push(
+      `${INDENT}${INDENT}case ${swiftCaseName(value)}(${variantName})`,
+    );
   }
   lines.push('');
-  lines.push(`${INDENT}${INDENT}private enum DiscriminatorKeys: String, CodingKey {`);
-  lines.push(`${INDENT.repeat(3)}case ${swiftPropertyName(discriminatorKey)} = "${discriminatorKey}"`);
+  lines.push(
+    `${INDENT}${INDENT}private enum DiscriminatorKeys: String, CodingKey {`,
+  );
+  lines.push(
+    `${INDENT.repeat(3)}case ${swiftPropertyName(discriminatorKey)} = "${discriminatorKey}"`,
+  );
   lines.push(`${INDENT}${INDENT}}`);
   lines.push('');
   lines.push(`${INDENT}${INDENT}init(from decoder: any Decoder) throws {`);
@@ -590,9 +712,7 @@ function emitUnion(typeName: string, variants: JSONSchema[]): string {
 }
 
 function docComment(text: string, indent: string): string[] {
-  return text
-    .split('\n')
-    .map((line) => `${indent}/// ${line}`.trimEnd());
+  return text.split('\n').map((line) => `${indent}/// ${line}`.trimEnd());
 }
 
 /**
@@ -665,7 +785,7 @@ const enumSections = [...discoveredEnums.entries()]
 
 const generatedSwift = `// Generated by pnpm api-dtos:generate. Do not edit by hand.
 //
-// Swift mirrors of the v1 wire contract in src/contracts/v1, produced from the
+// Swift mirrors of the shared wire contracts in src/contracts, produced from the
 // same Zod schemas the Route Handlers validate against. Companion hand-written
 // types (the response envelope, paged lists, JSONValue, and the decoder) live
 // in APISupport.swift.
@@ -695,7 +815,9 @@ ${enumSections.join('\n\n')}
 `;
 
 if (process.argv.includes('--check')) {
-  const committedSwift = await readFile(swiftOutputPath, 'utf8').catch(() => '');
+  const committedSwift = await readFile(swiftOutputPath, 'utf8').catch(
+    () => '',
+  );
   if (committedSwift !== generatedSwift) {
     throw new Error(
       'Generated Swift API DTOs are stale. Run pnpm api-dtos:generate.',

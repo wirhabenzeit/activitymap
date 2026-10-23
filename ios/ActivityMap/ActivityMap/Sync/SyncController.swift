@@ -36,6 +36,7 @@ final class SyncController {
     }
 
     let summaries: StreamSummaryLoader
+    let places: ActivityPlacesLoader
     let summarySync: StreamSummarySync
     let editing = ActivityEditingService()
     let sharing = ActivitySharingService()
@@ -108,6 +109,8 @@ final class SyncController {
         invalidate: @escaping (String) -> Void
     ) {
         self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
+        self.places = ActivityPlacesLoader(invalidate: invalidate)
+        activities.activityPlaces = self.places
         self.summarySync = StreamSummarySync(now: now, source: storedSummarySource, invalidate: invalidate)
         activities.streamSummaries = self.summaries
         self.activities = activities
@@ -159,6 +162,7 @@ final class SyncController {
                 guard current == generation, !Task.isCancelled else { return }
                 needsCleanup = false
                 await summaries.configure(active, storage: storage)
+                await places.configure(active, storage: storage)
                 guard current == generation, !Task.isCancelled else { return }
                 if let active {
                     await perform(active, storage: storage, generation: current)
@@ -307,6 +311,7 @@ final class SyncController {
                 retryAt = nil
                 status = .ready
                 summarySync.start(storage: storage)
+                places.revalidateDemanded()
             }
         } catch {
             guard current == generation, !Task.isCancelled else { return }
@@ -432,6 +437,7 @@ final class SyncController {
         publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
         photoCacheConfigured = false
         summaries.reset()
+        places.reset()
         activities.clearScope()
         photos = []
         checkpoint = nil

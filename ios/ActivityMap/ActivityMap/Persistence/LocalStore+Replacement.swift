@@ -32,6 +32,7 @@ extension LocalStore {
                 return dto
             }
             try reconcileSummaryReplacement(currentActivities, scopeKey: key, context: context)
+            try reconcilePlacesReplacement(currentActivities, scopeKey: key, context: context)
             let photosByID = Dictionary(uniqueKeysWithValues: existingPhotos.map { ($0.photoID, $0) })
             for row in existingActivities where !activityIDs.contains(row.activityID) { context.delete(row) }
             for row in existingPhotos where !photoIDs.contains(row.photoID) { context.delete(row) }

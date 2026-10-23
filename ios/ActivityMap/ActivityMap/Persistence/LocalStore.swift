@@ -35,7 +35,7 @@ actor LocalStore {
     nonisolated static func makeContainer(
         inMemory: Bool = false, url: URL? = nil
     ) throws -> ModelContainer {
-        let schema = Schema([StoredActivity.self, StoredPhoto.self, SyncState.self, StoredStreamSummary.self])
+        let schema = Schema([StoredActivity.self, StoredPhoto.self, SyncState.self, StoredStreamSummary.self, StoredActivityPlaces.self, StoredPlacesContext.self])
         let configuration: ModelConfiguration
         if let url {
             configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
@@ -103,6 +103,8 @@ actor LocalStore {
                     }
                 case .deleteActivity(let id):
                     invalidatedIDs.insert(id)
+                    for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>(
+                        predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) { context.delete(row) }
                     for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
                         predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) {
                         context.delete(row)
@@ -154,6 +156,8 @@ actor LocalStore {
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.scope == key })) { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredPlacesContext>(predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             try save(context)
             streamFences.invalidate(key)
             notifySummaryChange(scope: key)
@@ -173,6 +177,8 @@ actor LocalStore {
             for row in try context.fetch(FetchDescriptor<StoredPhoto>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<SyncState>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<StoredStreamSummary>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredPlacesContext>()) where row.scope != keep { context.delete(row) }
             try save(context)
             streamFences.invalidateAll()
             notifySummaryChange(scope: nil)

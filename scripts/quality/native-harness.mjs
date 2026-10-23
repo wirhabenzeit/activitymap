@@ -56,6 +56,7 @@ export const nativeSuites = [
   'ActivityMapTests/IngestionStatusTests',
   'ActivityMapTests/StravaImportTests',
   'ActivityMapTests/StreamsAPITests',
+  'ActivityMapTests/ActivityPlacesTests',
   'ActivityMapTests/StreamSummaryLoaderTests',
   'ActivityMapTests/StreamSummarySyncTests',
   'ActivityMapTests/SpeedDisplayTests',
@@ -69,6 +70,7 @@ export const nativeSuites = [
   'ActivityMapTests/MapResultsTests',
   'ActivityMapTests/ActivityContinuationTests',
   'ActivityMapTests/PhotoGalleryTests',
+  'ActivityMapUITests/ActivityPlacesUITests',
   'ActivityMapUITests/ActivityActionUITests',
   'ActivityMapUITests/StatsUITests',
   'ActivityMapUITests/MapPhotoUITests',
@@ -78,6 +80,7 @@ export const nativeSuites = [
 ];
 
 export const nativePRUISelectors = [
+  'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
   'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
   'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
   'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',

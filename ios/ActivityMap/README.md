@@ -320,7 +320,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-Required iOS CI builds the app and runs the selected unit/app-hosted suites plus five real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
+Required iOS CI builds the app and runs the selected unit/app-hosted suites plus six real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
 
@@ -486,8 +486,8 @@ IOS_TEST_PROFILE=pr pnpm test:ios
 IOS_TEST_PROFILE=full pnpm test:ios
 ```
 
-The local default is `full`. On iOS 27, `pr` builds the real app and runs all 30
-selected unit/app-hosted suites plus five real UI smoke methods: native GPX
+The local default is `full`. On iOS 27, `pr` builds the real app and runs all 31
+selected unit/app-hosted suites plus six real UI smoke methods: offline matched places, native GPX
 sharing/cancellation, List previous pull, Map next pull, Stats content/edge
 Back and standard Sport mix compact/expanded content. Pull-request CI and pushes
 to main select this profile only for native,
@@ -496,7 +496,7 @@ it conservatively. Web-only changes skip the native app job. It has an
 18-minute cold-build limit, eight-minute test limit and 35-minute job limit.
 This is not the full UI matrix.
 
-The full profile runs 36 selected suites, including all 53 UI methods, with the
+The full profile runs 38 selected suites, including all 54 UI methods, with the
 same 18-minute build limit, a 45-minute test limit and a 75-minute manual CI job.
 The seven action-matrix configurations run as independent methods so each has
 its own result and execution allowance.
@@ -560,3 +560,45 @@ The focused pipeline/gallery/map-policy suites passed 21 test methods on that
 simulator. All three broader `RenderedMapPhotoTests` timed out discovering map
 pins or the layers menu before photo demand; the unchanged pre-#414 photo cache
 reproduced those same failures. This rendering limitation needs separate review.
+
+## Matched places
+
+The active route shows server-matched peaks, passes and huts on the map. Combine
+shows places for its filter-visible selected group. A map tap's chooser results
+alone do not request or display places. Tap a
+marker for its name, kind and elevation; shared places show the selected-route
+count. The elevation curve includes separate marks for repeated encounters.
+Place icons use a neutral palette and an angular pass glyph. Opening a map card
+preserves both its marker anchor and camera position.
+Profile icons open their place directly, without a context menu or lift
+animation. Named VoiceOver actions reach every encounter without an additional
+Places button beside the profile, while retaining sample scrubbing.
+In Map detail, choosing an encounter focuses its map card; other
+activity details show a compact local card.
+Loading, empty results, unavailable coverage and request failures show no place
+status messages or retry controls. Available results appear normally, with
+offline caching and request backoff retained.
+
+The native app calls the existing `/api/activities/{id}/places` web endpoint
+with bearer authentication and decodes its shared generated DTO. No additional
+server endpoint or deployment is required. Matching uses stored GPS and never
+requests Strava streams. Results are saved in SwiftData, including completed zero-match
+checks. Reopening a route or the app reuses valid downloaded results offline.
+Stream changes, a newly observed catalogue/matcher version, deletion and account
+cleanup invalidate the corresponding data. Completed results revalidate lazily
+after one day online; current saved results remain available offline regardless
+of age. First-time uncached routes
+still need connectivity. No reference catalogue or matcher is downloaded.
+
+The API can later read persisted server relations without replacing this native
+cache/UI. Library-wide batch catch-up remains a later server-sync feature.
+See [the implementation plan](../../docs/activity-places-ios-plan.md).
+
+`ActivityPlacesTests` covers durable/offline reuse, disk-schema upgrade, account
+isolation, source/context/deletion fences, bounded request priority and profile
+projection. `ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection` uses
+production map/profile components with synthetic offline data and an inline map
+style; it covers marker interaction, repeated visits, style changes and selection
+preservation, plus active-route/Combine display scope. Unit checks include a
+100-result chooser and cancellation when demand shrinks. The journey is
+included in the PR and full native profiles.

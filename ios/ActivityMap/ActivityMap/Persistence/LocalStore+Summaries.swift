@@ -110,6 +110,7 @@ extension LocalStore {
             try save(context)
         } catch { context.rollback(); throw error }
         streamFences.recordWrite(fence, key: key)
+        notifySummaryChange(scope: scope.key, activityIDs: [dto.activityID], cancelsRequests: false)
         return .stored
     }
 
@@ -133,7 +134,8 @@ extension LocalStore {
             invalidates = previous.map { Self.summarySourceChanged($0, dto) } ?? false
         }
         if invalidates { cached?.invalidated = true }
-        return invalidates
+        let placesInvalidated = try reconcilePlacesUpsert(dto, previous: previous, scopeKey: scopeKey, context: context)
+        return invalidates || placesInvalidated
     }
 
     /// #213's atomic snapshot replacement calls this BEFORE its save. Existing
@@ -169,7 +171,7 @@ extension LocalStore {
         notifySummaryChange(scope: scopeKey)
     }
 
-    private static func summarySourceChanged(_ old: ActivityMapAPI.Activity, _ new: ActivityMapAPI.Activity) -> Bool {
+    static func summarySourceChanged(_ old: ActivityMapAPI.Activity, _ new: ActivityMapAPI.Activity) -> Bool {
         old.athlete != new.athlete || old.mapID != new.mapID || old.mapPolyline != new.mapPolyline
         || old.mapSummaryPolyline != new.mapSummaryPolyline || old.startDate != new.startDate
         || old.startDateLocal != new.startDateLocal || old.distance != new.distance

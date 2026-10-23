@@ -106,6 +106,7 @@ final class ActivityStore {
     private(set) var photosRevision = 0
     var photos: [Photo] = [] { didSet { photosRevision += 1 } }
     let photoImages: PhotoImageCache
+    var activityPlaces: ActivityPlacesLoader?
     var streamSummaries: StreamSummaryLoader?
     var activityEditing: ActivityEditingService?
     var elevationCursor: ElevationCursor?
@@ -237,6 +238,12 @@ final class ActivityStore {
     func toggleMember(_ id: Int) { if activityIndex.contains(id) { selection.toggleMember(id) } }
     var browsingActivities: [Activity] { onlySelected ? filteredActivities.filter { selectedActivityIDs.contains($0.id) } : filteredActivities }
     var visibleSelectedActivityIDs: Set<Int> { selectedActivityIDs.intersection(visibleActivityIDs) }
+    /// A map hit can fill the chooser with many candidates. Only the active
+    /// route contributes places while browsing; Combine opts into the group.
+    var mapPlacesActivityIDs: Set<Int> {
+        if isCombining { return visibleSelectedActivityIDs }
+        return activeActivityID.map { [$0] } ?? []
+    }
     /// The selected, filter-visible activity emphasised on the map.
     var activeActivityID: Int? { selectionSnapshot.active }
     /// The list detail opened independently of selection.
