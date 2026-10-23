@@ -70,7 +70,9 @@
     "test:library-owner": "node scripts/run-library-owner-browser.mjs",
     "presentation:generate": "node scripts/generate-presentation.mjs",
     "presentation:check": "node scripts/generate-presentation.mjs --check && node --test scripts/presentation.test.mjs",
-    "test:browsing-ui": "tsx --test src/components/list/*.test.tsx"
+    "test:browsing-ui": "tsx --test src/components/list/*.test.tsx",
+    "db:test-on-demand-places": "tsx --conditions=react-server scripts/database/test-on-demand-places.ts",
+    "test:activity-places-ui": "node scripts/verify-activity-places.mjs"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",

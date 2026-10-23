@@ -28,3 +28,36 @@ void test('account epochs are stable for profile refreshes and change on departu
   login({ currentUser: { ...alice, stravaConnected: false } });
   assert.equal(state.getState().authSession, first + 3);
 });
+
+void test('place interaction state is cleared on account changes, logout and disconnection', async () => {
+  const { useActivityPlaceFocus } = await import('./activity-place-focus');
+  const state = createStore<RootState>()(
+    immer((...args) => ({ ...createAuthSlice(...args) }) as RootState),
+  );
+  const alice = { id: 'alice', stravaConnected: true } as CurrentUserDTO;
+  const login = state.getState().initializeAuth;
+  const focus = () =>
+    useActivityPlaceFocus
+      .getState()
+      .setFocus({
+        userId: 'alice',
+        activityId: '123',
+        placeId: 'place',
+        visitIndex: 0,
+        source: 'profile',
+      });
+  login({ currentUser: alice });
+  focus();
+  login({ currentUser: { ...alice, name: 'Updated profile' } });
+  assert.equal(useActivityPlaceFocus.getState().focus?.activityId, '123');
+  login({ currentUser: { ...alice, id: 'bob' } });
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+  login({ currentUser: alice });
+  focus();
+  login({ currentUser: null });
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+  login({ currentUser: alice });
+  focus();
+  login({ currentUser: { ...alice, stravaConnected: false } });
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+});

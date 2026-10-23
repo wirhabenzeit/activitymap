@@ -1,4 +1,4 @@
-import { sql } from 'drizzle-orm';
+import { type SQL, sql } from 'drizzle-orm';
 import { type PostgresJsDatabase, drizzle } from 'drizzle-orm/postgres-js';
 import type { GeometryCollection } from 'geojson';
 import type postgres from 'postgres';
@@ -92,6 +92,16 @@ export function createPlacesRepository(
   client: postgres.Sql,
   database: PostgresJsDatabase = drizzle(client),
 ) {
+  return createPlaceDiscoveryRepository({
+    execute: async <T extends Record<string, unknown>>(query: SQL) =>
+      [...(await database.execute<T>(query))] as T[],
+  });
+}
+
+/** Both application Neon transactions and the offline publisher use this SQL. */
+export function createPlaceDiscoveryRepository(database: {
+  execute: <T extends Record<string, unknown>>(query: SQL) => Promise<T[]>;
+}) {
   return {
     async assertCatalogue(
       catalogueSnapshotId: string,
@@ -117,11 +127,13 @@ export function createPlacesRepository(
       }
     },
 
-    async discover(input: PlaceDiscoveryInput): Promise<{
+    discover: async (
+      input: PlaceDiscoveryInput,
+    ): Promise<{
       candidates: CandidatePlace[];
       covered: boolean;
       truncated: boolean;
-    }> {
+    }> => {
       const geometry = discoveryGeometry.parse(input.geometry);
       const coverage = parseCoverageGeometry(input.coverage);
       const radiusM = z

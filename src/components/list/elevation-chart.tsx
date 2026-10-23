@@ -1,29 +1,37 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ElevationPlot } from './elevation-plot';
-import { useElevationCursor } from '~/store/elevation-cursor';
 import { Loader2 } from 'lucide-react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
-import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import { Button } from '~/components/ui/button';
+import type { StreamMetadata } from '~/contracts/v1/activity-streams';
+import { useActivityPlaces } from '~/hooks/use-activity-places';
 import {
-  toElevationProfile,
+  activityPlacesQueryRoot,
+  placesMatchProfile,
+} from '~/lib/activity-places';
+import {
+  STREAM_SUMMARY_PREFETCH_BATCH,
+  STREAM_SUMMARY_PREFETCH_CONCURRENCY,
+  type StreamSummaryResult,
   canManuallyRetryStreamSummary,
   isStreamSummaryCurrent,
   isStreamSummaryResultReusable,
   reconcileStreamSummaryMetadata,
-  STREAM_SUMMARY_PREFETCH_BATCH,
-  STREAM_SUMMARY_PREFETCH_CONCURRENCY,
   streamSummaryQueryKey,
   streamSummaryRefetchInterval,
-  type StreamSummaryResult,
+  toElevationProfile,
 } from '~/lib/activity-stream-summary';
 import {
   loadActivityStreamSummary,
   loadStoredStreamSummaryBatch,
 } from '~/lib/sync/stream-summary-sync';
+import { useActivityPlaceFocus } from '~/store/activity-place-focus';
+import { useElevationCursor } from '~/store/elevation-cursor';
+
+import { ActivityPlacesSummary } from './activity-places-summary';
+import { ElevationPlot } from './elevation-plot';
 
 export type StreamSummaryActivity = {
   id: number;
@@ -120,6 +128,8 @@ export function ElevationChart({
   streamMetadata?: StreamMetadata;
 }) {
   const owner = useId();
+  const matchedPlaces = useActivityPlaces(activityId, streamMetadata);
+  const placeFocus = useActivityPlaceFocus((state) => state.focus);
   const queryClient = useQueryClient();
   const [retryClock, setRetryClock] = useState(() => Date.now());
   const queryKey = streamSummaryQueryKey(userId, activityId);
@@ -181,6 +191,26 @@ export function ElevationChart({
     () => () => useElevationCursor.getState().clearCursor(owner),
     [owner, profile, activityId, userId],
   );
+  const profileMatches = placesMatchProfile(
+    matchedPlaces.data,
+    query.data?.metadata,
+  );
+  useEffect(() => {
+    if (query.data?.metadata?.state !== 'current') return;
+    // A visible chart may have just fetched previously missing raw streams.
+    // Recheck stored-only matches once for this newly observed input revision.
+    void queryClient.invalidateQueries({
+      queryKey: activityPlacesQueryRoot(userId, activityId),
+    });
+    // Token fields identify the input; object identity must not retrigger work.
+  }, [
+    queryClient,
+    userId,
+    activityId,
+    query.data?.metadata?.generation,
+    query.data?.metadata?.revision,
+    query.data?.metadata?.state,
+  ]);
   const height = 165;
   const canRetry = canManuallyRetryStreamSummary(query.data, retryClock);
 
@@ -193,6 +223,13 @@ export function ElevationChart({
           <ElevationPlot
             key={`${userId}:${activityId}:${query.data?.metadata?.generation}:${query.data?.metadata?.revision}`}
             profile={profile}
+            places={profileMatches ? matchedPlaces.data?.places : []}
+            focusedPlaceKey={
+              placeFocus?.userId === userId &&
+              placeFocus.activityId === activityId
+                ? placeFocus.placeId + ':' + placeFocus.visitIndex
+                : undefined
+            }
             height={height}
             onSelection={(index) => {
               const coordinate =
@@ -243,6 +280,24 @@ export function ElevationChart({
           </div>
         )}
       </div>
+      {matchedPlaces.enabled && (
+        <ActivityPlacesSummary
+          userId={userId}
+          activityId={activityId}
+          data={matchedPlaces.data}
+          isLoading={matchedPlaces.isPending}
+          isError={matchedPlaces.isError}
+          retry={() => {
+            void matchedPlaces.refetch();
+          }}
+          profileReady={Boolean(profile && profileMatches)}
+          profileSpanM={
+            profile
+              ? profile.distance.at(-1)! - profile.distance[0]!
+              : undefined
+          }
+        />
+      )}
     </section>
   );
 }

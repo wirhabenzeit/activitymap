@@ -47,6 +47,7 @@ import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
 import { usePhotos } from '~/hooks/use-photos';
 import type { Activity } from '~/lib/activity';
+import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
 import { sortActivities } from '~/lib/activity-presentation';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { observeMapResize } from '~/lib/map-resize';
@@ -71,6 +72,7 @@ import { store } from '~/store';
 import { useShallowStore } from '~/store';
 
 import { ElevationRouteMarker } from './elevation-route-marker';
+import { MatchedPlacesLayer } from './matched-places-layer';
 
 const skyLayer: SkyLayer = {
   id: 'sky',
@@ -557,6 +559,8 @@ export default function InteractiveMap() {
   // Collect all interactive layer IDs from active overlays
   const activeInteractiveLayerIds = useMemo(() => {
     const ids: string[] = ['routeLayerBG', 'routeLayerBGsel']; // Default interactive layers
+    if (summaryUserId && visibleSelected.length)
+      ids.push(MATCHED_PLACES_HIT_LAYER);
 
     overlays.forEach((mapName) => {
       const mapSetting = getOverlayMapSetting(mapName);
@@ -570,7 +574,7 @@ export default function InteractiveMap() {
     });
 
     return ids;
-  }, [overlays]);
+  }, [overlays, summaryUserId, visibleSelected.length]);
 
   const overlayMapComponents = useMemo(
     () => (
@@ -882,6 +886,11 @@ export default function InteractiveMap() {
         <ElevationRouteMarker
           activities={activityDict}
           visibleIDs={visibleIDSet}
+        />
+        <MatchedPlacesLayer
+          activities={activityDict}
+          selectedIds={visibleSelected}
+          highlighted={highlighted}
         />
         {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}
       </ReactMapGL>

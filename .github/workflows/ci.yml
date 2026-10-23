@@ -81,6 +81,8 @@ jobs:
         run: pnpm test:browser:install --with-deps
       - name: Run fixture-only composed browser regressions
         run: pnpm test:browser
+      - name: Verify selected-route place markers and elevation annotations
+        run: pnpm test:activity-places-ui
       - name: Upload browser logs, traces, screenshots and result counts
         if: always()
         uses: actions/upload-artifact@v7
@@ -226,6 +228,8 @@ jobs:
         run: pnpm db:test-place-catalogue
       - name: Prove catalogue refresh, retirement and concurrent reader consistency
         run: pnpm db:test-place-refresh
+      - name: Prove read-only on-demand matching and private response fences
+        run: pnpm db:test-on-demand-places
       - name: Prove photo catch-up preserves existing data
         run: pnpm db:test-photo-backfill
       - name: Prove conservative hourly stream backfill

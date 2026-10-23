@@ -1,9 +1,11 @@
 'use client';
 
-import { type PointerEvent, useRef, useState } from 'react';
+import { type PointerEvent, useMemo, useRef, useState } from 'react';
 
+import type { MatchedPlace } from '~/contracts/activity-places';
 import { useDisplayUnits } from '~/hooks/use-display-preferences';
 import { useElementSize } from '~/hooks/use-element-size';
+import { elevationPlaceMarkers } from '~/lib/activity-places';
 import type { ElevationProfile } from '~/lib/activity-stream-summary';
 import {
   elevationAxisTicks,
@@ -14,15 +16,21 @@ import {
 } from '~/lib/elevation-profile';
 import { measurementScale, measurementUnit } from '~/lib/units';
 
+const EMPTY_PLACES: MatchedPlace[] = [];
+
 /** Linear, sample-preserving plot with one interaction surface for mouse, touch and keyboard. */
 export function ElevationPlot({
   profile,
   height = 165,
   onSelection = () => undefined,
+  places = EMPTY_PLACES,
+  focusedPlaceKey,
 }: {
   profile: ElevationProfile;
   height?: number;
   onSelection?: (index: number | null) => void;
+  places?: MatchedPlace[];
+  focusedPlaceKey?: string;
 }) {
   const units = useDisplayUnits();
   const [container, { width }] = useElementSize({
@@ -43,6 +51,10 @@ export function ElevationPlot({
     index: number | null;
   }>({ profile, index: null });
 
+  const placeMarkers = useMemo(
+    () => elevationPlaceMarkers(profile, places),
+    [profile, places],
+  );
   const start = profile.distance[0]!;
   const span = profile.distance.at(-1)! - start;
   const elevationDivisor = measurementScale('elevation', units);
@@ -258,6 +270,52 @@ export function ElevationPlot({
         >
           Distance ({distanceUnit})
         </text>
+        {placeMarkers.map((marker) => (
+          <g
+            key={marker.key}
+            data-testid="elevation-place-marker"
+            data-place-id={marker.placeId}
+            data-place-name={marker.name}
+          >
+            <title>{marker.name}</title>
+            <line
+              x1={x(marker.distanceM)}
+              x2={x(marker.distanceM)}
+              y1={y(marker.altitudeM / elevationDivisor)}
+              y2={bottom}
+              stroke={focusedPlaceKey === marker.key ? '#f97316' : '#0f766e'}
+              strokeOpacity={0.4}
+              strokeDasharray="2 3"
+            />
+            <circle
+              cx={x(marker.distanceM)}
+              cy={y(marker.altitudeM / elevationDivisor)}
+              r={focusedPlaceKey === marker.key ? 6 : 4.5}
+              fill={focusedPlaceKey === marker.key ? '#f97316' : '#0f766e'}
+              stroke="hsl(var(--background))"
+              strokeWidth={2}
+            />
+            {focusedPlaceKey === marker.key && (
+              <text
+                x={Math.max(left + 4, Math.min(right - 4, x(marker.distanceM)))}
+                y={Math.max(
+                  top + 10,
+                  y(marker.altitudeM / elevationDivisor) - 10,
+                )}
+                textAnchor={
+                  x(marker.distanceM) > (left + right) / 2 ? 'end' : 'start'
+                }
+                fill="hsl(var(--foreground))"
+                stroke="var(--background)"
+                strokeWidth={3}
+                paintOrder="stroke"
+                fontSize={11}
+              >
+                {marker.name}
+              </text>
+            )}
+          </g>
+        ))}
         {selected !== null && (
           <g>
             <line
