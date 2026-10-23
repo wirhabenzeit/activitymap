@@ -37,15 +37,13 @@ void test('place interaction state is cleared on account changes, logout and dis
   const alice = { id: 'alice', stravaConnected: true } as CurrentUserDTO;
   const login = state.getState().initializeAuth;
   const focus = () =>
-    useActivityPlaceFocus
-      .getState()
-      .setFocus({
-        userId: 'alice',
-        activityId: '123',
-        placeId: 'place',
-        visitIndex: 0,
-        source: 'profile',
-      });
+    useActivityPlaceFocus.getState().setFocus({
+      userId: 'alice',
+      activityId: '123',
+      placeId: 'place',
+      visitIndex: 0,
+      source: 'profile',
+    });
   login({ currentUser: alice });
   focus();
   login({ currentUser: { ...alice, name: 'Updated profile' } });
