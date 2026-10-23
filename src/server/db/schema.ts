@@ -1,7 +1,9 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigint,
   boolean,
+  check,
   doublePrecision,
   index,
   integer,
@@ -9,9 +11,11 @@ import {
   pgEnum,
   pgTable,
   primaryKey,
+  real,
   text,
   timestamp,
   uniqueIndex,
+  uuid,
   varchar,
 } from 'drizzle-orm/pg-core';
 
@@ -21,6 +25,23 @@ import type { StravaImportDTO } from '~/contracts/v1/strava-import';
 import type { JobRunSummary } from '~/lib/admin/job-run-summary';
 import type { StoredShareLinkFieldOptions } from '~/lib/sharing/fields';
 import type { StoredStreamSummary } from '~/lib/streams/compact-summary';
+import { geographyPoint } from '~/server/db/geography-point';
+import type { CatalogueManifest } from '~/server/places/catalogue-artifact';
+import type { CoverageGeometry } from '~/server/places/coverage';
+import {
+  PLACE_KINDS,
+  PLACE_POINT_DERIVATIONS,
+  PLACE_RELATIONS,
+  PLACE_SUBTYPES,
+} from '~/server/places/types';
+import type {
+  PlaceEncounter,
+  PlaceKind,
+  PlaceNames,
+  PlaceRelation,
+  PlaceSubtype,
+  PlaceTags,
+} from '~/server/places/types';
 import type { ActivityImportCursor } from '~/server/strava/activity-import-policy';
 import type {
   ActivityStreamType,
@@ -266,6 +287,221 @@ export const activityStreams = pgTable('activity_streams', {
   leaseExpiresAt: timestamp('lease_expires_at', { mode: 'date' }),
   nextRetryAt: timestamp('next_retry_at', { mode: 'date' }),
 });
+
+// The allowlists are small and fixed. Comparing cardinality with the sum of
+// present allowed values rejects duplicates and NULL members without a custom
+// database function or a subquery (which CHECK constraints cannot contain).
+function uniquePlaceValues(
+  column: AnyPgColumn,
+  allowed: readonly string[],
+  allowEmpty = false,
+) {
+  const literals = allowed.map((value) =>
+    sql.raw(`'${value.replaceAll("'", "''")}'`),
+  );
+  const presentCount = sql.join(
+    literals.map(
+      (value) => sql`CASE WHEN ${value} = ANY(${column}) THEN 1 ELSE 0 END`,
+    ),
+    sql` + `,
+  );
+  return sql`${column} <@ ARRAY[${sql.join(literals, sql`, `)}]::text[]
+    AND cardinality(${column}) = (${presentCount})
+    AND (cardinality(${column}) = 0 OR (array_ndims(${column}) = 1 AND array_lower(${column}, 1) = 1))
+    ${allowEmpty ? sql`` : sql`AND cardinality(${column}) > 0`}`;
+}
+
+// Immutable snapshot metadata; one published snapshot per region. Old manifests
+// remain available after refresh, while places retain their source identities.
+export const placeCatalogues = pgTable(
+  'place_catalogues',
+  {
+    snapshotId: text('snapshot_id').primaryKey(),
+    regionId: text('region_id').notNull(),
+    active: boolean('active').notNull().default(false),
+    manifest: jsonb('manifest').$type<CatalogueManifest>().notNull(),
+    coverage: jsonb('coverage').$type<CoverageGeometry>().notNull(),
+    publishedAt: timestamp('published_at', { mode: 'date', withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('place_catalogues_active_region_idx')
+      .on(table.regionId)
+      .where(sql`${table.active}`),
+    check(
+      'place_catalogues_region_check',
+      sql`${table.regionId} ~ '^[a-z][a-z0-9-]{0,63}$'`,
+    ),
+  ],
+);
+
+// Stable OSM identities, including retired rows that can later reappear.
+export const places = pgTable(
+  'places',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    osmType: text('osm_type', { enum: ['node', 'way', 'relation'] }).notNull(),
+    osmId: bigint('osm_id', { mode: 'bigint' }).notNull(),
+    kinds: text('kinds').array().$type<PlaceKind[]>().notNull(),
+    subtypes: text('subtypes').array().$type<PlaceSubtype[]>().notNull(),
+    displayName: text('display_name').notNull(),
+    names: jsonb('names').$type<PlaceNames>().notNull(),
+    location: geographyPoint('location').notNull(),
+    elevationM: real('elevation_m'),
+    tags: jsonb('tags').$type<PlaceTags>().notNull(),
+    osmVersion: integer('osm_version').notNull(),
+    osmUpdatedAt: timestamp('osm_updated_at', {
+      mode: 'date',
+      withTimezone: true,
+    }).notNull(),
+    pointDerivation: text('point_derivation', {
+      enum: PLACE_POINT_DERIVATIONS,
+    }).notNull(),
+    normalizationVersion: text('normalization_version').notNull(),
+    catalogueSnapshotId: text('catalogue_snapshot_id').notNull(),
+    catalogueRegion: text('catalogue_region'),
+    retiredAt: timestamp('retired_at', { mode: 'date', withTimezone: true }),
+    importedAt: timestamp('imported_at', { mode: 'date', withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('places_osm_identity_idx').on(table.osmType, table.osmId),
+    index('places_location_idx').using('gist', table.location),
+    check(
+      'places_osm_type_check',
+      sql`${table.osmType} IN ('node', 'way', 'relation')`,
+    ),
+    check('places_osm_id_check', sql`${table.osmId} > 0`),
+    check('places_kinds_check', uniquePlaceValues(table.kinds, PLACE_KINDS)),
+    check(
+      'places_subtypes_check',
+      uniquePlaceValues(table.subtypes, PLACE_SUBTYPES),
+    ),
+    check(
+      'places_kind_subtype_check',
+      sql`('peak' = ANY(${table.kinds})) = ('peak' = ANY(${table.subtypes}))
+        AND ('pass' = ANY(${table.kinds})) = (${table.subtypes} && ARRAY['natural_saddle', 'road_trail_pass']::text[])
+        AND ('hut' = ANY(${table.kinds})) = (${table.subtypes} && ARRAY['alpine_hut', 'wilderness_hut']::text[])`,
+    ),
+    check(
+      'places_display_name_check',
+      sql`length(btrim(${table.displayName})) > 0`,
+    ),
+    check(
+      'places_names_check',
+      sql`jsonb_typeof(${table.names}) = 'object' AND NOT jsonb_path_exists(${table.names}, '$.* ? (@.type() != "string")')`,
+    ),
+    check(
+      'places_tags_check',
+      sql`jsonb_typeof(${table.tags}) = 'object' AND NOT jsonb_path_exists(${table.tags}, '$.* ? (@.type() != "string")')`,
+    ),
+    check(
+      'places_location_check',
+      sql`NOT ST_IsEmpty(${table.location}::geometry)
+        AND ST_IsValid(${table.location}::geometry)
+        AND ST_X(${table.location}::geometry) BETWEEN -180 AND 180
+        AND ST_Y(${table.location}::geometry) BETWEEN -90 AND 90`,
+    ),
+    check(
+      'places_elevation_check',
+      sql`${table.elevationM} > '-Infinity'::real AND ${table.elevationM} < 'Infinity'::real`,
+    ),
+    check('places_osm_version_check', sql`${table.osmVersion} > 0`),
+    check(
+      'places_point_derivation_check',
+      sql`(${table.osmType} = 'node' AND ${table.pointDerivation} = 'osm_node')
+        OR (${table.osmType} IN ('way', 'relation')
+          AND ${table.pointDerivation} = 'validated_polygon_interior'
+          AND 'hut' = ANY(${table.kinds}))`,
+    ),
+    check(
+      'places_normalization_version_check',
+      sql`length(btrim(${table.normalizationVersion})) > 0`,
+    ),
+    check(
+      'places_catalogue_snapshot_check',
+      sql`length(btrim(${table.catalogueSnapshotId})) > 0`,
+    ),
+  ],
+);
+
+// Private activity evidence. One membership per activity/place preserves repeated
+// episodes and overlapping supported relations without duplicating visits.
+export const activityPlaces = pgTable(
+  'activity_places',
+  {
+    activityId: bigint('activity_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => activities.id, { onDelete: 'cascade' }),
+    placeId: uuid('place_id')
+      .notNull()
+      .references(() => places.id, { onDelete: 'restrict' }),
+    supportedRelations: text('supported_relations')
+      .array()
+      .$type<PlaceRelation[]>()
+      .notNull(),
+    encounters: jsonb('encounters').$type<PlaceEncounter[]>().notNull(),
+    evidenceVersion: integer('evidence_version').notNull(),
+    inputStreamGeneration: text('input_stream_generation').notNull(),
+    inputStreamRevision: bigint('input_stream_revision', {
+      mode: 'bigint',
+    }).notNull(),
+    inputSourceVersion: text('input_source_version').notNull(),
+    catalogueSnapshotId: text('catalogue_snapshot_id').notNull(),
+    matcherVersion: text('matcher_version').notNull(),
+    parametersHash: text('parameters_hash').notNull(),
+    runId: uuid('run_id').notNull(),
+    computedAt: timestamp('computed_at', { mode: 'date', withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.activityId, table.placeId] }),
+    index('activity_places_place_activity_idx').on(
+      table.placeId,
+      table.activityId,
+    ),
+    check(
+      'activity_places_supported_relations_check',
+      uniquePlaceValues(table.supportedRelations, PLACE_RELATIONS, true),
+    ),
+    check(
+      'activity_places_encounters_check',
+      sql`CASE WHEN jsonb_typeof(${table.encounters}) = 'array'
+        THEN jsonb_array_length(${table.encounters}) > 0 ELSE false END`,
+    ),
+    check(
+      'activity_places_evidence_version_check',
+      sql`${table.evidenceVersion} > 0`,
+    ),
+    check(
+      'activity_places_stream_generation_check',
+      sql`length(btrim(${table.inputStreamGeneration})) > 0`,
+    ),
+    check(
+      'activity_places_stream_revision_check',
+      sql`${table.inputStreamRevision} >= 0`,
+    ),
+    check(
+      'activity_places_source_version_check',
+      sql`length(btrim(${table.inputSourceVersion})) > 0`,
+    ),
+    check(
+      'activity_places_catalogue_snapshot_check',
+      sql`length(btrim(${table.catalogueSnapshotId})) > 0`,
+    ),
+    check(
+      'activity_places_matcher_version_check',
+      sql`length(btrim(${table.matcherVersion})) > 0`,
+    ),
+    check(
+      'activity_places_parameters_hash_check',
+      sql`${table.parametersHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+  ],
+);
 
 export const photos = pgTable(
   'photos',
