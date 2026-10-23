@@ -3,9 +3,11 @@
 Selecting activities on the web map automatically matches their stored GPS against
 the active Switzerland/Austria/Italy catalogue. Opening a route detail also asks
 for its matches. Matched peaks, passes and huts appear on the map; route details
-show named encounters and marks on the elevation profile. Repeated encounters
+show interactive peak, pass and hut symbols directly on the elevation profile.
+There is no duplicate place list. Hover, keyboard focus or a tap reveals the name.
+Repeated encounters
 retain separate distances. A place shared by selected routes has one map marker.
-Choosing a named encounter focuses its map popup; clicking the marker preserves
+Choosing a profile symbol focuses its map popup; clicking the marker preserves
 the activity selection. This delivery changes web UI only.
 
 ## Request and data flow
@@ -23,8 +25,13 @@ revocation, erasure scheduling, source invalidation or stream replacement.
 Responses have private/no-store headers and use the existing authentication,
 rate-limit and request-observation boundary. Raw evidence stays server-side.
 
-The web caches results briefly by account, activity and observed stream version.
-Map and detail observers share in-flight requests. A cancellable queue permits
+The web caches results by account, activity and observed stream version. Results
+are fresh for five minutes and inactive entries remain for fifteen minutes.
+Reopening a profile with the same input reuses its match; only a newly observed
+input revision prompts an additional check.
+Loading stays in a fixed-height chart header and a compact map status pill; it
+does not add rows to the card. The themed map card shows the place name, kind and
+elevation, plus a route count when shared. Map and detail observers share in-flight requests. A cancellable queue permits
 two concurrent requests and prioritizes an inspected activity. Deselecting or
 filtering a route removes its markers; switching accounts changes the query scope.
 
@@ -59,7 +66,9 @@ profile before annotations are shown.
 - `pnpm test:activity-places-ui`: isolated browser proof with the production hooks,
   actual Mapbox layers, elevation chart and synthetic API responses. Covers
   shared requests, repeated encounters, keyboard focus, multi-selection, filters,
-  account changes, stream revision alignment, retry and coverage messages.
+  account changes, stream revision alignment, retry and coverage messages. Also
+  checks distinct symbols, map style replacement, cached profile reopening, fixed
+  loading height and the absence of the former place list.
   Screenshots/results are retained under `output/quality/browser/activity-places`.
 
 Both integration proofs run in CI. Local read-only evaluation of five existing

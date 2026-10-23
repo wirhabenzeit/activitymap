@@ -129,16 +129,23 @@ const browser = await chromium.launch({
 });
 const requests = [],
   errors = [];
+let page;
 let owner = 'fixture',
   mode = 'complete',
-  revision = '1';
+  revision = '1',
+  holdResponse = false,
+  releaseResponse;
 try {
-  const page = await browser.newPage({ viewport: { width: 700, height: 680 } });
+  page = await browser.newPage({ viewport: { width: 700, height: 680 } });
   page.on('pageerror', (error) => errors.push(error.message));
   await page.route('https://**', (route) => route.abort());
   await page.route('**/api/activities/*/places', async (route) => {
     const id = new URL(route.request().url()).pathname.split('/')[3];
     requests.push({ owner, id, mode });
+    if (holdResponse)
+      await new Promise((resolve) => {
+        releaseResponse = resolve;
+      });
     if (mode === 'error') {
       await route.fulfill({
         status: 503,
@@ -171,6 +178,24 @@ try {
                   elevationM: 500,
                   visits: [{ distanceM: 100 }, { distanceM: 180 }],
                 },
+                {
+                  id: '00000000-0000-4000-8000-000000000002',
+                  name: 'Alpine test pass',
+                  kinds: ['pass'],
+                  longitude: 8.0004,
+                  latitude: 47.0004,
+                  elevationM: 450,
+                  visits: [{ distanceM: 40 }],
+                },
+                {
+                  id: '00000000-0000-4000-8000-000000000003',
+                  name: 'Alpine test hut',
+                  kinds: ['hut'],
+                  longitude: 8.0015,
+                  latitude: 47.0015,
+                  elevationM: 440,
+                  visits: [{ distanceM: 150 }],
+                },
               ]
             : [],
       },
@@ -181,9 +206,9 @@ try {
     () =>
       window.mapReady &&
       window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-        1,
+        3,
   );
-  assert.equal(await page.getByTestId('elevation-place-marker').count(), 2);
+  assert.equal(await page.getByTestId('elevation-place-marker').count(), 4);
   assert.equal(
     requests.filter((request) => request.id === '1').length,
     1,
@@ -193,6 +218,39 @@ try {
     await page.getByRole('checkbox').count(),
     0,
     'No matching/debug checkboxes',
+  );
+  assert.equal(
+    await page.getByText('Places along this route').count(),
+    0,
+    'No duplicate place list',
+  );
+  assert.deepEqual(
+    await page
+      .getByTestId('elevation-place-marker')
+      .evaluateAll((nodes) =>
+        [...new Set(nodes.map((node) => node.dataset.placeKind))].sort(),
+      ),
+    ['hut', 'pass', 'peak'],
+  );
+  assert.equal(
+    await page.getByRole('slider').getByRole('button').count(),
+    0,
+    'Place buttons are separate from the chart slider',
+  );
+  const beforeReopen = requests.length;
+  await page.evaluate(() =>
+    window.fixtureState.setState({ showProfile: false }),
+  );
+  await page.getByRole('slider').waitFor({ state: 'detached' });
+  await page.evaluate(() =>
+    window.fixtureState.setState({ showProfile: true }),
+  );
+  await page.getByRole('slider').waitFor();
+  await page.waitForFunction(() => window.client.isFetching() === 0);
+  assert.equal(
+    requests.length,
+    beforeReopen,
+    'Reopening a current profile reuses cached matching',
   );
   await page
     .getByRole('button', {
@@ -219,9 +277,34 @@ try {
       !window.fixtureMap.isMoving() &&
       window.fixtureMap.queryRenderedFeatures({
         layers: ['matched-places-points'],
-      }).length === 1,
+      }).length === 3,
   );
   assert.equal(await page.locator('.mapboxgl-popup').count(), 1);
+  const symbols = await page.evaluate(() =>
+    window.fixtureMap
+      .getSource('matched-places')
+      ._data.features.map((feature) => feature.properties.icon),
+  );
+  assert.equal(
+    new Set(symbols).size,
+    3,
+    'Distinct map sprites for peak, pass and hut',
+  );
+  assert(
+    await page.evaluate(() =>
+      ['peak', 'pass', 'hut'].every((kind) =>
+        window.fixtureMap.hasImage('matched-place-' + kind),
+      ),
+    ),
+    'All place sprites loaded',
+  );
+  await page
+    .getByRole('button', {
+      name: 'Highlight Alpine test peak at 100 m',
+      exact: true,
+    })
+    .click();
+  await page.mouse.move(650, 600);
   await page.screenshot({ path: join(output, 'desktop.png') });
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.setViewportSize({ width: 390, height: 720 });
@@ -240,9 +323,9 @@ try {
   assert.equal(await page.locator('.mapboxgl-popup').count(), 1);
   assert.equal(
     await page
-      .locator('.mapboxgl-popup-close-button')
+      .getByRole('button', { name: 'Close place', exact: true })
       .evaluate((element) => getComputedStyle(element).color),
-    'rgb(0, 0, 0)',
+    'rgb(163, 163, 163)',
   );
   await page.screenshot({ path: join(output, 'mobile-dark.png') });
   assert(
@@ -257,11 +340,9 @@ try {
   await page.waitForFunction(
     () =>
       window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      1,
+      3,
   );
-  await page
-    .getByText('Matched on 2 selected routes', { exact: true })
-    .waitFor();
+  await page.getByText('2 selected routes', { exact: true }).waitFor();
   await page.evaluate(() => window.fixtureState.setState({ visible: false }));
   await page.waitForFunction(
     () => !window.fixtureMap.getSource('matched-places'),
@@ -270,22 +351,56 @@ try {
   await page.waitForFunction(
     () =>
       window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      1,
+      3,
   );
-  await page.locator('.mapboxgl-popup-close-button').click();
+  await page.getByRole('button', { name: 'Close place', exact: true }).click();
   const pixel = await page.evaluate(() => {
     const p = window.fixtureMap.project([8.001, 47.001]);
     const r = window.fixtureMap.getCanvas().getBoundingClientRect();
     return { x: p.x + r.x, y: p.y + r.y };
   });
   await page.mouse.click(pixel.x, pixel.y);
-  await page
-    .getByText('Matched on 2 selected routes', { exact: true })
-    .waitFor();
+  await page.getByText('2 selected routes', { exact: true }).waitFor();
   assert.equal(
     await page.evaluate(() => window.selectionCalls),
     0,
     'Place clicks do not alter route selection',
+  );
+  await page.evaluate(
+    () =>
+      new Promise((resolve, reject) => {
+        const timeout = setTimeout(
+          () => reject(new Error('Map style replacement timed out')),
+          10000,
+        );
+        window.fixtureMap.once('style.load', () => {
+          clearTimeout(timeout);
+          resolve();
+        });
+        window.fixtureMap.setStyle(
+          {
+            version: 8,
+            glyphs: window.location.origin + '/fonts/{fontstack}/{range}.pbf',
+            sources: {},
+            layers: [
+              {
+                id: 'background',
+                type: 'background',
+                paint: { 'background-color': '#e9efea' },
+              },
+            ],
+          },
+          { diff: false },
+        );
+      }),
+  );
+  await page.waitForFunction(
+    () =>
+      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
+        3 &&
+      ['peak', 'pass', 'hut'].every((kind) =>
+        window.fixtureMap.hasImage('matched-place-' + kind),
+      ),
   );
   await page.evaluate(() => window.replaceProfile());
   await page.waitForFunction(
@@ -298,7 +413,7 @@ try {
   await page.waitForFunction(
     () =>
       document.querySelectorAll('[data-testid="elevation-place-marker"]')
-        .length === 2,
+        .length === 4,
   );
   mode = 'error';
   await page.evaluate(() => window.refreshPlaces());
@@ -313,16 +428,39 @@ try {
   await page.waitForFunction(
     () =>
       window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      1,
+      3,
   );
   await page.evaluate(() => window.fixtureState.setState({ selected: [1] }));
+  const profileHeight = await page
+    .getByRole('region', { name: 'Elevation profile', exact: true })
+    .evaluate((node) => node.getBoundingClientRect().height);
+  holdResponse = true;
+  const refresh = page.evaluate(() => window.refreshPlaces());
+  await page
+    .getByRole('status', { name: 'Finding places', exact: true })
+    .waitFor();
+  await page
+    .locator('[data-map-place]')
+    .getByText('Finding places', { exact: true })
+    .waitFor();
+  assert.equal(
+    await page
+      .getByRole('region', { name: 'Elevation profile', exact: true })
+      .evaluate((node) => node.getBoundingClientRect().height),
+    profileHeight,
+    'Loading preserves chart/card height',
+  );
+  assert.equal(profileHeight, 165);
+  await page.screenshot({ path: join(output, 'loading.png') });
+  holdResponse = false;
+  releaseResponse();
+  await refresh;
   mode = 'uncovered';
   await page.evaluate(() => window.refreshPlaces());
   await page
-    .getByText(
-      'Places are currently available for routes within Switzerland, Austria and Italy.',
-      { exact: true },
-    )
+    .getByRole('status', {
+      name: 'Places are currently available for routes within Switzerland, Austria and Italy.',
+    })
     .waitFor();
   assert.equal(await page.getByTestId('elevation-place-marker').count(), 0);
   mode = 'complete';
@@ -340,7 +478,9 @@ try {
     })
     .waitFor();
   assert.equal(
-    await page.getByRole('button', { name: /Show Alpine test peak/ }).count(),
+    await page
+      .getByRole('button', { name: /Highlight Alpine test peak/ })
+      .count(),
     0,
   );
   await page.evaluate(() => window.fixtureState.setState({ selected: [] }));
@@ -357,6 +497,11 @@ try {
         requests,
         checks: [
           'shared requests',
+          'cached profile reopen',
+          'map style replacement',
+          'distinct peak/pass/hut symbols',
+          'fixed-height loading',
+          'no duplicate place list',
           'repeated profile positions',
           'keyboard place focus',
           'mobile/dark layout',
@@ -369,7 +514,7 @@ try {
           'account isolation',
           'deselection',
         ],
-        screenshots: ['desktop.png', 'mobile-dark.png'],
+        screenshots: ['desktop.png', 'mobile-dark.png', 'loading.png'],
       },
       null,
       2,
@@ -379,6 +524,17 @@ try {
     'PASS web matching: actual Mapbox layers, profile annotations, shared requests, keyboard focus, multi-selection, filters, account isolation, stream replacement, retry and coverage states.',
   );
   console.log(`Evidence: ${output}`);
+} catch (error) {
+  if (page) {
+    await page
+      .screenshot({ path: join(output, 'failure.png') })
+      .catch(() => undefined);
+    await writeFile(
+      join(output, 'failure.json'),
+      JSON.stringify({ error: String(error), errors, requests }, null, 2),
+    );
+  }
+  throw error;
 } finally {
   await browser.close();
   server.close();

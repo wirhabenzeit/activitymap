@@ -32,8 +32,8 @@ function options(
     enabled: Boolean(userId),
     queryFn: ({ signal }) =>
       fetchActivityPlaces({ userId: userId!, activityId, signal }),
-    staleTime: 2 * 60_000,
-    gcTime: 5 * 60_000,
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
     retry: false,
     refetchOnWindowFocus: false,
   });
@@ -77,7 +77,10 @@ export function useSelectedActivityPlaces(
         )
       : [],
     userId,
-    isLoading: Boolean(userId) && queries.some((query) => query.isPending),
+    isLoading: Boolean(userId) && queries.some((query) => query.isFetching),
+    pendingCount: queries.filter((query) => query.isFetching || query.isPending)
+      .length,
+    totalCount: ids.length,
     isError: Boolean(userId) && queries.some((query) => query.isError),
     retry: () => {
       for (const query of queries) if (query.isError) void query.refetch();
