@@ -584,15 +584,15 @@ test('fixture write failure removes only its newly created partial route', async
   );
 });
 
-test('default simulator pairs the newest runtime with a supported phone instead of an incompatible hard-coded device', () => {
+test('default simulator preserves the phone and selects its newest compatible runtime', () => {
   const oldPhone = {
     name: 'iPhone 17 Pro',
     identifier: 'phone17',
     productFamily: 'iPhone',
   };
   const newPhone = {
-    name: 'iPhone 18 Pro',
-    identifier: 'phone18',
+    name: 'iPhone Duo',
+    identifier: 'phone-duo',
     productFamily: 'iPhone',
   };
   const older = {
@@ -609,6 +609,10 @@ test('default simulator pairs the newest runtime with a supported phone instead 
   };
   assert.deepEqual(
     selectNativeSimulator([older, newest], [oldPhone, newPhone]),
+    { runtime: older, type: oldPhone },
+  );
+  assert.deepEqual(
+    selectNativeSimulator([older, newest], [oldPhone, newPhone], newPhone.name),
     { runtime: newest, type: newPhone },
   );
   assert.deepEqual(
@@ -677,6 +681,6 @@ test('simulator selection does not lower the runtime floor or guess compatibilit
         [{ ...runtime, version: '27.1', supportedDeviceTypes: undefined }],
         [phone],
       ),
-    /no supported iPhone/,
+    /No available iOS 26\+ runtime supports/,
   );
 });

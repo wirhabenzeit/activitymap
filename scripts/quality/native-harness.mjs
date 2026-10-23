@@ -22,34 +22,18 @@ export function selectNativeSimulator(runtimes, devicetypes, requestedName) {
     runtime.supportedDeviceTypes?.some(
       (supported) => supported.identifier === type.identifier,
     );
-  if (requestedName) {
-    const type = devicetypes.find((item) => item.name === requestedName);
-    assert(
-      type,
-      'Requested IOS_DEVICE_NAME is unavailable; inspect xcrun simctl list devicetypes',
-    );
-    const runtime = available.find((item) => supports(item, type));
-    assert(
-      runtime,
-      'No available iOS 26+ runtime supports IOS_DEVICE_NAME: ' + requestedName,
-    );
-    return { runtime, type };
-  }
-  const runtime = available[0];
-  const compatible = devicetypes.filter(
-    (type) => type.productFamily === 'iPhone' && supports(runtime, type),
-  );
-  const type =
-    compatible.find((item) => item.name === 'iPhone 17 Pro') ??
-    runtime.supportedDeviceTypes
-      ?.map((supported) =>
-        compatible.find((item) => item.identifier === supported.identifier),
-      )
-      .find((item) => item?.name.endsWith(' Pro')) ??
-    compatible[0];
+  // Preserve the suite's phone/form-factor contract. Newer runtime bundles can
+  // support a different device family only (for example iPhone Duo).
+  const deviceName = requestedName ?? 'iPhone 17 Pro';
+  const type = devicetypes.find((item) => item.name === deviceName);
   assert(
     type,
-    'The newest available iOS runtime has no supported iPhone device type',
+    'Requested IOS_DEVICE_NAME is unavailable; inspect xcrun simctl list devicetypes',
+  );
+  const runtime = available.find((item) => supports(item, type));
+  assert(
+    runtime,
+    'No available iOS 26+ runtime supports IOS_DEVICE_NAME: ' + deviceName,
   );
   return { runtime, type };
 }
