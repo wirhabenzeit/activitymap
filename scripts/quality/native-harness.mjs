@@ -6,6 +6,38 @@ import { fileURLToPath } from 'node:url';
 
 import { runCommand } from './process.mjs';
 
+export function selectNativeSimulator(runtimes, devicetypes, requestedName) {
+  const available = runtimes
+    .filter(
+      (runtime) =>
+        runtime.isAvailable &&
+        runtime.identifier.includes('.iOS-') &&
+        Number(runtime.version.split('.')[0]) >= 26,
+    )
+    .sort((a, b) =>
+      b.version.localeCompare(a.version, undefined, { numeric: true }),
+    );
+  assert(available.length, 'Install an iOS 26+ simulator runtime in Xcode');
+  const supports = (runtime, type) =>
+    runtime.supportedDeviceTypes?.some(
+      (supported) => supported.identifier === type.identifier,
+    );
+  // Preserve the suite's phone/form-factor contract. Newer runtime bundles can
+  // support a different device family only (for example iPhone Duo).
+  const deviceName = requestedName ?? 'iPhone 17 Pro';
+  const type = devicetypes.find((item) => item.name === deviceName);
+  assert(
+    type,
+    'Requested IOS_DEVICE_NAME is unavailable; inspect xcrun simctl list devicetypes',
+  );
+  const runtime = available.find((item) => supports(item, type));
+  assert(
+    runtime,
+    'No available iOS 26+ runtime supports IOS_DEVICE_NAME: ' + deviceName,
+  );
+  return { runtime, type };
+}
+
 export const nativeSuites = [
   'ActivityMapTests/AdaptiveInspectionTests',
   'ActivityMapTests/BrowsingReconciliationTests',
@@ -246,36 +278,30 @@ export async function runNativeHarness({
       await command(['simctl', 'list', 'runtimes', '--json']),
     );
     if (!simulator) {
-      const runtime = runtimes
-        .filter(
-          (item) =>
-            item.isAvailable &&
-            item.identifier.includes('.iOS-') &&
-            Number(item.version.split('.')[0]) >= 26,
-        )
-        .sort((a, b) =>
-          b.version.localeCompare(a.version, undefined, { numeric: true }),
-        )[0];
-      assert(runtime, 'Install an iOS 26+ simulator runtime in Xcode');
       const { devicetypes } = JSON.parse(
         await command(['simctl', 'list', 'devicetypes', '--json']),
       );
-      const type = devicetypes.find(
-        (item) =>
-          item.name === (process.env.IOS_DEVICE_NAME || 'iPhone 17 Pro'),
+      await writeFile(
+        join(output, 'simulator-inventory.json'),
+        JSON.stringify({ runtimes, devicetypes }, null, 2),
       );
-      assert(
-        type,
-        'Requested IOS_DEVICE_NAME is unavailable; inspect xcrun simctl list devicetypes',
+      const { runtime, type } = selectNativeSimulator(
+        runtimes,
+        devicetypes,
+        process.env.IOS_DEVICE_NAME,
       );
+      manifest.deviceType = type.identifier;
       simulator = (
-        await command([
-          'simctl',
-          'create',
-          `ActivityMapQuality-${randomUUID()}`,
-          type.identifier,
-          runtime.identifier,
-        ])
+        await command(
+          [
+            'simctl',
+            'create',
+            `ActivityMapQuality-${randomUUID()}`,
+            type.identifier,
+            runtime.identifier,
+          ],
+          'simulator-create.log',
+        )
       ).trim();
       ownedSimulator = true;
     }

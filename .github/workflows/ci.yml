@@ -169,7 +169,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17-trixie
         env:
           POSTGRES_DB: activitymap_test
           POSTGRES_PASSWORD: postgres
@@ -188,6 +188,10 @@ jobs:
       MIGRATION_REQUIRE_TARGET_GUARDS: 'true'
     steps:
       - uses: actions/checkout@v7
+      - name: Install PostGIS binaries without populating the application schema
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec --user root -i "$POSTGRES_CONTAINER" sh < docker/postgres-places/install-postgis.sh
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -216,6 +220,12 @@ jobs:
         run: pnpm db:test-activity-streams
       - name: Prove stream API, invalidation and shared request budgeting
         run: pnpm db:test-stream-lifecycle
+      - name: Prove activity-place spatial indexes, constraints and erasure
+        run: pnpm db:test-activity-places
+      - name: Prove frozen catalogue imports are atomic and repeatable
+        run: pnpm db:test-place-catalogue
+      - name: Prove catalogue refresh, retirement and concurrent reader consistency
+        run: pnpm db:test-place-refresh
       - name: Prove photo catch-up preserves existing data
         run: pnpm db:test-photo-backfill
       - name: Prove conservative hourly stream backfill
