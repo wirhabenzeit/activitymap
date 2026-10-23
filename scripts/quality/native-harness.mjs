@@ -269,13 +269,16 @@ export async function runNativeHarness({
         'Requested IOS_DEVICE_NAME is unavailable; inspect xcrun simctl list devicetypes',
       );
       simulator = (
-        await command([
-          'simctl',
-          'create',
-          `ActivityMapQuality-${randomUUID()}`,
-          type.identifier,
-          runtime.identifier,
-        ])
+        await command(
+          [
+            'simctl',
+            'create',
+            `ActivityMapQuality-${randomUUID()}`,
+            type.identifier,
+            runtime.identifier,
+          ],
+          'simulator-create.log',
+        )
       ).trim();
       ownedSimulator = true;
     }
