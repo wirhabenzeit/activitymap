@@ -70,7 +70,9 @@
     "test:library-owner": "node scripts/run-library-owner-browser.mjs",
     "presentation:generate": "node scripts/generate-presentation.mjs",
     "presentation:check": "node scripts/generate-presentation.mjs --check && node --test scripts/presentation.test.mjs",
-    "test:browsing-ui": "tsx --test src/components/list/*.test.tsx"
+    "test:browsing-ui": "tsx --test src/components/list/*.test.tsx",
+    "db:test-on-demand-places": "tsx --conditions=react-server scripts/database/test-on-demand-places.ts",
+    "test:activity-places-ui": "node scripts/verify-activity-places.mjs"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
@@ -128,7 +130,7 @@
     "lucide-react": "^1.45.0",
     "mapbox-gl": "^3.30.0",
     "motion": "^13.4.4",
-    "next": "^16.3.8",
+    "next": "^16.4.3",
     "next-themes": "^0.4.6",
     "polygon-clipping": "0.15.7",
     "postgres": "^3.4.9",
@@ -164,7 +166,7 @@
     "babel-plugin-react-compiler": "19.1.0-rc.3",
     "drizzle-kit": "^0.31.10",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.3.8",
+    "eslint-config-next": "^16.4.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-drizzle": "^0.2.3",
     "eslint-plugin-react-compiler": "19.1.0-rc.2",

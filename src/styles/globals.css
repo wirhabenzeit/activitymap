@@ -261,3 +261,29 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Keep place cards in the product theme, including Mapbox's arrow. */
+.matched-place-popup .mapboxgl-popup-content {
+  padding: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  box-shadow: 0 4px 20px #0002;
+}
+.matched-place-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.matched-place-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.matched-place-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
+  border-top-color: hsl(var(--popover));
+}
+.matched-place-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.matched-place-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.matched-place-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
+  border-bottom-color: hsl(var(--popover));
+}
+.matched-place-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: hsl(var(--popover));
+}
+.matched-place-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: hsl(var(--popover));
+}

@@ -1,7 +1,9 @@
 'use client';
 
 import { type MapMouseEvent, Point, type PointLike } from 'mapbox-gl';
-import { useControl, type IControl } from 'react-map-gl/mapbox';
+import { type IControl, useControl } from 'react-map-gl/mapbox';
+
+import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
 
 const styles = `
 .boxdraw {
@@ -82,7 +84,14 @@ export class SelectionControl implements IControl {
     if (!this.map) return;
     if (
       e.originalEvent.target instanceof Element &&
-      e.originalEvent.target.closest('[data-map-photo]')
+      e.originalEvent.target.closest('[data-map-photo], [data-map-place]')
+    )
+      return;
+    if (
+      this.map.getLayer(MATCHED_PLACES_HIT_LAYER) &&
+      this.map.queryRenderedFeatures(e.point, {
+        layers: [MATCHED_PLACES_HIT_LAYER],
+      }).length
     )
       return;
     if (Date.now() < this.suppressClickUntil) return;
@@ -124,7 +133,7 @@ export class SelectionControl implements IControl {
   mouseDown = (e: MapMouseEvent) => {
     if (
       e.originalEvent.target instanceof Element &&
-      e.originalEvent.target.closest('[data-map-photo]')
+      e.originalEvent.target.closest('[data-map-photo], [data-map-place]')
     )
       return;
     if (!(e.originalEvent.shiftKey && e.originalEvent.button === 0)) return;

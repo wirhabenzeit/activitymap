@@ -1,29 +1,37 @@
 'use client';
 
-import { useEffect, useId, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ElevationPlot } from './elevation-plot';
-import { useElevationCursor } from '~/store/elevation-cursor';
 import { Loader2 } from 'lucide-react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 
-import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import { Button } from '~/components/ui/button';
+import type { StreamMetadata } from '~/contracts/v1/activity-streams';
+import { useActivityPlaces } from '~/hooks/use-activity-places';
 import {
-  toElevationProfile,
+  activityPlacesQueryRoot,
+  placesMatchProfile,
+} from '~/lib/activity-places';
+import {
+  STREAM_SUMMARY_PREFETCH_BATCH,
+  STREAM_SUMMARY_PREFETCH_CONCURRENCY,
+  type StreamSummaryResult,
   canManuallyRetryStreamSummary,
   isStreamSummaryCurrent,
   isStreamSummaryResultReusable,
   reconcileStreamSummaryMetadata,
-  STREAM_SUMMARY_PREFETCH_BATCH,
-  STREAM_SUMMARY_PREFETCH_CONCURRENCY,
   streamSummaryQueryKey,
   streamSummaryRefetchInterval,
-  type StreamSummaryResult,
+  toElevationProfile,
 } from '~/lib/activity-stream-summary';
 import {
   loadActivityStreamSummary,
   loadStoredStreamSummaryBatch,
 } from '~/lib/sync/stream-summary-sync';
+import { useActivityPlaceFocus } from '~/store/activity-place-focus';
+import { useElevationCursor } from '~/store/elevation-cursor';
+
+import { ActivityPlacesStatus } from './activity-places-status';
+import { ElevationPlot } from './elevation-plot';
 
 export type StreamSummaryActivity = {
   id: number;
@@ -120,6 +128,8 @@ export function ElevationChart({
   streamMetadata?: StreamMetadata;
 }) {
   const owner = useId();
+  const matchedPlaces = useActivityPlaces(activityId, streamMetadata);
+  const placeFocus = useActivityPlaceFocus((state) => state.focus);
   const queryClient = useQueryClient();
   const [retryClock, setRetryClock] = useState(() => Date.now());
   const queryKey = streamSummaryQueryKey(userId, activityId);
@@ -181,6 +191,51 @@ export function ElevationChart({
     () => () => useElevationCursor.getState().clearCursor(owner),
     [owner, profile, activityId, userId],
   );
+  const profileMatches = placesMatchProfile(
+    matchedPlaces.data,
+    query.data?.metadata,
+  );
+  const recheckedPlaceInput = useRef<string | null>(null);
+  useEffect(() => {
+    const metadata = query.data?.metadata;
+    const matches = matchedPlaces.data;
+    if (metadata?.state !== 'current' || !matches || matchedPlaces.isFetching)
+      return;
+    if (
+      matches.streamGeneration === metadata.generation &&
+      matches.streamRevision === metadata.revision
+    )
+      return;
+    const input = JSON.stringify([
+      userId,
+      activityId,
+      metadata.generation,
+      metadata.revision,
+    ]);
+    if (recheckedPlaceInput.current === input) return;
+    recheckedPlaceInput.current = input;
+    // Recheck only when a profile exposes newer input, not whenever its card opens.
+    void queryClient.invalidateQueries({
+      queryKey: activityPlacesQueryRoot(userId, activityId),
+    });
+  }, [
+    queryClient,
+    userId,
+    activityId,
+    query.data?.metadata,
+    matchedPlaces.data,
+    matchedPlaces.isFetching,
+  ]);
+  const placesStatus = matchedPlaces.enabled ? (
+    <ActivityPlacesStatus
+      data={matchedPlaces.data}
+      isLoading={matchedPlaces.isFetching}
+      isError={matchedPlaces.isError}
+      retry={() => {
+        void matchedPlaces.refetch();
+      }}
+    />
+  ) : null;
   const height = 165;
   const canRetry = canManuallyRetryStreamSummary(query.data, retryClock);
 
@@ -193,7 +248,24 @@ export function ElevationChart({
           <ElevationPlot
             key={`${userId}:${activityId}:${query.data?.metadata?.generation}:${query.data?.metadata?.revision}`}
             profile={profile}
+            places={profileMatches ? matchedPlaces.data?.places : []}
+            focusedPlaceKey={
+              placeFocus?.userId === userId &&
+              placeFocus.activityId === activityId
+                ? placeFocus.placeId + ':' + placeFocus.visitIndex
+                : undefined
+            }
             height={height}
+            placesStatus={placesStatus}
+            onPlaceSelect={(marker) =>
+              useActivityPlaceFocus.getState().setFocus({
+                userId,
+                activityId,
+                placeId: marker.placeId,
+                visitIndex: marker.visitIndex,
+                source: 'profile',
+              })
+            }
             onSelection={(index) => {
               const coordinate =
                 index === null ? undefined : profile.latlng?.[index];

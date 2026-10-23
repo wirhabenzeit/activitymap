@@ -2,6 +2,7 @@ import { type StateCreator } from 'zustand';
 
 import type { CurrentUserDTO } from '~/server/db/dto';
 
+import { resetActivityPlaceFocus } from './activity-place-focus';
 import { resetBrowsingContext } from './browsing';
 import { type RootState } from './index';
 
@@ -64,6 +65,7 @@ export const createAuthSlice: StateCreator<
         accountChanged ||
         state.user?.stravaConnected !== nextUser?.stravaConnected
       ) {
+        resetActivityPlaceFocus();
         state.authSession += 1;
       }
       if (accountChanged) {
