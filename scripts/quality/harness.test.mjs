@@ -34,6 +34,7 @@ import {
   nativeSuiteEligibility,
   nativeSuites,
   nativeTestProfile,
+  selectNativeSimulator,
   validateNativeSuites,
   validateNativeSummary,
 } from './native-harness.mjs';
@@ -580,5 +581,102 @@ test('fixture write failure removes only its newly created partial route', async
   assert.equal(
     await readFile(join(route, 'page.tsx'), 'utf8'),
     'developer fixture',
+  );
+});
+
+test('default simulator pairs the newest runtime with a supported phone instead of an incompatible hard-coded device', () => {
+  const oldPhone = {
+    name: 'iPhone 17 Pro',
+    identifier: 'phone17',
+    productFamily: 'iPhone',
+  };
+  const newPhone = {
+    name: 'iPhone 18 Pro',
+    identifier: 'phone18',
+    productFamily: 'iPhone',
+  };
+  const older = {
+    identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-0',
+    version: '27.0',
+    isAvailable: true,
+    supportedDeviceTypes: [oldPhone],
+  };
+  const newest = {
+    identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-1',
+    version: '27.1',
+    isAvailable: true,
+    supportedDeviceTypes: [newPhone],
+  };
+  assert.deepEqual(
+    selectNativeSimulator([older, newest], [oldPhone, newPhone]),
+    { runtime: newest, type: newPhone },
+  );
+  assert.deepEqual(
+    selectNativeSimulator([older, newest], [oldPhone, newPhone], oldPhone.name),
+    { runtime: older, type: oldPhone },
+  );
+  assert.deepEqual(selectNativeSimulator([older], [oldPhone, newPhone]), {
+    runtime: older,
+    type: oldPhone,
+  });
+});
+
+test('simulator selection ignores unavailable and unsupported platforms and preserves explicit-device errors', () => {
+  const phone = {
+    name: 'iPhone 17 Pro',
+    identifier: 'phone17',
+    productFamily: 'iPhone',
+  };
+  const runtime = {
+    identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-0',
+    version: '27.0',
+    isAvailable: true,
+    supportedDeviceTypes: [phone],
+  };
+  const unavailable = { ...runtime, version: '27.2', isAvailable: false };
+  const vision = {
+    ...runtime,
+    identifier: 'com.apple.CoreSimulator.SimRuntime.xrOS-27-1',
+    version: '27.1',
+  };
+  assert.deepEqual(
+    selectNativeSimulator([unavailable, vision, runtime], [phone]),
+    { runtime, type: phone },
+  );
+  assert.throws(
+    () => selectNativeSimulator([runtime], [phone], 'Missing phone'),
+    /IOS_DEVICE_NAME is unavailable/,
+  );
+  assert.throws(
+    () =>
+      selectNativeSimulator(
+        [{ ...runtime, supportedDeviceTypes: [] }],
+        [phone],
+        phone.name,
+      ),
+    /No available iOS 26\+ runtime supports/,
+  );
+});
+
+test('simulator selection does not lower the runtime floor or guess compatibility when the inventory is incomplete', () => {
+  const phone = {
+    name: 'iPhone 17 Pro',
+    identifier: 'phone17',
+    productFamily: 'iPhone',
+  };
+  const runtime = {
+    identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-25-0',
+    version: '25.0',
+    isAvailable: true,
+    supportedDeviceTypes: [phone],
+  };
+  assert.throws(() => selectNativeSimulator([runtime], [phone]), /iOS 26\+/);
+  assert.throws(
+    () =>
+      selectNativeSimulator(
+        [{ ...runtime, version: '27.1', supportedDeviceTypes: undefined }],
+        [phone],
+      ),
+    /no supported iPhone/,
   );
 });

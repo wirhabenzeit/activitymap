@@ -6,6 +6,54 @@ import { fileURLToPath } from 'node:url';
 
 import { runCommand } from './process.mjs';
 
+export function selectNativeSimulator(runtimes, devicetypes, requestedName) {
+  const available = runtimes
+    .filter(
+      (runtime) =>
+        runtime.isAvailable &&
+        runtime.identifier.includes('.iOS-') &&
+        Number(runtime.version.split('.')[0]) >= 26,
+    )
+    .sort((a, b) =>
+      b.version.localeCompare(a.version, undefined, { numeric: true }),
+    );
+  assert(available.length, 'Install an iOS 26+ simulator runtime in Xcode');
+  const supports = (runtime, type) =>
+    runtime.supportedDeviceTypes?.some(
+      (supported) => supported.identifier === type.identifier,
+    );
+  if (requestedName) {
+    const type = devicetypes.find((item) => item.name === requestedName);
+    assert(
+      type,
+      'Requested IOS_DEVICE_NAME is unavailable; inspect xcrun simctl list devicetypes',
+    );
+    const runtime = available.find((item) => supports(item, type));
+    assert(
+      runtime,
+      'No available iOS 26+ runtime supports IOS_DEVICE_NAME: ' + requestedName,
+    );
+    return { runtime, type };
+  }
+  const runtime = available[0];
+  const compatible = devicetypes.filter(
+    (type) => type.productFamily === 'iPhone' && supports(runtime, type),
+  );
+  const type =
+    compatible.find((item) => item.name === 'iPhone 17 Pro') ??
+    runtime.supportedDeviceTypes
+      ?.map((supported) =>
+        compatible.find((item) => item.identifier === supported.identifier),
+      )
+      .find((item) => item?.name.endsWith(' Pro')) ??
+    compatible[0];
+  assert(
+    type,
+    'The newest available iOS runtime has no supported iPhone device type',
+  );
+  return { runtime, type };
+}
+
 export const nativeSuites = [
   'ActivityMapTests/AdaptiveInspectionTests',
   'ActivityMapTests/BrowsingReconciliationTests',
@@ -246,28 +294,19 @@ export async function runNativeHarness({
       await command(['simctl', 'list', 'runtimes', '--json']),
     );
     if (!simulator) {
-      const runtime = runtimes
-        .filter(
-          (item) =>
-            item.isAvailable &&
-            item.identifier.includes('.iOS-') &&
-            Number(item.version.split('.')[0]) >= 26,
-        )
-        .sort((a, b) =>
-          b.version.localeCompare(a.version, undefined, { numeric: true }),
-        )[0];
-      assert(runtime, 'Install an iOS 26+ simulator runtime in Xcode');
       const { devicetypes } = JSON.parse(
         await command(['simctl', 'list', 'devicetypes', '--json']),
       );
-      const type = devicetypes.find(
-        (item) =>
-          item.name === (process.env.IOS_DEVICE_NAME || 'iPhone 17 Pro'),
+      await writeFile(
+        join(output, 'simulator-inventory.json'),
+        JSON.stringify({ runtimes, devicetypes }, null, 2),
       );
-      assert(
-        type,
-        'Requested IOS_DEVICE_NAME is unavailable; inspect xcrun simctl list devicetypes',
+      const { runtime, type } = selectNativeSimulator(
+        runtimes,
+        devicetypes,
+        process.env.IOS_DEVICE_NAME,
       );
+      manifest.deviceType = type.identifier;
       simulator = (
         await command(
           [
