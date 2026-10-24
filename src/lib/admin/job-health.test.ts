@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import { jobHealth, type JobRun } from './job-health.ts';
+import { type JobRun, jobHealth } from './job-health.ts';
 
 const now = new Date('2026-10-05T22:00:00Z');
 const minutesAgo = (minutes: number) =>
@@ -41,6 +42,16 @@ void test('a job is late after two and a half missed intervals', () => {
   assert.equal(rows['drain-webhook-inbox']!.health, 'late');
   assert.equal(rows['backfill-activity-streams']!.health, 'ok');
   assert.equal(rows['cleanup-rate-limits']!.health, 'late');
+});
+
+void test('matching health allows its fifteen-minute schedule', () => {
+  const run = (minutes: number): JobRun => ({
+    job: 'match-activity-places',
+    startedAt: minutesAgo(minutes),
+    status: 'completed',
+  });
+  assert.equal(byJob([run(30)])['match-activity-places']!.health, 'ok');
+  assert.equal(byJob([run(38)])['match-activity-places']!.health, 'late');
 });
 
 void test('the latest run decides failing and disabled, and failures are counted', () => {

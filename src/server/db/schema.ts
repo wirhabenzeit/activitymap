@@ -575,6 +575,45 @@ export const placeMatchingLease = pgTable('place_matching_lease', {
   }).notNull(),
 });
 
+// Dirty activities only. Source/version fences remain authoritative when the
+// worker reads and commits; this table avoids scanning settled activities.
+export const placeMatchingPending = pgTable(
+  'place_matching_pending',
+  {
+    activityId: bigint('activity_id', { mode: 'bigint' })
+      .primaryKey()
+      .references(() => activities.id, { onDelete: 'cascade' }),
+    availableAt: timestamp('available_at', { mode: 'date', withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index('place_matching_pending_available_idx').on(
+      table.availableAt,
+      table.activityId,
+    ),
+  ],
+);
+
+// The first worker after a catalogue/recipe change seeds pending work once.
+export const placeMatchingQueueState = pgTable(
+  'place_matching_queue_state',
+  {
+    singleton: boolean('singleton').primaryKey().default(true),
+    recipeHash: text('recipe_hash').notNull(),
+    catalogueSnapshotId: text('catalogue_snapshot_id').notNull(),
+    catalogueRevision: bigint('catalogue_revision', {
+      mode: 'bigint',
+    }).notNull(),
+  },
+  (table) => [
+    check(
+      'place_matching_queue_state_singleton_check',
+      sql`${table.singleton}`,
+    ),
+  ],
+);
+
 export const photos = pgTable(
   'photos',
   {

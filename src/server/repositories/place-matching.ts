@@ -89,9 +89,20 @@ type StoredCandidate = {
 const sameInput = (catalogue: MatchingCatalogue) =>
   sql`c.user_id=u.id AND c.stream_generation=s.generation AND c.stream_revision=s.revision AND c.source_version=s.source_version AND c.catalogue_snapshot_id=${catalogue.snapshotId} AND c.catalogue_revision=${catalogue.revision}::bigint`;
 
-/** One leased worker; no job queue to populate or invalidate. Eligibility is a
- * comparison with current input/version tuples, so a crash cannot lose work. */
+/** One leased worker with a durable pending index. Exact input/version tuples
+ * remain authoritative; crashes leave unacknowledged work eligible to resume. */
 export function createPlaceMatchingRepository(database: typeof db = db) {
+  let pendingQueueReady: boolean | undefined;
+  const hasPendingQueue = async () => {
+    pendingQueueReady ??=
+      (
+        await database.execute<{ ready: boolean }>(sql`
+          SELECT to_regclass('public.place_matching_pending') IS NOT NULL
+            AND to_regclass('public.place_matching_queue_state') IS NOT NULL AS ready
+        `)
+      ).rows[0]?.ready ?? false;
+    return pendingQueueReady;
+  };
   const catalogue = async (): Promise<MatchingCatalogue> => {
     const row = (
       await database.execute<{ snapshot_id: string | null; revision: string }>(
@@ -306,6 +317,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         throw new Error('Matching commit identity mismatch');
     }
     const candidates = writes.map((write) => write.candidate);
+    const usePendingQueue = await hasPendingQueue();
     return database.transaction(async (tx) => {
       await tx.execute(
         sql`SELECT set_config('statement_timeout','10000',true)`,
@@ -354,8 +366,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         result: response,
         result_revision: randomUUID(),
       }));
-      const rows = (
-        await tx.execute<{ activity_id: string }>(sql`
+      const writeChecks = sql`
         INSERT INTO activity_place_checks(activity_id,recipe_hash,user_id,stream_generation,stream_revision,source_version,catalogue_snapshot_id,catalogue_revision,matcher_version,discovery_version,parameters_hash,result,result_revision,checked_at,retry_at,error)
         SELECT a.id,${MATCHING_RECIPE_HASH},u.id,s.generation,s.revision,s.source_version,${catalogue.snapshotId},${catalogue.revision}::bigint,
           ${MATCHING_RECIPE.matcherVersion},${MATCHING_RECIPE.discoveryVersion},${MATCHING_RECIPE.parametersHash},requested.result,requested.result_revision,
@@ -365,8 +376,21 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         WHERE ${matchesRequest} AND ${current} AND ${connected}
         ORDER BY a.id
         ON CONFLICT(activity_id,recipe_hash) DO UPDATE SET user_id=EXCLUDED.user_id,stream_generation=EXCLUDED.stream_generation,stream_revision=EXCLUDED.stream_revision,source_version=EXCLUDED.source_version,catalogue_snapshot_id=EXCLUDED.catalogue_snapshot_id,catalogue_revision=EXCLUDED.catalogue_revision,matcher_version=EXCLUDED.matcher_version,discovery_version=EXCLUDED.discovery_version,parameters_hash=EXCLUDED.parameters_hash,result=EXCLUDED.result,result_revision=EXCLUDED.result_revision,checked_at=EXCLUDED.checked_at,retry_at=EXCLUDED.retry_at,error=EXCLUDED.error
-        RETURNING activity_id::text
-      `)
+        RETURNING activity_id,retry_at
+      `;
+      const rows = (
+        await tx.execute<{ activity_id: string }>(
+          usePendingQueue
+            ? sql`
+          WITH written AS (${writeChecks}),
+          finished AS (
+            DELETE FROM place_matching_pending p USING written w
+            WHERE p.activity_id=w.activity_id AND w.retry_at IS NULL
+          )
+          SELECT activity_id::text FROM written
+        `
+            : sql`WITH written AS (${writeChecks}) SELECT activity_id::text FROM written`,
+        )
       ).rows;
       const committed = rows.map((row) => row.activity_id);
       const committedSet = new Set(committed);
@@ -520,10 +544,68 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
       limit: number,
       activityIds?: string[],
     ): Promise<MatchingCandidate[]> {
+      if (!catalogue.snapshotId) return [];
+      const queued = await hasPendingQueue();
+      if (queued) {
+        // One atomic seed after catalogue/recipe changes. When unchanged, the
+        // empty changed CTE makes the activity scan a never-executed branch.
+        await database.execute(sql`
+          WITH changed AS (
+            INSERT INTO place_matching_queue_state(singleton,recipe_hash,catalogue_snapshot_id,catalogue_revision)
+            VALUES(true,${MATCHING_RECIPE_HASH},${catalogue.snapshotId},${catalogue.revision}::bigint)
+            ON CONFLICT(singleton) DO UPDATE SET recipe_hash=EXCLUDED.recipe_hash,
+              catalogue_snapshot_id=EXCLUDED.catalogue_snapshot_id,catalogue_revision=EXCLUDED.catalogue_revision
+            WHERE (place_matching_queue_state.recipe_hash,place_matching_queue_state.catalogue_snapshot_id,place_matching_queue_state.catalogue_revision)
+              IS DISTINCT FROM (EXCLUDED.recipe_hash,EXCLUDED.catalogue_snapshot_id,EXCLUDED.catalogue_revision)
+            RETURNING singleton
+          )
+          INSERT INTO place_matching_pending(activity_id,available_at)
+          SELECT a.id,CASE WHEN COALESCE((${sameInput(catalogue)}),false) THEN COALESCE(c.retry_at,statement_timestamp()) ELSE statement_timestamp() END
+          FROM activities a JOIN "user" u ON u.athlete_id=a.athlete
+          JOIN activity_streams s ON s.activity_id=a.id
+          LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
+          WHERE EXISTS(SELECT 1 FROM changed) AND ${connected}
+            AND s.fetched_at IS NOT NULL AND s.invalidated_at IS NULL
+            AND s.last_attempt_status<>'invalidated' AND s.payload IS NOT NULL
+            AND (NOT COALESCE((${sameInput(catalogue)}),false) OR c.result IS NULL)
+          ON CONFLICT(activity_id) DO UPDATE SET available_at=LEAST(place_matching_pending.available_at,EXCLUDED.available_at)
+        `);
+        // Reconnection or manual reset can mark an already-current result.
+        // Retire it using version metadata, without recomputing source hashes.
+        await database.execute(sql`
+          DELETE FROM place_matching_pending p USING activities a,"user" u,activity_streams s,activity_place_checks c
+          WHERE a.id=p.activity_id AND u.athlete_id=a.athlete AND s.activity_id=a.id
+            AND c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
+            AND ${sameInput(catalogue)} AND c.result IS NOT NULL
+        `);
+      }
       const rows = (
         await database.execute<StoredCandidate>(sql`
+        ${
+          queued
+            ? sql`WITH todo AS MATERIALIZED (
+          SELECT a.id,c.checked_at FROM place_matching_pending p
+          JOIN activities a ON a.id=p.activity_id JOIN "user" u ON u.athlete_id=a.athlete
+          JOIN activity_streams s ON s.activity_id=a.id
+          LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
+          WHERE p.available_at<=statement_timestamp() AND ${connected}
+            AND s.fetched_at IS NOT NULL AND s.invalidated_at IS NULL
+            AND s.last_attempt_status<>'invalidated' AND s.payload IS NOT NULL
+            AND (NOT COALESCE((${sameInput(catalogue)}),false) OR (c.result IS NULL AND (c.retry_at IS NULL OR c.retry_at<=statement_timestamp())))
+            ${
+              activityIds
+                ? sql`AND a.id IN (${sql.join(
+                    activityIds.map((id) => sql`${id}::bigint`),
+                    sql`, `,
+                  )})`
+                : sql``
+            }
+          ORDER BY c.checked_at ASC NULLS FIRST,a.id DESC LIMIT ${limit}
+        )`
+            : sql``
+        }
         SELECT a.id::text AS activity_id,u.id AS user_id,u.athlete_id AS athlete_id,s.generation,s.revision::text,s.source_version,a.map_bbox,a.start_latlng
-        FROM activities a JOIN "user" u ON u.athlete_id=a.athlete JOIN activity_streams s ON s.activity_id=a.id
+        FROM ${queued ? sql`todo t JOIN activities a ON a.id=t.id` : sql`activities a`} JOIN "user" u ON u.athlete_id=a.athlete JOIN activity_streams s ON s.activity_id=a.id
         LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
         WHERE ${connected} AND ${current} ${
           activityIds

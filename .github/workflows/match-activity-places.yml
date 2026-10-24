@@ -1,0 +1,33 @@
+name: Run encounter matching
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  match:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 2
+    steps:
+      - name: Run one bounded matching cycle
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request
+          secret = os.environ.get('CRON_SECRET')
+          if not secret:
+              raise RuntimeError('CRON_SECRET is not configured')
+          request = urllib.request.Request(
+              'https://activitymap.cc/api/cron/match-activity-places',
+              data=b'{}', method='POST',
+              headers={'x-cron-secret': secret, 'content-type': 'application/json'},
+          )
+          with urllib.request.urlopen(request, timeout=65) as response:
+              result = json.load(response)
+          print(json.dumps(result, indent=2))
+          if result.get('failed', 0):
+              raise RuntimeError('Matching reported activity failures')
+          PY

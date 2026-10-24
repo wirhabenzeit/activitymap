@@ -14,15 +14,16 @@ hourly jobs gaps of up to 9.7 hours. Vercel's Hobby plan only allows daily
 cron jobs. The `activitymap-cron` Worker in `cloudflare/cron` therefore
 triggers the routes on time:
 
-| Cron (UTC)    | Jobs, in order                                                                                                      |
-| ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `*/5 * * * *` | `drain-webhook-inbox`, `match-activity-places`                                                                      |
-| `0 * * * *`   | `cleanup-rate-limits`                                                                                               |
-| `17 * * * *`  | `erase-revoked-athletes`                                                                                            |
-| `37 * * * *`  | `reconcile-strava-summaries`, `backfill-activity-streams` (only if reconcile succeeded), `backfill-activity-photos` |
-| `47 * * * *`  | `sync-activities` (up to 30 detail refreshes and 30 older activities)                                               |
+| Cron (UTC)           | Jobs, in order                                                                                                      |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `*/5 * * * *`        | `drain-webhook-inbox`                                                                                               |
+| `2,17,32,47 * * * *` | `match-activity-places`                                                                                             |
+| `0 * * * *`          | `cleanup-rate-limits`                                                                                               |
+| `17 * * * *`         | `erase-revoked-athletes`                                                                                            |
+| `37 * * * *`         | `reconcile-strava-summaries`, `backfill-activity-streams` (only if reconcile succeeded), `backfill-activity-photos` |
+| `47 * * * *`         | `sync-activities` (up to 30 detail refreshes and 30 older activities)                                               |
 
-Place matching runs every five minutes over up to 500 stale activities, with a
+Place matching runs every fifteen minutes (at :02, :17, :32 and :47) over up to 500 stale activities, with a
 40-second work deadline and a recoverable two-minute lease. A bounded metadata
 pool of 2,000 candidates lets each group choose nearby activities while starting
 in freshness order. It uses only stored streams, loads nearby places once per
@@ -35,6 +36,14 @@ with bulk inserts in one transaction per group. Job metrics report input/commit
 batch counts and milliseconds spent reading inputs, loading places,
 matching/preparing tracks and committing results, so database overhead can be
 distinguished from local computation.
+An indexed pending-work table tracks stream changes, failures awaiting retry,
+manual check resets and reconnections. Catalogue/recipe changes seed a catch-up
+once; settled runs do not scan/hash every activity. The existing source,
+authorization, catalogue and lease checks still guard each pending item.
+Queue acknowledgements commit atomically with checks and sync events, so a
+crashed or failed write leaves the work pending. The manual **Run encounter
+matching** GitHub workflow runs one bounded cycle from reviewed `main`; it adds
+no recurring schedule and keeps credentials in the existing Actions secret.
 See [matching versions and invalidation](on-demand-places.md#persistent-checks-versions-and-invalidation).
 
 Each hour, stream backfill handles up to 40 activities (60 Strava requests)

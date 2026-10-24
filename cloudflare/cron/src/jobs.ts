@@ -18,6 +18,9 @@ export const SCHEDULES: Record<string, CronJob[]> = {
   // New and changed activities arrive through Strava webhooks.
   '*/5 * * * *': [
     { name: 'drain-webhook-inbox', path: '/api/cron/drain-webhook-inbox' },
+  ],
+  // Offset from the webhook trigger so the quarter-hour drain finishes first.
+  '2,17,32,47 * * * *': [
     { name: 'match-activity-places', path: '/api/cron/match-activity-places' },
   ],
   '0 * * * *': [

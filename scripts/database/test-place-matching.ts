@@ -288,6 +288,29 @@ try {
   const changes = createChangesRepository(database);
   const beforeMatch = await changes.latestSequence(actor.athleteId);
   assert.equal((await run()).saved, 1);
+  assert.equal(
+    (
+      await client`SELECT count(*)::integer AS count FROM place_matching_pending`
+    )[0]?.count,
+    0,
+    'Successful checks retire pending work',
+  );
+  // Prove the idle path does not evaluate even one activity's source hash.
+  // Restore the real function before any later fixture writes/triggers.
+  const sourceDefinition = (
+    await client`SELECT pg_get_functiondef('activity_stream_source(activities)'::regprocedure) AS definition`
+  )[0]!.definition as string;
+  await client.unsafe(
+    "CREATE OR REPLACE FUNCTION activity_stream_source(a activities) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE STRICT AS $$ BEGIN RAISE EXCEPTION 'idle worker scanned an activity source'; END; $$",
+  );
+  try {
+    const idle = await run();
+    assert.equal(idle.selected, 0);
+    assert.equal(idle.inputBatches, 0);
+    assert.equal(idle.placesLoaded, 0);
+  } finally {
+    await client.unsafe(sourceDefinition);
+  }
   assert.equal((await coverage())?.checked, 1);
   assert.equal((await coverage())?.pending, 0);
   const events = await changes.findAfter(actor.athleteId, beforeMatch);
@@ -518,6 +541,8 @@ try {
   assert(atomicToken);
   const beforeAtomic =
     await client`SELECT activity_id::text,result_revision::text FROM activity_place_checks WHERE recipe_hash=${MATCHING_RECIPE_HASH} ORDER BY activity_id`;
+  const pendingBeforeAtomic =
+    await client`SELECT activity_id::text,available_at::text FROM place_matching_pending ORDER BY activity_id`;
   const feedHighWater =
     await client`SELECT max(sequence)::text AS sequence FROM sync_change`;
   await client.unsafe(
@@ -539,6 +564,11 @@ try {
       await client`SELECT activity_id::text,result_revision::text FROM activity_place_checks WHERE recipe_hash=${MATCHING_RECIPE_HASH} ORDER BY activity_id`,
       beforeAtomic,
       'A failed feed insert rolls back every result in the batch',
+    );
+    assert.deepEqual(
+      await client`SELECT activity_id::text,available_at::text FROM place_matching_pending ORDER BY activity_id`,
+      pendingBeforeAtomic,
+      'A failed feed insert also rolls back queue acknowledgements',
     );
     assert.deepEqual(
       await client`SELECT max(sequence)::text AS sequence FROM sync_change`,
@@ -796,6 +826,17 @@ try {
   assert.equal((await coverage())?.retryWaiting, 1);
   assert.equal((await coverage())?.failed, 1);
   assert.equal((await coverage())?.pending, 0);
+  await client`UPDATE activity_place_checks SET retry_at=clock_timestamp()-interval '1 second' WHERE activity_id=${id}::bigint AND recipe_hash=${MATCHING_RECIPE_HASH}`;
+  assert.equal(
+    (await repository.candidates(evaluated.catalogue, 500)).length,
+    1,
+    'Due failures are discoverable through the pending-work index',
+  );
+  await client`UPDATE activity_place_checks SET retry_at=clock_timestamp()+interval '5 minutes' WHERE activity_id=${id}::bigint AND recipe_hash=${MATCHING_RECIPE_HASH}`;
+  assert.equal(
+    (await repository.candidates(evaluated.catalogue, 500)).length,
+    0,
+  );
   await client`UPDATE places SET display_name=display_name WHERE id=(SELECT id FROM places LIMIT 1)`;
   assert.equal(
     (await coverage())?.pending,

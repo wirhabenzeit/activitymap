@@ -27,6 +27,7 @@ const { values } = parseArgs({
   options: {
     limit: { type: 'string', default: '500' },
     mode: { type: 'string', default: 'after' },
+    idle: { type: 'boolean', default: false },
     out: {
       type: 'string',
       default: 'output/quality/batch-places/io-after.json',
@@ -103,77 +104,129 @@ if (values.mode === 'before') {
   factory = previousRepository.createPlaceMatchingRepository;
 }
 try {
-  const expected = await admin<
-    { activity_id: string; result: ActivityPlacesResponse }[]
-  >`
+  if (values.idle) {
+    const beforeFeed = (
+      await admin<
+        { count: number }[]
+      >`SELECT count(*)::integer AS count FROM sync_change`
+    )[0]!.count;
+    const activities = (
+      await admin<
+        { count: number }[]
+      >`SELECT count(*)::integer AS count FROM activities`
+    )[0]!.count;
+    assert(
+      activities >= 1000,
+      'Idle benchmarks require a settled snapshot with at least 1,000 activities',
+    );
+    const runs = [];
+    for (let i = 0; i < 3; i++) {
+      statements = 0;
+      const started = performance.now();
+      const result = await worker({
+        repository: factory(database),
+        loadSnapshot: (selection) =>
+          loadBatchPlaceCatalogue(database, selection),
+      });
+      assert.equal(
+        result.selected,
+        0,
+        'Settle all eligible matching work before the idle benchmark',
+      );
+      assert.equal(result.failed, 0);
+      assert.equal(result.stopReason, 'complete');
+      runs.push({ wallMs: performance.now() - started, statements, ...result });
+    }
+    assert.equal(
+      (await admin`SELECT count(*)::integer AS count FROM sync_change`)[0]!
+        .count,
+      beforeFeed,
+      'Idle runs must not publish sync events',
+    );
+    const report = {
+      mode: values.mode,
+      activities,
+      runs,
+      scope:
+        'Idle worker on a guarded local snapshot with real leases/checkpoint reads; no matching or sync events. First run includes queue initialization when needed.',
+    };
+    await mkdir(dirname(values.out), { recursive: true });
+    await writeFile(values.out, JSON.stringify(report, null, 2) + '\n');
+    console.log(JSON.stringify(report, null, 2));
+  } else {
+    const expected = await admin<
+      { activity_id: string; result: ActivityPlacesResponse }[]
+    >`
     SELECT a.id::text AS activity_id,c.result FROM activity_place_checks c
     JOIN activities a ON a.id=c.activity_id JOIN activity_streams s ON s.activity_id=a.id
     WHERE c.recipe_hash=${MATCHING_RECIPE_HASH} AND c.result IS NOT NULL
       AND c.stream_generation=s.generation AND c.stream_revision=s.revision AND c.source_version=s.source_version
     ORDER BY a.id LIMIT ${limit}
   `;
-  assert.equal(
-    expected.length,
-    limit,
-    'Restore a settled reference snapshot into this isolated test database first',
-  );
-  const ids = expected.map((row) => row.activity_id);
-  const beforeFeed = (
-    await admin`SELECT count(*)::integer AS count FROM sync_change`
-  )[0]!.count as number;
-  await admin`DELETE FROM activity_place_checks WHERE recipe_hash=${MATCHING_RECIPE_HASH} AND activity_id=ANY(${ids}::bigint[])`;
-  statements = 0;
-  const started = performance.now(),
-    cpu = process.cpuUsage();
-  const runs = [];
-  let saved = 0;
-  while (saved < limit) {
-    const result = await worker({
-      repository: factory(database),
-      activityIds: ids,
-      activityLimit: Math.min(500, limit - saved),
-      loadSnapshot: (selection) => loadBatchPlaceCatalogue(database, selection),
-    });
-    assert.equal(result.failed, 0);
-    assert.equal(result.superseded, 0);
-    assert(result.saved > 0, 'Write benchmark made no durable progress');
-    saved += result.saved;
-    runs.push(result);
+    assert.equal(
+      expected.length,
+      limit,
+      'Restore a settled reference snapshot into this isolated test database first',
+    );
+    const ids = expected.map((row) => row.activity_id);
+    const beforeFeed = (
+      await admin`SELECT count(*)::integer AS count FROM sync_change`
+    )[0]!.count as number;
+    await admin`DELETE FROM activity_place_checks WHERE recipe_hash=${MATCHING_RECIPE_HASH} AND activity_id=ANY(${ids}::bigint[])`;
+    statements = 0;
+    const started = performance.now(),
+      cpu = process.cpuUsage();
+    const runs = [];
+    let saved = 0;
+    while (saved < limit) {
+      const result = await worker({
+        repository: factory(database),
+        activityIds: ids,
+        activityLimit: Math.min(500, limit - saved),
+        loadSnapshot: (selection) =>
+          loadBatchPlaceCatalogue(database, selection),
+      });
+      assert.equal(result.failed, 0);
+      assert.equal(result.superseded, 0);
+      assert(result.saved > 0, 'Write benchmark made no durable progress');
+      saved += result.saved;
+      runs.push(result);
+    }
+    const wallSeconds = (performance.now() - started) / 1000,
+      used = process.cpuUsage(cpu);
+    const persisted = await admin<
+      { activity_id: string; result: ActivityPlacesResponse }[]
+    >`SELECT activity_id::text AS activity_id,result FROM activity_place_checks WHERE recipe_hash=${MATCHING_RECIPE_HASH} AND activity_id=ANY(${ids}::bigint[]) ORDER BY activity_id`;
+    assert.deepEqual(
+      persisted.map((row) => ({ ...row })),
+      expected.map((row) => ({ ...row })),
+      'Durable results differ from the reference',
+    );
+    const afterFeed = (
+      await admin`SELECT count(*)::integer AS count FROM sync_change`
+    )[0]!.count as number;
+    assert.equal(
+      afterFeed - beforeFeed,
+      limit,
+      'Exactly one sync event per committed result',
+    );
+    const report = {
+      mode: values.mode,
+      measuredAt: new Date().toISOString(),
+      activities: saved,
+      statements,
+      statementsPerActivity: statements / saved,
+      wallSeconds,
+      applicationCpuSeconds: (used.user + used.system) / 1e6,
+      peakProcessRssMiB: process.resourceUsage().maxRSS / 1024,
+      runs,
+      scope:
+        'Guarded local snapshot; real input reads, leases, freshness/authorization locks, result upserts, sync-feed inserts and commits. Each persisted result and sync-event count verified. No production writes or Strava calls. Local RTT/hardware differ from production.',
+    };
+    await mkdir(dirname(values.out), { recursive: true });
+    await writeFile(values.out, JSON.stringify(report, null, 2) + '\n');
+    console.log(JSON.stringify(report, null, 2));
   }
-  const wallSeconds = (performance.now() - started) / 1000,
-    used = process.cpuUsage(cpu);
-  const persisted = await admin<
-    { activity_id: string; result: ActivityPlacesResponse }[]
-  >`SELECT activity_id::text AS activity_id,result FROM activity_place_checks WHERE recipe_hash=${MATCHING_RECIPE_HASH} AND activity_id=ANY(${ids}::bigint[]) ORDER BY activity_id`;
-  assert.deepEqual(
-    persisted.map((row) => ({ ...row })),
-    expected.map((row) => ({ ...row })),
-    'Durable results differ from the reference',
-  );
-  const afterFeed = (
-    await admin`SELECT count(*)::integer AS count FROM sync_change`
-  )[0]!.count as number;
-  assert.equal(
-    afterFeed - beforeFeed,
-    limit,
-    'Exactly one sync event per committed result',
-  );
-  const report = {
-    mode: values.mode,
-    measuredAt: new Date().toISOString(),
-    activities: saved,
-    statements,
-    statementsPerActivity: statements / saved,
-    wallSeconds,
-    applicationCpuSeconds: (used.user + used.system) / 1e6,
-    peakProcessRssMiB: process.resourceUsage().maxRSS / 1024,
-    runs,
-    scope:
-      'Guarded local snapshot; real input reads, leases, freshness/authorization locks, result upserts, sync-feed inserts and commits. Each persisted result and sync-event count verified. No production writes or Strava calls. Local RTT/hardware differ from production.',
-  };
-  await mkdir(dirname(values.out), { recursive: true });
-  await writeFile(values.out, JSON.stringify(report, null, 2) + '\n');
-  console.log(JSON.stringify(report, null, 2));
 } finally {
   await pool.end();
   await admin.end();

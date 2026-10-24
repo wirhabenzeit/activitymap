@@ -101,7 +101,11 @@ void test('a network error is reported, not thrown', async () => {
   const { fetch } = fakeFetch({
     '/api/cron/drain-webhook-inbox': new Error('connection reset'),
   });
-  const [result, matching] = await runSchedule('*/5 * * * *', {
+  const [result] = await runSchedule('*/5 * * * *', {
+    ...options,
+    fetch,
+  });
+  const [matching] = await runSchedule('2,17,32,47 * * * *', {
     ...options,
     fetch,
   });
@@ -115,6 +119,21 @@ void test('a network error is reported, not thrown', async () => {
   assert.equal(result!.status, 'error');
   assert.equal(result!.body, 'connection reset');
   assert.equal(isSuccess(result!), false);
+});
+
+void test('webhooks keep five-minute cadence while matching runs independently every fifteen minutes', async () => {
+  const { fetch, calls } = fakeFetch({});
+  await runSchedule('*/5 * * * *', { ...options, fetch });
+  assert.deepEqual(
+    calls.map((call) => new URL(call.url).pathname),
+    ['/api/cron/drain-webhook-inbox'],
+  );
+  calls.length = 0;
+  await runSchedule('2,17,32,47 * * * *', { ...options, fetch });
+  assert.deepEqual(
+    calls.map((call) => new URL(call.url).pathname),
+    ['/api/cron/match-activity-places'],
+  );
 });
 
 void test('an unknown trigger is an error rather than a silent no-op', async () => {
