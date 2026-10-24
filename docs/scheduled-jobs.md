@@ -89,6 +89,18 @@ activities, throughput, batch counts and input/place/matching/commit timings.
 Absent metrics on older runs are shown as unavailable. Refresh reads a new
 snapshot without fetching from Strava or starting matching work.
 
+The admin page has an explicit 60-second function limit for cold-start/network
+headroom. Coverage materializes source/version facts once per activity before
+aggregating; repeating the source hash per count made the query alone exceed
+the previous 10-second default. On the same 4,602-activity local snapshot, the
+query fell from 10.33 s to 1.46 s with identical counts, and the complete
+dashboard data load took 1.75 s. These are local measurements. Production logs
+record total, initial-read and ingestion-read milliseconds plus account count.
+Reproduce the full data-loading path with `pnpm benchmark:admin-dashboard` on a
+local snapshot; it requires at least 1,000 activities by default (override
+`--min-activities`) and refuses remote databases. This exercises real reads;
+rendering a page with synthetic data alone does not validate query performance.
+
 An activity failure does not fail the whole run: `completed` means the job
 finished, while `failed` counts its individual activity failures. Detail and
 stream retries back off from one hour to at most 24 hours. A stream run can

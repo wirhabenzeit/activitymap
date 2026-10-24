@@ -78,7 +78,8 @@
     "db:test-place-matching": "tsx --conditions=react-server scripts/database/test-place-matching.ts",
     "places:match-local": "tsx --conditions=react-server scripts/match-activity-places.ts",
     "benchmark:regional-place-matching": "tsx --conditions=react-server scripts/benchmark-regional-place-matching.ts",
-    "benchmark:place-matching-io": "tsx --conditions=react-server scripts/benchmark-place-matching-io.ts"
+    "benchmark:place-matching-io": "tsx --conditions=react-server scripts/benchmark-place-matching-io.ts",
+    "benchmark:admin-dashboard": "tsx --conditions=react-server scripts/benchmark-admin-dashboard.ts"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
