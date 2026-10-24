@@ -25,8 +25,6 @@ export const SCHEDULES: Record<string, CronJob[]> = {
   ],
   '0 * * * *': [
     { name: 'cleanup-rate-limits', path: '/api/cron/cleanup-rate-limits' },
-  ],
-  '17 * * * *': [
     {
       name: 'erase-revoked-athletes',
       path: '/api/cron/erase-revoked-athletes',
