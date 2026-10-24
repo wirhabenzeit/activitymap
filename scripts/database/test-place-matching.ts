@@ -71,7 +71,16 @@ neonConfig.forceDisablePgSSL = true;
 neonConfig.pipelineConnect = false;
 neonConfig.wsProxy = () => `127.0.0.1:${address.port}/v2`;
 const pool = new Pool({ connectionString: target.connectionString, max: 2 });
-const database = drizzle({ client: pool, schema });
+const statements: string[] = [];
+const database = drizzle({
+  client: pool,
+  schema,
+  logger: {
+    logQuery(query) {
+      statements.push(query);
+    },
+  },
+});
 const actor: Actor = {
   userId: `on-demand-${randomUUID()}`,
   athleteId: 9345001,
@@ -378,6 +387,155 @@ try {
     2,
   );
   assert.equal((await run()).saved, 2);
+  // Multiple owners share bounded input queries and one atomic write/feed
+  // transaction. A stale row is excluded without discarding valid neighbours.
+  const evaluateBatch = async () => {
+    const catalogue = await repository.catalogue();
+    const candidates = await repository.candidates(catalogue, 500);
+    const before = statements.length;
+    const inputs = await repository.readInputs(candidates);
+    assert.equal(
+      statements.length - before,
+      2,
+      'Batch inputs use two queries regardless of activity count',
+    );
+    assert.equal(inputs.consumed, 2);
+    const matcher = createBatchActivityPlaceMatcher({
+      snapshot: await loadBatchPlaceCatalogue(database),
+      policy: SERVER_MATCHER_POLICY,
+    });
+    return {
+      catalogue,
+      writes: await Promise.all(
+        candidates.map(async (candidate) => ({
+          candidate,
+          response: await matcher.match({
+            userId: candidate.userId,
+            activityId: candidate.activityId,
+            input: inputs.inputs.get(candidate.activityId)!,
+          }),
+        })),
+      ),
+    };
+  };
+  await client`UPDATE activity_streams SET revision=revision+1 WHERE activity_id IN (${id}::bigint,${secondId}::bigint)`;
+  const bulkCandidates = await repository.candidates(
+    await repository.catalogue(),
+    500,
+  );
+  const boundedInputs = await repository.readInputs(bulkCandidates, 3);
+  assert.equal(
+    boundedInputs.consumed,
+    1,
+    'The input sample budget defers the rest of a large geographic group',
+  );
+  assert.equal(boundedInputs.inputs.size, 1);
+  const sizeCache = new Map<string, number>();
+  await repository.readInputs(bulkCandidates, 3, sizeCache);
+  const cachedReadStart = statements.length;
+  assert.equal(
+    (await repository.readInputs(bulkCandidates.slice(1), 3, sizeCache)).inputs
+      .size,
+    1,
+  );
+  assert.equal(
+    statements.length - cachedReadStart,
+    1,
+    'Deferred tracks reuse sample counts, while payloads are read afresh',
+  );
+  await client`UPDATE account SET revoked_at=now() WHERE id=${actor.userId}`;
+  assert.equal(
+    (
+      await repository.readInputs(bulkCandidates, 100_000, sizeCache)
+    ).inputs.has(id),
+    false,
+    'Cached sizes never bypass current account authorization',
+  );
+  await client`UPDATE account SET revoked_at=NULL WHERE id=${actor.userId}`;
+  await client`UPDATE activity_streams SET revision=revision+1 WHERE activity_id=${id}::bigint`;
+  assert.equal(
+    (
+      await repository.readInputs(bulkCandidates, 100_000, sizeCache)
+    ).inputs.has(id),
+    false,
+    'Cached sizes never bypass current stream identity',
+  );
+  const forged = {
+    ...bulkCandidates.find((candidate) => candidate.activityId === id)!,
+    userId: other.userId,
+    athleteId: other.athleteId,
+  };
+  assert.equal(
+    (await repository.readInputs([forged])).inputs.size,
+    0,
+    'Bulk input reads cannot disclose another account',
+  );
+  const bulk = await evaluateBatch();
+  const bulkToken = await repository.acquire();
+  assert(bulkToken);
+  await client`UPDATE activity_streams SET revision=revision+1 WHERE activity_id=${id}::bigint`;
+  const queryStart = statements.length;
+  const partial = await repository.commitMany(
+    bulkToken,
+    bulk.catalogue,
+    bulk.writes,
+  );
+  assert.deepEqual(partial, { committed: [secondId], fenceLost: false });
+  assert(
+    statements.length - queryStart <= 14,
+    'Batch writes use a fixed number of statements across owners',
+  );
+  await repository.release(bulkToken);
+  await run();
+
+  await client`UPDATE activity_streams SET revision=revision+1 WHERE activity_id IN (${id}::bigint,${secondId}::bigint)`;
+  const atomicBatch = await evaluateBatch();
+  const atomicToken = await repository.acquire();
+  assert(atomicToken);
+  const beforeAtomic =
+    await client`SELECT activity_id::text,result_revision::text FROM activity_place_checks WHERE recipe_hash=${MATCHING_RECIPE_HASH} ORDER BY activity_id`;
+  const feedHighWater =
+    await client`SELECT max(sequence)::text AS sequence FROM sync_change`;
+  await client.unsafe(
+    `CREATE FUNCTION test_reject_batch_feed() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.entity_id='${id}' THEN RAISE EXCEPTION 'injected batch feed failure'; END IF; RETURN NEW; END $$`,
+  );
+  await client.unsafe(
+    'CREATE TRIGGER test_reject_batch_feed BEFORE INSERT ON sync_change FOR EACH ROW EXECUTE FUNCTION test_reject_batch_feed()',
+  );
+  try {
+    await assert.rejects(
+      repository.commitMany(
+        atomicToken,
+        atomicBatch.catalogue,
+        atomicBatch.writes,
+      ),
+      /Failed query|injected batch feed failure/,
+    );
+    assert.deepEqual(
+      await client`SELECT activity_id::text,result_revision::text FROM activity_place_checks WHERE recipe_hash=${MATCHING_RECIPE_HASH} ORDER BY activity_id`,
+      beforeAtomic,
+      'A failed feed insert rolls back every result in the batch',
+    );
+    assert.deepEqual(
+      await client`SELECT max(sequence)::text AS sequence FROM sync_change`,
+      feedHighWater,
+    );
+  } finally {
+    await client.unsafe('DROP TRIGGER test_reject_batch_feed ON sync_change');
+    await client.unsafe('DROP FUNCTION test_reject_batch_feed()');
+  }
+  await client`UPDATE places SET display_name=display_name WHERE id=(SELECT id FROM places LIMIT 1)`;
+  assert.deepEqual(
+    await repository.commitMany(
+      atomicToken,
+      atomicBatch.catalogue,
+      atomicBatch.writes,
+    ),
+    { committed: [], fenceLost: true },
+    'A changed catalogue rejects the whole batch',
+  );
+  await repository.release(atomicToken);
+  assert.equal((await run()).saved, 2);
   await client`DELETE FROM activities WHERE id=${secondId}::bigint`;
   await client`UPDATE activities SET distance=COALESCE(distance,0)+1 WHERE id=${id}::bigint`;
   assert.equal(
@@ -390,7 +548,8 @@ try {
   await run();
 
   // Concurrent matching and activity writers cannot commit a later sequence
-  // before an earlier allocation for the same athlete becomes visible.
+  // before an earlier allocation for the same athlete becomes visible. Reverse
+  // owner order in the second batch to exercise deterministic multi-owner locks.
   let releaseWriter!: () => void;
   let writerReady!: () => void;
   const releaseGate = new Promise<void>((resolve) => {
@@ -408,6 +567,12 @@ try {
           entityId: id,
           operation: 'upsert',
         },
+        {
+          athleteId: other.athleteId,
+          entityType: 'activity',
+          entityId: secondId,
+          operation: 'delete',
+        },
       ],
       tx,
     );
@@ -422,6 +587,12 @@ try {
     .transaction(async (tx) => {
       const rows = await changes.record(
         [
+          {
+            athleteId: other.athleteId,
+            entityType: 'activity',
+            entityId: secondId,
+            operation: 'delete',
+          },
           {
             athleteId: actor.athleteId,
             entityType: 'activity',
@@ -462,7 +633,11 @@ try {
     firstWriter,
     secondWriter,
   ]);
-  assert(firstEvents[0]!.sequence < secondEvents[0]!.sequence);
+  for (const athleteId of [actor.athleteId, other.athleteId])
+    assert(
+      firstEvents.find((event) => event.athleteId === athleteId)!.sequence <
+        secondEvents.find((event) => event.athleteId === athleteId)!.sequence,
+    );
   assert.equal((await changes.findAfter(actor.athleteId, highWater)).length, 2);
 
   // Algorithm/discovery/settings identity changes invalidate all prior recipes.

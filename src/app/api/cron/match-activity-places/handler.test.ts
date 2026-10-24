@@ -12,6 +12,12 @@ const result = {
   groups: 0,
   placesLoaded: 0,
   elapsedMs: 0,
+  inputBatches: 0,
+  commitBatches: 0,
+  inputReadMs: 0,
+  catalogueLoadMs: 0,
+  matchingMs: 0,
+  commitMs: 0,
   stopReason: 'complete' as const,
 };
 const request = (body = '{}', secret = 'secret') =>

@@ -52,9 +52,28 @@ export function createActivityClusterQueue<
     candidate,
     point: activityClusterPoint(candidate.locationHint ?? {}),
   }));
+  const priority = new Map(
+    candidates.map((candidate, index) => [candidate, index]),
+  );
   return {
     get size() {
       return remaining.length;
+    },
+    restore(deferred: readonly T[]) {
+      for (const candidate of deferred) {
+        if (
+          !priority.has(candidate) ||
+          remaining.some((entry) => entry.candidate === candidate)
+        )
+          throw new Error('Invalid deferred matching candidate');
+        remaining.push({
+          candidate,
+          point: activityClusterPoint(candidate.locationHint ?? {}),
+        });
+      }
+      remaining.sort(
+        (a, b) => priority.get(a.candidate)! - priority.get(b.candidate)!,
+      );
     },
     take(seed?: T, fillSparseGroup = false): T | undefined {
       if (!remaining.length) return undefined;

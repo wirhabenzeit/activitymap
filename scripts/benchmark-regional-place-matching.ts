@@ -124,24 +124,34 @@ while (verified < candidates.length) {
       release: async () => undefined,
       candidates: async (_catalogue, limit) =>
         [...remaining.values()].slice(0, limit),
-      readInput: async (candidate) => {
-        pendingReads++;
-        return repository.readInput(candidate);
+      readInputs: async (candidates, budget, sizeCache) => {
+        const result = await repository.readInputs(
+          candidates,
+          budget,
+          sizeCache,
+        );
+        pendingReads += result.consumed;
+        return result;
       },
-      commit: async (_token, version, candidate, response) => {
+      commitMany: async (_token, version, writes) => {
         assert.deepEqual(version, catalogue, 'Catalogue changed');
-        assert(response, 'Regional run failed instead of matching');
-        assert.deepEqual(
-          response,
-          expected.get(candidate.activityId),
-          `Regional result differs for activity ${candidate.activityId}`,
-        );
-        assert(
-          // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
-          remaining.delete(candidate.activityId),
-          'Candidate matched more than once',
-        );
-        return true;
+        for (const { candidate, response } of writes) {
+          assert(response, 'Regional run failed instead of matching');
+          assert.deepEqual(
+            response,
+            expected.get(candidate.activityId),
+            `Regional result differs for activity ${candidate.activityId}`,
+          );
+          assert(
+            // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
+            remaining.delete(candidate.activityId),
+            'Candidate matched more than once',
+          );
+        }
+        return {
+          committed: writes.map((write) => write.candidate.activityId),
+          fenceLost: false,
+        };
       },
     },
     loadSnapshot: async (selection) => {

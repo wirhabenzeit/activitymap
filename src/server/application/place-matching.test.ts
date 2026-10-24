@@ -44,6 +44,42 @@ function fixture() {
       revision: '1',
     }),
     candidates: async () => [candidate],
+    readInputs: async (candidates) => ({
+      consumed: candidates.length,
+      inputs: new Map(
+        (
+          await Promise.all(
+            candidates.map(
+              async (candidate) =>
+                [
+                  candidate.activityId,
+                  await repository.readInput(candidate),
+                ] as const,
+            ),
+          )
+        ).filter(
+          (entry): entry is readonly [string, NonNullable<(typeof entry)[1]>] =>
+            entry[1] !== null,
+        ),
+      ),
+    }),
+    commitMany: async (token, catalogue, writes) => ({
+      committed: (
+        await Promise.all(
+          writes.map(async (write) =>
+            (await repository.commit(
+              token,
+              catalogue,
+              write.candidate,
+              write.response,
+            ))
+              ? write.candidate.activityId
+              : null,
+          ),
+        )
+      ).filter((id): id is string => id !== null),
+      fenceLost: false,
+    }),
     readInput: async () => ({ generation: 'g', revision: '1', payload: {} }),
     commit: async (_token, _catalogue, _candidate, result) => {
       calls.push(result ? result.status : 'failed');
@@ -128,8 +164,14 @@ void test('input changes fence a batch; missing streams skip locally and failure
   failed.repository.readInput = async () => {
     throw new Error('temporary storage failure');
   };
-  assert.equal((await processPlaceMatching(failed)).failed, 1);
-  assert(failed.calls.includes('failed'));
+  await assert.rejects(
+    processPlaceMatching(failed),
+    /temporary storage failure/,
+  );
+  assert(
+    !failed.calls.includes('failed'),
+    'A failed bulk read must not mark unread activities as matching failures',
+  );
   assert.equal(failed.calls.at(-1), 'release');
 });
 
@@ -312,7 +354,7 @@ void test('missing location hints cannot grow a group beyond the sparse fill siz
   assert.equal(result.groups, 2);
 });
 
-void test('slow input loading starts saving before a large group exhausts the run deadline', async () => {
+void test('computed results are checkpointed when matching reaches the run deadline', async () => {
   const f = fixture();
   f.repository.candidates = async () =>
     Array.from({ length: 500 }, (_, i) => ({
@@ -321,16 +363,55 @@ void test('slow input loading starts saving before a large group exhausts the ru
       locationHint: { start: [47, 8] },
     }));
   let now = 0;
-  f.repository.readInput = async () => {
-    now += 100;
-    return { generation: 'g', revision: '1', payload: {} };
-  };
-  const result = await processPlaceMatching({ ...f, clock: () => now });
-  assert(
-    result.saved > 0,
-    'A slow-read run must checkpoint work instead of loading until its deadline',
-  );
+  const result = await processPlaceMatching({
+    ...f,
+    clock: () => now++,
+    timeMs: 100,
+  });
+  assert(result.saved > 0, 'A deadline must not discard the completed prefix');
   assert(result.groups > 1);
   assert.equal(result.stopReason, 'deadline');
   assert.equal(f.calls.at(-1), 'release');
+});
+
+void test('worker reads and writes batches directly and resumes sample-budget deferrals without duplicates', async () => {
+  const f = fixture();
+  const candidates = Array.from({ length: 60 }, (_, i) => ({
+    ...candidate,
+    activityId: String(i + 1),
+    locationHint: { start: [47, 8] },
+  }));
+  f.repository.candidates = async () => candidates;
+  f.repository.readInput = async () => {
+    throw new Error('Per-activity reads are forbidden');
+  };
+  f.repository.commit = async () => {
+    throw new Error('Per-activity writes are forbidden');
+  };
+  const reads: number[] = [],
+    writes: string[][] = [];
+  f.repository.readInputs = async (candidates) => {
+    reads.push(candidates.length);
+    const selected = candidates.slice(0, 20);
+    return {
+      consumed: selected.length,
+      inputs: new Map(
+        selected.map((candidate) => [
+          candidate.activityId,
+          { generation: 'g', revision: '1', payload: {} },
+        ]),
+      ),
+    };
+  };
+  f.repository.commitMany = async (_token, _catalogue, batch) => {
+    const ids = batch.map((write) => write.candidate.activityId);
+    writes.push(ids);
+    return { committed: ids, fenceLost: false };
+  };
+  const result = await processPlaceMatching(f);
+  assert.deepEqual(reads, [60, 40, 20]);
+  assert.equal(result.saved, 60);
+  assert.equal(result.inputBatches, 3);
+  assert.equal(result.commitBatches, 3);
+  assert.equal(new Set(writes.flat()).size, 60);
 });
