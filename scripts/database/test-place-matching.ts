@@ -169,9 +169,32 @@ try {
     start_date_local: new Date('2026-10-20T10:00:00Z'),
     timezone: 'UTC',
     geometryState: 'summary',
+    map_bbox: [
+      peak.location.longitude - 0.0002,
+      peak.location.latitude,
+      peak.location.longitude + 0.0002,
+      peak.location.latitude,
+    ],
+    start_latlng: [peak.location.latitude, peak.location.longitude - 0.0002],
   });
   assert.equal((await repository.read(actor, id)).status, 'missing_streams');
   await resetStreams();
+  const scheduledCandidate = (
+    await repository.candidates(await repository.catalogue(), 1)
+  )[0];
+  assert.deepEqual(
+    scheduledCandidate?.locationHint,
+    {
+      bounds: [
+        peak.location.longitude - 0.0002,
+        peak.location.latitude,
+        peak.location.longitude + 0.0002,
+        peak.location.latitude,
+      ],
+      start: [peak.location.latitude, peak.location.longitude - 0.0002],
+    },
+    'Spatial scheduling gets lightweight summary hints without loading GPS payloads',
+  );
   const track = prepareTrack(payload, SERVER_MATCHER_POLICY);
   const windows = placeQueryWindows(
     track.geometry,

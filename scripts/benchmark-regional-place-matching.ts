@@ -60,10 +60,12 @@ type Baseline = {
   revision: string;
   source_version: string;
   result: ActivityPlacesResponse;
+  map_bbox: number[] | null;
+  start_latlng: number[] | null;
 };
 const rows = (
   await db.execute<Baseline>(sql`
-  SELECT a.id::text AS activity_id,u.id AS user_id,u.athlete_id,s.generation,s.revision::text,s.source_version,c.result
+  SELECT a.id::text AS activity_id,u.id AS user_id,u.athlete_id,s.generation,s.revision::text,s.source_version,c.result,a.map_bbox,a.start_latlng
   FROM activities a JOIN "user" u ON u.athlete_id=a.athlete JOIN activity_streams s ON s.activity_id=a.id
   JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
   WHERE a.athlete=${Number(values.athlete)} AND c.user_id=u.id AND c.result IS NOT NULL
@@ -94,6 +96,7 @@ const candidates: MatchingCandidate[] = selected.map((row) => ({
   generation: row.generation,
   revision: row.revision,
   sourceVersion: row.source_version,
+  locationHint: { bounds: row.map_bbox, start: row.start_latlng },
 }));
 const groupSizes: number[] = [],
   windows: number[] = [],
@@ -105,19 +108,26 @@ const count = (
   )
 ).rows[0]!.count;
 let verified = 0;
+const remaining = new Map(
+  candidates.map((candidate) => [candidate.activityId, candidate]),
+);
+const uniquePlaces = new Set<string>();
+const activitiesPerGroup: number[] = [];
+let pendingReads = 0;
 const started = performance.now(),
   cpu = process.cpuUsage();
 while (verified < candidates.length) {
-  const slice = candidates.slice(
-    verified,
-    verified + PLACE_MATCHING_BATCH_SIZE,
-  );
   const result = await processPlaceMatching({
     repository: {
       ...repository,
       acquire: async () => 'read-only-comparison',
       release: async () => undefined,
-      candidates: async () => slice,
+      candidates: async (_catalogue, limit) =>
+        [...remaining.values()].slice(0, limit),
+      readInput: async (candidate) => {
+        pendingReads++;
+        return repository.readInput(candidate);
+      },
       commit: async (_token, version, candidate, response) => {
         assert.deepEqual(version, catalogue, 'Catalogue changed');
         assert(response, 'Regional run failed instead of matching');
@@ -126,12 +136,20 @@ while (verified < candidates.length) {
           expected.get(candidate.activityId),
           `Regional result differs for activity ${candidate.activityId}`,
         );
+        assert(
+          // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
+          remaining.delete(candidate.activityId),
+          'Candidate matched more than once',
+        );
         return true;
       },
     },
     loadSnapshot: async (selection) => {
       const before = performance.now();
       const snapshot = await loadBatchPlaceCatalogue(undefined, selection);
+      for (const place of snapshot.places) uniquePlaces.add(place.id);
+      activitiesPerGroup.push(pendingReads);
+      pendingReads = 0;
       loadsMs.push(performance.now() - before);
       groupSizes.push(snapshot.places.length);
       windows.push(selection.windows.length);
@@ -165,6 +183,11 @@ const report = {
   cataloguePlaces: count,
   groups: groupSizes.length,
   placeRowsTransferred: totalPlaces,
+  distinctPlacesTransferred: uniquePlaces.size,
+  repeatedPlaceRowsAcrossGroups: totalPlaces - uniquePlaces.size,
+  maxActivitiesPerGroup: Math.max(...activitiesPerGroup),
+  averageActivitiesPerGroup:
+    activitiesPerGroup.reduce((a, b) => a + b, 0) / activitiesPerGroup.length,
   fullCatalogueRowsForSameGroups: count * groupSizes.length,
   defaultBatchActivities: PLACE_MATCHING_BATCH_SIZE,
   fullCatalogueRowsAtDefaultBatchSize:

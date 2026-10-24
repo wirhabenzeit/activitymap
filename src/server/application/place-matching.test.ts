@@ -207,3 +207,46 @@ void test('the prepared sample budget bounds groups independently of activity co
   assert.equal(result.saved, 3);
   assert.equal(result.groups, 2);
 });
+
+void test('spatial lookahead chooses work beyond the first batch while preserving the work limit and oldest seed', async () => {
+  const f = fixture();
+  const located = (id: string, longitude: number) => ({
+    ...candidate,
+    activityId: id,
+    locationHint: { start: [47, longitude] },
+  });
+  const candidates = [
+    located('1', 8),
+    located('2', 13),
+    located('3', 8.001),
+    located('4', 8.002),
+  ];
+  let requested = 0;
+  f.repository.candidates = async (_catalogue, limit) => {
+    requested = limit;
+    return candidates;
+  };
+  const read: string[] = [];
+  f.repository.readInput = async (candidate) => {
+    read.push(candidate.activityId);
+    return { generation: 'g', revision: '1', payload: {} };
+  };
+  const result = await processPlaceMatching({ ...f, activityLimit: 3 });
+  assert.equal(requested, 12);
+  assert.deepEqual(read, ['1', '3', '4']);
+  assert.equal(result.selected, 3);
+  assert.equal(result.saved, 3);
+  assert.equal(result.groups, 1);
+  assert.equal(result.stopReason, 'batch_limit');
+});
+
+void test('sparse regions share a bounded pull rather than producing singleton queries', async () => {
+  const f = fixture();
+  f.repository.candidates = async () => [
+    { ...candidate, locationHint: { start: [47, 8] } },
+    { ...candidate, activityId: '2', locationHint: { start: [52, 13] } },
+  ];
+  const result = await processPlaceMatching(f);
+  assert.equal(result.saved, 2);
+  assert.equal(result.groups, 1);
+});

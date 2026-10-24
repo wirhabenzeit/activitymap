@@ -23,9 +23,12 @@ triggers the routes on time:
 | `47 * * * *`  | `sync-activities` (up to 30 detail refreshes and 30 older activities)                                               |
 
 Place matching runs every five minutes over up to 500 stale activities, with a
-40-second work deadline and a recoverable two-minute lease. It uses only stored
-streams, loads nearby places once per bounded group of activities and makes no
-Strava requests. Each group holds up to 25 activities and stops growing at
+40-second work deadline and a recoverable two-minute lease. A bounded metadata
+pool of 2,000 candidates lets each group choose nearby activities while starting
+in freshness order. It uses only stored streams, loads nearby places once per
+bounded group of activities and makes no Strava requests. Groups fill to 25
+where memory budgets allow and can grow to 100 when route centres stay within
+25 km of the seed. Each group stops growing at
 100,000 GPS samples or 1,000 sections (one activity can cross those targets).
 See [matching versions and invalidation](on-demand-places.md#persistent-checks-versions-and-invalidation).
 

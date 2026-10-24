@@ -15,6 +15,7 @@ import {
 } from '~/server/application/match-activity-places';
 import type { Actor } from '~/server/auth/actor';
 import { db } from '~/server/db';
+import type { ActivityLocationHint } from '~/server/places/activity-clusters';
 import { canonicalJson } from '~/server/places/catalogue-artifact';
 import { V1_PLACE_REGION } from '~/server/places/catalogue-regions';
 import {
@@ -41,6 +42,7 @@ export type MatchingCandidate = {
   generation: string;
   revision: string;
   sourceVersion: string;
+  locationHint?: ActivityLocationHint;
 };
 type StoredCandidate = {
   activity_id: string;
@@ -49,6 +51,8 @@ type StoredCandidate = {
   generation: string;
   revision: string;
   source_version: string;
+  map_bbox: number[] | null;
+  start_latlng: number[] | null;
 };
 const sameInput = (catalogue: MatchingCatalogue) =>
   sql`c.user_id=u.id AND c.stream_generation=s.generation AND c.stream_revision=s.revision AND c.source_version=s.source_version AND c.catalogue_snapshot_id=${catalogue.snapshotId} AND c.catalogue_revision=${catalogue.revision}::bigint`;
@@ -245,7 +249,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
     ): Promise<MatchingCandidate[]> {
       const rows = (
         await database.execute<StoredCandidate>(sql`
-        SELECT a.id::text AS activity_id,u.id AS user_id,u.athlete_id AS athlete_id,s.generation,s.revision::text,s.source_version
+        SELECT a.id::text AS activity_id,u.id AS user_id,u.athlete_id AS athlete_id,s.generation,s.revision::text,s.source_version,a.map_bbox,a.start_latlng
         FROM activities a JOIN "user" u ON u.athlete_id=a.athlete JOIN activity_streams s ON s.activity_id=a.id
         LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
         WHERE ${connected} AND ${current} ${
@@ -266,6 +270,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         generation: row.generation,
         revision: row.revision,
         sourceVersion: row.source_version,
+        locationHint: { bounds: row.map_bbox, start: row.start_latlng },
       }));
     },
     async readInput(
