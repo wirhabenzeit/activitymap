@@ -208,8 +208,9 @@ update/delete of cached rows or geographic invalidation queue is required.
 New and removed places must be published with their updated manifest count;
 matching fails closed if the loaded catalogue disagrees with its manifest.
 
-`POST /api/cron/match-activity-places` runs every five minutes after the webhook
-drain, independently of whether that drain succeeds. It requires the existing
+`POST /api/cron/match-activity-places` runs every fifteen minutes at :02, :17,
+:32 and :47, independently of the five-minute webhook drain. The two-minute
+offset normally lets that drain finish first. It requires the existing
 production/external-effects guards and `CRON_SECRET`. A run takes an expiring
 120-second global lease, processes at most 500 stale activities by default (maximum
 2,000), and stops starting work at a 40-second deadline. It reads a bounded
@@ -218,7 +219,8 @@ freshness order: unchecked first, then oldest checks, with descending activity I
 breaking ties. Each group starts with the first remaining candidate, then takes
 the nearest routes from that pool using summary-bounds centres, falling back to
 start coordinates. This also chooses the actual 500 spatially from the larger
-pool. Location hints affect scheduling only; the stored GPS still defines the
+pool. Candidates come from an indexed pending-work table rather than scanning
+all activities. Location hints affect scheduling only; the stored GPS still defines the
 complete place query and matching inputs.
 
 Groups fill to 25 activities where memory budgets allow, including distant
@@ -245,7 +247,13 @@ group's boxes, using the partial GiST index on `location::geometry`. It never
 builds a single rectangle between distant routes, nor retries with a full
 catalogue. A scoped snapshot rejects tracks outside its loaded windows. Empty
 cycles never load the catalogue. The check itself is the
-checkpoint, so interrupted runs resume from remaining stale rows. Failures record
+checkpoint, so interrupted runs resume from remaining pending rows. Successful
+commits retire pending work atomically with the check and sync event; failures
+retain it at the retry time. Stream identity changes enqueue only the affected
+activity; unavailable/deleted streams remove it until fresh streams arrive.
+Account reconnection restores eligible work, and catalogue/recipe changes seed
+all stale work once via a version checkpoint. Current results queued by a
+reconnection are retired using cheap version metadata. Failures record
 only a safe code and back off five minutes; changed inputs bypass old backoff.
 Partial results remain explicitly partial until inputs or recipe change.
 
@@ -331,9 +339,10 @@ for kind, name in [('application', 'worker'), ('repositories', 'repository')]:
 PY
 ```
 
-Migrations: `0026_activity-place-checks` and the spatial index in
-`0027_regional-place-queries`. Apply before deploying readers/workers,
-then deploy the updated application and Cloudflare Worker schedule. No additional
+Migrations `0026_activity-place-checks` and `0027_regional-place-queries` must
+already be applied before deploying readers/workers. Roll out the additive
+`0028_pending-place-matching` migration as described below, then deploy the
+Cloudflare Worker schedule. No additional
 environment variable is required. Run local catch-up with
 `pnpm places:match-local --batches 20`; this command refuses remote databases.
 `pnpm db:test-place-matching` exercises the real Neon/Drizzle path on a guarded
@@ -343,6 +352,24 @@ local/global invalidation, no-op publication, concurrent stale commits/reads,
 recipes, leases, backoff and cascades.
 The browser proof additionally covers a catalogue change without a stream change
 and pending-to-complete refresh.
+
+Migration 0028 is additive and compatible with older workers. During rollout,
+new workers detect whether both queue tables exist and keep the previous scan
+until the migration is applied. Deploy the application, apply the guarded
+production migration, then deploy the Cloudflare schedule and confirm a live
+cycle. Both database triggers and the queue acknowledgement are transactionally
+coupled to their corresponding stream/check writes. Deletion cascades remove
+pending rows. No raw GPS or results are copied into the queue.
+
+An idle comparison on the same settled 4,602-activity local snapshot measured
+three previous full-scan cycles at 3,008 / 2,920 / 2,860 ms, versus 98 ms for
+queue initialization and 21 / 19 ms thereafter. Both ran actual leases and
+published no sync events. Production latency differs. Reproduce with
+`pnpm benchmark:place-matching-io --idle --mode after --out <report>` on an
+isolated guarded local `*_test` snapshot; `--mode before` uses the historical
+copies described above (the pre-queue ref is `ab386071`). The database proof
+also replaces the source-hash function with a throwing implementation during
+an idle run, proving that settled activities are never hashed.
 
 ## Synchronizing matched places to web and iOS
 

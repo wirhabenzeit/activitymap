@@ -5,7 +5,7 @@
  */
 export const SCHEDULED_JOB_INTERVALS = {
   'drain-webhook-inbox': 5 * 60_000,
-  'match-activity-places': 5 * 60_000,
+  'match-activity-places': 15 * 60_000,
   'cleanup-rate-limits': 60 * 60_000,
   'erase-revoked-athletes': 60 * 60_000,
   'reconcile-strava-summaries': 60 * 60_000,
