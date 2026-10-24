@@ -227,7 +227,10 @@ when additional route centres are within 25 km of the fixed seed. Missing or
 invalid hints remain eligible for the smaller groups, but cannot justify
 geographic growth beyond 25 activities. A default cron run can therefore share
 one place pull across all 500 activities when the geographic and track-size
-budgets allow it. Each stored track is loaded separately, and each
+budgets allow it. Input reads use a bulk sample-count query followed by one
+bulk GPS-payload query for the prefix that fits the sample budget. Counts for
+deferred tracks are reused within the run, keyed by exact input identity;
+payload reads always recheck authorization and current stream identity. Each
 group also stops growing at
 100,000 original GPS samples or 1,000 continuous sections (the last activity can
 cross the sample/section targets). Raw payloads are released after preparation;
@@ -267,12 +270,66 @@ now also reports distinct places, repeated place rows across groups and group
 activity counts. It verifies every result and retires committed IDs explicitly,
 so spatially reordered work cannot skip or duplicate activities.
 
-Each commit locks and rechecks the lease, catalogue revision, active snapshot,
-eligible account, activity and exact current stream before atomically replacing
-its check. Work computed before publication, erasure, revocation, deletion or
+Each group commits all computed checks with one multi-row upsert and one bulk
+sync-feed insert in the same transaction. Feed locks for all affected athletes
+are acquired in deterministic order in one SQL statement. Each commit locks and
+rechecks the lease, catalogue revision, active snapshot, eligible accounts,
+activities and exact current streams. Stale rows are excluded without losing
+valid neighbours; a changed global lease or catalogue fences the entire batch.
+Already computed results are flushed even when the work deadline is reached.
+Work computed before publication, erasure, revocation, deletion or
 stream replacement cannot become current. Foreign keys cascade check deletion
 with both the activity and its owner. No raw GPS or credentials enter stored
 read models or job logs.
+
+A separate local write-path benchmark on 24 October 2026 measured the same 500
+activities against an isolated snapshot, using the Neon/Drizzle WebSocket driver
+and real transactions, freshness locks, upserts and sync-feed inserts:
+
+| Measurement      | Per-activity I/O |   Bulk I/O |
+| ---------------- | ---------------: | ---------: |
+| SQL statements   |            7,076 |        254 |
+| Wall time        |          17.60 s |     2.90 s |
+| Application CPU  |           5.19 s |     1.83 s |
+| Peak process RSS |       332.78 MiB | 383.08 MiB |
+
+Both runs persisted identical results and exactly 500 sync events, using 12
+place loads totalling 595 rows. The bulk run used 12 input batches and 12 commit
+batches. This is about 6 times faster locally with 96.4% fewer SQL statements;
+network latency and hardware differ in production. The larger bounded reads
+increase peak memory in this measurement. All 4,602 reference results also passed
+the read-only comparison. Job metrics now separate input reads, place loads,
+matching/preparation and commits (`inputReadMs`, `catalogueLoadMs`, `matchingMs`,
+`commitMs`), plus `inputBatches` and `commitBatches`.
+
+Reproduce actual writes with `pnpm benchmark:place-matching-io --mode after`.
+This command requires an **isolated local snapshot** with settled reference
+checks: it deletes the selected checks, recreates them and appends sync events.
+It refuses non-local databases, names not ending in `_test`, or missing explicit
+`MIGRATION_DATABASE_URL`, `MIGRATION_EXPECTED_HOST`,
+`MIGRATION_EXPECTED_DATABASE`, `MIGRATION_REQUIRE_TARGET_GUARDS=true` guards.
+Use `--limit` (default 500) and `--out` to select workload and report path.
+
+For `--mode before`, create the historical worker/repository copies from the
+reviewed pre-change ref first (reports and these copies stay under ignored
+`output/quality/`):
+
+```sh
+python3 - <<'PY'
+from pathlib import Path
+from subprocess import check_output
+root = Path('output/quality/batch-io-before')
+root.mkdir(parents=True, exist_ok=True)
+for kind, name in [('application', 'worker'), ('repositories', 'repository')]:
+    text = check_output(['git', 'show', f'980d455a:src/server/{kind}/place-matching.ts'], text=True)
+    for module in ['changes', 'place-matching-input']:
+        text = text.replace(f"'./{module}'", f"'~/server/repositories/{module}'")
+    for module in ['batch-activity-places', 'match-activity-places']:
+        text = text.replace(f"'./{module}'", f"'~/server/application/{module}'")
+    text = text.replace("'~/server/repositories/place-matching'", "'./repository'")
+    (root / f'{name}.ts').write_text(text)
+PY
+```
 
 Migrations: `0026_activity-place-checks` and the spatial index in
 `0027_regional-place-queries`. Apply before deploying readers/workers,
@@ -280,8 +337,10 @@ then deploy the updated application and Cloudflare Worker schedule. No additiona
 environment variable is required. Run local catch-up with
 `pnpm places:match-local --batches 20`; this command refuses remote databases.
 `pnpm db:test-place-matching` exercises the real Neon/Drizzle path on a guarded
-local `*_test` database, covering zeroes, local/global invalidation, no-op
-publication, concurrent stale commits/reads, recipes, leases, backoff and cascades.
+local `*_test` database, covering bounded bulk reads, cached-size authorization,
+partial stale batches, atomic multi-owner check/feed rollback, zeroes,
+local/global invalidation, no-op publication, concurrent stale commits/reads,
+recipes, leases, backoff and cascades.
 The browser proof additionally covers a catalogue change without a stream change
 and pending-to-complete refresh.
 

@@ -98,3 +98,16 @@ void test('sparse groups can fill with the nearest distant routes and retain mis
   assert.equal(queue.take(seed, true), missing);
   assert.equal(queue.size, 0);
 });
+
+void test('input-budget deferrals return to their original freshness priority', () => {
+  const first = at('first', 47, 8),
+    second = at('second', 48, 9),
+    third = at('third', 47, 8.001);
+  const queue = createActivityClusterQueue([first, second, third]);
+  assert.equal(queue.take(), first);
+  assert.equal(queue.take(first), third);
+  queue.restore([third]);
+  assert.equal(queue.take(), second);
+  assert.equal(queue.take(), third);
+  assert.equal(queue.size, 0);
+});

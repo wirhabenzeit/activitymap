@@ -128,13 +128,21 @@ export function createChangesRepository(
     // through commit for each athlete so a later committed sequence cannot
     // make a cursor skip an earlier, still uncommitted matching/activity write.
     // The lock is scoped to this feed, never to other athletes' work.
-    for (const athleteId of [
+    const athleteIds = [
       ...new Set(entries.map((entry) => entry.athleteId)),
-    ].sort((a, b) => a - b)) {
-      await tx.execute(
-        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`activitymap-sync:${athleteId}`}, 0))`,
-      );
-    }
+    ].sort((a, b) => a - b);
+    // OFFSET 0 keeps the ordered subquery as an executor boundary: acquire
+    // locks in the same order for every writer, with one round trip per batch.
+    await tx.execute(sql`
+      SELECT pg_advisory_xact_lock(hashtextextended(lock_key, 0)) FROM (
+        SELECT 'activitymap-sync:' || athlete_id::text AS lock_key
+        FROM unnest(ARRAY[${sql.join(
+          athleteIds.map((id) => sql`${id}::bigint`),
+          sql`, `,
+        )}]) AS owners(athlete_id)
+        ORDER BY athlete_id OFFSET 0
+      ) ordered
+    `);
     return tx
       .insert(syncChanges)
       .values(

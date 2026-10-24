@@ -28,7 +28,6 @@ import {
 import { createChangesRepository } from './changes';
 import {
   currentPlaceStreams as current,
-  eligiblePlaceActivity as eligible,
   placeStreamsTooLarge as tooLarge,
 } from './place-matching-input';
 
@@ -44,6 +43,28 @@ export type MatchingCandidate = {
   sourceVersion: string;
   locationHint?: ActivityLocationHint;
 };
+export type MatchingWrite = {
+  candidate: MatchingCandidate;
+  response: ActivityPlacesResponse | null;
+};
+export type MatchingBatchCommit = { committed: string[]; fenceLost: boolean };
+export type MatchingBatchInputs = {
+  inputs: Map<string, ActivityPlaceInput>;
+  consumed: number;
+};
+const matchingRequests = (candidates: readonly MatchingCandidate[]) =>
+  sql`jsonb_to_recordset(${JSON.stringify(
+    candidates.map((candidate) => ({
+      activity_id: candidate.activityId,
+      user_id: candidate.userId,
+      athlete_id: candidate.athleteId,
+      generation: candidate.generation,
+      revision: candidate.revision,
+      source_version: candidate.sourceVersion,
+    })),
+  )}::jsonb) AS requested(activity_id bigint,user_id text,athlete_id bigint,generation text,revision bigint,source_version text)`;
+const matchesRequest = sql`a.id=requested.activity_id AND a.athlete=requested.athlete_id AND u.id=requested.user_id AND u.athlete_id=requested.athlete_id
+  AND s.generation=requested.generation AND s.revision=requested.revision AND s.source_version=requested.source_version`;
 type StoredCandidate = {
   activity_id: string;
   user_id: string;
@@ -150,8 +171,212 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
       places: [],
     };
   };
+  const readInputs = async (
+    candidates: readonly MatchingCandidate[],
+    sampleBudget = 100_000,
+    sizeCache: Map<string, number> = new Map(),
+  ): Promise<MatchingBatchInputs> => {
+    if (!candidates.length) return { inputs: new Map(), consumed: 0 };
+    if (
+      candidates.length > 500 ||
+      new Set(candidates.map((c) => c.activityId)).size !== candidates.length ||
+      !Number.isInteger(sampleBudget) ||
+      sampleBudget < 1 ||
+      sampleBudget > 100_000
+    )
+      throw new Error('Invalid matching input batch');
+    // A small sizing query prevents transferring 500 long GPS payloads just
+    // because their route centres are nearby. Both queries fence identities.
+    const sizeKey = (candidate: MatchingCandidate) =>
+      canonicalJson([
+        candidate.activityId,
+        candidate.userId,
+        candidate.athleteId,
+        candidate.generation,
+        candidate.revision,
+        candidate.sourceVersion,
+      ]);
+    const unknown = candidates.filter(
+      (candidate) => !sizeCache.has(sizeKey(candidate)),
+    );
+    const sizes = unknown.length
+      ? (
+          await database.execute<{ activity_id: string; samples: number }>(sql`
+      SELECT a.id::text AS activity_id, CASE WHEN ${tooLarge} THEN 0
+        WHEN jsonb_typeof(s.payload->'latlng'->'data')='array' THEN jsonb_array_length(s.payload->'latlng'->'data') ELSE 0 END AS samples
+      FROM ${matchingRequests(unknown)} JOIN activities a ON a.id=requested.activity_id
+      JOIN "user" u ON u.id=requested.user_id JOIN activity_streams s ON s.activity_id=a.id
+      WHERE ${matchesRequest} AND ${current} AND ${connected}
+    `)
+        ).rows
+      : [];
+    const keys = new Map(
+      unknown.map((candidate) => [candidate.activityId, sizeKey(candidate)]),
+    );
+    for (const row of sizes)
+      sizeCache.set(keys.get(row.activity_id)!, row.samples);
+    const byId = new Map(
+      candidates
+        .filter((candidate) => sizeCache.has(sizeKey(candidate)))
+        .map((candidate) => [
+          candidate.activityId,
+          sizeCache.get(sizeKey(candidate))!,
+        ]),
+    );
+    let consumed = 0,
+      samples = 0;
+    while (consumed < candidates.length && samples < sampleBudget) {
+      samples += byId.get(candidates[consumed]!.activityId) ?? 0;
+      consumed++;
+    }
+    const selected = candidates
+      .slice(0, consumed)
+      .filter((candidate) => byId.has(candidate.activityId));
+    if (!selected.length) return { inputs: new Map(), consumed };
+    const rows = (
+      await database.execute<{
+        activity_id: string;
+        payload: unknown;
+        too_large: boolean;
+      }>(sql`
+      SELECT a.id::text AS activity_id, ${tooLarge} AS too_large,
+        CASE WHEN NOT (${tooLarge}) THEN jsonb_build_object('latlng',s.payload->'latlng','time',s.payload->'time','distance',s.payload->'distance','altitude',s.payload->'altitude') END AS payload
+      FROM ${matchingRequests(selected)} JOIN activities a ON a.id=requested.activity_id
+      JOIN "user" u ON u.id=requested.user_id JOIN activity_streams s ON s.activity_id=a.id
+      WHERE ${matchesRequest} AND ${current} AND ${connected}
+    `)
+    ).rows;
+    const identities = new Map(
+      selected.map((candidate) => [candidate.activityId, candidate]),
+    );
+    return {
+      consumed,
+      inputs: new Map(
+        rows.map((row) => {
+          const candidate = identities.get(row.activity_id)!;
+          return [
+            row.activity_id,
+            {
+              generation: candidate.generation,
+              revision: candidate.revision,
+              payload: row.payload,
+              too_large: row.too_large,
+            },
+          ];
+        }),
+      ),
+    };
+  };
+  const commitMany = async (
+    token: string,
+    catalogue: MatchingCatalogue,
+    writes: readonly MatchingWrite[],
+  ): Promise<MatchingBatchCommit> => {
+    if (!writes.length) return { committed: [], fenceLost: false };
+    if (
+      writes.length > 500 ||
+      new Set(writes.map((write) => write.candidate.activityId)).size !==
+        writes.length
+    )
+      throw new Error('Invalid matching write batch');
+    for (const { candidate, response } of writes) {
+      if (!response) continue;
+      activityPlacesResponseSchema.parse(response);
+      if (
+        response.userId !== candidate.userId ||
+        response.activityId !== candidate.activityId ||
+        response.streamGeneration !== candidate.generation ||
+        response.streamRevision !== candidate.revision ||
+        response.catalogueSnapshotId !== catalogue.snapshotId ||
+        response.matcherVersion !== MATCHING_RECIPE.matcherVersion ||
+        response.status === 'pending' ||
+        response.status === 'unavailable'
+      )
+        throw new Error('Matching commit identity mismatch');
+    }
+    const candidates = writes.map((write) => write.candidate);
+    return database.transaction(async (tx) => {
+      await tx.execute(
+        sql`SELECT set_config('statement_timeout','10000',true)`,
+      );
+      const lease = (
+        await tx.execute(
+          sql`SELECT token FROM place_matching_lease WHERE key=${KEY} AND token=${token}::uuid AND expires_at>clock_timestamp() FOR UPDATE`,
+        )
+      ).rows[0];
+      if (!lease) return { committed: [], fenceLost: true };
+      const revision = (
+        await tx.execute<{ revision: string }>(
+          sql`SELECT revision::text FROM place_catalogue_revision WHERE singleton FOR SHARE`,
+        )
+      ).rows[0];
+      if (revision?.revision !== catalogue.revision)
+        return { committed: [], fenceLost: true };
+      const active = (
+        await tx.execute<{ snapshot_id: string | null }>(
+          sql`SELECT ${preferredCatalogue} AS snapshot_id`,
+        )
+      ).rows[0];
+      if (active?.snapshot_id !== catalogue.snapshotId)
+        return { committed: [], fenceLost: true };
+      // Lock the complete batch in deterministic order. Revalidate in the
+      // following statement, after waits, before writing any private results.
+      await tx.execute(
+        sql`SELECT u.id FROM "user" u WHERE u.id IN (SELECT requested.user_id FROM ${matchingRequests(candidates)}) ORDER BY u.id FOR KEY SHARE OF u`,
+      );
+      await tx.execute(
+        sql`SELECT c.id FROM account c WHERE c."providerId"='strava' AND EXISTS (SELECT 1 FROM ${matchingRequests(candidates)} WHERE c."userId"=requested.user_id AND c."accountId"=requested.athlete_id::text) ORDER BY c.id FOR SHARE OF c`,
+      );
+      await tx.execute(
+        sql`SELECT a.id FROM activities a WHERE a.id IN (SELECT requested.activity_id FROM ${matchingRequests(candidates)}) ORDER BY a.id FOR SHARE OF a`,
+      );
+      await tx.execute(
+        sql`SELECT s.activity_id FROM activity_streams s WHERE s.activity_id IN (SELECT requested.activity_id FROM ${matchingRequests(candidates)}) ORDER BY s.activity_id FOR SHARE OF s`,
+      );
+      const records = writes.map(({ candidate, response }) => ({
+        activity_id: candidate.activityId,
+        user_id: candidate.userId,
+        athlete_id: candidate.athleteId,
+        generation: candidate.generation,
+        revision: candidate.revision,
+        source_version: candidate.sourceVersion,
+        result: response,
+        result_revision: randomUUID(),
+      }));
+      const rows = (
+        await tx.execute<{ activity_id: string }>(sql`
+        INSERT INTO activity_place_checks(activity_id,recipe_hash,user_id,stream_generation,stream_revision,source_version,catalogue_snapshot_id,catalogue_revision,matcher_version,discovery_version,parameters_hash,result,result_revision,checked_at,retry_at,error)
+        SELECT a.id,${MATCHING_RECIPE_HASH},u.id,s.generation,s.revision,s.source_version,${catalogue.snapshotId},${catalogue.revision}::bigint,
+          ${MATCHING_RECIPE.matcherVersion},${MATCHING_RECIPE.discoveryVersion},${MATCHING_RECIPE.parametersHash},requested.result,requested.result_revision,
+          clock_timestamp(),CASE WHEN requested.result IS NULL THEN clock_timestamp()+interval '5 minutes' END,CASE WHEN requested.result IS NULL THEN 'matching_failed' END
+        FROM jsonb_to_recordset(${JSON.stringify(records)}::jsonb) AS requested(activity_id bigint,user_id text,athlete_id bigint,generation text,revision bigint,source_version text,result jsonb,result_revision uuid)
+        JOIN activities a ON a.id=requested.activity_id JOIN "user" u ON u.id=requested.user_id JOIN activity_streams s ON s.activity_id=a.id
+        WHERE ${matchesRequest} AND ${current} AND ${connected}
+        ORDER BY a.id
+        ON CONFLICT(activity_id,recipe_hash) DO UPDATE SET user_id=EXCLUDED.user_id,stream_generation=EXCLUDED.stream_generation,stream_revision=EXCLUDED.stream_revision,source_version=EXCLUDED.source_version,catalogue_snapshot_id=EXCLUDED.catalogue_snapshot_id,catalogue_revision=EXCLUDED.catalogue_revision,matcher_version=EXCLUDED.matcher_version,discovery_version=EXCLUDED.discovery_version,parameters_hash=EXCLUDED.parameters_hash,result=EXCLUDED.result,result_revision=EXCLUDED.result_revision,checked_at=EXCLUDED.checked_at,retry_at=EXCLUDED.retry_at,error=EXCLUDED.error
+        RETURNING activity_id::text
+      `)
+      ).rows;
+      const committed = rows.map((row) => row.activity_id);
+      const committedSet = new Set(committed);
+      await createChangesRepository(database).record(
+        candidates
+          .filter((candidate) => committedSet.has(candidate.activityId))
+          .map((candidate) => ({
+            athleteId: candidate.athleteId,
+            entityType: 'activity',
+            entityId: candidate.activityId,
+            operation: 'upsert',
+          })),
+        tx,
+      );
+      return { committed, fenceLost: false };
+    });
+  };
   return {
     catalogue,
+    readInputs,
+    commitMany,
     /** One bounded query for all activity results on a sync page; never matches
      * or fetches streams. The manifest and rows share a database snapshot. */
     async sync(actor: Actor, activityIds: string[]) {
@@ -276,22 +501,9 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
     async readInput(
       candidate: MatchingCandidate,
     ): Promise<ActivityPlaceInput | null> {
-      const row = (
-        await database.execute<{ payload: unknown; too_large: boolean }>(sql`
-        SELECT ${tooLarge} AS too_large, CASE WHEN NOT (${tooLarge}) THEN jsonb_build_object('latlng',s.payload->'latlng','time',s.payload->'time','distance',s.payload->'distance','altitude',s.payload->'altitude') END AS payload
-        FROM activities a JOIN activity_streams s ON s.activity_id=a.id
-        WHERE ${eligible({ userId: candidate.userId, athleteId: candidate.athleteId, authentication: 'bearer' }, candidate.activityId)} AND ${current}
-          AND s.generation=${candidate.generation} AND s.revision=${candidate.revision}::bigint AND s.source_version=${candidate.sourceVersion}
-      `)
-      ).rows[0];
-      return row
-        ? {
-            generation: candidate.generation,
-            revision: candidate.revision,
-            payload: row.payload,
-            too_large: row.too_large,
-          }
-        : null;
+      return (
+        (await readInputs([candidate])).inputs.get(candidate.activityId) ?? null
+      );
     },
     async commit(
       token: string,
@@ -299,85 +511,9 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
       candidate: MatchingCandidate,
       response: ActivityPlacesResponse | null,
     ): Promise<boolean> {
-      if (response) {
-        activityPlacesResponseSchema.parse(response);
-        if (
-          response.userId !== candidate.userId ||
-          response.activityId !== candidate.activityId ||
-          response.streamGeneration !== candidate.generation ||
-          response.streamRevision !== candidate.revision ||
-          response.catalogueSnapshotId !== catalogue.snapshotId ||
-          response.matcherVersion !== MATCHING_RECIPE.matcherVersion ||
-          response.status === 'pending' ||
-          response.status === 'unavailable'
-        )
-          throw new Error('Matching commit identity mismatch');
-      }
-      return database.transaction(async (tx) => {
-        await tx.execute(
-          sql`SELECT set_config('statement_timeout','10000',true)`,
-        );
-        const lease = (
-          await tx.execute(
-            sql`SELECT token FROM place_matching_lease WHERE key=${KEY} AND token=${token}::uuid AND expires_at>clock_timestamp() FOR UPDATE`,
-          )
-        ).rows[0];
-        if (!lease) return false;
-        const revision = (
-          await tx.execute<{ revision: string }>(
-            sql`SELECT revision::text FROM place_catalogue_revision WHERE singleton FOR SHARE`,
-          )
-        ).rows[0];
-        if (revision?.revision !== catalogue.revision) return false;
-        const active = (
-          await tx.execute<{ snapshot_id: string | null }>(
-            sql`SELECT ${preferredCatalogue} AS snapshot_id`,
-          )
-        ).rows[0];
-        if (active?.snapshot_id !== catalogue.snapshotId) return false;
-        const user = (
-          await tx.execute(
-            sql`SELECT id FROM "user" WHERE id=${candidate.userId} AND athlete_id=${candidate.athleteId} FOR KEY SHARE`,
-          )
-        ).rows[0];
-        if (!user) return false;
-        const account = (
-          await tx.execute(
-            sql`SELECT id FROM account WHERE "userId"=${candidate.userId} AND "providerId"='strava' AND "accountId"=${String(candidate.athleteId)} AND revoked_at IS NULL AND scheduled_erasure_at IS NULL AND (COALESCE("accessToken",access_token,'')<>'' OR COALESCE("refreshToken",refresh_token,'')<>'') ORDER BY id LIMIT 1 FOR SHARE`,
-          )
-        ).rows[0];
-        if (!account) return false;
-        const activity = (
-          await tx.execute(
-            sql`SELECT id FROM activities WHERE id=${candidate.activityId}::bigint AND athlete=${candidate.athleteId} FOR SHARE`,
-          )
-        ).rows[0];
-        if (!activity) return false;
-        const stream = (
-          await tx.execute(
-            sql`SELECT s.activity_id FROM activity_streams s JOIN activities a ON a.id=s.activity_id WHERE s.activity_id=${candidate.activityId}::bigint AND ${current} AND s.generation=${candidate.generation} AND s.revision=${candidate.revision}::bigint AND s.source_version=${candidate.sourceVersion} FOR SHARE OF s`,
-          )
-        ).rows[0];
-        if (!stream) return false;
-        await tx.execute(sql`INSERT INTO activity_place_checks(activity_id,recipe_hash,user_id,stream_generation,stream_revision,source_version,catalogue_snapshot_id,catalogue_revision,matcher_version,discovery_version,parameters_hash,result,result_revision,checked_at,retry_at,error)
-          VALUES(${candidate.activityId}::bigint,${MATCHING_RECIPE_HASH},${candidate.userId},${candidate.generation},${candidate.revision}::bigint,${candidate.sourceVersion},${catalogue.snapshotId},${catalogue.revision}::bigint,${MATCHING_RECIPE.matcherVersion},${MATCHING_RECIPE.discoveryVersion},${MATCHING_RECIPE.parametersHash},${response ? JSON.stringify(response) : null}::jsonb,${randomUUID()}::uuid,clock_timestamp(),CASE WHEN ${response === null} THEN clock_timestamp()+interval '5 minutes' END,${response === null ? 'matching_failed' : null})
-          ON CONFLICT(activity_id,recipe_hash) DO UPDATE SET user_id=EXCLUDED.user_id,stream_generation=EXCLUDED.stream_generation,stream_revision=EXCLUDED.stream_revision,source_version=EXCLUDED.source_version,catalogue_snapshot_id=EXCLUDED.catalogue_snapshot_id,catalogue_revision=EXCLUDED.catalogue_revision,matcher_version=EXCLUDED.matcher_version,discovery_version=EXCLUDED.discovery_version,parameters_hash=EXCLUDED.parameters_hash,result=EXCLUDED.result,result_revision=EXCLUDED.result_revision,checked_at=EXCLUDED.checked_at,retry_at=EXCLUDED.retry_at,error=EXCLUDED.error`);
-        // Matching is part of the activity aggregate. Publishing through the
-        // existing feed keeps older clients compatible and removes no-match
-        // visits by replacing the whole bundle, atomically with this check.
-        await createChangesRepository(database).record(
-          [
-            {
-              athleteId: candidate.athleteId,
-              entityType: 'activity',
-              entityId: candidate.activityId,
-              operation: 'upsert',
-            },
-          ],
-          tx,
-        );
-        return true;
-      });
+      return (
+        await commitMany(token, catalogue, [{ candidate, response }])
+      ).committed.includes(candidate.activityId);
     },
   };
 }

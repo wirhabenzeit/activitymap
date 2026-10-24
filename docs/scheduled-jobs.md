@@ -30,6 +30,11 @@ bounded group of activities and makes no Strava requests. Groups fill to 25
 where memory budgets allow and can grow to 500 when route centres stay within
 25 km of the seed. Each group stops growing at
 100,000 GPS samples or 1,000 sections (one activity can cross those targets).
+Stored GPS is read in bounded batches; computed checks and sync events are saved
+with bulk inserts in one transaction per group. Job metrics report input/commit
+batch counts and milliseconds spent reading inputs, loading places,
+matching/preparing tracks and committing results, so database overhead can be
+distinguished from local computation.
 See [matching versions and invalidation](on-demand-places.md#persistent-checks-versions-and-invalidation).
 
 Each hour, stream backfill handles up to 40 activities (60 Strava requests)
