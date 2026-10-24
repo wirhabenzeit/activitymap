@@ -16,11 +16,18 @@ triggers the routes on time:
 
 | Cron (UTC)    | Jobs, in order                                                                                                      |
 | ------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `*/5 * * * *` | `drain-webhook-inbox`                                                                                               |
+| `*/5 * * * *` | `drain-webhook-inbox`, `match-activity-places`                                                                      |
 | `0 * * * *`   | `cleanup-rate-limits`                                                                                               |
 | `17 * * * *`  | `erase-revoked-athletes`                                                                                            |
 | `37 * * * *`  | `reconcile-strava-summaries`, `backfill-activity-streams` (only if reconcile succeeded), `backfill-activity-photos` |
 | `47 * * * *`  | `sync-activities` (up to 30 detail refreshes and 30 older activities)                                               |
+
+Place matching runs every five minutes over up to 500 stale activities, with a
+40-second work deadline and a recoverable two-minute lease. It uses only stored
+streams, loads nearby places once per bounded group of activities and makes no
+Strava requests. Each group holds up to 25 activities and stops growing at
+100,000 GPS samples or 1,000 sections (one activity can cross those targets).
+See [matching versions and invalidation](on-demand-places.md#persistent-checks-versions-and-invalidation).
 
 Each hour, stream backfill handles up to 40 activities (60 Strava requests)
 and photo catch-up up to 20 activities (48 requests). With Strava's 3,000

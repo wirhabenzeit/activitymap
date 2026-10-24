@@ -46,6 +46,7 @@ import {
 import { useShallowStore } from '~/store';
 
 import { DisplaySettings } from './display-settings';
+import { PlaceDebugSettings } from './place-debug-settings';
 
 export function SettingsDialog({
   open,
@@ -485,6 +486,7 @@ export function SettingsDialog({
               className="m-0 [@media(min-width:640px)_and_(max-height:500px)]:py-3"
             >
               <DisplaySettings />
+              <PlaceDebugSettings check={open && tab === 'display'} />
             </TabsContent>
           </AppDialogBody>
           <AppDialogBody asChild>

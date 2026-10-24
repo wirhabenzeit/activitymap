@@ -71,8 +71,8 @@ import {
 import { store } from '~/store';
 import { useShallowStore } from '~/store';
 
+import { ActivityPlacesLayers } from './activity-places-layers';
 import { ElevationRouteMarker } from './elevation-route-marker';
-import { MatchedPlacesLayer } from './matched-places-layer';
 
 const skyLayer: SkyLayer = {
   id: 'sky',
@@ -887,7 +887,7 @@ export default function InteractiveMap() {
           activities={activityDict}
           visibleIDs={visibleIDSet}
         />
-        <MatchedPlacesLayer
+        <ActivityPlacesLayers
           activities={activityDict}
           selectedIds={visibleSelected}
           highlighted={highlighted}

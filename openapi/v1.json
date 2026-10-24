@@ -424,6 +424,156 @@
             ],
             "additionalProperties": false
           },
+          "placeMatches": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "activityId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "complete",
+                      "missing_streams",
+                      "uncovered",
+                      "partial",
+                      "unavailable",
+                      "pending"
+                    ]
+                  },
+                  "streamGeneration": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "streamRevision": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "catalogueSnapshotId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "matcherVersion": {
+                    "type": "string"
+                  },
+                  "matchingVersion": {
+                    "type": "string"
+                  },
+                  "resultRevision": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "places": {
+                    "maxItems": 250,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kinds": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "peak",
+                              "pass",
+                              "hut"
+                            ]
+                          }
+                        },
+                        "longitude": {
+                          "type": "number",
+                          "minimum": -180,
+                          "maximum": 180
+                        },
+                        "latitude": {
+                          "type": "number",
+                          "minimum": -90,
+                          "maximum": 90
+                        },
+                        "elevationM": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "visits": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "distanceM": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "distanceM"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "kinds",
+                        "longitude",
+                        "latitude",
+                        "elevationM",
+                        "visits"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "userId",
+                  "activityId",
+                  "status",
+                  "streamGeneration",
+                  "streamRevision",
+                  "catalogueSnapshotId",
+                  "matcherVersion",
+                  "places"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "pattern": "^\\d+$"
@@ -2866,6 +3016,10 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "placeMatchingVersion": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
                       }
                     },
                     "required": [
@@ -2943,6 +3097,10 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "placeMatchingVersion": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
                       }
                     },
                     "required": [
@@ -3065,6 +3223,10 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "placeMatchingVersion": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
                   }
                 },
                 "required": [

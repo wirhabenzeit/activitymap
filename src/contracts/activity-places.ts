@@ -28,11 +28,14 @@ export const activityPlacesResponseSchema = z.object({
     'uncovered',
     'partial',
     'unavailable',
+    'pending',
   ]),
   streamGeneration: z.string().nullable(),
   streamRevision: z.string().regex(/^\d+$/),
   catalogueSnapshotId: z.string().nullable(),
   matcherVersion: z.string(),
+  matchingVersion: z.string().optional(),
+  resultRevision: z.string().nullable().optional(),
   places: z.array(matchedPlaceSchema).max(250),
 });
 export type ActivityPlacesResponse = z.infer<

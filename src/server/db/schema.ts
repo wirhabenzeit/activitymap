@@ -19,6 +19,7 @@ import {
   varchar,
 } from 'drizzle-orm/pg-core';
 
+import type { ActivityPlacesResponse } from '~/contracts/activity-places';
 import { sportTypes } from '~/contracts/sport';
 import type { SportType } from '~/contracts/sport';
 import type { StravaImportDTO } from '~/contracts/v1/strava-import';
@@ -369,6 +370,9 @@ export const places = pgTable(
   (table) => [
     uniqueIndex('places_osm_identity_idx').on(table.osmType, table.osmId),
     index('places_location_idx').using('gist', table.location),
+    index('places_geometry_location_idx')
+      .using('gist', sql`(${table.location}::geometry)`)
+      .where(sql`${table.retiredAt} IS NULL`),
     check(
       'places_osm_type_check',
       sql`${table.osmType} IN ('node', 'way', 'relation')`,
@@ -502,6 +506,74 @@ export const activityPlaces = pgTable(
     ),
   ],
 );
+
+// Completion records include zero-match and non-complete checks. Different
+// deployed recipes coexist, so an old worker cannot overwrite a new algorithm.
+export const activityPlaceChecks = pgTable(
+  'activity_place_checks',
+  {
+    activityId: bigint('activity_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => activities.id, { onDelete: 'cascade' }),
+    recipeHash: text('recipe_hash').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    streamGeneration: text('stream_generation').notNull(),
+    streamRevision: bigint('stream_revision', { mode: 'bigint' }).notNull(),
+    sourceVersion: text('source_version').notNull(),
+    catalogueSnapshotId: text('catalogue_snapshot_id').notNull(),
+    catalogueRevision: bigint('catalogue_revision', {
+      mode: 'bigint',
+    }).notNull(),
+    matcherVersion: text('matcher_version').notNull(),
+    discoveryVersion: text('discovery_version').notNull(),
+    parametersHash: text('parameters_hash').notNull(),
+    result: jsonb('result').$type<ActivityPlacesResponse>(),
+    resultRevision: uuid('result_revision').notNull().defaultRandom(),
+    checkedAt: timestamp('checked_at', { mode: 'date', withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    retryAt: timestamp('retry_at', { mode: 'date', withTimezone: true }),
+    error: text('error'),
+  },
+  (table) => [
+    primaryKey({ columns: [table.activityId, table.recipeHash] }),
+    index('activity_place_checks_user_idx').on(table.userId),
+    check(
+      'activity_place_checks_recipe_check',
+      sql`${table.recipeHash} ~ '^[0-9a-f]{64}$'`,
+    ),
+    check(
+      'activity_place_checks_revision_check',
+      sql`${table.streamRevision} >= 0 AND ${table.catalogueRevision} >= 0`,
+    ),
+  ],
+);
+
+// A statement-level trigger advances this counter for all place/catalogue
+// writes, including manual corrections. Publication remains one transaction.
+export const placeCatalogueRevision = pgTable(
+  'place_catalogue_revision',
+  {
+    singleton: boolean('singleton').primaryKey().default(true),
+    revision: bigint('revision', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+  },
+  (table) => [
+    check('place_catalogue_revision_singleton_check', sql`${table.singleton}`),
+  ],
+);
+
+export const placeMatchingLease = pgTable('place_matching_lease', {
+  key: text('key').primaryKey(),
+  token: uuid('token').notNull(),
+  expiresAt: timestamp('expires_at', {
+    mode: 'date',
+    withTimezone: true,
+  }).notNull(),
+});
 
 export const photos = pgTable(
   'photos',
@@ -811,7 +883,9 @@ export const syncOperationEnum = pgEnum('sync_operation', ['upsert', 'delete']);
 // value, so a "changes after cursor X" query that compared timestamps could
 // silently skip or duplicate a row at a page boundary. `generatedAlwaysAsIdentity()`
 // guarantees `sequence` is strictly increasing and gap-tolerant (a rolled-back
-// insert simply burns a value, which is fine for ordering purposes).
+// insert simply burns a value, which is fine for ordering purposes). The
+// changes repository also holds an athlete-scoped transaction advisory lock
+// before allocating sequences: identity allocation alone is not COMMIT order.
 //
 // Every insert into this table must happen in the same database transaction
 // as the `activities`/`photos` mutation it records - see the call sites

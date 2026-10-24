@@ -8,6 +8,7 @@ import {
   validatePolicy,
 } from './policy';
 import type { CandidatePlace, PlaceMatch } from './run-types';
+import { peakSpatialScore } from './spatial-score';
 import {
   type PreparedSample,
   type PreparedSection,
@@ -76,6 +77,18 @@ function closestOnSegment(
     lengthSquared === 0
       ? 0
       : Math.max(0, Math.min(1, -(a.x * dx + a.y * dy) / lengthSquared));
+  return atFraction(first, last, place, fraction);
+}
+function atFraction(
+  first: PreparedSample,
+  last: PreparedSample,
+  place: CandidatePlace,
+  fraction: number,
+): Closest {
+  const a = relativeVectorM(first.point, place.location);
+  const b = relativeVectorM(last.point, place.location);
+  const dx = b.x - a.x,
+    dy = b.y - a.y;
   const reference: PlaceEncounterFragment['closest'] =
     fraction === 0
       ? { kind: 'sample', index: first.index }
@@ -107,9 +120,68 @@ function interpolate(
     ? undefined
     : before + (after - before) * closest.fraction;
 }
+interface PeakClosest extends Closest {
+  score: number;
+  reliable: boolean;
+}
+interface PeakChoices {
+  any?: PeakClosest;
+  reliable?: PeakClosest;
+}
+function addPeakChoices(
+  choices: PeakChoices,
+  first: PreparedSample,
+  last: PreparedSample,
+  place: CandidatePlace,
+  policy: MatcherPolicy,
+) {
+  const a = relativeVectorM(first.point, place.location);
+  const b = relativeVectorM(last.point, place.location);
+  const ax = a.x / policy.peakRadiusM,
+    ay = a.y / policy.peakRadiusM;
+  const dx = (b.x - a.x) / policy.peakRadiusM,
+    dy = (b.y - a.y) / policy.peakRadiusM;
+  const hasElevation =
+    place.elevationM !== undefined &&
+    first.altitudeM !== undefined &&
+    last.altitudeM !== undefined;
+  const az = hasElevation
+    ? (first.altitudeM! - place.elevationM!) / policy.peakVerticalToleranceM
+    : 0;
+  const dz = hasElevation
+    ? (last.altitudeM! - first.altitudeM!) / policy.peakVerticalToleranceM
+    : 0;
+  const lengthSquared = dx * dx + dy * dy + dz * dz;
+  const fraction =
+    lengthSquared === 0
+      ? 0
+      : Math.max(
+          0,
+          Math.min(1, -(ax * dx + ay * dy + az * dz) / lengthSquared),
+        );
+  // Endpoints remain valid observations even when interpolation is too sparse.
+  for (const position of new Set([0, fraction, 1])) {
+    const closest = atFraction(first, last, place, position);
+    const score = peakSpatialScore(
+      closest.distance,
+      interpolate(closest, 'altitudeM'),
+      place.elevationM,
+      policy,
+    ).score;
+    const reliable =
+      closest.reference.kind === 'sample' ||
+      last.sectionDistanceM - first.sectionDistanceM <=
+        policy.maxInterpolationDistanceM;
+    const candidate = { ...closest, score, reliable };
+    if (!choices.any || score < choices.any.score) choices.any = candidate;
+    if (reliable && (!choices.reliable || score < choices.reliable.score))
+      choices.reliable = candidate;
+  }
+}
 interface ActiveEpisode {
   start: PreparedSample;
   closest: Closest;
+  peak?: PeakChoices;
 }
 
 function episodeEvidence(
@@ -132,6 +204,16 @@ function episodeEvidence(
     start.providerDistanceM !== undefined &&
     end.providerDistanceM !== undefined &&
     providerDistance !== undefined;
+  const bestPeak =
+    active.peak?.reliable && active.peak.reliable.score <= 1
+      ? active.peak.reliable
+      : active.peak?.any;
+  const peakAltitude = bestPeak && interpolate(bestPeak, 'altitudeM');
+  const peakScore =
+    bestPeak &&
+    peakSpatialScore(bestPeak.distance, peakAltitude, place.elevationM, policy);
+  const peakProviderDistance =
+    bestPeak && interpolate(bestPeak, 'providerDistanceM');
   const evidence = {
     section_id: section.id,
     start_gps_index: start.index,
@@ -162,6 +244,36 @@ function episodeEvidence(
           end: end.sectionDistanceM,
         },
     min_horizontal_distance_m: closest.distance,
+    ...(bestPeak && peakScore
+      ? {
+          peak_match: {
+            closest: bestPeak.reference,
+            horizontal_distance_m: bestPeak.distance,
+            ...(peakAltitude === undefined
+              ? {}
+              : { recorded_altitude_m: peakAltitude }),
+            ...(peakScore.altitudeDifferenceM === undefined
+              ? {}
+              : { altitude_difference_m: peakScore.altitudeDifferenceM }),
+            weighted_score: peakScore.score,
+            ...(peakScore.spatialDistanceM === undefined
+              ? {}
+              : { spatial_distance_m: peakScore.spatialDistanceM }),
+            uses_elevation: peakScore.usesElevation,
+            reliable: bestPeak.reliable,
+            route_distance_m:
+              peakProviderDistance === undefined
+                ? {
+                    basis: 'section_gps' as const,
+                    closest: interpolate(bestPeak, 'sectionDistanceM')!,
+                  }
+                : {
+                    basis: 'provider_distance' as const,
+                    closest: peakProviderDistance,
+                  },
+          },
+        }
+      : {}),
     source: {
       point: { ...place.location },
       ...(place.elevationM === undefined
@@ -328,6 +440,10 @@ export function matchEncounters(
           active = { start: lastOutside ?? first, closest };
         else if (active && closest.distance < active.closest.distance)
           active.closest = closest;
+        if (active && place.kinds.includes('peak')) {
+          active.peak ??= {};
+          addPeakChoices(active.peak, first, last, place, policy);
+        }
         if (endDistance > policy.exitRadiusM) {
           emit(last);
           lastOutside = last;
@@ -352,4 +468,32 @@ export function matchEncounters(
     partial: track.partial || hasBlockingMatchReasons(reasons),
     reasons: [...reasons].sort(),
   };
+}
+
+/** Debug measurement over valid sections, including candidates outside entry. */
+export function inspectClosestPlace(
+  track: PreparedTrack,
+  place: CandidatePlace,
+  policy: MatcherPolicy,
+): PlaceEncounterFragment | undefined {
+  let best: { closest: Closest; section: PreparedSection } | undefined;
+  for (const section of track.sections) {
+    for (let index = 0; index < section.samples.length; index++) {
+      const last = section.samples[index]!;
+      const first = section.samples[Math.max(0, index - 1)]!;
+      const closest = closestOnSegment(first, last, place);
+      if (!best || closest.distance < best.closest.distance)
+        best = { closest, section };
+    }
+  }
+  return best
+    ? episodeEvidence(
+        { start: best.closest.first, closest: best.closest },
+        best.closest.last,
+        best.section,
+        track,
+        place,
+        policy,
+      )
+    : undefined;
 }

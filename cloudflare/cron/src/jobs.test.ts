@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
 
 import { SCHEDULES, isSuccess, runSchedule } from './jobs.ts';
@@ -100,7 +101,16 @@ void test('a network error is reported, not thrown', async () => {
   const { fetch } = fakeFetch({
     '/api/cron/drain-webhook-inbox': new Error('connection reset'),
   });
-  const [result] = await runSchedule('*/5 * * * *', { ...options, fetch });
+  const [result, matching] = await runSchedule('*/5 * * * *', {
+    ...options,
+    fetch,
+  });
+  assert.equal(matching?.name, 'match-activity-places');
+  assert.equal(
+    matching?.status,
+    200,
+    'Matching still runs when webhook ingestion fails',
+  );
 
   assert.equal(result!.status, 'error');
   assert.equal(result!.body, 'connection reset');

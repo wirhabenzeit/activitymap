@@ -215,6 +215,7 @@ const inlineEnumNames = new Map<string, string>([
       'uncovered',
       'partial',
       'unavailable',
+      'pending',
     ]),
     'ActivityPlacesStatus',
   ],

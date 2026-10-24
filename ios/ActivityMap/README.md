@@ -2,6 +2,13 @@
 
 The SwiftUI client supports mobile sign-in and local-first activity synchronization. Sign in to bootstrap activities and photo metadata into SwiftData; the map and list then read that cache. Sample activities are used only by Xcode previews.
 
+Matched places and visits arrive with activity sync and are saved in the same
+SwiftData transaction as their activity and sync cursor. Complete results are
+available offline. Empty replacements remove prior visits, and a changed matching
+version hides outdated results until refreshed. Existing caches stage one fresh
+bootstrap when the server first advertises this support; a failed refresh keeps
+the prior completed library. See [matching synchronization](../../docs/on-demand-places.md#synchronizing-matched-places-to-web-and-ios).
+
 ## Run it
 
 1. Use Xcode 27 or newer. The app runs on iOS 26 or newer; Xcode 27 is needed to compile optional iOS 27 APIs.

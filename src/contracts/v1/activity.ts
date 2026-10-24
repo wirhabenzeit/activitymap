@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { activityPlacesResponseSchema } from '~/contracts/activity-places';
 import { sportTypes } from '~/contracts/sport';
 import type { Activity } from '~/server/db/schema';
 
@@ -40,64 +41,78 @@ export type GeometryState = z.infer<typeof geometryStateSchema>;
 export const photosStateSchema = z.enum(['current', 'refresh_required']);
 export type PhotosState = z.infer<typeof photosStateSchema>;
 
-export const activityDTOSchema = z.object({
-  streams: streamMetadataSchema.optional(),
-  id: idString,
-  athlete: idString,
-  name: z.string(),
-  description: z.string().nullable(),
-  distance: z.number().nullable(),
-  moving_time: z.number().int().nullable(),
-  elapsed_time: z.number().int().nullable(),
-  total_elevation_gain: z.number().nullable(),
-  sport_type: z.enum(sportTypes),
-  start_date: isoDateTime,
-  start_date_local: isoDateTime,
-  timezone: z.string(),
-  start_latlng: z.array(z.number()).nullable(),
-  end_latlng: z.array(z.number()).nullable(),
-  achievement_count: z.number().int().nullable(),
-  kudos_count: z.number().int().nullable(),
-  comment_count: z.number().int().nullable(),
-  athlete_count: z.number().int().nullable(),
-  photo_count: z.number().int().nullable(),
-  total_photo_count: z.number().int().nullable(),
-  map_id: z.string().nullable(),
-  map_polyline: z.string().nullable(),
-  map_summary_polyline: z.string().nullable(),
-  map_bbox: z.array(z.number()).nullable(),
-  trainer: z.boolean().nullable(),
-  commute: z.boolean().nullable(),
-  manual: z.boolean().nullable(),
-  private: z.boolean().nullable(),
-  flagged: z.boolean().nullable(),
-  workout_type: z.number().int().nullable(),
-  upload_id: idString.nullable(),
-  average_speed: z.number().nullable(),
-  max_speed: z.number().nullable(),
-  calories: z.number().nullable(),
-  has_heartrate: z.boolean().nullable(),
-  average_heartrate: z.number().nullable(),
-  max_heartrate: z.number().nullable(),
-  heartrate_opt_out: z.boolean().nullable(),
-  display_hide_heartrate_option: z.boolean().nullable(),
-  elev_high: z.number().nullable(),
-  elev_low: z.number().nullable(),
-  pr_count: z.number().int().nullable(),
-  has_kudoed: z.boolean().nullable(),
-  hide_from_home: z.boolean().nullable(),
-  gear_id: z.string().nullable(),
-  device_watts: z.boolean().nullable(),
-  average_watts: z.number().nullable(),
-  max_watts: z.number().int().nullable(),
-  weighted_average_watts: z.number().int().nullable(),
-  kilojoules: z.number().nullable(),
-  last_updated: isoDateTime.nullable(),
-  geometry_state: geometryStateSchema,
-  photos_state: photosStateSchema.nullable(),
-  last_summary_seen_at: isoDateTime.nullable(),
-  last_detailed_fetched_at: isoDateTime.nullable(),
-});
+export const activityDTOSchema = z
+  .object({
+    streams: streamMetadataSchema.optional(),
+    // Complete replacement of this activity's matched places, including zeroes.
+    placeMatches: activityPlacesResponseSchema.nullish(),
+    id: idString,
+    athlete: idString,
+    name: z.string(),
+    description: z.string().nullable(),
+    distance: z.number().nullable(),
+    moving_time: z.number().int().nullable(),
+    elapsed_time: z.number().int().nullable(),
+    total_elevation_gain: z.number().nullable(),
+    sport_type: z.enum(sportTypes),
+    start_date: isoDateTime,
+    start_date_local: isoDateTime,
+    timezone: z.string(),
+    start_latlng: z.array(z.number()).nullable(),
+    end_latlng: z.array(z.number()).nullable(),
+    achievement_count: z.number().int().nullable(),
+    kudos_count: z.number().int().nullable(),
+    comment_count: z.number().int().nullable(),
+    athlete_count: z.number().int().nullable(),
+    photo_count: z.number().int().nullable(),
+    total_photo_count: z.number().int().nullable(),
+    map_id: z.string().nullable(),
+    map_polyline: z.string().nullable(),
+    map_summary_polyline: z.string().nullable(),
+    map_bbox: z.array(z.number()).nullable(),
+    trainer: z.boolean().nullable(),
+    commute: z.boolean().nullable(),
+    manual: z.boolean().nullable(),
+    private: z.boolean().nullable(),
+    flagged: z.boolean().nullable(),
+    workout_type: z.number().int().nullable(),
+    upload_id: idString.nullable(),
+    average_speed: z.number().nullable(),
+    max_speed: z.number().nullable(),
+    calories: z.number().nullable(),
+    has_heartrate: z.boolean().nullable(),
+    average_heartrate: z.number().nullable(),
+    max_heartrate: z.number().nullable(),
+    heartrate_opt_out: z.boolean().nullable(),
+    display_hide_heartrate_option: z.boolean().nullable(),
+    elev_high: z.number().nullable(),
+    elev_low: z.number().nullable(),
+    pr_count: z.number().int().nullable(),
+    has_kudoed: z.boolean().nullable(),
+    hide_from_home: z.boolean().nullable(),
+    gear_id: z.string().nullable(),
+    device_watts: z.boolean().nullable(),
+    average_watts: z.number().nullable(),
+    max_watts: z.number().int().nullable(),
+    weighted_average_watts: z.number().int().nullable(),
+    kilojoules: z.number().nullable(),
+    last_updated: isoDateTime.nullable(),
+    geometry_state: geometryStateSchema,
+    photos_state: photosStateSchema.nullable(),
+    last_summary_seen_at: isoDateTime.nullable(),
+    last_detailed_fetched_at: isoDateTime.nullable(),
+  })
+  .superRefine((activity, ctx) => {
+    if (
+      activity.placeMatches &&
+      activity.placeMatches.activityId !== activity.id
+    )
+      ctx.addIssue({
+        code: 'custom',
+        path: ['placeMatches', 'activityId'],
+        message: 'Matching result belongs to another activity',
+      });
+  });
 
 export type ActivityDTO = z.infer<typeof activityDTOSchema>;
 

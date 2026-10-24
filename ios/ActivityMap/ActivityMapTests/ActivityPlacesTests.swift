@@ -16,7 +16,7 @@ private actor PlacesProbe: ActivityPlacesSource {
     private let id = "9007199254740993"
     private func result(status: ActivityMapAPI.ActivityPlacesStatus = .complete, places: [ActivityMapAPI.MatchedPlace] = []) -> ActivityMapAPI.ActivityPlaces {
         .init(userID: scope.userID, activityID: id, status: status, streamGeneration: "g1", streamRevision: "1",
-              catalogueSnapshotID: "snapshot", matcherVersion: "v1", places: places)
+              catalogueSnapshotID: "snapshot", matcherVersion: "v1", matchingVersion: nil, resultRevision: nil, places: places)
     }
     private func activity(revision: String = "1") throws -> ActivityMapAPI.Activity {
         let metadata = try JSONSerialization.jsonObject(with: Data(StreamFixtures.metadataJSON(generation: "g1", revision: revision).utf8))
@@ -26,6 +26,109 @@ private actor PlacesProbe: ActivityPlacesSource {
         let deadline = Date().addingTimeInterval(5)
         while !loader.loading.isEmpty, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
         #expect(loader.loading.isEmpty)
+    }
+    private func syncedActivity(version: String, empty: Bool = false, userID: String? = nil) throws -> ActivityMapAPI.Activity {
+        let places: [[String: Any]] = empty ? [] : [["id": "00000000-0000-4000-8000-000000000001", "name": "Summit", "kinds": ["peak"],
+            "longitude": 8, "latitude": 46, "elevationM": 2000, "visits": [["distanceM": 100]]]]
+        let matches: [String: Any] = ["userId": userID ?? scope.userID, "activityId": id, "status": "complete",
+            "streamGeneration": "g1", "streamRevision": "1", "catalogueSnapshotId": "catalogue", "matcherVersion": "v5",
+            "matchingVersion": version, "resultRevision": UUID().uuidString, "places": places]
+        let metadata = try JSONSerialization.jsonObject(with: Data(StreamFixtures.metadataJSON(generation: "g1", revision: "1").utf8))
+        return try Fixtures.activity(["id": id, "streams": metadata, "placeMatches": matches])
+    }
+    private func placesCheckpoint(version: String, cursor: String = "cursor-1") -> SyncCheckpoint {
+        var checkpoint = Fixtures.checkpoint
+        checkpoint.placesSyncReady = true
+        checkpoint.changesCursor = cursor
+        checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: version)
+        return checkpoint
+    }
+    @Test func syncedVisitsLoadOfflineWithoutRequestsAndZeroReplacementRemovesThem() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let version = String(repeating: "a", count: 64)
+        let original = try syncedActivity(version: version)
+        try await storage.apply([.upsertActivity(original)], checkpoint: placesCheckpoint(version: version), scope: scope)
+        let probe = PlacesProbe(result())
+        let loader = ActivityPlacesLoader(source: { _ in probe })
+        await loader.configure(SyncFixtures.session(verified: false), storage: storage)
+        loader.demand([id], owner: UUID())
+        try await wait(loader)
+        #expect(loader.result(id)?.places.count == 1)
+        #expect(await probe.calls == 0)
+        let zero = try syncedActivity(version: version, empty: true)
+        try await storage.apply([.upsertActivity(zero)], checkpoint: placesCheckpoint(version: version, cursor: "zero"), scope: scope)
+        for _ in 0..<20 { await Task.yield() }
+        try await wait(loader)
+        #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope)?.dto.places.isEmpty == true)
+        #expect(loader.result(id)?.places.isEmpty == true)
+        #expect(await probe.calls == 0)
+        loader.reset()
+    }
+    @Test func emptySyncPageInvalidatesGlobalVersionAndFencesLateDirectResponses() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let version = String(repeating: "a", count: 64)
+        let original = try syncedActivity(version: version)
+        try await storage.apply([.upsertActivity(original)], checkpoint: placesCheckpoint(version: version), scope: scope)
+        let fence = await storage.streamFence()
+        try await storage.apply([], checkpoint: placesCheckpoint(version: String(repeating: "b", count: 64)), scope: scope)
+        #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope) == nil)
+        #expect(try await !storage.saveActivityPlaces(original.placeMatches!, scope: scope, fence: fence, now: .now))
+        #expect(try await storage.snapshot(scope: scope).activities.first?.placeMatches?.places.count == 1)
+    }
+    @Test func failedSaveRollsBackVisitReplacementAndItsCheckpoint() async throws {
+        enum DiskError: Error { case full }
+        let container = try LocalStore.makeContainer(inMemory: true)
+        let storage = LocalStore(container: container)
+        let version = String(repeating: "a", count: 64)
+        let checkpoint = placesCheckpoint(version: version)
+        try await storage.apply([.upsertActivity(try syncedActivity(version: version))], checkpoint: checkpoint, scope: scope)
+        let failing = LocalStore(container: container, save: { _ in throw DiskError.full })
+        let zero = try syncedActivity(version: version, empty: true)
+        await #expect(throws: DiskError.self) {
+            try await failing.apply([.upsertActivity(zero)], checkpoint: self.placesCheckpoint(version: version, cursor: "uncommitted"), scope: self.scope)
+        }
+        #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope)?.dto.places.count == 1)
+        #expect(try await storage.snapshot(scope: scope).checkpoint == checkpoint)
+    }
+    @Test func crossAccountSyncedBundleCannotBeSavedOrAcknowledged() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let version = String(repeating: "a", count: 64)
+        let wrong = try syncedActivity(version: version, userID: "other")
+        await #expect(throws: LocalStore.PlacesSyncError.self) {
+            try await storage.apply([.upsertActivity(wrong)], checkpoint: self.placesCheckpoint(version: version), scope: self.scope)
+        }
+        #expect(try await storage.snapshot(scope: scope).activities.isEmpty)
+        #expect(try await storage.snapshot(scope: scope).checkpoint == nil)
+    }
+    @Test func legacyCacheStagesOnePlaceBootstrapAndKeepsOldDataIfItFails() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let old = try activity()
+        _ = try await SyncEngine(source: SyncFixtures.complete([old]), store: storage, scope: scope).run()
+        let oldCheckpoint = try #require(await storage.snapshot(scope: scope).checkpoint)
+        let oldCursor = try #require(oldCheckpoint.changesCursor)
+        #expect(oldCheckpoint.placesSyncReady != true)
+        let version = String(repeating: "a", count: 64)
+        let freshness = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: nil, placeMatchingVersion: version)
+        let failure = ScriptedSyncSource([
+            .changes(oldCursor, .success(SyncFixtures.changes(next: oldCursor, freshness: freshness))),
+            .bootstrap(.activities, nil, .failure(.transport("offline"))),
+        ])
+        await #expect(throws: APIClient.RequestError.self) {
+            try await SyncEngine(source: failure, store: storage, scope: self.scope).run()
+        }
+        #expect(try await storage.snapshot(scope: scope).activities == [old])
+        #expect(try await storage.snapshot(scope: scope).checkpoint == oldCheckpoint)
+        let updated = try syncedActivity(version: version)
+        let source = ScriptedSyncSource([
+            .changes(oldCursor, .success(SyncFixtures.changes(next: oldCursor, freshness: freshness))),
+            .bootstrap(.activities, nil, .success(SyncFixtures.activities([updated], freshness: freshness))),
+            .bootstrap(.photos, nil, .success(SyncFixtures.photos(freshness: freshness))),
+            .changes("snapshot", .success(SyncFixtures.changes(next: "snapshot", freshness: freshness))),
+        ])
+        let checkpoint = try await SyncEngine(source: source, store: storage, scope: scope).run()
+        #expect(checkpoint.placesSyncReady == true)
+        #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope)?.dto.places.count == 1)
+        #expect(await source.steps.isEmpty)
     }
     @Test func mapChooserCandidatesDoNotContributePlacesUntilActivatedOrCombined() {
         let store = ActivityStore(activities: (1...100).map { ActivityStoreSelectionTests.activity($0) })
@@ -125,7 +228,7 @@ private actor PlacesProbe: ActivityPlacesSource {
         let first = result(); let oldFence = await storage.streamFence()
         #expect(try await storage.saveActivityPlaces(first, scope: scope, fence: oldFence, now: .now))
         let next = ActivityMapAPI.ActivityPlaces(userID: first.userID, activityID: "2", status: .complete,
-            streamGeneration: "g1", streamRevision: "1", catalogueSnapshotID: "new-snapshot", matcherVersion: "v2", places: [])
+            streamGeneration: "g1", streamRevision: "1", catalogueSnapshotID: "new-snapshot", matcherVersion: "v2", matchingVersion: nil, resultRevision: nil, places: [])
         let nextFence = await storage.streamFence()
         #expect(try await storage.saveActivityPlaces(next, scope: scope, fence: nextFence, now: .now))
         #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope) == nil)
@@ -294,7 +397,7 @@ private actor PlacesProbe: ActivityPlacesSource {
         let first = result(places: [place])
         let second = ActivityMapAPI.ActivityPlaces(userID: first.userID, activityID: "2", status: .complete,
             streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: first.catalogueSnapshotID,
-            matcherVersion: first.matcherVersion, places: [place])
+            matcherVersion: first.matcherVersion, matchingVersion: nil, resultRevision: nil, places: [place])
         let mapped = DisplayMatchedPlace.aggregate([first, first, second])
         #expect(mapped.count == 1)
         #expect(mapped.first?.activityIDs.count == 2)
@@ -313,7 +416,7 @@ private actor GatedPlacesProbe: ActivityPlacesSource {
     func finish(_ id: String) {
         let dto = ActivityMapAPI.ActivityPlaces(userID: template.userID, activityID: id, status: .complete,
             streamGeneration: template.streamGeneration, streamRevision: template.streamRevision,
-            catalogueSnapshotID: template.catalogueSnapshotID, matcherVersion: template.matcherVersion,
+            catalogueSnapshotID: template.catalogueSnapshotID, matcherVersion: template.matcherVersion, matchingVersion: nil, resultRevision: nil,
             places: [])
         continuations.removeValue(forKey: id)?.resume(returning: dto)
     }

@@ -26,19 +26,29 @@ import SwiftData
 nonisolated struct CachedActivityPlaces: Sendable {
     let dto: ActivityMapAPI.ActivityPlaces
     let storedAt: Date
+    var synchronized = false
 }
 
-/// Last identity observed in a response, not an independent server manifest.
-/// Keeping the persisted model/keys also preserves the first Dev build's store.
+/// Global matching identity from the sync manifest or a newer direct response.
+/// Optional version preserves decoding of the first Dev build's cached identity.
 nonisolated struct PlaceMatchingIdentity: Codable, Equatable, Sendable {
     let catalogueSnapshotID: String
     let matcherVersion: String
+    var matchingVersion: String?
     enum CodingKeys: String, CodingKey {
         case catalogueSnapshotID = "catalogueSnapshotId"
-        case matcherVersion
+        case matcherVersion, matchingVersion
     }
     init?(_ dto: ActivityMapAPI.ActivityPlaces) {
-        guard let snapshot = dto.catalogueSnapshotID else { return nil }
-        catalogueSnapshotID = snapshot; matcherVersion = dto.matcherVersion
+        guard dto.catalogueSnapshotID != nil || dto.matchingVersion != nil else { return nil }
+        catalogueSnapshotID = dto.catalogueSnapshotID ?? ""; matcherVersion = dto.matcherVersion
+        matchingVersion = dto.matchingVersion
+    }
+    init(version: String) {
+        catalogueSnapshotID = ""; matcherVersion = ""; matchingVersion = version
+    }
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        if lhs.matchingVersion != nil || rhs.matchingVersion != nil { return lhs.matchingVersion == rhs.matchingVersion }
+        return lhs.catalogueSnapshotID == rhs.catalogueSnapshotID && lhs.matcherVersion == rhs.matcherVersion
     }
 }

@@ -2,6 +2,7 @@ import type {
   ActivityPlacesResponse,
   MatchedPlace,
 } from '~/contracts/activity-places';
+import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import type { ElevationProfile } from '~/lib/activity-stream-summary';
 import { nearestElevationSample } from '~/lib/elevation-profile';
@@ -13,12 +14,40 @@ export const activityPlacesQueryKey = (
   userId: string,
   activityId: string,
   metadata?: StreamMetadata,
+  matchingVersion?: string,
 ) => [
   ...activityPlacesQueryRoot(userId, activityId),
   metadata?.generation ?? null,
   metadata?.revision ?? '0',
   metadata?.state ?? 'not_fetched',
+  ...(matchingVersion ? [matchingVersion] : []),
 ];
+/** A synchronized bundle is authoritative only for its account, inputs and
+ * global version. Retaining old data on disk never makes it current. */
+export function syncedActivityPlaces(
+  activity: ActivityDTO | undefined,
+  userId: string,
+  version: string | undefined,
+  metadata = activity?.streams,
+): ActivityPlacesResponse | undefined {
+  const result = activity?.placeMatches;
+  if (
+    !result ||
+    !version ||
+    result.userId !== userId ||
+    result.activityId !== activity?.id ||
+    result.matchingVersion !== version
+  )
+    return undefined;
+  if (
+    metadata &&
+    (result.streamGeneration !== metadata.generation ||
+      result.streamRevision !== metadata.revision ||
+      (result.status === 'complete' && metadata.state !== 'current'))
+  )
+    return undefined;
+  return result;
+}
 export type SelectedMatchedPlace = MatchedPlace & { activityIds: string[] };
 export function selectedMatchedPlaces(
   results: (ActivityPlacesResponse | undefined)[],

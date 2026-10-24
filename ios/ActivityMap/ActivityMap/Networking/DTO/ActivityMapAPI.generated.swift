@@ -44,6 +44,8 @@ nonisolated extension ActivityMapAPI {
         let streamRevision: String
         let catalogueSnapshotID: String?
         let matcherVersion: String
+        let matchingVersion: String?
+        let resultRevision: String?
         let places: [MatchedPlace]
 
         enum CodingKeys: String, CodingKey {
@@ -54,6 +56,8 @@ nonisolated extension ActivityMapAPI {
             case streamRevision
             case catalogueSnapshotID = "catalogueSnapshotId"
             case matcherVersion
+            case matchingVersion
+            case resultRevision
             case places
         }
     }
@@ -375,6 +379,7 @@ nonisolated extension ActivityMapAPI {
 
     struct Activity: Codable, Hashable, Sendable {
         let streams: StreamMetadata?
+        let placeMatches: ActivityPlaces?
         let id: String
         let athlete: String
         let name: String
@@ -433,6 +438,7 @@ nonisolated extension ActivityMapAPI {
 
         enum CodingKeys: String, CodingKey {
             case streams
+            case placeMatches
             case id
             case athlete
             case name
@@ -575,6 +581,7 @@ nonisolated extension ActivityMapAPI {
 
     struct SyncFreshnessMeta: Codable, Hashable, Sendable {
         let lastSummaryReconciledAt: Date?
+        let placeMatchingVersion: String?
     }
 
     struct SyncChangeItem: Codable, Hashable, Sendable {
@@ -809,6 +816,7 @@ nonisolated extension ActivityMapAPI {
         case uncovered = "uncovered"
         case partial = "partial"
         case unavailable = "unavailable"
+        case pending = "pending"
     }
 
     enum AuthenticationMethod: String, Codable, Hashable, Sendable {

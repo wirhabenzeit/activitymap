@@ -133,9 +133,13 @@ private actor PlacesWorker {
                     if let cached {
                         guard current == self.epoch else { return }
                         self.results[id] = cached.dto; self.validatedAt[id] = cached.storedAt
+                        if cached.synchronized && cached.dto.status != .pending {
+                            if cached.dto.status != .complete { self.retryAt[id] = .distantFuture }
+                            return
+                        }
                         if cached.dto.status == .complete {
                             if !session.verified || self.now().timeIntervalSince(cached.storedAt) < 86400 { return }
-                        } else if cached.storedAt.addingTimeInterval(900) > .now {
+                        } else if cached.dto.status != .pending && cached.storedAt.addingTimeInterval(900) > .now {
                             self.retryAt[id] = cached.storedAt.addingTimeInterval(900); return
                         }
                     }
@@ -172,7 +176,10 @@ private actor PlacesWorker {
                         }
                     }
                     self.results[id] = dto; self.validatedAt[id] = self.now(); self.failures[id] = nil
-                    if dto.status != .complete { self.retryAt[id] = .now.addingTimeInterval(900) }
+                    if dto.status == .pending {
+                        self.retryAt[id] = .now.addingTimeInterval(3)
+                        try await Task.sleep(for: .seconds(3))
+                    } else if dto.status != .complete { self.retryAt[id] = .now.addingTimeInterval(900) }
                 } catch is CancellationError {
                     // Scope/source fencing owns cancellation; no user-facing error.
                 } catch {

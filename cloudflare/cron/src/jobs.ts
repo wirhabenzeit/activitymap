@@ -18,6 +18,7 @@ export const SCHEDULES: Record<string, CronJob[]> = {
   // New and changed activities arrive through Strava webhooks.
   '*/5 * * * *': [
     { name: 'drain-webhook-inbox', path: '/api/cron/drain-webhook-inbox' },
+    { name: 'match-activity-places', path: '/api/cron/match-activity-places' },
   ],
   '0 * * * *': [
     { name: 'cleanup-rate-limits', path: '/api/cron/cleanup-rate-limits' },

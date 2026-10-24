@@ -18,6 +18,7 @@ nonisolated struct StoreSnapshot: Sendable {
 /// Each operation uses a fresh context with autosave disabled: all mutations and
 /// the checkpoint reach disk in one save, or are rolled back together.
 actor LocalStore {
+    enum PlacesSyncError: Error { case invalidScope }
     private let container: ModelContainer
     let save: @Sendable (ModelContext) throws -> Void
 
@@ -72,11 +73,15 @@ actor LocalStore {
         let context = makeContext()
         let scopeKey = scope.key
         var invalidatedIDs = Set<String>()
+        var placesVersionChanged = false
         do {
             // Preserve feed order, including multiple operations on one entity.
             for mutation in mutations {
                 switch mutation {
                 case .upsertActivity(let dto):
+                    if let matches = dto.placeMatches, matches.userID != scope.userID || matches.activityID != dto.id {
+                        throw PlacesSyncError.invalidScope
+                    }
                     let key = StoreScope.key([scopeKey, dto.id])
                     if let row = try context.fetch(FetchDescriptor<StoredActivity>(
                         predicate: #Predicate { $0.key == key })).first {
@@ -126,6 +131,7 @@ actor LocalStore {
                 }
             }
             if let checkpoint {
+                placesVersionChanged = try reconcilePlacesVersion(checkpoint.freshness?.placeMatchingVersion, scopeKey: scopeKey, context: context)
                 if let state = try context.fetch(FetchDescriptor<SyncState>(
                     predicate: #Predicate { $0.scope == scopeKey })).first {
                     state.payload = try StoreCodec.encode(checkpoint)
@@ -135,6 +141,10 @@ actor LocalStore {
             }
             try Task.checkCancellation()
             try save(context)
+            if placesVersionChanged {
+                streamFences.invalidate(scopeKey)
+                notifySummaryChange(scope: scopeKey)
+            }
             for id in invalidatedIDs { streamFences.invalidate(StoreScope.key([scopeKey, id])) }
             if !invalidatedIDs.isEmpty { notifySummaryChange(scope: scopeKey, activityIDs: invalidatedIDs) }
         } catch {

@@ -63,6 +63,8 @@ export type V1SyncState = {
   changesCursor: string | null;
   lastSyncAt: string | null;
   updatedAt: string;
+  placeMatchingVersion?: string;
+  placesSyncReady?: boolean;
 };
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;
@@ -353,6 +355,14 @@ export const applyV1SyncPage = async (
 ): Promise<void> => {
   options.signal?.throwIfAborted();
   if (state.scope !== scope) throw new Error('Sync checkpoint scope mismatch');
+  for (const item of mutations) {
+    const matches = item.activity?.placeMatches;
+    if (
+      matches &&
+      (matches.activityId !== item.id || scope !== `auth:${matches.userId}`)
+    )
+      throw new Error('Matching result scope mismatch');
+  }
   if (options.replace && (!state.bootstrapComplete || !state.lastSyncAt)) {
     throw new Error('Cannot replace with an incomplete snapshot');
   }

@@ -70,7 +70,7 @@ struct PlacesUITestFixture: View {
                 let pass = ActivityMapAPI.MatchedPlace(id: "pass", name: "Test pass", kinds: [.pass], longitude: 8.0035, latitude: 47.0025,
                     elevationM: 550, visits: [.init(distanceM: 725)])
                 let result = ActivityMapAPI.ActivityPlaces(userID: session.scope.userID, activityID: "1", status: .complete,
-                    streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic",
+                    streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic", matchingVersion: nil, resultRevision: nil,
                     places: [hut, peak, pass])
                 _ = try await storage.saveActivityPlaces(result, scope: session.scope, fence: fence, now: .now)
                 await places.configure(session, storage: storage)
