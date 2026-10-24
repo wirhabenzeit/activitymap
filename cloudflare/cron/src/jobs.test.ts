@@ -33,6 +33,19 @@ void test('every Worker cron trigger has jobs, and every job schedule is a trigg
   const crons = (JSON.parse(config) as { triggers: { crons: string[] } })
     .triggers.crons;
   assert.deepEqual([...crons].sort(), Object.keys(SCHEDULES).sort());
+  assert.ok(crons.length <= 5, 'Stay within the Workers Free cron limit');
+});
+
+void test('hourly housekeeping shares one trigger and failures remain independent', async () => {
+  const { fetch } = fakeFetch({ '/api/cron/cleanup-rate-limits': 503 });
+  const results = await runSchedule('0 * * * *', { ...options, fetch });
+  assert.deepEqual(
+    results.map(({ name, status }) => [name, status]),
+    [
+      ['cleanup-rate-limits', 503],
+      ['erase-revoked-athletes', 200],
+    ],
+  );
 });
 
 void test('jobs are POSTed in order with the cron secret and their bounds', async () => {

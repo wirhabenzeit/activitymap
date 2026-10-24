@@ -18,8 +18,7 @@ triggers the routes on time:
 | -------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | `*/5 * * * *`        | `drain-webhook-inbox`                                                                                               |
 | `2,17,32,47 * * * *` | `match-activity-places`                                                                                             |
-| `0 * * * *`          | `cleanup-rate-limits`                                                                                               |
-| `17 * * * *`         | `erase-revoked-athletes`                                                                                            |
+| `0 * * * *`          | `cleanup-rate-limits`, `erase-revoked-athletes`                                                                     |
 | `37 * * * *`         | `reconcile-strava-summaries`, `backfill-activity-streams` (only if reconcile succeeded), `backfill-activity-photos` |
 | `47 * * * *`         | `sync-activities` (up to 30 detail refreshes and 30 older activities)                                               |
 
@@ -45,6 +44,9 @@ crashed or failed write leaves the work pending. The manual **Run encounter
 matching** GitHub workflow runs one bounded cycle from reviewed `main`; it adds
 no recurring schedule and keeps credentials in the existing Actions secret.
 See [matching versions and invalidation](on-demand-places.md#persistent-checks-versions-and-invalidation).
+
+Hourly housekeeping shares one trigger to keep the Worker within the account's
+five-trigger limit. Each job still runs if the other fails.
 
 Each hour, stream backfill handles up to 40 activities (60 Strava requests)
 and photo catch-up up to 20 activities (48 requests). With Strava's 3,000
