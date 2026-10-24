@@ -222,9 +222,12 @@ pool. Location hints affect scheduling only; the stored GPS still defines the
 complete place query and matching inputs.
 
 Groups fill to 25 activities where memory budgets allow, including distant
-neighbours in sparse regions to avoid singleton queries. They can grow to 100
+neighbours in sparse regions to avoid singleton queries. They can grow to 500
 when additional route centres are within 25 km of the fixed seed. Missing or
-invalid hints remain eligible. Each stored track is loaded separately, and each
+invalid hints remain eligible for the smaller groups, but cannot justify
+geographic growth beyond 25 activities. A default cron run can therefore share
+one place pull across all 500 activities when the geographic and track-size
+budgets allow it. Each stored track is loaded separately, and each
 group also stops growing at
 100,000 original GPS samples or 1,000 continuous sections (the last activity can
 cross the sample/section targets). Raw payloads are released after preparation;
@@ -243,16 +246,18 @@ Partial results remain explicitly partial until inputs or recipe change.
 A read-only local comparison on 24 October 2026 checked all 4,602 persisted
 reference results against the 80,366-place catalogue. Every result was identical:
 
-| Measurement                 | Sequential groups of 25 | Spatial groups up to 100 |
+| Measurement                 | Sequential groups of 25 | Spatial groups up to 500 |
 | --------------------------- | ----------------------: | -----------------------: |
-| Place rows transferred      |                  28,960 |                   16,799 |
-| Minimal matching JSON bytes |               5,458,077 |                3,178,214 |
+| Place rows transferred      |                  28,960 |                   17,147 |
+| Minimal matching JSON bytes |               5,458,077 |                3,243,890 |
 | Place-data queries          |                     215 |                      192 |
-| Wall time                   |                 58.20 s |                  56.25 s |
-| Peak process RSS            |              437.36 MiB |               461.69 MiB |
+| Wall time                   |                 58.20 s |                  57.38 s |
+| Peak process RSS            |              437.36 MiB |               476.66 MiB |
 
-Spatial grouping reduced place transfers by 42.0%. The largest group contained
-97 activities. The runtime and memory figures are single-process local
+Spatial grouping reduced place transfers by 40.8%. Track-size budgets limited
+the largest group in this dataset to 97 activities; a regression test verifies
+that 500 nearby short tracks share one place pull. The runtime and memory
+figures are single-process local
 measurements, not production throughput estimates; the comparison replaces
 lease/check writes with result assertions. `benchmark:regional-place-matching`
 now also reports distinct places, repeated place rows across groups and group

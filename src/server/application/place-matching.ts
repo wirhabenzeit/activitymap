@@ -32,7 +32,7 @@ import type { ActivityPlaceInput } from './match-activity-places';
 
 export const PLACE_MATCHING_BATCH_SIZE = 500;
 export const PLACE_MATCHING_TIME_MS = 40_000;
-export const PLACE_MATCHING_GROUP_ACTIVITIES = 100;
+export const PLACE_MATCHING_GROUP_ACTIVITIES = PLACE_MATCHING_BATCH_SIZE;
 export const PLACE_MATCHING_GROUP_MIN_ACTIVITIES = 25;
 export const PLACE_MATCHING_GROUP_SAMPLES = 100_000;
 export const PLACE_MATCHING_GROUP_SECTIONS = 1_000;

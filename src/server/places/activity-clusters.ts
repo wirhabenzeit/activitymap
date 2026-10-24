@@ -60,6 +60,9 @@ export function createActivityClusterQueue<
       if (!remaining.length) return undefined;
       if (seed === undefined) return remaining.shift()!.candidate;
       const origin = activityClusterPoint(seed.locationHint ?? {});
+      // Unknown locations can fill small groups, but cannot justify enlarging
+      // one on geographic grounds.
+      if (!origin && !fillSparseGroup) return undefined;
       let selected = -1;
       let nearest = fillSparseGroup ? Infinity : ACTIVITY_CLUSTER_RADIUS_M;
       for (let index = 0; index < remaining.length; index++) {
