@@ -114,6 +114,15 @@ const payload = {
   altitude: stream('altitude', [1235, 1235, 1235]),
 };
 const repository = createPlaceMatchingRepository(database);
+async function coverage() {
+  const rows = await repository.coverage(await repository.catalogue());
+  for (const row of rows) {
+    assert.equal(row.total, row.eligible + row.waitingForStreams);
+    assert.equal(row.eligible, row.checked + row.pending + row.retryWaiting);
+    assert(row.limited <= row.checked);
+  }
+  return rows.find((row) => row.userId === actor.userId);
+}
 async function resetStreams() {
   await client`DELETE FROM activity_streams WHERE activity_id=${id}::bigint`;
   await client`INSERT INTO activity_streams(activity_id,generation,revision,requested_types,available_types,payload,source_version,fetched_at,last_attempt_at,last_attempt_status)
@@ -187,7 +196,10 @@ try {
     start_latlng: [peak.location.latitude, peak.location.longitude - 0.0002],
   });
   assert.equal((await repository.read(actor, id)).status, 'missing_streams');
+  assert.equal((await coverage())?.waitingForStreams, 1);
+  assert.equal((await coverage())?.eligible, 0);
   await resetStreams();
+  assert.equal((await coverage())?.pending, 1);
   const scheduledCandidate = (
     await repository.candidates(await repository.catalogue(), 1)
   )[0];
@@ -276,6 +288,8 @@ try {
   const changes = createChangesRepository(database);
   const beforeMatch = await changes.latestSequence(actor.athleteId);
   assert.equal((await run()).saved, 1);
+  assert.equal((await coverage())?.checked, 1);
+  assert.equal((await coverage())?.pending, 0);
   const events = await changes.findAfter(actor.athleteId, beforeMatch);
   assert.equal(
     events.length,
@@ -350,6 +364,11 @@ try {
   assert.equal((await repository.read(actor, id)).status, 'pending');
   assert.equal((await run()).saved, 1);
   assert.equal((await repository.read(actor, id)).places.length, 0);
+  assert.equal(
+    (await coverage())?.checked,
+    1,
+    'Zero encounters count as checked',
+  );
   assert.deepEqual(
     (await repository.sync(actor, [id])).results.get(id)?.places,
     [],
@@ -444,6 +463,11 @@ try {
     'Deferred tracks reuse sample counts, while payloads are read afresh',
   );
   await client`UPDATE account SET revoked_at=now() WHERE id=${actor.userId}`;
+  assert.equal(
+    await coverage(),
+    undefined,
+    'Dashboard excludes revoked accounts',
+  );
   assert.equal(
     (
       await repository.readInputs(bulkCandidates, 100_000, sizeCache)
@@ -769,7 +793,16 @@ try {
     0,
     'Failed checks back off',
   );
+  assert.equal((await coverage())?.retryWaiting, 1);
+  assert.equal((await coverage())?.failed, 1);
+  assert.equal((await coverage())?.pending, 0);
   await client`UPDATE places SET display_name=display_name WHERE id=(SELECT id FROM places LIMIT 1)`;
+  assert.equal(
+    (await coverage())?.pending,
+    1,
+    'Catalogue changes invalidate coverage',
+  );
+  assert.equal((await coverage())?.retryWaiting, 0);
   assert.equal(
     (await repository.candidates(await repository.catalogue(), 500)).length,
     1,

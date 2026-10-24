@@ -44,6 +44,7 @@ function fixture() {
       revision: '1',
     }),
     candidates: async () => [candidate],
+    coverage: async () => [],
     readInputs: async (candidates) => ({
       consumed: candidates.length,
       inputs: new Map(
