@@ -114,7 +114,7 @@ test('native profiles retain all unit suites and select exactly the intended PR 
   assert.deepEqual(pr.suites, [...unitSuites, ...expectedUI]);
   assert.equal(new Set(pr.suites).size, 37);
   assert.equal(pr.name, 'pr');
-  assert.equal(pr.runtimeTimeoutMs, 8 * 60 * 1000);
+  assert.equal(pr.runtimeTimeoutMs, 12 * 60 * 1000);
   assert.deepEqual(full.suites, nativeSuites);
   assert.equal(full.suites.length, 38);
   assert.equal(full.name, 'full');
