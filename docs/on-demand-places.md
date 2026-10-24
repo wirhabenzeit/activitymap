@@ -211,13 +211,30 @@ matching fails closed if the loaded catalogue disagrees with its manifest.
 `POST /api/cron/match-activity-places` runs every five minutes after the webhook
 drain, independently of whether that drain succeeds. It requires the existing
 production/external-effects guards and `CRON_SECRET`. A run takes an expiring
-120-second global lease, selects at most 500 stale activities by default (maximum
-2,000), and stops starting work at a 40-second deadline. Selection loads only
-metadata; each stored track is loaded separately, and each run processes bounded
-groups. Each group stops growing at 25 activities,
+120-second global lease, processes at most 500 stale activities by default (maximum
+2,000), and stops starting work at a 40-second deadline. It reads a bounded
+metadata pool four times the work limit (2,000 by default) in the existing
+freshness order: unchecked first, then oldest checks, with descending activity ID
+breaking ties. Each group starts with the first remaining candidate, then takes
+the nearest routes from that pool using summary-bounds centres, falling back to
+start coordinates. This also chooses the actual 500 spatially from the larger
+pool. Location hints affect scheduling only; the stored GPS still defines the
+complete place query and matching inputs.
+
+Groups fill to 25 activities where memory budgets allow, including distant
+neighbours in sparse regions to avoid singleton queries. They can grow to 500
+when additional route centres are within 25 km of the fixed seed. Missing or
+invalid hints remain eligible for the smaller groups, but cannot justify
+geographic growth beyond 25 activities. A default cron run can therefore share
+one place pull across all 500 activities when the geographic and track-size
+budgets allow it. Each stored track is loaded separately, and each
+group also stops growing at
 100,000 original GPS samples or 1,000 continuous sections (the last activity can
 cross the sample/section targets). Raw payloads are released after preparation;
-the prepared tracks are reused for matching. Separate boxes for continuous
+the prepared tracks are reused for matching.
+Group preparation also stops after five seconds or half the remaining run
+budget, whichever is smaller, so slow input reads leave time to checkpoint work.
+Separate boxes for continuous
 sections are padded by the discovery radius, its 1% + 1 m discovery slack and
 another 2 m margin. Longitude-wrap boxes are split, and poles are handled
 conservatively. One spatial query loads the distinct places intersecting that
@@ -228,6 +245,27 @@ cycles never load the catalogue. The check itself is the
 checkpoint, so interrupted runs resume from remaining stale rows. Failures record
 only a safe code and back off five minutes; changed inputs bypass old backoff.
 Partial results remain explicitly partial until inputs or recipe change.
+
+A read-only local comparison on 24 October 2026 checked all 4,602 persisted
+reference results against the 80,366-place catalogue. Every result was identical:
+
+| Measurement                 | Sequential groups of 25 | Spatial groups up to 500 |
+| --------------------------- | ----------------------: | -----------------------: |
+| Place rows transferred      |                  28,960 |                   17,147 |
+| Minimal matching JSON bytes |               5,458,077 |                3,243,890 |
+| Place-data queries          |                     215 |                      192 |
+| Wall time                   |                 58.20 s |                  57.38 s |
+| Peak process RSS            |              437.36 MiB |               476.66 MiB |
+
+Spatial grouping reduced place transfers by 40.8%. Track-size budgets limited
+the largest group in this dataset to 97 activities; a regression test verifies
+that 500 nearby short tracks share one place pull. The runtime and memory
+figures are single-process local
+measurements, not production throughput estimates; the comparison replaces
+lease/check writes with result assertions. `benchmark:regional-place-matching`
+now also reports distinct places, repeated place rows across groups and group
+activity counts. It verifies every result and retires committed IDs explicitly,
+so spatially reordered work cannot skip or duplicate activities.
 
 Each commit locks and rechecks the lease, catalogue revision, active snapshot,
 eligible account, activity and exact current stream before atomically replacing

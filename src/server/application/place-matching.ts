@@ -1,6 +1,10 @@
 import 'server-only';
 
 import {
+  PLACE_MATCHING_CANDIDATE_MULTIPLIER,
+  createActivityClusterQueue,
+} from '~/server/places/activity-clusters';
+import {
   type MatchingCatalogue,
   SERVER_MATCHER_POLICY,
 } from '~/server/places/matching-version';
@@ -28,7 +32,9 @@ import type { ActivityPlaceInput } from './match-activity-places';
 
 export const PLACE_MATCHING_BATCH_SIZE = 500;
 export const PLACE_MATCHING_TIME_MS = 40_000;
-export const PLACE_MATCHING_GROUP_ACTIVITIES = 25;
+export const PLACE_MATCHING_GROUP_ACTIVITIES = PLACE_MATCHING_BATCH_SIZE;
+export const PLACE_MATCHING_GROUP_MIN_ACTIVITIES = 25;
+export const PLACE_MATCHING_GROUP_PREPARE_TIME_MS = 5_000;
 export const PLACE_MATCHING_GROUP_SAMPLES = 100_000;
 export const PLACE_MATCHING_GROUP_SECTIONS = 1_000;
 type PreparedCandidate = {
@@ -106,34 +112,50 @@ export async function processPlaceMatching(
     // Avoid loading the entire catalogue when this cycle has no pending work.
     const candidates = await repository.candidates(
       current,
-      activityLimit,
+      activityLimit * PLACE_MATCHING_CANDIDATE_MULTIPLIER,
       options.activityIds,
     );
     if (!candidates.length) return result;
-    let next = 0;
+    const queue = createActivityClusterQueue(candidates);
     const failed = async (candidate: MatchingCandidate) => {
       result.failed++;
       if (!(await repository.commit(token, current, candidate, null)))
         result.stopReason = 'inputs_changed';
     };
-    while (next < candidates.length) {
+    while (queue.size && result.selected < activityLimit) {
       const group: PreparedCandidate[] = [];
       const windows: PlaceQueryWindow[] = [];
+      let seed: MatchingCandidate | undefined;
       let samples = 0,
         sections = 0;
+      const groupStarted = clock();
+      const prepareTimeMs = Math.min(
+        PLACE_MATCHING_GROUP_PREPARE_TIME_MS,
+        Math.max(0, (timeMs - (groupStarted - started)) / 2),
+      );
       // Metadata selection stays large; raw GPS and prepared samples are retained
       // only for this bounded group. Every stream is read and prepared once.
       while (
-        next < candidates.length &&
+        queue.size &&
+        result.selected < activityLimit &&
         group.length < PLACE_MATCHING_GROUP_ACTIVITIES &&
         samples < PLACE_MATCHING_GROUP_SAMPLES &&
         sections < PLACE_MATCHING_GROUP_SECTIONS
       ) {
+        // Large, short tracks can fit the memory limits while their individual
+        // database reads exhaust the run. Reserve time to match and save the
+        // prepared group instead of repeatedly abandoning it at the deadline.
+        if (group.length && clock() - groupStarted >= prepareTimeMs) break;
         if (clock() - started >= timeMs) {
           result.stopReason = 'deadline';
           break;
         }
-        const candidate = candidates[next++]!;
+        const candidate = queue.take(
+          seed,
+          group.length < PLACE_MATCHING_GROUP_MIN_ACTIVITIES,
+        );
+        if (!candidate) break;
+        seed ??= candidate;
         result.selected++;
         try {
           const input = await repository.readInput(candidate);
@@ -223,7 +245,7 @@ export async function processPlaceMatching(
       }
       if (result.stopReason !== 'complete') break;
     }
-    if (result.stopReason === 'complete' && candidates.length === activityLimit)
+    if (result.stopReason === 'complete' && result.selected === activityLimit)
       result.stopReason = 'batch_limit';
     return result;
   } finally {

@@ -139,6 +139,7 @@ void test('each bounded group shares one scoped catalogue and track inputs are r
   const candidates = Array.from({ length: count }, (_, i) => ({
     ...candidate,
     activityId: String(i + 1),
+    locationHint: { start: [46.9, 8] },
   }));
   f.repository.candidates = async () => candidates;
   let reads = 0;
@@ -163,6 +164,7 @@ void test('each bounded group shares one scoped catalogue and track inputs are r
   const selections: { windows: readonly PlaceQueryWindow[] }[] = [];
   const result = await processPlaceMatching({
     ...f,
+    activityLimit: count,
     loadSnapshot: async (selection) => {
       selections.push(selection);
       return { ...snapshot, windows: selection.windows };
@@ -206,4 +208,129 @@ void test('the prepared sample budget bounds groups independently of activity co
   const result = await processPlaceMatching(f);
   assert.equal(result.saved, 3);
   assert.equal(result.groups, 2);
+});
+
+void test('spatial lookahead chooses work beyond the first batch while preserving the work limit and oldest seed', async () => {
+  const f = fixture();
+  const located = (id: string, longitude: number) => ({
+    ...candidate,
+    activityId: id,
+    locationHint: { start: [47, longitude] },
+  });
+  const candidates = [
+    located('1', 8),
+    located('2', 13),
+    located('3', 8.001),
+    located('4', 8.002),
+  ];
+  let requested = 0;
+  f.repository.candidates = async (_catalogue, limit) => {
+    requested = limit;
+    return candidates;
+  };
+  const read: string[] = [];
+  f.repository.readInput = async (candidate) => {
+    read.push(candidate.activityId);
+    return { generation: 'g', revision: '1', payload: {} };
+  };
+  const result = await processPlaceMatching({ ...f, activityLimit: 3 });
+  assert.equal(requested, 12);
+  assert.deepEqual(read, ['1', '3', '4']);
+  assert.equal(result.selected, 3);
+  assert.equal(result.saved, 3);
+  assert.equal(result.groups, 1);
+  assert.equal(result.stopReason, 'batch_limit');
+});
+
+void test('sparse regions share a bounded pull rather than producing singleton queries', async () => {
+  const f = fixture();
+  f.repository.candidates = async () => [
+    { ...candidate, locationHint: { start: [47, 8] } },
+    { ...candidate, activityId: '2', locationHint: { start: [52, 13] } },
+  ];
+  const result = await processPlaceMatching(f);
+  assert.equal(result.saved, 2);
+  assert.equal(result.groups, 1);
+});
+
+void test('all 500 nearby short tracks share one place pull', async () => {
+  const f = fixture();
+  f.repository.candidates = async () =>
+    Array.from({ length: 500 }, (_, i) => ({
+      ...candidate,
+      activityId: String(i + 1),
+      locationHint: { start: [46.9, 8] },
+    }));
+  const stream = (data: unknown[]) => ({
+    data,
+    resolution: 'high',
+    series_type: 'time',
+    original_size: data.length,
+  });
+  f.repository.readInput = async () => ({
+    generation: 'g',
+    revision: '1',
+    payload: {
+      latlng: stream([
+        [46.9, 8],
+        [46.9, 8.0001],
+      ]),
+      time: stream([0, 10]),
+      distance: stream([0, 10]),
+    },
+  });
+  const result = await processPlaceMatching(f);
+  assert.equal(result.saved, 500);
+  assert.equal(result.groups, 1);
+  assert.equal(f.calls.filter((call) => call === 'load').length, 1);
+});
+
+void test('larger groups stop when nearby candidates run out', async () => {
+  const f = fixture();
+  f.repository.candidates = async () => [
+    ...Array.from({ length: 40 }, (_, i) => ({
+      ...candidate,
+      activityId: String(i + 1),
+      locationHint: { start: [47, 8] },
+    })),
+    { ...candidate, activityId: '41', locationHint: { start: [52, 13] } },
+  ];
+  const result = await processPlaceMatching(f);
+  assert.equal(result.saved, 41);
+  assert.equal(result.groups, 2);
+});
+
+void test('missing location hints cannot grow a group beyond the sparse fill size', async () => {
+  const f = fixture();
+  f.repository.candidates = async () =>
+    Array.from({ length: 26 }, (_, i) => ({
+      ...candidate,
+      activityId: String(i + 1),
+    }));
+  const result = await processPlaceMatching(f);
+  assert.equal(result.saved, 26);
+  assert.equal(result.groups, 2);
+});
+
+void test('slow input loading starts saving before a large group exhausts the run deadline', async () => {
+  const f = fixture();
+  f.repository.candidates = async () =>
+    Array.from({ length: 500 }, (_, i) => ({
+      ...candidate,
+      activityId: String(i + 1),
+      locationHint: { start: [47, 8] },
+    }));
+  let now = 0;
+  f.repository.readInput = async () => {
+    now += 100;
+    return { generation: 'g', revision: '1', payload: {} };
+  };
+  const result = await processPlaceMatching({ ...f, clock: () => now });
+  assert(
+    result.saved > 0,
+    'A slow-read run must checkpoint work instead of loading until its deadline',
+  );
+  assert(result.groups > 1);
+  assert.equal(result.stopReason, 'deadline');
+  assert.equal(f.calls.at(-1), 'release');
 });
