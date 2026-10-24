@@ -10,6 +10,7 @@ nonisolated struct SyncCheckpoint: Codable, Equatable, Sendable {
     var lastSyncAt: Date?
     var retention: ActivityMapAPI.SyncRetentionMeta?
     var freshness: ActivityMapAPI.SyncFreshnessMeta?
+    var placesSyncReady: Bool?
 }
 
 @Model

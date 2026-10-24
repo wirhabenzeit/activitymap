@@ -1,16 +1,17 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import {
+  type Activity,
   activities,
   photos,
   syncChanges,
-  type Activity,
 } from '~/server/db/schema';
 
 import {
-  createActivitiesRepository,
   type ActivitiesRepository,
+  createActivitiesRepository,
 } from './activities.ts';
 
 type FakeCall = {
@@ -42,6 +43,7 @@ function buildFakeDb(opts: {
 
   function makeHandle(via: FakeCall['via']) {
     return {
+      execute: async () => undefined,
       select(_columns?: unknown) {
         return {
           from(table: unknown) {
@@ -289,6 +291,7 @@ void test('replaceExistingForAthlete locks the owned row and updates it with its
   const calls: string[] = [];
   const saved = { id: 7, athlete: 42, name: 'Updated' };
   const tx = {
+    execute: async () => undefined,
     select() {
       return {
         from() {
@@ -297,7 +300,9 @@ void test('replaceExistingForAthlete locks the owned row and updates it with its
               return {
                 async for(mode: string) {
                   calls.push(`select:${mode}`);
-                  return [{ id: 7, lastUpdated: new Date('2026-01-01T00:00:00Z') }];
+                  return [
+                    { id: 7, lastUpdated: new Date('2026-01-01T00:00:00Z') },
+                  ];
                 },
               };
             },
@@ -368,10 +373,14 @@ void test('replaceExistingForAthlete cannot resurrect a row deleted before its t
     },
   };
   const repo = repoWith(db as unknown as ReturnType<typeof buildFakeDb>['db']);
-  const result = await repo.replaceExistingForAthlete(42, {
-    id: 7,
-    athlete: 42,
-  } as Activity, null);
+  const result = await repo.replaceExistingForAthlete(
+    42,
+    {
+      id: 7,
+      athlete: 42,
+    } as Activity,
+    null,
+  );
   assert.equal(result, null);
   assert.equal(updated, false);
 });

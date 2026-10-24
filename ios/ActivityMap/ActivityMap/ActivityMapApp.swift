@@ -6,6 +6,7 @@ struct ActivityMapApp: App {
     private let isTesting = ProcessInfo.processInfo.arguments.contains("--unit-testing")
     private let persistence: Result<LocalStore, Error>
     #if DEBUG
+    private let isPlacesUITesting = ProcessInfo.processInfo.arguments.contains("--places-ui-testing")
     private let isActivityActionsUITesting = ProcessInfo.processInfo.arguments.contains("--activity-actions-ui-testing")
     private let isMapRotationUITesting = ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
     private let isMapPhotoUITesting = ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
@@ -22,7 +23,8 @@ struct ActivityMapApp: App {
 
     private static var usesInMemoryPersistence: Bool {
         #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("--activity-actions-ui-testing")
+        if ProcessInfo.processInfo.arguments.contains("--places-ui-testing")
+            || ProcessInfo.processInfo.arguments.contains("--activity-actions-ui-testing")
             || ProcessInfo.processInfo.arguments.contains("--map-rotation-ui-testing")
             || ProcessInfo.processInfo.arguments.contains("--map-photo-ui-testing")
             || ProcessInfo.processInfo.arguments.contains("--list-selection-ui-testing")
@@ -34,7 +36,9 @@ struct ActivityMapApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if isActivityActionsUITesting {
+            if isPlacesUITesting {
+                PlacesUITestFixture()
+            } else if isActivityActionsUITesting {
                 ActivityActionsUITestFixture()
             } else if isStatsUITesting {
                 StatsUITestFixture()

@@ -13,8 +13,8 @@ explicit disposable Postgres service.
 | `pnpm test:browser:install`            | Provision the lockfile-matched Playwright Chromium; append `--with-deps` on Linux                                                 |
 | `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
 | `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
-| `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all 30 selected unit/app-hosted suites and five real UI smoke methods on iOS 27                       |
-| `pnpm test:ios`                        | Build and run the full 36-suite native selection, including all 53 selected real UI methods, on iOS 27                            |
+| `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all 31 selected unit/app-hosted suites and six real UI smoke methods on iOS 27                        |
+| `pnpm test:ios`                        | Build and run the full 38-suite native selection, including all 54 selected real UI methods, on iOS 27                            |
 | `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
 | `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
 | `pnpm format:check src/path.ts`        | Check explicit files                                                                                                              |
@@ -82,9 +82,11 @@ Pull-request CI and pushes to main explicitly use `IOS_TEST_PROFILE=pr` when
 native-related files change. A cheap Ubuntu diff check covers iOS sources, shared
 fixtures/catalogs, contracts/OpenAPI, stream codecs, native/testflight tooling and
 the relevant workflows. Web-only changes skip the native app job; an unavailable
-or invalid comparison conservatively runs it. This builds the real app and runs all 30 selected unit/app-hosted suites plus five
+or invalid comparison conservatively runs it. This builds the real app and runs all 31 selected unit/app-hosted suites plus six
 real UI smoke methods on iOS 27:
 
+- Offline matched places on the map/profile, repeated encounters, style replacement and selection preservation:
+  `ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection`.
 - Native GPX sharing, repeated cancellation and departure cleanup:
   `ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture`.
 - List previous-activity pull:
@@ -100,7 +102,7 @@ This is a smoke boundary, not the complete UI matrix. The
 [Full iOS runtime workflow](../.github/workflows/ios-full.yml) is manually
 requested with **Actions → Full iOS runtime → Run workflow**, selecting the
 branch or tag to test. It explicitly uses `IOS_TEST_PROFILE=full`, runs the same
-30 unit/app-hosted suites and all six selected UI suites (36 suites and 53 UI
+31 unit/app-hosted suites and all seven selected UI suites (38 suites and 54 UI
 methods in total on iOS 27), and has no automatic schedule. Run either profile
 locally with:
 

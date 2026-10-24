@@ -4,10 +4,10 @@ import { and, asc, eq, gt, lt, sql } from 'drizzle-orm';
 
 import { db as defaultDb } from '~/server/db';
 import {
-  syncChanges,
   type SyncChange,
   type SyncEntityType,
   type SyncOperation,
+  syncChanges,
 } from '~/server/db/schema';
 
 type DrizzleDb = typeof defaultDb;
@@ -97,7 +97,9 @@ export interface ChangesRepository {
  */
 export const DEFAULT_RETENTION_DAYS = 90;
 
-function normalizeSequence(value: number | string | bigint | null | undefined): number {
+function normalizeSequence(
+  value: number | string | bigint | null | undefined,
+): number {
   if (value === null || value === undefined) return 0;
 
   // PostgreSQL's `max(bigint)` aggregate is returned as text by the Neon
@@ -119,24 +121,35 @@ function normalizeSequence(value: number | string | bigint | null | undefined): 
 export function createChangesRepository(
   database: DrizzleDb = defaultDb,
 ): ChangesRepository {
+  const record: ChangesRepository['record'] = async (entries, tx) => {
+    if (entries.length === 0) return [];
+    if (!tx) return database.transaction((handle) => record(entries, handle));
+    // Identity sequences are allocated before COMMIT. Serialize allocation
+    // through commit for each athlete so a later committed sequence cannot
+    // make a cursor skip an earlier, still uncommitted matching/activity write.
+    // The lock is scoped to this feed, never to other athletes' work.
+    for (const athleteId of [
+      ...new Set(entries.map((entry) => entry.athleteId)),
+    ].sort((a, b) => a - b)) {
+      await tx.execute(
+        sql`SELECT pg_advisory_xact_lock(hashtextextended(${`activitymap-sync:${athleteId}`}, 0))`,
+      );
+    }
+    return tx
+      .insert(syncChanges)
+      .values(
+        entries.map((entry) => ({
+          athleteId: entry.athleteId,
+          entityType: entry.entityType,
+          entityId: String(entry.entityId),
+          operation: entry.operation,
+          ...(entry.changedAt ? { changedAt: entry.changedAt } : {}),
+        })),
+      )
+      .returning();
+  };
   return {
-    async record(entries, tx) {
-      if (entries.length === 0) return [];
-      const handle = tx ?? database;
-      return handle
-        .insert(syncChanges)
-        .values(
-          entries.map((entry) => ({
-            athleteId: entry.athleteId,
-            entityType: entry.entityType,
-            entityId: String(entry.entityId),
-            operation: entry.operation,
-            ...(entry.changedAt ? { changedAt: entry.changedAt } : {}),
-          })),
-        )
-        .returning();
-    },
-
+    record,
     async findAfter(athleteId, afterSequence, { limit = 500 } = {}) {
       return database
         .select()
@@ -154,7 +167,9 @@ export function createChangesRepository(
     async latestSequence(athleteId) {
       const [row] = await database
         .select({
-          max: sql<number | string | bigint | null>`max(${syncChanges.sequence})`,
+          max: sql<
+            number | string | bigint | null
+          >`max(${syncChanges.sequence})`,
         })
         .from(syncChanges)
         .where(eq(syncChanges.athleteId, athleteId));

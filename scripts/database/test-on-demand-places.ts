@@ -10,7 +10,12 @@ import postgres from 'postgres';
 import ws, { WebSocketServer, createWebSocketStream } from 'ws';
 
 import { createActivityPlacesHandler } from '../../src/app/api/activities/[id]/places/handler';
+import { createPlaceDebugHandler } from '../../src/app/api/debug/places/handler';
 import { activityPlacesResponseSchema } from '../../src/contracts/activity-places';
+import {
+  DEFAULT_PLACE_DEBUG_SETTINGS,
+  placeDebugResponseSchema,
+} from '../../src/contracts/place-debug';
 import type { Actor } from '../../src/server/auth/actor';
 import {
   resolveMigrationTarget,
@@ -91,7 +96,16 @@ const payload = {
   distance: stream('distance', [0, 20, 40]),
   altitude: stream('altitude', [1235, 1235, 1235]),
 };
+const previousAdminAllowlist = process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS;
+process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS = `${actor.athleteId},${other.athleteId}`;
 const repository = createOnDemandPlacesRepository(database);
+const debugRequest = () =>
+  new Request(`http://localhost/api/activities/${id}/places/debug`, {
+    method: 'POST',
+    body: JSON.stringify(DEFAULT_PLACE_DEBUG_SETTINGS),
+  });
+const debugHandle = (current: Actor, debug = repository.debug) =>
+  createPlaceDebugHandler({ resolveActor: async () => current, debug });
 const request = () =>
   new Request(`http://localhost/api/activities/${id}/places`);
 const handle = (current: Actor, match = repository.match) =>
@@ -120,7 +134,7 @@ async function fingerprints() {
     ];
   return result;
 }
-function racing(change: () => Promise<unknown>) {
+function racingRepository(change: () => Promise<unknown>) {
   const wrapped = new Proxy(database, {
     get(target, property, receiver) {
       if (property === 'transaction')
@@ -132,8 +146,10 @@ function racing(change: () => Promise<unknown>) {
       return Reflect.get(target, property, receiver) as unknown;
     },
   });
-  return createOnDemandPlacesRepository(wrapped).match;
+  return createOnDemandPlacesRepository(wrapped);
 }
+const racing = (change: () => Promise<unknown>) =>
+  racingRepository(change).match;
 try {
   assert.equal(
     (await client`SELECT count(*)::integer AS count FROM places`)[0]?.count,
@@ -189,6 +205,22 @@ try {
     before,
     'Successful matching and HTTP handling must not write data',
   );
+  const debugResponse = await debugHandle(actor)(debugRequest(), id);
+  assert.equal(debugResponse.status, 200);
+  const debugResult = placeDebugResponseSchema.parse(
+    await debugResponse.json(),
+  );
+  assert.equal(debugResult.status, 'complete');
+  assert.equal(
+    debugResult.candidates.filter((p) => p.status === 'matched').length,
+    1,
+  );
+  assert.deepEqual(
+    await fingerprints(),
+    before,
+    'Debug matching must never write data',
+  );
+  assert.equal((await debugHandle(other)(debugRequest(), id)).status, 404);
   assert.equal((await handle(other)(request(), id)).status, 404);
   for (const update of [
     { revokedAt: new Date() },
@@ -200,6 +232,7 @@ try {
       .set(update)
       .where(eq(schema.accounts.id, actor.userId));
     assert.equal((await handle(actor)(request(), id)).status, 404);
+    assert.equal((await debugHandle(actor)(debugRequest(), id)).status, 404);
     await database
       .update(schema.accounts)
       .set({
@@ -240,6 +273,31 @@ try {
     'Input replacement during matching fences the response',
   );
   await resetStreams();
+  const debugReplace = racingRepository(
+    () =>
+      client`UPDATE activity_streams SET generation='debug-new-generation' WHERE activity_id=${id}::bigint`,
+  ).debug;
+  assert.equal(
+    (await debugHandle(actor, debugReplace)(debugRequest(), id)).status,
+    409,
+    'Debug matching fences concurrent stream replacement',
+  );
+  await resetStreams();
+  const debugRevoke = racingRepository(() =>
+    database
+      .update(schema.accounts)
+      .set({ revokedAt: new Date() })
+      .where(eq(schema.accounts.id, actor.userId)),
+  ).debug;
+  assert.equal(
+    (await debugHandle(actor, debugRevoke)(debugRequest(), id)).status,
+    404,
+    'Debug matching fences concurrent revocation',
+  );
+  await database
+    .update(schema.accounts)
+    .set({ revokedAt: null })
+    .where(eq(schema.accounts.id, actor.userId));
   const gps = {
     ...payload,
     latlng: stream('latlng', [
@@ -266,9 +324,12 @@ try {
     0,
   );
   console.log(
-    'PASS on-demand matching through real Neon WebSocket/Drizzle, private HTTP handler, lossless IDs, no writes, eligibility, stale inputs, concurrent revocation/replacement, coverage and sample budgets.',
+    'PASS production and debug matching through real Neon WebSocket/Drizzle, private HTTP handlers, lossless IDs, no writes, eligibility, stale inputs, concurrent revocation/replacement, coverage and sample budgets.',
   );
 } finally {
+  if (previousAdminAllowlist === undefined)
+    delete process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS;
+  else process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS = previousAdminAllowlist;
   await database
     .delete(schema.users)
     .where(inArray(schema.users.id, [actor.userId, other.userId]));

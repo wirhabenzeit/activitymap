@@ -6,6 +6,7 @@ import type {
   ActivityPlacesResponse,
   MatchedPlace,
 } from '~/contracts/activity-places';
+import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 
 import {
@@ -13,6 +14,7 @@ import {
   elevationPlaceMarkers,
   placesMatchProfile,
   selectedMatchedPlaces,
+  syncedActivityPlaces,
 } from './activity-places';
 import {
   createPlaceRequestQueue,
@@ -189,4 +191,39 @@ void test('an inspected route moves ahead of the remaining selected-route queue'
   release();
   await Promise.all([first, earlier, inspected]);
   assert.deepEqual(order, ['inspected', 'earlier']);
+});
+
+void test('synchronized results require the account, activity, global version and current stream inputs', () => {
+  const version = 'a'.repeat(64);
+  const matches = { ...response(), matchingVersion: version };
+  const activity = {
+    id: '1',
+    placeMatches: matches,
+    streams: { generation: 'g', revision: '2', state: 'current' },
+  } as ActivityDTO;
+  assert.equal(syncedActivityPlaces(activity, 'u', version), matches);
+  assert.equal(syncedActivityPlaces(activity, 'other', version), undefined);
+  assert.equal(syncedActivityPlaces(activity, 'u', 'b'.repeat(64)), undefined);
+  assert.equal(
+    syncedActivityPlaces({ ...activity, id: '2' }, 'u', version),
+    undefined,
+  );
+  assert.equal(syncedActivityPlaces(activity, 'u', undefined), undefined);
+  for (const streams of [
+    { ...activity.streams!, generation: 'new' },
+    { ...activity.streams!, revision: '3' },
+    { ...activity.streams!, state: 'stale' as const },
+  ])
+    assert.equal(
+      syncedActivityPlaces({ ...activity, streams }, 'u', version),
+      undefined,
+    );
+  assert.deepEqual(
+    syncedActivityPlaces(
+      { ...activity, placeMatches: { ...matches, places: [] } },
+      'u',
+      version,
+    )?.places,
+    [],
+  );
 });

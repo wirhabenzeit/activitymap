@@ -18,6 +18,11 @@ extension LocalStore {
                 predicate: #Predicate { $0.scope == key }))
             let existingPhotos = try context.fetch(FetchDescriptor<StoredPhoto>(
                 predicate: #Predicate { $0.scope == key }))
+            for dto in snapshot.activities {
+                if let matches = dto.placeMatches, matches.userID != scope.userID || matches.activityID != dto.id {
+                    throw PlacesSyncError.invalidScope
+                }
+            }
             let activityIDs = Set(snapshot.activities.map(\.id))
             let eligiblePhotos = snapshot.photos.filter { activityIDs.contains($0.activityID) }
             let photoIDs = Set(eligiblePhotos.map(\.uniqueID))
@@ -32,6 +37,7 @@ extension LocalStore {
                 return dto
             }
             try reconcileSummaryReplacement(currentActivities, scopeKey: key, context: context)
+            try reconcilePlacesReplacement(currentActivities, scopeKey: key, context: context)
             let photosByID = Dictionary(uniqueKeysWithValues: existingPhotos.map { ($0.photoID, $0) })
             for row in existingActivities where !activityIDs.contains(row.activityID) { context.delete(row) }
             for row in existingPhotos where !photoIDs.contains(row.photoID) { context.delete(row) }
@@ -45,6 +51,7 @@ extension LocalStore {
                     row.payload = try StoreCodec.encode(dto)
                 } else { context.insert(try StoredPhoto(scope: key, dto: dto)) }
             }
+            _ = try reconcilePlacesVersion(checkpoint.freshness?.placeMatchingVersion, scopeKey: key, context: context)
             if let state = try context.fetch(FetchDescriptor<SyncState>(
                 predicate: #Predicate { $0.scope == key })).first {
                 state.payload = try StoreCodec.encode(checkpoint)

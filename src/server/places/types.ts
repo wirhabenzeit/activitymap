@@ -201,6 +201,24 @@ export const placeRelationAssessmentSchema = z.strictObject({
   reason_codes: z.array(code).min(1).refine(unique, 'Duplicate reason codes'),
 });
 
+/** The peak scoring point is independent of the horizontal closest point. */
+export const placePeakMatchSchema = z.strictObject({
+  closest: placeClosestReferenceSchema,
+  horizontal_distance_m: nonnegative,
+  recorded_altitude_m: finite.optional(),
+  altitude_difference_m: finite.optional(),
+  weighted_score: nonnegative,
+  spatial_distance_m: nonnegative.optional(),
+  uses_elevation: z.boolean(),
+  reliable: z.boolean(),
+  route_distance_m: z
+    .strictObject({
+      basis: z.enum(['provider_distance', 'section_gps']),
+      closest: nonnegative,
+    })
+    .optional(),
+});
+
 /** Structural evidence only: deciding continuity and visit support is matcher work. */
 export const placeEncounterFragmentSchema = z
   .strictObject({
@@ -211,6 +229,7 @@ export const placeEncounterFragmentSchema = z
     elapsed_s: placeElapsedSecondsSchema.optional(),
     route_distance_m: placeRouteDistanceSchema.optional(),
     min_horizontal_distance_m: nonnegative,
+    peak_match: placePeakMatchSchema.optional(),
     source: z.strictObject({
       point: placePointSchema,
       mapped_elevation_m: finite.optional(),
@@ -246,6 +265,39 @@ export const placeEncounterFragmentSchema = z
         path: ['closest'],
         message: 'Closest reference must lie within the episode GPS bounds',
       });
+    }
+    const peak = encounter.peak_match;
+    if (peak) {
+      const reference = peak.closest;
+      const first =
+        reference.kind === 'sample' ? reference.index : reference.start_index;
+      const last =
+        reference.kind === 'sample' ? reference.index : reference.end_index;
+      if (first < encounter.start_gps_index || last > encounter.end_gps_index)
+        context.addIssue({
+          code: 'custom',
+          path: ['peak_match', 'closest'],
+          message: 'Peak reference must lie within the episode GPS bounds',
+        });
+      const mapped = encounter.source.mapped_elevation_m;
+      const difference =
+        peak.recorded_altitude_m === undefined || mapped === undefined
+          ? undefined
+          : peak.recorded_altitude_m - mapped;
+      if (
+        peak.uses_elevation !== (difference !== undefined) ||
+        peak.altitude_difference_m !== difference ||
+        (difference === undefined
+          ? peak.spatial_distance_m !== undefined
+          : peak.spatial_distance_m !==
+            Math.hypot(peak.horizontal_distance_m, difference))
+      )
+        context.addIssue({
+          code: 'custom',
+          path: ['peak_match'],
+          message:
+            'Peak score elevation evidence must agree with the source and scoring mode',
+        });
     }
     if (encounter.altitude_difference_m !== undefined) {
       const recorded = encounter.recorded_altitude_m;

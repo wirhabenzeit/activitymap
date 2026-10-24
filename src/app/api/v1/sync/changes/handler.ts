@@ -1,25 +1,25 @@
 import { randomUUID } from 'node:crypto';
 
-import { requestIdFor } from '~/server/http/request-id';
-
-import type { Actor } from '~/server/auth/actor';
 import { toActivityDTO } from '~/contracts/v1/activity';
-import { toPhotoDTO } from '~/contracts/v1/photo';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
+import { toPhotoDTO } from '~/contracts/v1/photo';
+import { toIdString } from '~/contracts/v1/primitives';
 import {
+  type SyncChangeItemDTO,
   syncChangesPageDTOSchema,
   syncChangesQuerySchema,
-  type SyncChangeItemDTO,
 } from '~/contracts/v1/sync';
-import { toIdString } from '~/contracts/v1/primitives';
-import { encodeSyncCursor, tryDecodeSyncCursor } from '~/server/sync/cursor';
+import type { Actor } from '~/server/auth/actor';
+import type { SyncChange } from '~/server/db/schema';
+import { requestIdFor } from '~/server/http/request-id';
 import type { ActivitiesRepository } from '~/server/repositories/activities';
-import type { PhotosRepository } from '~/server/repositories/photos';
 import type { ChangesRepository } from '~/server/repositories/changes';
 import { DEFAULT_RETENTION_DAYS } from '~/server/repositories/changes';
-import type { SyncChange } from '~/server/db/schema';
+import type { PhotosRepository } from '~/server/repositories/photos';
+import type { PlaceMatchingRepository } from '~/server/repositories/place-matching';
 import type { SummaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
+import { encodeSyncCursor, tryDecodeSyncCursor } from '~/server/sync/cursor';
 
 export interface SyncChangesHandlerDependencies {
   createRequestId?: () => string;
@@ -30,6 +30,7 @@ export interface SyncChangesHandlerDependencies {
   activitiesRepo: Pick<ActivitiesRepository, 'findManyByIds'>;
   photosRepo: Pick<PhotosRepository, 'findManyByIds'>;
   changesRepo: Pick<ChangesRepository, 'findAfter' | 'latestSequence'>;
+  placesRepo?: Pick<PlaceMatchingRepository, 'sync'>;
   freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
   retentionDays?: number;
@@ -60,6 +61,7 @@ export function createSyncChangesHandler({
   photosRepo,
   changesRepo,
   freshnessRepo = { lastCompletedAt: async () => null },
+  placesRepo,
   retentionDays = DEFAULT_RETENTION_DAYS,
 }: SyncChangesHandlerDependencies) {
   return async function GET(request: Request): Promise<Response> {
@@ -83,10 +85,14 @@ export function createSyncChangesHandler({
       });
       if (!parsedQuery.success) {
         return Response.json(
-          errorEnvelope('validation_failed', 'The query parameters are invalid.', {
-            requestId,
-            details: parsedQuery.error.flatten(),
-          }),
+          errorEnvelope(
+            'validation_failed',
+            'The query parameters are invalid.',
+            {
+              requestId,
+              details: parsedQuery.error.flatten(),
+            },
+          ),
           { status: 400 },
         );
       }
@@ -94,7 +100,10 @@ export function createSyncChangesHandler({
       const { cursor, limit } = parsedQuery.data;
       const decoded = tryDecodeSyncCursor(cursor);
       if (decoded === null) {
-        return rebootstrapRequired(requestId, 'The `cursor` parameter is invalid.');
+        return rebootstrapRequired(
+          requestId,
+          'The `cursor` parameter is invalid.',
+        );
       }
 
       if (decoded.athleteId !== actor.athleteId) {
@@ -146,9 +155,7 @@ export function createSyncChangesHandler({
       const nextCursorValidUntil =
         changes.length === 0
           ? cursorValidUntil
-          : new Date(
-              nowValue.getTime() + retentionDays * 24 * 60 * 60 * 1000,
-            );
+          : new Date(nowValue.getTime() + retentionDays * 24 * 60 * 60 * 1000);
       const payload = {
         items,
         nextCursor,
@@ -157,11 +164,26 @@ export function createSyncChangesHandler({
           cursorValidUntil: nextCursorValidUntil.toISOString(),
         },
         freshness: {
-          lastSummaryReconciledAt: (
-            await freshnessRepo.lastCompletedAt(actor.athleteId)
-          )?.toISOString() ?? null,
+          lastSummaryReconciledAt:
+            (
+              await freshnessRepo.lastCompletedAt(actor.athleteId)
+            )?.toISOString() ?? null,
         },
       };
+
+      if (placesRepo) {
+        const matches = await placesRepo.sync(
+          actor,
+          items.flatMap((item) => (item.activity ? [item.id] : [])),
+        );
+        Object.assign(payload.freshness, {
+          placeMatchingVersion: matches.version,
+        });
+        for (const item of items) {
+          if (item.activity)
+            item.activity.placeMatches = matches.results.get(item.id);
+        }
+      }
 
       const body = responseEnvelope(syncChangesPageDTOSchema).parse(
         makeEnvelope(payload, nowValue),

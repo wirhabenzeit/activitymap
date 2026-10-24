@@ -603,3 +603,44 @@ void test('normalized place rejects invalid identities, points, category/derivat
     true,
   );
 });
+
+void test('peak scoring evidence keeps its own bounded reference and consistent elevation sources', () => {
+  const peak_match: NonNullable<PlaceEncounterFragment['peak_match']> = {
+    closest: { kind: 'sample', index: 1 },
+    horizontal_distance_m: 3,
+    recorded_altitude_m: 4,
+    altitude_difference_m: 4,
+    weighted_score: 0.5,
+    spatial_distance_m: 5,
+    uses_elevation: true,
+    reliable: true,
+  };
+  assert(
+    placeEncounterFragmentSchema.safeParse(encounter({ peak_match })).success,
+  );
+  for (const change of [
+    { closest: { kind: 'sample' as const, index: 3 } },
+    { weighted_score: NaN },
+    { altitude_difference_m: -4 },
+    { uses_elevation: false },
+    { spatial_distance_m: 6 },
+  ])
+    assert(
+      !placeEncounterFragmentSchema.safeParse(
+        encounter({ peak_match: { ...peak_match, ...change } }),
+      ).success,
+    );
+  assert(
+    placeEncounterFragmentSchema.safeParse(
+      encounter({
+        peak_match: {
+          closest: { kind: 'sample', index: 1 },
+          horizontal_distance_m: 3,
+          weighted_score: 0.5,
+          uses_elevation: false,
+          reliable: true,
+        },
+      }),
+    ).success,
+  );
+});

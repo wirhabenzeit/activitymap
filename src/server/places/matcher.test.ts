@@ -593,3 +593,130 @@ void test('a speed spike is excluded locally and cannot invent a visit along its
   );
   assert.deepEqual(onlyJump.matches[0]!.evidence.supported_relations, []);
 });
+
+void test('peak scoring finds a better spatial point without replacing closest-point evidence', () => {
+  const custom = { ...policy, peakVerticalToleranceM: 20 };
+  const result = run(
+    payload([xy(0), xy(20)], { altitudes: [0, 100], distances: [0, 20] }),
+    [peak],
+    custom,
+  );
+  const fragment = result.matches[0]!.evidence.encounters[0]!.fragments[0]!;
+  assert.deepEqual(result.matches[0]!.evidence.supported_relations, [
+    'reached_peak',
+  ]);
+  assert.equal(fragment.recorded_altitude_m, 0);
+  assert.equal(fragment.min_horizontal_distance_m, 0);
+  assert(fragment.peak_match!.weighted_score < 1);
+  assert(fragment.peak_match!.horizontal_distance_m > 19);
+  assert(fragment.peak_match!.recorded_altitude_m! > 95);
+  assert(fragment.peak_match!.route_distance_m!.closest > 19);
+  assert.equal(fragment.peak_match!.uses_elevation, true);
+});
+
+void test('combined peak score rejects a point inside both individual limits', () => {
+  const result = run(
+    payload([xy(-2, 28), xy(2, 28)], { altitudes: [180, 180] }),
+  );
+  const fragment = result.matches[0]!.evidence.encounters[0]!.fragments[0]!;
+  assert(fragment.min_horizontal_distance_m < policy.peakRadiusM);
+  assert(
+    Math.abs(fragment.altitude_difference_m!) < policy.peakVerticalToleranceM,
+  );
+  assert(fragment.peak_match!.weighted_score > 1);
+  assert.deepEqual(result.matches[0]!.evidence.supported_relations, []);
+  assert(
+    fragment.relation_assessments[0]!.reason_codes.includes(
+      'outside_spatial_tolerance',
+    ),
+  );
+});
+
+void test('missing, unaligned or partially missing elevation falls back to horizontal scoring', () => {
+  const absent = { ...peak };
+  delete absent.elevationM;
+  const unaligned = payload([xy(-20), xy(20)]);
+  const cases = [
+    { data: payload([xy(-20), xy(20)], { altitudes: null }), place: peak },
+    { data: payload([xy(-20), xy(20)]), place: absent },
+    {
+      data: {
+        ...unaligned,
+        altitude: { ...unaligned.altitude, resolution: 'low' },
+      },
+      place: peak,
+    },
+    {
+      data: payload([xy(0), xy(20)], { altitudes: [null, 1000] }),
+      place: peak,
+    },
+  ];
+  for (const { data, place } of cases) {
+    const result = run(data, [place]);
+    const scoring =
+      result.matches[0]!.evidence.encounters[0]!.fragments[0]!.peak_match!;
+    assert.deepEqual(result.matches[0]!.evidence.supported_relations, [
+      'reached_peak',
+    ]);
+    assert.equal(scoring.uses_elevation, false);
+    assert.equal(scoring.spatial_distance_m, undefined);
+    assert.equal(scoring.altitude_difference_m, undefined);
+    assert(
+      Math.abs(
+        scoring.weighted_score -
+          scoring.horizontal_distance_m / policy.peakRadiusM,
+      ) < 1e-12,
+    );
+  }
+});
+
+void test('a reliable endpoint can support a peak when a better sparse interior cannot', () => {
+  const result = run(payload([xy(-200), xy(20)]));
+  const fragment = result.matches[0]!.evidence.encounters[0]!.fragments[0]!;
+  assert.deepEqual(result.matches[0]!.evidence.supported_relations, [
+    'reached_peak',
+  ]);
+  assert.equal(fragment.closest.kind, 'segment');
+  assert.equal(fragment.peak_match!.closest.kind, 'sample');
+  assert.equal(fragment.peak_match!.reliable, true);
+});
+
+void test('peak scores never combine horizontal proximity with elevation from outside the radius or across recording gaps', () => {
+  const custom = { ...policy, peakVerticalToleranceM: 20 };
+  const acrossGap = run(
+    payload([xy(0), xy(80)], { altitudes: [0, 100], times: [0, 121] }),
+    [peak],
+    custom,
+  );
+  assert.deepEqual(acrossGap.matches[0]!.evidence.supported_relations, []);
+  assert(
+    acrossGap.matches[0]!.evidence.encounters[0]!.fragments.every(
+      (f) => f.relation_assessments[0]!.status !== 'supported',
+    ),
+  );
+  const sameSection = run(
+    payload([xy(0), xy(80)], { altitudes: [0, 100] }),
+    [peak],
+    custom,
+  );
+  assert.deepEqual(sameSection.matches[0]!.evidence.supported_relations, []);
+});
+
+void test('mixed peak and hut candidates keep their independent scoring points', () => {
+  const mixed: CandidatePlace = {
+    ...peak,
+    kinds: ['peak', 'hut'],
+    subtypes: ['peak', 'alpine_hut'],
+  };
+  const result = run(
+    payload([xy(0), xy(80)], { altitudes: [0, 100] }),
+    [mixed],
+    { ...policy, peakVerticalToleranceM: 20 },
+  );
+  const fragment = result.matches[0]!.evidence.encounters[0]!.fragments[0]!;
+  assert.equal(fragment.min_horizontal_distance_m, 0);
+  assert(fragment.peak_match!.horizontal_distance_m > 50);
+  assert.deepEqual(result.matches[0]!.evidence.supported_relations, [
+    'arrived_at_hut',
+  ]);
+});

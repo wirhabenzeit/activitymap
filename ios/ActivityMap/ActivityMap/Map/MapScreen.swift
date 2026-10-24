@@ -13,6 +13,7 @@ struct MapScreen: View {
     @Environment(\.mapTerrainOverride) private var mapTerrainOverride
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
+    @State private var placesOwner = UUID()
     @State private var viewport: Viewport
     @State private var acceptsCameraEvents = false
     @State private var cameraTransitionID: UUID?
@@ -120,7 +121,10 @@ struct MapScreen: View {
             Button("OK", role: .cancel) { terrain.errorMessage = nil }
         } message: { Text(terrain.errorMessage ?? "") }
         .onChange(of: store.visibleActivityIDs) { _, _ in picker.reconcile(with: store) }
-        .onChange(of: store.activeActivityID) { _, _ in picker.reconcile(with: store) }
+        .onChange(of: store.activeActivityID) { _, _ in
+            picker.reconcile(with: store)
+            store.activityPlaces?.focus = nil
+        }
         .onChange(of: store.selectedActivityIDs) { _, ids in
             picker.reconcile(with: store)
             if ids.isEmpty {
@@ -170,6 +174,13 @@ struct MapScreen: View {
                 context.cancelLocationRequest()
             }
         }
+        .task(id: PlacesDemand(ids: store.mapPlacesActivityIDs, priority: store.activeActivityID, session: store.activityPlaces?.sessionRevision, visible: store.selectedTab == .map)) {
+            guard let loader = store.activityPlaces else { return }
+            loader.demand(store.selectedTab == .map ? Set(store.mapPlacesActivityIDs.map(String.init)) : [], owner: placesOwner,
+                priority: store.activeActivityID.map(String.init))
+            if let focus = loader.focus, !store.mapPlacesActivityIDs.contains(Int(focus.activityID) ?? -1) { loader.focus = nil }
+        }
+        .onDisappear { store.activityPlaces?.release(placesOwner) }
         .onAppear {
             compass.record(context.camera.bearing)
             configureTerrain()
@@ -201,6 +212,9 @@ struct MapScreen: View {
             RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
                         selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
 
+            if let loader = store.activityPlaces {
+                MatchedPlacesLayer(places: DisplayMatchedPlace.aggregate(store.mapPlacesActivityIDs.compactMap { loader.result(String($0)) }), loader: loader)
+            }
             if context.showPhotos {
                 ForEvery(photoGroups) { group in
                     if let photo = photoModels[group.id], let coordinate = photo.location,
@@ -217,7 +231,7 @@ struct MapScreen: View {
 
             routeInteraction(proxy: proxy)
             TapInteraction { context in
-                if let map = proxy.map, !handlePhotoTap(at: context.point, map: map) {
+                if let map = proxy.map, !handlePlaceTap(at: context.point, map: map) && !handlePhotoTap(at: context.point, map: map) {
                     picker.pick(at: context.point, map: map, store: store)
                 }
                 return true
@@ -284,6 +298,16 @@ struct MapScreen: View {
         .onMapLoadingError { error in
             if error.sourceId == terrain.sourceID || error.type == .style {
                 terrain.failed(sourceID: terrain.sourceID)
+            }
+        }
+        .onChange(of: store.activityPlaces?.focus) { _, focus in
+            guard let focus, focus.revealOnMap, let place = store.activityPlaces?.result(focus.activityID)?.places.first(where: { $0.id == focus.placeID }),
+                  store.mapPlacesActivityIDs.contains(Int(focus.activityID) ?? -1), let map = proxy.map else { return }
+            let coordinate = CLLocationCoordinate2D(latitude: place.latitude, longitude: place.longitude)
+            let visible = CGRect(origin: .zero, size: geometry.size).inset(by: context.camera.padding).insetBy(dx: 60, dy: 90)
+            if !visible.contains(map.point(for: coordinate)) {
+                var camera = context.camera; camera.center = coordinate
+                withViewportAnimation(.easeOut(duration: 0.35)) { viewport = camera.viewport }
             }
         }
         .overlay { MapPositionOverlay(state: positions) }
@@ -362,6 +386,14 @@ struct MapScreen: View {
         if photoThumbnails != thumbnails { photoThumbnails = thumbnails }
     }
 
+    private func handlePlaceTap(at point: CGPoint, map: MapboxMap) -> Bool {
+        guard let loader = store.activityPlaces else { return false }
+        let places = DisplayMatchedPlace.aggregate(store.mapPlacesActivityIDs.compactMap { loader.result(String($0)) })
+        return places.contains { entry in
+            let anchor = map.point(for: CLLocationCoordinate2D(latitude: entry.place.latitude, longitude: entry.place.longitude))
+            return abs(point.x - anchor.x) <= 22 && abs(point.y - anchor.y) <= 22
+        }
+    }
     private func handlePhotoTap(at point: CGPoint, map: MapboxMap) -> Bool {
         guard context.showPhotos else { return false }
         // Test the current projection during camera animation, rather than the
@@ -506,7 +538,7 @@ struct MapScreen: View {
         // Route hits take priority over external feature overlays. Photo
         // annotations consume their own taps before this layer interaction.
         TapInteraction(.layer(RouteSource.ordinaryLayerID), radius: RouteHitTesting.radius) { _, context in
-            if let map = proxy.map, !handlePhotoTap(at: context.point, map: map) {
+            if let map = proxy.map, !handlePlaceTap(at: context.point, map: map) && !handlePhotoTap(at: context.point, map: map) {
                 picker.pick(at: context.point, map: map, store: store)
             }
             return true
@@ -687,4 +719,11 @@ extension EnvironmentValues {
         get { self[MapStyleOverrideKey.self] }
         set { self[MapStyleOverrideKey.self] = newValue }
     }
+}
+
+private struct PlacesDemand: Equatable {
+    let ids: Set<Int>
+    let priority: Int?
+    let session: Int?
+    let visible: Bool
 }

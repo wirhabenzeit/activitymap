@@ -183,6 +183,20 @@
       "when": 1792735761368,
       "tag": "0025_place-catalogue-refresh",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792838783503,
+      "tag": "0026_activity-place-checks",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792843321184,
+      "tag": "0027_regional-place-queries",
+      "breakpoints": true
     }
   ]
 }

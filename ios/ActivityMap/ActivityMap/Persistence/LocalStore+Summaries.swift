@@ -8,6 +8,9 @@ nonisolated struct SummaryStoreChange: Sendable {
     /// Invalidation must cancel demand. A prefetch publication must not cancel
     /// a user-requested refresh or pending foreground fetch already in flight.
     let cancelsRequests: Bool
+    /// Place-only publications share this observer stream but leave elevation
+    /// requests and their cached summaries untouched.
+    let affectsSummaries: Bool
 }
 
 nonisolated struct SummarySyncCandidate: Sendable {
@@ -27,9 +30,9 @@ extension LocalStore {
         }
     }
     private func removeSummaryObserver(_ id: UUID) { summaryObservers[id] = nil }
-    func notifySummaryChange(scope: String?, activityIDs: Set<String>? = nil, cancelsRequests: Bool = true) {
+    func notifySummaryChange(scope: String?, activityIDs: Set<String>? = nil, cancelsRequests: Bool = true, affectsSummaries: Bool = true) {
         for observer in summaryObservers.values {
-            observer.yield(SummaryStoreChange(scope: scope, activityIDs: activityIDs, cancelsRequests: cancelsRequests))
+            observer.yield(SummaryStoreChange(scope: scope, activityIDs: activityIDs, cancelsRequests: cancelsRequests, affectsSummaries: affectsSummaries))
         }
     }
     func streamFence() -> StreamFence { streamFences.capture() }
@@ -110,6 +113,7 @@ extension LocalStore {
             try save(context)
         } catch { context.rollback(); throw error }
         streamFences.recordWrite(fence, key: key)
+        notifySummaryChange(scope: scope.key, activityIDs: [dto.activityID], cancelsRequests: false)
         return .stored
     }
 
@@ -169,7 +173,7 @@ extension LocalStore {
         notifySummaryChange(scope: scopeKey)
     }
 
-    private static func summarySourceChanged(_ old: ActivityMapAPI.Activity, _ new: ActivityMapAPI.Activity) -> Bool {
+    static func summarySourceChanged(_ old: ActivityMapAPI.Activity, _ new: ActivityMapAPI.Activity) -> Bool {
         old.athlete != new.athlete || old.mapID != new.mapID || old.mapPolyline != new.mapPolyline
         || old.mapSummaryPolyline != new.mapSummaryPolyline || old.startDate != new.startDate
         || old.startDateLocal != new.startDateLocal || old.distance != new.distance

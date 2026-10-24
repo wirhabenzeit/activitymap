@@ -93,6 +93,10 @@ async function catchUp(
   await drainSyncChanges(
     initial.changesCursor!,
     async (page) => {
+      // A cache created before place bundles existed needs one full snapshot.
+      // Stage it before replacing the completed offline library.
+      if (page.freshness.placeMatchingVersion && !state.placesSyncReady)
+        throw new SyncRebootstrapRequiredError({ requestId: null });
       const caughtUp =
         page.items.length === 0 && page.nextCursor === state.changesCursor;
       state = {
@@ -101,6 +105,8 @@ async function catchUp(
         bootstrapComplete: caughtUp || state.bootstrapComplete,
         lastSyncAt: caughtUp ? nowIso() : state.lastSyncAt,
         updatedAt: nowIso(),
+        placeMatchingVersion:
+          page.freshness.placeMatchingVersion ?? state.placeMatchingVersion,
       };
       await commit(page.items, state);
       count(result, page.items);
@@ -131,6 +137,7 @@ async function bootstrap(
     changesCursor: null,
     lastSyncAt: null,
     updatedAt: nowIso(),
+    placesSyncReady: undefined,
   };
   const commit: Commit = async (items, checkpoint) => {
     signal?.throwIfAborted();
@@ -151,6 +158,10 @@ async function bootstrap(
       resource,
       async (page) => {
         if (page.snapshotCursor) state.bootstrapCursor = page.snapshotCursor;
+        if (page.resource === 'activities')
+          state.placesSyncReady =
+            (state.placesSyncReady ?? true) &&
+            Boolean(page.freshness.placeMatchingVersion);
         const items: V1SyncMutation[] =
           page.resource === 'activities'
             ? page.items.map((activity) => ({
@@ -167,7 +178,12 @@ async function bootstrap(
                 id: photo.unique_id,
                 photo,
               }));
-        state = { ...state, updatedAt: nowIso() };
+        state = {
+          ...state,
+          updatedAt: nowIso(),
+          placeMatchingVersion:
+            page.freshness.placeMatchingVersion ?? state.placeMatchingVersion,
+        };
         await commit(items, state);
         count(result, items);
       },

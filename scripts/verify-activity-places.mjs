@@ -63,6 +63,9 @@ import {ElevationChart} from '~/components/list/elevation-chart';import {Matched
 import {Selection} from '~/components/map/selection-control';import {useShallowStore} from '~/store';
 import {encodeStreamSummary} from '~/lib/streams/compact-summary';import {streamSummaryQueryKey} from '~/lib/activity-stream-summary';
 import {activityPlacesQueryRoot} from '~/lib/activity-places';
+import {applyV1SyncPage,getV1SyncState} from '~/lib/sync/v1-store';
+import {getLibraryOwner} from '~/lib/sync/library-owner';
+import fixtureDTOs from './shared/sync-integrity-fixtures.v1.json';
 const metadata={generation:'g1',revision:'1',state:'current',fetch_status:'succeeded',available_types:['distance','altitude','latlng'],fetched_at:null,expires_at:null};
 const latlng=[[47,8],[47.001,8.001],[47.002,8.002]];
 const source={metadata,summary:encodeStreamSummary({version:2,basis:'distance',distance:[0,100,200],altitude:[400,500,420],latlng}),requestedAgainst:metadata,status:'ready',message:null,retryAt:null,pollStartedAt:0,pollAttempts:0};
@@ -71,6 +74,12 @@ for(const user of ['fixture','other'])client.setQueryData(streamSummaryQueryKey(
 const activities=new globalThis.Map([[1,{id:1,streamsMetadata:metadata}],[2,{id:2,streamsMetadata:metadata}]]);
 window.refreshPlaces=()=>client.resetQueries({queryKey:['library','auth:'+window.fixtureState.getState().user.id,'activity-places']});
 window.replaceProfile=()=>client.setQueryData(streamSummaryQueryKey('fixture','1'),{...source,metadata:{...metadata,revision:'2'}});
+window.saveSyncedPlaces=async(bundle,version)=>{
+ const scope='auth:fixture';const state={scope,bootstrapCursor:'snapshot',bootstrapComplete:true,changesCursor:bundle?.resultRevision??'version',lastSyncAt:new Date().toISOString(),updatedAt:new Date().toISOString(),placeMatchingVersion:version,placesSyncReady:true};
+ const mutations=bundle?[{sequence:'1',entityType:'activity',operation:'upsert',id:'1',activity:{...fixtureDTOs.activity,id:'1',streams:metadata,placeMatches:bundle}}]:[];
+ await applyV1SyncPage(scope,mutations,state);await getLibraryOwner(client,scope).load();
+};
+window.restoreProfile=()=>client.setQueryData(streamSummaryQueryKey('fixture','1'),source);
 window.selectionCalls=0;
 function App(){const s=useShallowStore(state=>state);const ids=s.visible?s.selected:[];return <QueryClientProvider client={client}>
 <Map preserveDrawingBuffer={true} ref={ref=>{if(ref)window.fixtureMap=ref.getMap();}} onIdle={()=>window.mapReady=true} initialViewState={{longitude:8.001,latitude:47.001,zoom:14}} mapboxAccessToken="pk.offline-test" style={{height:260,width:'100%'}} mapStyle={{version:8,glyphs:window.location.origin+'/fonts/{fontstack}/{range}.pbf',sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e9efea'}}]}}>
@@ -133,12 +142,16 @@ let page;
 let owner = 'fixture',
   mode = 'complete',
   revision = '1',
+  matchingVersion = 'a'.repeat(64),
   holdResponse = false,
   releaseResponse;
 try {
   page = await browser.newPage({ viewport: { width: 700, height: 680 } });
   page.on('pageerror', (error) => errors.push(error.message));
   await page.route('https://**', (route) => route.abort());
+  await page.route('**/api/places/version', (route) =>
+    route.fulfill({ json: { version: matchingVersion } }),
+  );
   await page.route('**/api/activities/*/places', async (route) => {
     const id = new URL(route.request().url()).pathname.split('/')[3];
     requests.push({ owner, id, mode });
@@ -163,6 +176,7 @@ try {
         streamRevision: revision,
         catalogueSnapshotId: 'fixture-catalogue',
         matcherVersion: 'fixture-matcher',
+        matchingVersion,
         places:
           mode === 'complete'
             ? [
@@ -415,6 +429,33 @@ try {
       document.querySelectorAll('[data-testid="elevation-place-marker"]')
         .length === 4,
   );
+  const beforeVersionChange = requests.length;
+  matchingVersion = 'b'.repeat(64);
+  mode = 'pending';
+  await page.evaluate(() =>
+    window.client.invalidateQueries({
+      queryKey: ['library', 'auth:fixture', 'place-matching-version'],
+    }),
+  );
+  await page.waitForFunction(
+    () =>
+      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
+      0,
+  );
+  assert(
+    requests.length > beforeVersionChange,
+    'Catalogue change fetches again without a stream change',
+  );
+  await page
+    .locator('[data-map-place]')
+    .getByText(/^Finding places/)
+    .waitFor();
+  mode = 'complete';
+  await page.waitForFunction(
+    () =>
+      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
+      3,
+  );
   mode = 'error';
   await page.evaluate(() => window.refreshPlaces());
   await page
@@ -488,6 +529,102 @@ try {
     () => !window.fixtureMap.getSource('matched-places'),
   );
   assert.equal(await page.getByTestId('elevation-place-marker').count(), 0);
+  // Synchronized bundles drive the actual map/profile while the direct API
+  // fails, including authoritative zeroes and a manifest-only invalidation.
+  await page.waitForFunction(() => window.client.isFetching() === 0);
+  mode = 'error';
+  owner = 'fixture';
+  revision = '1';
+  const bundle = {
+    userId: 'fixture',
+    activityId: '1',
+    status: 'complete',
+    streamGeneration: 'g1',
+    streamRevision: '1',
+    catalogueSnapshotId: 'synced-catalogue',
+    matcherVersion: 'v5',
+    matchingVersion,
+    resultRevision: 'synced-positive',
+    places: [
+      {
+        id: '00000000-0000-4000-8000-000000000001',
+        name: 'Synced summit',
+        kinds: ['peak'],
+        longitude: 8.001,
+        latitude: 47.001,
+        elevationM: 500,
+        visits: [{ distanceM: 100 }],
+      },
+    ],
+  };
+  await page.evaluate(
+    async ({ bundle, version }) => {
+      await window.saveSyncedPlaces(bundle, version);
+      window.restoreProfile();
+      window.fixtureState.setState({
+        user: { id: 'fixture', stravaConnected: true },
+        selected: [1],
+      });
+    },
+    { bundle, version: matchingVersion },
+  );
+  await page
+    .getByRole('button', {
+      name: 'Highlight Synced summit at 100 m',
+      exact: true,
+    })
+    .waitFor();
+  await page.waitForFunction(
+    () =>
+      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
+      1,
+  );
+  const beforeSyncedReplacements = requests.length;
+  await page.evaluate(
+    async ({ bundle, version }) => {
+      await window.saveSyncedPlaces(
+        { ...bundle, resultRevision: 'synced-zero', places: [] },
+        version,
+      );
+    },
+    { bundle, version: matchingVersion },
+  );
+  await page.waitForFunction(
+    () =>
+      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
+      0,
+  );
+  assert.equal(await page.getByTestId('elevation-place-marker').count(), 0);
+  assert.equal(
+    requests.length,
+    beforeSyncedReplacements,
+    'Synced zero replaces visits without a per-activity request',
+  );
+  await page.evaluate(
+    ({ bundle, version }) => window.saveSyncedPlaces(bundle, version),
+    { bundle, version: matchingVersion },
+  );
+  await page
+    .getByRole('button', {
+      name: 'Highlight Synced summit at 100 m',
+      exact: true,
+    })
+    .waitFor();
+  matchingVersion = 'c'.repeat(64);
+  await page.evaluate(
+    (version) => window.saveSyncedPlaces(null, version),
+    matchingVersion,
+  );
+  await page.waitForFunction(
+    () =>
+      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
+      0,
+  );
+  assert.equal(
+    await page.getByTestId('elevation-place-marker').count(),
+    0,
+    'Manifest-only invalidation hides profile visits',
+  );
   assert.deepEqual(errors, []);
   await writeFile(
     join(output, 'result.json'),
@@ -498,6 +635,9 @@ try {
         checks: [
           'shared requests',
           'cached profile reopen',
+          'synchronized bundles without per-activity requests',
+          'synchronized zero replacement',
+          'manifest-only invalidation',
           'map style replacement',
           'distinct peak/pass/hut symbols',
           'fixed-height loading',

@@ -1,6 +1,9 @@
+import { after } from 'next/server';
+
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
+import { processPlaceMatching } from '~/server/application/place-matching';
 import { logger } from '~/server/logging/logger';
-import { createOnDemandPlacesRepository } from '~/server/repositories/on-demand-places';
+import { createPlaceMatchingRepository } from '~/server/repositories/place-matching';
 
 import { createActivityPlacesHandler } from './handler';
 
@@ -14,9 +17,27 @@ export async function GET(
       const { id } = await params;
       return createActivityPlacesHandler({
         resolveActor: context.actor,
-        match: createOnDemandPlacesRepository().match,
+        match: async (actor, activityId) => {
+          const result = await createPlaceMatchingRepository().read(
+            actor,
+            activityId,
+          );
+          if (result.status === 'pending')
+            after(async () => {
+              try {
+                await processPlaceMatching({
+                  activityIds: [activityId],
+                  activityLimit: 1,
+                  timeMs: 10_000,
+                });
+              } catch (error) {
+                logger.error('Requested place matching failed', error);
+              }
+            });
+          return result;
+        },
         onError: () =>
-          logger.error('On-demand place matching failed', {
+          logger.error('Place results read failed', {
             requestId: context.requestId,
           }),
       })(request, id);

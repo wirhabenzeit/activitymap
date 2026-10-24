@@ -351,7 +351,7 @@ final class StreamSummaryLoader {
     }
 
     private func committed(_ change: SummaryStoreChange, epoch current: Int) async {
-        guard current == epoch, let session, let storage,
+        guard change.affectsSummaries, current == epoch, let session, let storage,
               change.scope == nil || change.scope == session.scope.key else { return }
         let ids = change.activityIDs ?? Set(states.keys).union(requests.keys)
         for id in ids {

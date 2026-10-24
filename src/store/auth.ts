@@ -5,6 +5,7 @@ import type { CurrentUserDTO } from '~/server/db/dto';
 import { resetActivityPlaceFocus } from './activity-place-focus';
 import { resetBrowsingContext } from './browsing';
 import { type RootState } from './index';
+import { usePlaceDebug } from './place-debug';
 
 export type InitialAuth = {
   currentUser: CurrentUserDTO | null;
@@ -66,6 +67,7 @@ export const createAuthSlice: StateCreator<
         state.user?.stravaConnected !== nextUser?.stravaConnected
       ) {
         resetActivityPlaceFocus();
+        usePlaceDebug.setState({ userId: null });
         state.authSession += 1;
       }
       if (accountChanged) {

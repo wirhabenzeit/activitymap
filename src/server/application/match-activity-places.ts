@@ -6,9 +6,14 @@ import { matchEncounters } from '~/server/places/encounters';
 import {
   DEFAULT_MATCHER_POLICY,
   MATCHER_VERSION,
+  type MatcherPolicy,
+  validatePolicy,
 } from '~/server/places/policy';
 import type { PublishedCatalogue } from '~/server/places/published-catalogue';
-import { prepareTrack } from '~/server/places/track-sections';
+import {
+  type PreparedTrack,
+  prepareTrack,
+} from '~/server/places/track-sections';
 import type {
   CandidatePlace,
   PlaceDiscoveryInput,
@@ -25,6 +30,10 @@ export async function matchActivityPlaces(options: {
   activityId: string;
   input: ActivityPlaceInput;
   catalogue: PublishedCatalogue | null;
+  /** Batch workers pin one immutable policy for the entire run. */
+  policy?: Readonly<MatcherPolicy>;
+  /** Internal batches may reuse a track prepared with the same pinned policy. */
+  preparedTrack?: PreparedTrack;
   discover: (input: PlaceDiscoveryInput) => Promise<{
     candidates: CandidatePlace[];
     covered: boolean;
@@ -43,10 +52,10 @@ export async function matchActivityPlaces(options: {
     places: [],
   };
   if (input.too_large) return { ...response, status: 'partial' };
-  if (input.payload == null) return response;
+  if (input.payload == null && !options.preparedTrack) return response;
   if (!catalogue) return { ...response, status: 'unavailable' };
-  const policy = DEFAULT_MATCHER_POLICY;
-  const track = prepareTrack(input.payload, policy);
+  const policy = validatePolicy(options.policy ?? DEFAULT_MATCHER_POLICY);
+  const track = options.preparedTrack ?? prepareTrack(input.payload, policy);
   if (!track.sections.length)
     return {
       ...response,
@@ -89,16 +98,35 @@ export async function matchActivityPlaces(options: {
           if (assessment.relation === 'arrived_at_hut')
             supportedKinds.add('hut');
         }
+      const peakFragments = supported.filter(
+        (fragment) =>
+          fragment.peak_match &&
+          fragment.relation_assessments.some(
+            (a) => a.relation === 'reached_peak' && a.status === 'supported',
+          ),
+      );
+      const bestPeak = peakFragments.reduce<
+        (typeof supported)[number] | undefined
+      >(
+        (best, fragment) =>
+          !best ||
+          fragment.peak_match!.weighted_score < best.peak_match!.weighted_score
+            ? fragment
+            : best,
+        undefined,
+      );
       const closest = supported.reduce((best, fragment) =>
         fragment.min_horizontal_distance_m < best.min_horizontal_distance_m
           ? fragment
           : best,
       );
+      // Peak profile marks identify the actual scoring point; other relations
+      // retain their horizontal closest point. Never mix section-local distances.
+      const position =
+        bestPeak?.peak_match?.route_distance_m ?? closest.route_distance_m;
       visits.push({
         distanceM:
-          closest.route_distance_m?.basis === 'provider_distance'
-            ? closest.route_distance_m.closest
-            : null,
+          position?.basis === 'provider_distance' ? position.closest : null,
       });
     }
     if (!visits.length) continue;

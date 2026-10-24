@@ -56,6 +56,7 @@ export const nativeSuites = [
   'ActivityMapTests/IngestionStatusTests',
   'ActivityMapTests/StravaImportTests',
   'ActivityMapTests/StreamsAPITests',
+  'ActivityMapTests/ActivityPlacesTests',
   'ActivityMapTests/StreamSummaryLoaderTests',
   'ActivityMapTests/StreamSummarySyncTests',
   'ActivityMapTests/SpeedDisplayTests',
@@ -69,6 +70,7 @@ export const nativeSuites = [
   'ActivityMapTests/MapResultsTests',
   'ActivityMapTests/ActivityContinuationTests',
   'ActivityMapTests/PhotoGalleryTests',
+  'ActivityMapUITests/ActivityPlacesUITests',
   'ActivityMapUITests/ActivityActionUITests',
   'ActivityMapUITests/StatsUITests',
   'ActivityMapUITests/MapPhotoUITests',
@@ -78,6 +80,7 @@ export const nativeSuites = [
 ];
 
 export const nativePRUISelectors = [
+  'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
   'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
   'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
   'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
@@ -98,9 +101,9 @@ export function nativeTestProfile(name = 'full') {
             ...nativePRUISelectors,
           ]
         : [...nativeSuites],
-    // The complete hosted UI matrix reached the old 35-minute cap during its
-    // last method. Keep per-test deadlines and give the full matrix headroom.
-    runtimeTimeoutMs: (name === 'pr' ? 8 : 45) * 60 * 1000,
+    // The hosted PR suite exceeded eight minutes while passing tests; allow
+    // time for all six UI journeys. The full matrix retains its existing bound.
+    runtimeTimeoutMs: (name === 'pr' ? 12 : 45) * 60 * 1000,
   };
 }
 

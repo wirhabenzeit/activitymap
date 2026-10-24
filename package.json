@@ -55,6 +55,7 @@
     "stats-tiles:check": "tsx scripts/generate-stats-tiles.ts --check",
     "db:convert-stream-summaries": "tsx --conditions=react-server scripts/database/convert-stream-summaries.ts",
     "benchmark:compact-streams": "tsx scripts/benchmark-compact-streams.ts",
+    "benchmark:place-matching": "tsx --conditions=react-server scripts/benchmark-place-matching.ts",
     "test:compact-stream-swift": "bash scripts/verify-compact-stream-codec.sh",
     "db:test-photo-backfill": "tsx --conditions=react-server scripts/database/test-photo-backfill.ts",
     "db:test-strava-import": "tsx --conditions=react-server scripts/database/test-strava-import.ts",
@@ -72,7 +73,11 @@
     "presentation:check": "node scripts/generate-presentation.mjs --check && node --test scripts/presentation.test.mjs",
     "test:browsing-ui": "tsx --test src/components/list/*.test.tsx",
     "db:test-on-demand-places": "tsx --conditions=react-server scripts/database/test-on-demand-places.ts",
-    "test:activity-places-ui": "node scripts/verify-activity-places.mjs"
+    "test:activity-places-ui": "node scripts/verify-activity-places.mjs",
+    "test:place-debug-ui": "node scripts/verify-place-debug.mjs",
+    "db:test-place-matching": "tsx --conditions=react-server scripts/database/test-place-matching.ts",
+    "places:match-local": "tsx --conditions=react-server scripts/match-activity-places.ts",
+    "benchmark:regional-place-matching": "tsx --conditions=react-server scripts/benchmark-regional-place-matching.ts"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",

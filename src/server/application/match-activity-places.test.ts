@@ -134,3 +134,19 @@ void test('repeated visits retain distinct route positions and mixed kinds expos
     [20, 100],
   );
 });
+
+void test('peak profile visits use the best weighted scoring point instead of the horizontal closest point', async () => {
+  const result = await run(
+    payload({
+      points: [
+        [46, 8],
+        [46, 8.0002],
+      ],
+      altitudes: [-100, 100],
+      distances: [0, 20],
+      times: [0, 20],
+    }),
+  );
+  assert.equal(result.places.length, 1);
+  assert(result.places[0]!.visits[0]!.distanceM! > 15);
+});
