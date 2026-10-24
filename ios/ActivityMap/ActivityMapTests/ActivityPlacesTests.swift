@@ -10,6 +10,18 @@ private actor PlacesProbe: ActivityPlacesSource {
     func places(activityID: String) async -> ActivityMapAPI.ActivityPlaces { calls += 1; return dto }
 }
 
+nonisolated private final class PlacesSaveFailure: @unchecked Sendable {
+    enum DiskError: Error { case full }
+    private let lock = NSLock()
+    private var pending = false
+    func failNextSave() { lock.lock(); defer { lock.unlock() }; pending = true }
+    func consumeFailure() -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        defer { pending = false }
+        return pending
+    }
+}
+
 @Suite(.serialized)
 @MainActor struct ActivityPlacesTests {
     private let scope = Fixtures.scope
@@ -42,6 +54,107 @@ private actor PlacesProbe: ActivityPlacesSource {
         checkpoint.changesCursor = cursor
         checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: version)
         return checkpoint
+    }
+    private func summaryResponse(revision: String, activityID: String? = nil) throws -> SummarySourceProbe.Response {
+        let body = StreamFixtures.envelope(StreamFixtures.summaryJSON(id: activityID ?? id, revision: revision))
+        let payload = try ActivityMapAPI.makeDecoder().decode(
+            ActivityMapAPI.Envelope<ActivityMapAPI.ActivityCompactStreamSummary>.self, from: body).data
+        return .init(payload: payload, statusCode: 200, retryAfter: nil, requestID: "places-regression", body: body)
+    }
+    @Test(arguments: ["bundle", "manifest"], [false, true])
+    func placeOnlyChangesPreserveForegroundSummaryRequests(change: String, refresh: Bool) async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let version = String(repeating: "a", count: 64)
+        let original = try syncedActivity(version: version)
+        try await storage.apply([.upsertActivity(original)], checkpoint: placesCheckpoint(version: version), scope: scope)
+        // An independently observed summary provides a FIFO observer barrier:
+        // seeing its later publication proves preceding change events retired.
+        let barrierID = "2"
+        try await storage.apply([.upsertActivity(try Fixtures.activity(["id": barrierID]))], scope: scope)
+        let barrierFence = await storage.streamFence()
+        #expect(try await storage.saveStreamSummary(summaryResponse(revision: "1", activityID: barrierID).payload,
+            scope: scope, fence: barrierFence) == .stored)
+        if refresh {
+            let fence = await storage.streamFence()
+            #expect(try await storage.saveStreamSummary(summaryResponse(revision: "1").payload,
+                scope: scope, fence: fence) == .stored)
+        }
+        let probe = SummarySourceProbe([], hold: true)
+        let loader = StreamSummaryLoader(source: { _ in probe })
+        await loader.configure(SyncFixtures.session(), storage: storage)
+        defer { loader.reset() }
+        await loader.load(activityID: barrierID)
+        let request = Task { await loader.load(activityID: id, refresh: refresh) }
+        let deadline = Date().addingTimeInterval(5)
+        while await probe.calls == 0, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(await probe.calls == 1)
+        // This also represents a stored-only summary request already in flight.
+        let summaryFence = await storage.streamFence()
+        if change == "bundle" {
+            try await storage.apply([.upsertActivity(try syncedActivity(version: version, empty: true))],
+                checkpoint: placesCheckpoint(version: version, cursor: "replacement"), scope: scope)
+            #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope)?.dto.places.isEmpty == true)
+        } else {
+            try await storage.apply([], checkpoint: placesCheckpoint(version: String(repeating: "b", count: 64)), scope: scope)
+            #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope) == nil)
+        }
+        #expect(await storage.summaryFenceIsCurrent(summaryFence, activityID: id, scope: scope),
+            "Matching changes must not invalidate elevation writes")
+        let publicationFence = await storage.streamFence()
+        #expect(try await storage.saveStreamSummary(summaryResponse(revision: "2", activityID: barrierID).payload,
+            scope: scope, fence: publicationFence) == .stored)
+        let observerDeadline = Date().addingTimeInterval(5)
+        while loader.currentSummary(for: barrierID)?.metadata.revision != "2", Date() < observerDeadline {
+            try await Task.sleep(for: .milliseconds(5))
+        }
+        #expect(loader.currentSummary(for: barrierID)?.metadata.revision == "2")
+        await probe.resolve(try summaryResponse(revision: "2"))
+        await request.value
+        #expect(await probe.calls == 1)
+        #expect(loader.currentSummary(for: id)?.metadata.revision == "2",
+            "The original foreground load or refresh must finish without new demand")
+        #expect(try await storage.cachedStreamSummary(activityID: id, scope: scope)?.metadata.revision == "2")
+    }
+    @Test func sameVersionZeroReplacementFencesOlderDirectPlaceResponse() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let version = String(repeating: "a", count: 64)
+        let original = try syncedActivity(version: version)
+        try await storage.apply([.upsertActivity(original)], checkpoint: placesCheckpoint(version: version), scope: scope)
+        let pending = await storage.streamFence()
+        try await storage.apply([.upsertActivity(try syncedActivity(version: version, empty: true))],
+            checkpoint: placesCheckpoint(version: version, cursor: "zero"), scope: scope)
+        #expect(try await !storage.saveActivityPlaces(original.placeMatches!, scope: scope, fence: pending, now: .now))
+        #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope)?.dto.places.isEmpty == true)
+        #expect(await storage.summaryFenceIsCurrent(pending, activityID: id, scope: scope),
+            "Replacing places fences only place responses")
+    }
+    @Test(arguments: ["bundle", "manifest"])
+    func failedPlaceChangePreservesBothRequestFences(change: String) async throws {
+        let failure = PlacesSaveFailure()
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true), save: { context in
+            if failure.consumeFailure() { throw PlacesSaveFailure.DiskError.full }
+            try context.save()
+        })
+        let version = String(repeating: "a", count: 64)
+        let original = try syncedActivity(version: version)
+        let checkpoint = placesCheckpoint(version: version)
+        try await storage.apply([.upsertActivity(original)], checkpoint: checkpoint, scope: scope)
+        let pending = await storage.streamFence()
+        let mutations: [StoreMutation] = change == "bundle"
+            ? [.upsertActivity(try syncedActivity(version: version, empty: true))] : []
+        let replacementVersion = change == "manifest" ? String(repeating: "b", count: 64) : version
+        failure.failNextSave()
+        await #expect(throws: PlacesSaveFailure.DiskError.self) {
+            try await storage.apply(mutations,
+                checkpoint: self.placesCheckpoint(version: replacementVersion, cursor: "uncommitted"), scope: self.scope)
+        }
+        #expect(try await storage.snapshot(scope: scope).checkpoint == checkpoint)
+        #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope)?.dto.places.count == 1)
+        #expect(await storage.summaryFenceIsCurrent(pending, activityID: id, scope: scope))
+        #expect(try await storage.saveActivityPlaces(original.placeMatches!, scope: scope, fence: pending, now: .now),
+            "An uncommitted place change must not reject an earlier place request")
+        #expect(try await storage.saveStreamSummary(summaryResponse(revision: "2").payload,
+            scope: scope, fence: pending) == .stored)
     }
     @Test func syncedVisitsLoadOfflineWithoutRequestsAndZeroReplacementRemovesThem() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))

@@ -73,6 +73,7 @@ actor LocalStore {
         let context = makeContext()
         let scopeKey = scope.key
         var invalidatedIDs = Set<String>()
+        var changedPlacesIDs = Set<String>()
         var placesVersionChanged = false
         do {
             // Preserve feed order, including multiple operations on one entity.
@@ -90,10 +91,16 @@ actor LocalStore {
                         if try reconcileSummaryUpsert(dto, previous: previous, scopeKey: scopeKey, context: context) {
                             invalidatedIDs.insert(dto.id)
                         }
+                        if try reconcilePlacesUpsert(dto, previous: previous, scopeKey: scopeKey, context: context) {
+                            changedPlacesIDs.insert(dto.id)
+                        }
                         row.payload = try StoreCodec.encode(dto)
                     } else {
                         if try reconcileSummaryUpsert(dto, previous: nil, scopeKey: scopeKey, context: context) {
                             invalidatedIDs.insert(dto.id)
+                        }
+                        if try reconcilePlacesUpsert(dto, previous: nil, scopeKey: scopeKey, context: context) {
+                            changedPlacesIDs.insert(dto.id)
                         }
                         context.insert(try StoredActivity(scope: scopeKey, dto: dto))
                     }
@@ -141,12 +148,14 @@ actor LocalStore {
             }
             try Task.checkCancellation()
             try save(context)
-            if placesVersionChanged {
-                streamFences.invalidate(scopeKey)
-                notifySummaryChange(scope: scopeKey)
-            }
             for id in invalidatedIDs { streamFences.invalidate(StoreScope.key([scopeKey, id])) }
             if !invalidatedIDs.isEmpty { notifySummaryChange(scope: scopeKey, activityIDs: invalidatedIDs) }
+            if placesVersionChanged {
+                placesChangesCommitted(scopeKey: scopeKey)
+            } else {
+                let placesOnlyIDs = changedPlacesIDs.subtracting(invalidatedIDs)
+                if !placesOnlyIDs.isEmpty { placesChangesCommitted(scopeKey: scopeKey, activityIDs: placesOnlyIDs) }
+            }
         } catch {
             context.rollback()
             throw error

@@ -17,12 +17,15 @@ extension LocalStore {
         guard !Self.activityIsOlder(dto, than: previous) else { throw ActivityEditingError.reconciliation }
         do {
             let invalidates = try reconcileSummaryUpsert(dto, previous: previous, scopeKey: scope.key, context: context)
+            let placesChanged = try reconcilePlacesUpsert(dto, previous: previous, scopeKey: scope.key, context: context)
             row.payload = try StoreCodec.encode(dto)
             try Task.checkCancellation()
             try save(context)
             if invalidates {
                 streamFences.invalidate(key)
                 notifySummaryChange(scope: scope.key, activityIDs: [dto.id])
+            } else if placesChanged {
+                placesChangesCommitted(scopeKey: scope.key, activityIDs: [dto.id])
             }
         } catch { context.rollback(); throw error }
     }

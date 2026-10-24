@@ -7,8 +7,25 @@ extension LocalStore {
         let order = StreamRevision.compare(metadata.revision, dto.streamRevision)
         return order == .orderedDescending || (order == .orderedSame && metadata.generation != dto.streamGeneration)
     }
-    // Places deliberately share the stream fence: activity source invalidation,
-    // replacement, deletion and scope cleanup invalidate both derived read models.
+    // Places share the stream clock and source fences so replacement, deletion
+    // and cleanup still invalidate both read models. Place-only changes use
+    // separate keys so they cannot reject an unrelated elevation response.
+    private static func placesFenceKey(scopeKey: String, activityID: String? = nil) -> String {
+        StoreScope.key([scopeKey, "places"] + (activityID.map { [$0] } ?? []))
+    }
+    private func placesFenceIsCurrent(_ fence: StreamFence, activityID: String, scope: StoreScope) -> Bool {
+        summaryFenceIsCurrent(fence, activityID: activityID, scope: scope)
+            && streamFences.admits(fence, keys: [Self.placesFenceKey(scopeKey: scope.key),
+                Self.placesFenceKey(scopeKey: scope.key, activityID: activityID)])
+    }
+    /// Called only after the place bundle/version and its checkpoint are saved.
+    func placesChangesCommitted(scopeKey: String, activityIDs: Set<String>? = nil) {
+        if let activityIDs {
+            for id in activityIDs { streamFences.invalidate(Self.placesFenceKey(scopeKey: scopeKey, activityID: id)) }
+        } else { streamFences.invalidate(Self.placesFenceKey(scopeKey: scopeKey)) }
+        notifySummaryChange(scope: scopeKey, activityIDs: activityIDs, affectsSummaries: false)
+    }
+
     func cachedActivityPlaces(activityID: String, scope: StoreScope) throws -> CachedActivityPlaces? {
         let context = makeContext()
         let key = StoreScope.key([scope.key, activityID])
@@ -46,7 +63,7 @@ extension LocalStore {
         return try? StoreCodec.decode(PlaceMatchingIdentity.self, from: row.payload)
     }
     func saveActivityPlaces(_ dto: ActivityMapAPI.ActivityPlaces, scope: StoreScope, fence: StreamFence, now: Date) throws -> Bool {
-        guard summaryFenceIsCurrent(fence, activityID: dto.activityID, scope: scope) else { return false }
+        guard placesFenceIsCurrent(fence, activityID: dto.activityID, scope: scope) else { return false }
         let context = makeContext(); let key = StoreScope.key([scope.key, dto.activityID])
         guard try placesInputCurrent(dto, scope: scope, context: context, checkIdentity: false) else { return false }
         let identityKey = StoreScope.key([scope.key, "places-identity"])
