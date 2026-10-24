@@ -78,6 +78,17 @@ Every cron route appends one row per run through `withJobLog`; writing it
 never fails the job. Access requires a Strava sign-in whose athlete id is
 listed in `ACTIVITYMAP_ADMIN_ATHLETE_IDS`; anyone else gets a 404.
 
+The ingestion table shows per-athlete counts, percentages, scheduling and
+outstanding detail/stream/photo work. Place matching has a dedicated summary
+and per-athlete coverage: checked (including zero encounters), queued, retry
+waiting, outstanding failures and waiting for streams. Limited checks include
+partial, uncovered and missing-GPS results. Only checks matching the current
+recipe, catalogue and stream identity count as checked; revoked or disconnected
+accounts are excluded from matching totals. The latest matching run shows saved
+activities, throughput, batch counts and input/place/matching/commit timings.
+Absent metrics on older runs are shown as unavailable. Refresh reads a new
+snapshot without fetching from Strava or starting matching work.
+
 An activity failure does not fail the whole run: `completed` means the job
 finished, while `failed` counts its individual activity failures. Detail and
 stream retries back off from one hour to at most 24 hours. A stream run can

@@ -52,6 +52,17 @@ export type MatchingBatchInputs = {
   inputs: Map<string, ActivityPlaceInput>;
   consumed: number;
 };
+export type MatchingCoverage = {
+  userId: string;
+  total: number;
+  eligible: number;
+  checked: number;
+  limited: number;
+  pending: number;
+  retryWaiting: number;
+  failed: number;
+  waitingForStreams: number;
+};
 const matchingRequests = (candidates: readonly MatchingCandidate[]) =>
   sql`jsonb_to_recordset(${JSON.stringify(
     candidates.map((candidate) => ({
@@ -375,6 +386,34 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
   };
   return {
     catalogue,
+    /** Admin-only aggregate: current versions, including zero-encounter checks.
+     * No GPS samples, place lists, names or credentials are loaded. Pending and
+     * retryWaiting partition eligible work not yet checked; failed overlaps. */
+    async coverage(catalogue: MatchingCatalogue): Promise<MatchingCoverage[]> {
+      const eligible = sql`COALESCE((${current}),false)`;
+      const fresh = sql`COALESCE((${sameInput(catalogue)}),false)`;
+      const checked = sql`${eligible} AND ${fresh} AND c.result IS NOT NULL`;
+      const failed = sql`${eligible} AND ${fresh} AND c.result IS NULL`;
+      const waiting = sql`${failed} AND c.retry_at>statement_timestamp()`;
+      const count = (condition: ReturnType<typeof sql>) =>
+        sql`count(*) FILTER (WHERE ${condition})::integer`;
+      return (
+        await database.execute<MatchingCoverage>(sql`
+          SELECT u.id AS "userId",count(*)::integer AS total,
+            ${count(eligible)} AS eligible,
+            ${count(checked)} AS checked,
+            ${count(sql`${checked} AND c.result->>'status'<>'complete'`)} AS limited,
+            ${count(sql`${eligible} AND (NOT ${fresh} OR (c.result IS NULL AND (c.retry_at IS NULL OR c.retry_at<=statement_timestamp())))`)} AS pending,
+            ${count(waiting)} AS "retryWaiting",
+            ${count(failed)} AS failed,
+            ${count(sql`NOT ${eligible}`)} AS "waitingForStreams"
+          FROM activities a JOIN "user" u ON u.athlete_id=a.athlete
+          LEFT JOIN activity_streams s ON s.activity_id=a.id
+          LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
+          WHERE ${connected} GROUP BY u.id
+        `)
+      ).rows;
+    },
     readInputs,
     commitMany,
     /** One bounded query for all activity results on a sync page; never matches

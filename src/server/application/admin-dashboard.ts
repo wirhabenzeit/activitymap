@@ -13,14 +13,15 @@ import {
   activityStreams,
   backgroundJobRuns,
   photoFetchAttempts,
-  streamBackfillAttempts,
   stravaRequestBudgets,
   stravaWebhookEvents,
+  streamBackfillAttempts,
   users,
 } from '~/server/db/schema';
 import { detailEnrichmentPending } from '~/server/repositories/ingestion';
-import { photoRefreshPending } from '~/server/repositories/photo-backfill';
 import { ingestionStatusRepository } from '~/server/repositories/ingestion-status';
+import { photoRefreshPending } from '~/server/repositories/photo-backfill';
+import { createPlaceMatchingRepository } from '~/server/repositories/place-matching';
 import { scheduledJobLogRepository } from '~/server/repositories/scheduled-job-log';
 import { getWebhookInboxMetrics } from '~/server/strava/webhook-drain';
 
@@ -136,6 +137,7 @@ export async function loadAdminDashboard(now = new Date()) {
     budgets,
     athletes,
     failures,
+    matching,
   ] = await Promise.all([
     db.select().from(backgroundJobRuns).orderBy(backgroundJobRuns.job),
     scheduledJobLogRepository.recent(RECENT_RUNS),
@@ -172,6 +174,14 @@ export async function loadAdminDashboard(now = new Date()) {
       .where(isNotNull(users.athlete_id))
       .orderBy(users.name),
     loadActivityFailures(),
+    (async () => {
+      const repository = createPlaceMatchingRepository();
+      const catalogue = await repository.catalogue();
+      return {
+        available: catalogue.snapshotId !== null,
+        coverage: await repository.coverage(catalogue),
+      };
+    })(),
   ]);
 
   const options = {
@@ -201,6 +211,7 @@ export async function loadAdminDashboard(now = new Date()) {
     webhookFailures,
     budgets,
     coverage,
+    matching,
     activityFailures: failures,
     switches: options,
   };

@@ -1,19 +1,20 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
+import { type JobHealth, jobHealth } from '~/lib/admin/job-health';
+import { type RunFailure, runFailures } from '~/lib/admin/job-run-summary';
 import {
-  loadAdminDashboard,
-  type ActivityFailure,
-  type AdminDashboard,
-} from '~/server/application/admin-dashboard';
-import { requireAdmin } from '~/server/auth/admin';
-import { jobHealth, type JobHealth } from '~/lib/admin/job-health';
-import { runFailures, type RunFailure } from '~/lib/admin/job-run-summary';
-import {
+  coverageProgress,
   coverageSummaries,
   schedulingLabel,
 } from '~/lib/ingestion/presentation';
 import { cn } from '~/lib/utils';
+import {
+  type ActivityFailure,
+  type AdminDashboard,
+  loadAdminDashboard,
+} from '~/server/application/admin-dashboard';
+import { requireAdmin } from '~/server/auth/admin';
 
 /**
  * Read-only operations dashboard (issue #328): scheduled job health and run
@@ -197,6 +198,38 @@ export default async function AdminPage({
       run.job,
       (itemFailuresByJob.get(run.job) ?? 0) + itemFailures(run),
     );
+  const matchingByUser = new Map(
+    data.matching.coverage.map((row) => [row.userId, row]),
+  );
+  const matchingTotals = data.matching.coverage.reduce(
+    (totals, row) => ({
+      checked: totals.checked + row.checked,
+      limited: totals.limited + row.limited,
+      eligible: totals.eligible + row.eligible,
+      pending: totals.pending + row.pending,
+      retryWaiting: totals.retryWaiting + row.retryWaiting,
+      failed: totals.failed + row.failed,
+      waitingForStreams: totals.waitingForStreams + row.waitingForStreams,
+    }),
+    {
+      checked: 0,
+      limited: 0,
+      eligible: 0,
+      pending: 0,
+      retryWaiting: 0,
+      failed: 0,
+      waitingForStreams: 0,
+    },
+  );
+  const matchingRun = data.runs.find(
+    (run) => run.job === 'match-activity-places',
+  );
+  const matchingMetric = (key: string) => {
+    const value = matchingRun?.summary?.[key];
+    return typeof value === 'number' && Number.isFinite(value) ? value : null;
+  };
+  const saved = matchingMetric('saved');
+  const elapsed = matchingMetric('elapsedMs');
 
   return (
     <main className="mx-auto max-w-6xl space-y-8 bg-background px-4 py-6 text-foreground">
@@ -216,6 +249,112 @@ export default async function AdminPage({
           Refresh
         </Link>
       </header>
+
+      <Section
+        title="Place matching"
+        description="Current checks for connected accounts. Empty encounter results count as checked; limited checks have partial, missing-GPS or uncovered routes. Counts update when you refresh."
+      >
+        <div className="space-y-4 p-4 text-sm">
+          {!data.matching.available && (
+            <Badge tone="warn">Waiting for a published place catalogue</Badge>
+          )}
+          {data.matching.available && (
+            <Badge
+              tone={
+                matchingTotals.pending || matchingTotals.retryWaiting
+                  ? 'warn'
+                  : matchingTotals.eligible
+                    ? 'good'
+                    : 'muted'
+              }
+            >
+              {matchingTotals.pending || matchingTotals.retryWaiting
+                ? 'Work pending'
+                : matchingTotals.eligible
+                  ? 'Eligible activities caught up'
+                  : 'No current streams to match'}
+            </Badge>
+          )}
+          <dl className="grid grid-cols-2 gap-4 tabular-nums sm:grid-cols-4">
+            {[
+              [
+                'Checked',
+                `${matchingTotals.checked.toLocaleString()} / ${matchingTotals.eligible.toLocaleString()}`,
+              ],
+              ['Queued', matchingTotals.pending.toLocaleString()],
+              [
+                'Waiting to retry',
+                matchingTotals.retryWaiting.toLocaleString(),
+              ],
+              [
+                'Waiting for streams',
+                matchingTotals.waitingForStreams.toLocaleString(),
+              ],
+            ].map(([label, value]) => (
+              <div key={label}>
+                <dt className="text-xs text-muted-foreground">{label}</dt>
+                <dd className="mt-1 text-lg font-semibold">{value}</dd>
+              </div>
+            ))}
+          </dl>
+          <p className="text-xs text-muted-foreground">
+            {matchingTotals.limited.toLocaleString()} limited checks ·{' '}
+            {matchingTotals.failed.toLocaleString()} outstanding failed checks
+            {matchingTotals.failed > 0 &&
+              ' (included in queued or waiting to retry)'}
+          </p>
+          {matchingRun ? (
+            <div className="space-y-2 border-t pt-3">
+              <p>
+                Last run {ago(matchingRun.startedAt, now)} ·{' '}
+                {matchingRun.status} ·{' '}
+                {saved === null
+                  ? 'saved count unavailable'
+                  : `${saved.toLocaleString()} saved`}{' '}
+                in {duration(matchingRun.durationMs)}
+                {saved !== null &&
+                  elapsed !== null &&
+                  elapsed > 0 &&
+                  ` · ${((saved * 1000) / elapsed).toFixed(1)} activities/s`}
+                {matchingRun.stopReason &&
+                  ` · ${matchingRun.stopReason.replaceAll('_', ' ')}`}
+              </p>
+              {matchingRun.error && (
+                <p className="text-red-700 dark:text-red-300">
+                  {matchingRun.error}
+                </p>
+              )}
+              <dl className="flex flex-wrap gap-x-6 gap-y-2 text-xs">
+                {[
+                  ['Read inputs', 'inputReadMs'],
+                  ['Load places', 'catalogueLoadMs'],
+                  ['Prepare and match', 'matchingMs'],
+                  ['Commit results', 'commitMs'],
+                ].map(([label, key]) => {
+                  const ms = matchingMetric(key!);
+                  return (
+                    <div key={key}>
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="tabular-nums">
+                        {ms === null ? '—' : duration(ms)}
+                      </dd>
+                    </div>
+                  );
+                })}
+              </dl>
+              <p className="text-xs text-muted-foreground">
+                {matchingMetric('inputBatches') ?? '—'} input batches ·{' '}
+                {matchingMetric('commitBatches') ?? '—'} commit batches ·{' '}
+                {matchingMetric('failed') ?? '—'} activity failures
+              </p>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">
+              No matching runs logged yet.
+            </p>
+          )}
+        </div>
+      </Section>
 
       <Section
         title="Scheduled jobs"
@@ -477,8 +616,8 @@ export default async function AdminPage({
       </Section>
 
       <Section
-        title="Import coverage"
-        description="Per athlete, from the same read model as Settings → Sync & data. The status says what the scheduler is doing; failing activities are counted separately."
+        title="Ingestion status"
+        description="Per athlete: stored coverage, outstanding work and scheduling. Strava import uses the same status as Settings → Sync & data; place checks use the current stream and catalogue versions."
       >
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
@@ -488,11 +627,16 @@ export default async function AdminPage({
               <th className={th}>Details</th>
               <th className={th}>Streams</th>
               <th className={th}>Photos</th>
+              <th className={th}>Place checks</th>
             </tr>
           </thead>
           <tbody>
             {data.coverage.map((athlete) => {
               const [history, ...rest] = coverageSummaries(athlete.status);
+              const matching = matchingByUser.get(athlete.userId);
+              const matchingProgress =
+                matching &&
+                coverageProgress(matching.checked, matching.eligible);
               return (
                 <tr key={athlete.userId} className="border-t">
                   <td className={td}>
@@ -518,16 +662,58 @@ export default async function AdminPage({
                       const terminal = failing.filter(
                         (failure) => !failure.nextAttemptAt,
                       ).length;
+                      const pendingCounts: [number, string][] =
+                        pipeline === 'details'
+                          ? [
+                              [
+                                athlete.status.details.neverFetched,
+                                'awaiting details',
+                              ],
+                              [
+                                athlete.status.details.invalidated,
+                                'invalidated',
+                              ],
+                              [
+                                athlete.status.details.retryWaiting,
+                                'waiting to retry',
+                              ],
+                            ]
+                          : pipeline === 'streams'
+                            ? [
+                                [athlete.status.streams.runnable, 'queued'],
+                                [athlete.status.streams.waiting, 'waiting'],
+                                [athlete.status.streams.blocked, 'blocked'],
+                                [athlete.status.streams.failed, 'failed'],
+                              ]
+                            : [
+                                [
+                                  athlete.status.photos.refreshRequired,
+                                  'refresh pending',
+                                ],
+                                [athlete.status.photos.unknown, 'unknown'],
+                              ];
+                      const outstanding = pendingCounts
+                        .filter(([count]) => count > 0)
+                        .map(
+                          ([count, label]) =>
+                            `${count.toLocaleString()} ${label}`,
+                        )
+                        .join(' · ');
                       return (
                         <td key={pipeline} className={td}>
                           <div className="tabular-nums">
-                            {summary.progress
-                              ? `${summary.progress.percent}%`
-                              : '—'}
+                            {summary.count}
+                            {summary.progress &&
+                              ` · ${summary.progress.percent}%`}
                           </div>
                           <div className="text-xs text-muted-foreground">
                             {schedulingLabel(athlete.status[pipeline])}
                           </div>
+                          {outstanding && (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              {outstanding}
+                            </div>
+                          )}
                           {failing.length > 0 && (
                             <div className="mt-1">
                               <Badge tone={terminal ? 'bad' : 'warn'}>
@@ -540,6 +726,37 @@ export default async function AdminPage({
                       );
                     },
                   )}
+                  <td className={td}>
+                    {matching ? (
+                      <>
+                        <div className="tabular-nums">
+                          {matching.checked.toLocaleString()} /{' '}
+                          {matching.eligible.toLocaleString()} checked
+                          {matchingProgress &&
+                            ` · ${matchingProgress.percent}%`}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {matching.pending.toLocaleString()} queued ·{' '}
+                          {matching.retryWaiting.toLocaleString()} waiting to
+                          retry
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          {matching.waitingForStreams.toLocaleString()} waiting
+                          for streams · {matching.limited.toLocaleString()}{' '}
+                          limited
+                        </div>
+                        {matching.failed > 0 && (
+                          <Badge tone="warn">{matching.failed} failed</Badge>
+                        )}
+                      </>
+                    ) : (
+                      <span className="text-muted-foreground">
+                        {athlete.revokedAt
+                          ? 'Disconnected'
+                          : 'No eligible activities'}
+                      </span>
+                    )}
+                  </td>
                 </tr>
               );
             })}
