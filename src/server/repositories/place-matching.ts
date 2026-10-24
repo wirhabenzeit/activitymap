@@ -391,26 +391,35 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
      * retryWaiting partition eligible work not yet checked; failed overlaps. */
     async coverage(catalogue: MatchingCatalogue): Promise<MatchingCoverage[]> {
       const eligible = sql`COALESCE((${current}),false)`;
-      const fresh = sql`COALESCE((${sameInput(catalogue)}),false)`;
-      const checked = sql`${eligible} AND ${fresh} AND c.result IS NOT NULL`;
-      const failed = sql`${eligible} AND ${fresh} AND c.result IS NULL`;
-      const waiting = sql`${failed} AND c.retry_at>statement_timestamp()`;
+      const checked = sql`eligible AND fresh AND has_result`;
+      const failed = sql`eligible AND fresh AND NOT has_result`;
+      const waiting = sql`${failed} AND retry_at>statement_timestamp()`;
       const count = (condition: ReturnType<typeof sql>) =>
         sql`count(*) FILTER (WHERE ${condition})::integer`;
       return (
         await database.execute<MatchingCoverage>(sql`
-          SELECT u.id AS "userId",count(*)::integer AS total,
-            ${count(eligible)} AS eligible,
+          -- Materialize the source/version facts once per activity. Inlining
+          -- currentPlaceStreams into each aggregate repeats an expensive source
+          -- hash (including whole-row JSON conversion) for every count.
+          WITH inputs AS MATERIALIZED (
+            SELECT u.id AS user_id, ${eligible} AS eligible,
+              COALESCE((${sameInput(catalogue)}),false) AS fresh,
+              c.result IS NOT NULL AS has_result,
+              c.result->>'status' AS status,c.retry_at
+            FROM activities a JOIN "user" u ON u.athlete_id=a.athlete
+            LEFT JOIN activity_streams s ON s.activity_id=a.id
+            LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
+            WHERE ${connected}
+          )
+          SELECT user_id AS "userId",count(*)::integer AS total,
+            ${count(sql`eligible`)} AS eligible,
             ${count(checked)} AS checked,
-            ${count(sql`${checked} AND c.result->>'status'<>'complete'`)} AS limited,
-            ${count(sql`${eligible} AND (NOT ${fresh} OR (c.result IS NULL AND (c.retry_at IS NULL OR c.retry_at<=statement_timestamp())))`)} AS pending,
+            ${count(sql`${checked} AND status<>'complete'`)} AS limited,
+            ${count(sql`eligible AND (NOT fresh OR (NOT has_result AND (retry_at IS NULL OR retry_at<=statement_timestamp())))`)} AS pending,
             ${count(waiting)} AS "retryWaiting",
             ${count(failed)} AS failed,
-            ${count(sql`NOT ${eligible}`)} AS "waitingForStreams"
-          FROM activities a JOIN "user" u ON u.athlete_id=a.athlete
-          LEFT JOIN activity_streams s ON s.activity_id=a.id
-          LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
-          WHERE ${connected} GROUP BY u.id
+            ${count(sql`NOT eligible`)} AS "waitingForStreams"
+          FROM inputs GROUP BY user_id
         `)
       ).rows;
     },

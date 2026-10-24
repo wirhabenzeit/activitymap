@@ -18,6 +18,7 @@ import {
   streamBackfillAttempts,
   users,
 } from '~/server/db/schema';
+import { logger } from '~/server/logging/logger';
 import { detailEnrichmentPending } from '~/server/repositories/ingestion';
 import { ingestionStatusRepository } from '~/server/repositories/ingestion-status';
 import { photoRefreshPending } from '~/server/repositories/photo-backfill';
@@ -128,6 +129,7 @@ async function loadActivityFailures(): Promise<ActivityFailure[]> {
  * tokens or activity names.
  */
 export async function loadAdminDashboard(now = new Date()) {
+  const started = Date.now();
   const [
     jobs,
     runs,
@@ -188,6 +190,8 @@ export async function loadAdminDashboard(now = new Date()) {
     streamBackfillEnabled: streamBackfillEnabled(),
     photoBackfillEnabled: photoBackfillEnabled(),
   };
+  const initialReadMs = Date.now() - started;
+  const ingestionStarted = Date.now();
   const coverage = await Promise.all(
     athletes.map(async (athlete) => ({
       ...athlete,
@@ -201,6 +205,13 @@ export async function loadAdminDashboard(now = new Date()) {
       ),
     })),
   );
+
+  logger.info('[Admin dashboard] Loaded', {
+    durationMs: Date.now() - started,
+    initialReadMs,
+    ingestionReadMs: Date.now() - ingestionStarted,
+    accounts: coverage.length,
+  });
 
   return {
     observedAt: now,

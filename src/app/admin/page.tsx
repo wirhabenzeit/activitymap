@@ -25,6 +25,7 @@ import { requireAdmin } from '~/server/auth/admin';
  */
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export const metadata: Metadata = {
   title: 'Admin · ActivityMap',
