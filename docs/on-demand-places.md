@@ -231,7 +231,10 @@ budgets allow it. Each stored track is loaded separately, and each
 group also stops growing at
 100,000 original GPS samples or 1,000 continuous sections (the last activity can
 cross the sample/section targets). Raw payloads are released after preparation;
-the prepared tracks are reused for matching. Separate boxes for continuous
+the prepared tracks are reused for matching.
+Group preparation also stops after five seconds or half the remaining run
+budget, whichever is smaller, so slow input reads leave time to checkpoint work.
+Separate boxes for continuous
 sections are padded by the discovery radius, its 1% + 1 m discovery slack and
 another 2 m margin. Longitude-wrap boxes are split, and poles are handled
 conservatively. One spatial query loads the distinct places intersecting that

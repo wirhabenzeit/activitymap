@@ -34,6 +34,7 @@ export const PLACE_MATCHING_BATCH_SIZE = 500;
 export const PLACE_MATCHING_TIME_MS = 40_000;
 export const PLACE_MATCHING_GROUP_ACTIVITIES = PLACE_MATCHING_BATCH_SIZE;
 export const PLACE_MATCHING_GROUP_MIN_ACTIVITIES = 25;
+export const PLACE_MATCHING_GROUP_PREPARE_TIME_MS = 5_000;
 export const PLACE_MATCHING_GROUP_SAMPLES = 100_000;
 export const PLACE_MATCHING_GROUP_SECTIONS = 1_000;
 type PreparedCandidate = {
@@ -127,6 +128,11 @@ export async function processPlaceMatching(
       let seed: MatchingCandidate | undefined;
       let samples = 0,
         sections = 0;
+      const groupStarted = clock();
+      const prepareTimeMs = Math.min(
+        PLACE_MATCHING_GROUP_PREPARE_TIME_MS,
+        Math.max(0, (timeMs - (groupStarted - started)) / 2),
+      );
       // Metadata selection stays large; raw GPS and prepared samples are retained
       // only for this bounded group. Every stream is read and prepared once.
       while (
@@ -136,6 +142,10 @@ export async function processPlaceMatching(
         samples < PLACE_MATCHING_GROUP_SAMPLES &&
         sections < PLACE_MATCHING_GROUP_SECTIONS
       ) {
+        // Large, short tracks can fit the memory limits while their individual
+        // database reads exhaust the run. Reserve time to match and save the
+        // prepared group instead of repeatedly abandoning it at the deadline.
+        if (group.length && clock() - groupStarted >= prepareTimeMs) break;
         if (clock() - started >= timeMs) {
           result.stopReason = 'deadline';
           break;

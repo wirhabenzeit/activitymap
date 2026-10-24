@@ -311,3 +311,26 @@ void test('missing location hints cannot grow a group beyond the sparse fill siz
   assert.equal(result.saved, 26);
   assert.equal(result.groups, 2);
 });
+
+void test('slow input loading starts saving before a large group exhausts the run deadline', async () => {
+  const f = fixture();
+  f.repository.candidates = async () =>
+    Array.from({ length: 500 }, (_, i) => ({
+      ...candidate,
+      activityId: String(i + 1),
+      locationHint: { start: [47, 8] },
+    }));
+  let now = 0;
+  f.repository.readInput = async () => {
+    now += 100;
+    return { generation: 'g', revision: '1', payload: {} };
+  };
+  const result = await processPlaceMatching({ ...f, clock: () => now });
+  assert(
+    result.saved > 0,
+    'A slow-read run must checkpoint work instead of loading until its deadline',
+  );
+  assert(result.groups > 1);
+  assert.equal(result.stopReason, 'deadline');
+  assert.equal(f.calls.at(-1), 'release');
+});
