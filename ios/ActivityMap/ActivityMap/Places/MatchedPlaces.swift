@@ -1,10 +1,14 @@
 import Foundation
 import SwiftUI
 
-nonisolated struct DisplayMatchedPlace: Identifiable {
+nonisolated struct DisplayMatchedPlace: Identifiable, Equatable {
     let place: ActivityMapAPI.MatchedPlace
     let activityIDs: [String]
     var id: String { place.id }
+    static func clusterKind(_ places: [Self]) -> ActivityMapAPI.PlaceKind? {
+        let kinds = Set(places.flatMap { $0.place.kinds })
+        return kinds.count == 1 ? kinds.first : nil
+    }
     static func aggregate(_ results: [ActivityMapAPI.ActivityPlaces]) -> [Self] {
         var places: [String: ActivityMapAPI.MatchedPlace] = [:]
         var owners: [String: Set<String>] = [:]
@@ -59,13 +63,15 @@ extension ActivityMapAPI.MatchedPlace {
 struct MatchedPlaceSymbol: View {
     let place: ActivityMapAPI.MatchedPlace
     var active = false
+    var mapMarker = false
     var body: some View {
-        PlaceGlyph(kind: place.kind).fill(active ? Color.white : Color(uiColor: .systemBackground))
+        PlaceGlyph(kind: place.kind).fill(active || mapMarker ? Color.white : Color(uiColor: .systemBackground))
             .frame(width: PlaceGlyph.chartSymbol(for: place.kind).size,
                    height: PlaceGlyph.chartSymbol(for: place.kind).size)
             .frame(width: PlaceGlyph.chartSymbol(for: place.kind).diameter,
                    height: PlaceGlyph.chartSymbol(for: place.kind).diameter)
-            .background(Circle().fill(active ? AppTheme.accent : Color.primary))
+            .background(Circle().fill(active ? AppTheme.accent : mapMarker ? MapMarkerPalette.ink : Color.primary))
+            .overlay { if mapMarker { Circle().stroke(.white, lineWidth: 1.5) } }
             .accessibilityHidden(true)
     }
 }
@@ -73,6 +79,7 @@ struct MatchedPlaceSymbol: View {
 struct MatchedPlaceCard: View {
     let place: ActivityMapAPI.MatchedPlace
     var routeCount = 1
+    var overview = false
     var onClose: () -> Void = {}
     @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
     var body: some View {
@@ -85,7 +92,7 @@ struct MatchedPlaceCard: View {
                         let units = preferences?.units ?? .metric
                         Text("\((elevation / units.elevationScale).formatted(.number.precision(.fractionLength(0)))) \(units.elevationUnit)")
                     }
-                    if routeCount > 1 { Text("· \(routeCount) selected routes") }
+                    if routeCount > 1 { Text("\(place.elevationM == nil ? "" : "· ")\(routeCount) \(overview ? "activities" : "selected routes")") }
                 }.font(.caption2).foregroundStyle(.secondary)
             }.padding(.vertical, 6).padding(.leading, 10)
             Button(action: onClose) {

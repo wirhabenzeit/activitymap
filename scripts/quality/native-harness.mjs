@@ -67,6 +67,7 @@ export const nativeSuites = [
   'ActivityMapTests/ActivityStoreSelectionTests',
   'ActivityMapTests/SelectionFixtureTests',
   'ActivityMapTests/MapPhotoTests',
+  'ActivityMapTests/MapPlaceTests',
   'ActivityMapTests/MapResultsTests',
   'ActivityMapTests/ActivityContinuationTests',
   'ActivityMapTests/PhotoGalleryTests',
@@ -81,6 +82,7 @@ export const nativeSuites = [
 
 export const nativePRUISelectors = [
   'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
+  'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
   'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
   'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
   'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
@@ -102,7 +104,7 @@ export function nativeTestProfile(name = 'full') {
           ]
         : [...nativeSuites],
     // The hosted PR suite exceeded eight minutes while passing tests; allow
-    // time for all six UI journeys. The full matrix retains its existing bound.
+    // time for all seven UI journeys. The full matrix retains its existing bound.
     runtimeTimeoutMs: (name === 'pr' ? 12 : 45) * 60 * 1000,
   };
 }

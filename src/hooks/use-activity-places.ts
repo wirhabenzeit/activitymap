@@ -28,6 +28,8 @@ import { useShallowStore } from '~/store';
 
 import { useLibrarySnapshot } from './use-library-snapshot';
 
+const noActivityIds: number[] = [];
+
 function usePlaceUser() {
   return useShallowStore((state) =>
     state.isInitialized && !state.isGuest && state.user?.stravaConnected
@@ -178,9 +180,15 @@ export function useActivityPlaces(
 export function useSelectedActivityPlaces(
   activities: ReadonlyMap<number, Activity>,
   selectedIds: number[],
+  // The overview reads synchronized results only. Direct requests stay limited
+  // to selected routes, rather than queueing thousands of background reads.
+  overviewIds: number[] = noActivityIds,
 ) {
   const userId = usePlaceUser();
-  const version = useMatchingVersion(userId, selectedIds.length > 0);
+  const version = useMatchingVersion(
+    userId,
+    selectedIds.length > 0 || overviewIds.length > 0,
+  );
   const client = useQueryClient();
   const ids = useMemo(
     () => selectedIds.filter((id) => activities.has(id)),
@@ -210,7 +218,23 @@ export function useSelectedActivityPlaces(
       ),
     ),
   });
-  const selected = new Set(ids.map(String));
+  const overview = useMemo(
+    () => overviewIds.filter((id) => activities.has(id)),
+    [overviewIds, activities],
+  );
+  const overviewResults = useMemo(
+    () =>
+      overview.map((id) =>
+        syncedActivityPlaces(
+          syncedActivities.get(String(id)),
+          userId ?? '',
+          version.data,
+          activities.get(id)?.streamsMetadata,
+        ),
+      ),
+    [overview, syncedActivities, userId, version.data, activities],
+  );
+  const selected = new Set([...ids, ...overview].map(String));
   const versionChanged = queries.some(
     (query, index) =>
       !settled[index] &&
@@ -227,15 +251,18 @@ export function useSelectedActivityPlaces(
     places:
       userId && !version.isError
         ? selectedMatchedPlaces(
-            queries.map(
-              (query, index) =>
-                settled[index] ??
-                (!query.isError &&
-                (!query.data?.matchingVersion ||
-                  query.data.matchingVersion === version.data)
-                  ? query.data
-                  : undefined),
-            ),
+            [
+              ...queries.map(
+                (query, index) =>
+                  settled[index] ??
+                  (!query.isError &&
+                  (!query.data?.matchingVersion ||
+                    query.data.matchingVersion === version.data)
+                    ? query.data
+                    : undefined),
+              ),
+              ...overviewResults,
+            ],
             userId,
             selected,
           )

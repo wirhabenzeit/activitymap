@@ -23,6 +23,7 @@ struct MapCamera {
 final class MapContext {
     @ObservationIgnored private(set) var camera = MapCamera.initial
     var showPhotos = false
+    var showPlaces = false
     var baseStyle = BaseStyle.standard
     var activeOverlays = Set(SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault))
     private(set) var isPitched = false
@@ -69,6 +70,7 @@ final class MapContext {
 
     func clearScope() {
         showPhotos = false
+        showPlaces = false
         camera = .initial
         locatedPosition = nil
         isPitched = false

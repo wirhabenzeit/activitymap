@@ -8,6 +8,120 @@ import XCTest
         XCUIDevice.shared.orientation = .portrait
     }
 
+    func testPlaceAndPhotoPinsShareCompactAppearanceAcrossThemes() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--places-ui-testing", "--places-overview-ui-testing", "--places-marker-style-ui-testing"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["Map layers"].waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["Map layers"].tap()
+        app.buttons["Show places on map"].tap()
+        let places = app.buttons["place-cluster-hut"]
+        let photos = app.buttons["map-photo-marker-photo-a"]
+        XCTAssertTrue(places.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(photos.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(places.frame.width, 44, accuracy: 1)
+        XCTAssertEqual(photos.frame.width, places.frame.width, accuracy: 1)
+        for theme in ["light", "dark"] {
+            let capture = XCTAttachment(screenshot: app.screenshot())
+            capture.name = "Photo and place pins \(theme)"; capture.lifetime = .keepAlways; add(capture)
+            if theme == "light" {
+                app.buttons["places-change-style"].tap()
+                XCTAssertTrue(places.waitForExistence(timeout: 10))
+                XCTAssertTrue(photos.waitForExistence(timeout: 10))
+            }
+        }
+    }
+
+    func testPlacesOverviewClusteringFilteringAndContextualActivityPicking() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--places-ui-testing", "--places-overview-ui-testing"]
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.buttons["Map layers"].waitForExistence(timeout: 20), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["places-selection-count"].label, "Selected routes: 0")
+        app.buttons["Map layers"].tap()
+        XCTAssertTrue(app.buttons["Show places on map"].waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons["Show places on map"].tap()
+        let cluster = app.buttons["place-cluster-hut"]
+        XCTAssertTrue(cluster.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(cluster.label, "Explore 4 visited places", "Shared summit is counted once")
+        XCTAssertEqual(app.staticTexts["places-selection-count"].label, "Selected routes: 0")
+        let overview = XCTAttachment(screenshot: app.screenshot())
+        overview.name = "Visited places overview without selection"; overview.lifetime = .keepAlways; add(overview)
+        openOverviewChooser(app)
+        app.buttons["choose-place-peak"].tap()
+        XCTAssertTrue(app.staticTexts["Selected routes: 2"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["places-detail-state"].label, "Detail: none")
+        XCTAssertTrue(app.buttons["close-place"].waitForExistence(timeout: 5), app.debugDescription)
+        app.buttons["close-place"].tap()
+        app.buttons["places-inspect-first"].tap()
+        XCTAssertEqual(app.staticTexts["places-detail-state"].label, "Detail: 1")
+        openOverviewChooser(app)
+        app.buttons["choose-place-peak"].tap()
+        XCTAssertEqual(app.staticTexts["places-selection-count"].label, "Selected routes: 1")
+        XCTAssertEqual(app.staticTexts["places-detail-state"].label, "Detail: 1", "Visited place preserves open detail")
+        let visited = XCTAttachment(screenshot: app.screenshot())
+        visited.name = "Visited place keeps the current activity detail"; visited.lifetime = .keepAlways; add(visited)
+        app.buttons["close-place"].tap()
+        openOverviewChooser(app)
+        app.buttons["choose-place-second-hut"].tap()
+        XCTAssertEqual(app.staticTexts["places-detail-state"].label, "Detail: 2", "Unvisited place picks the matching activity")
+        let detail = XCTAttachment(screenshot: app.screenshot())
+        detail.name = "Place selects its matching activity"; detail.lifetime = .keepAlways; add(detail)
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.35)).tap()
+        XCTAssertTrue(app.staticTexts["Selected routes: 0"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertFalse(app.buttons["close-place"].exists, "Blank map clears both place and activities")
+        app.buttons["places-hide-second"].tap()
+        XCTAssertTrue(cluster.waitForExistence(timeout: 5))
+        let filtered = NSPredicate(format: "label == %@", "Explore 3 visited places")
+        expectation(for: filtered, evaluatedWith: cluster)
+        waitForExpectations(timeout: 5)
+        app.buttons["Map layers"].tap()
+        app.buttons["Show places on map"].tap()
+        XCTAssertFalse(cluster.exists)
+    }
+
+    private func openOverviewChooser(_ app: XCUIApplication) {
+        for _ in 0..<6 {
+            let chooser = app.buttons["choose-place-peak"]
+            if chooser.exists { return }
+            let cluster = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "place-cluster-")).firstMatch
+            XCTAssertTrue(cluster.waitForExistence(timeout: 5), app.debugDescription)
+            cluster.tap()
+            if chooser.waitForExistence(timeout: 1) { return }
+        }
+        XCTFail("Coincident places must open a chooser at close zoom: \(app.debugDescription)")
+    }
+
+    func testPlacesOverviewSurvivesRotationStyleAndToggle() {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--places-ui-testing", "--places-overview-ui-testing"]
+        app.launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        XCTAssertTrue(app.buttons["Map layers"].waitForExistence(timeout: 20), app.debugDescription)
+        app.buttons["Map layers"].tap()
+        app.buttons["Show places on map"].tap()
+        let cluster = app.buttons["place-cluster-hut"]
+        XCTAssertTrue(cluster.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(cluster.label, "Explore 4 visited places")
+        for orientation in [UIDeviceOrientation.landscapeLeft, .portrait] {
+            XCUIDevice.shared.orientation = orientation
+            XCTAssertTrue(cluster.waitForExistence(timeout: 10), app.debugDescription)
+            let capture = XCTAttachment(screenshot: app.screenshot())
+            capture.name = "Places overview orientation \(orientation.rawValue)"; capture.lifetime = .keepAlways; add(capture)
+        }
+        app.buttons["places-change-style"].tap()
+        XCTAssertTrue(cluster.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertEqual(app.staticTexts["places-selection-count"].label, "Selected routes: 0")
+        app.buttons["Map layers"].tap()
+        app.buttons["Show places on map"].tap()
+        XCTAssertFalse(cluster.exists)
+    }
+
     func testMapTapShowsPlacesFromOverlappingRoutesBeforeOpeningDetails() {
         continueAfterFailure = false
         let app = XCUIApplication()

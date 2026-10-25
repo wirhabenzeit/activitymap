@@ -327,7 +327,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-Required iOS CI builds the app and runs the selected unit/app-hosted suites plus six real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
+Required iOS CI builds the app and runs the selected unit/app-hosted suites plus seven real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
 
@@ -493,8 +493,8 @@ IOS_TEST_PROFILE=pr pnpm test:ios
 IOS_TEST_PROFILE=full pnpm test:ios
 ```
 
-The local default is `full`. On iOS 27, `pr` builds the real app and runs all 31
-selected unit/app-hosted suites plus six real UI smoke methods: offline matched places, native GPX
+The local default is `full`. On iOS 27, `pr` builds the real app and runs all 32
+selected unit/app-hosted suites plus seven real UI smoke methods: offline matched places, the places overview, native GPX
 sharing/cancellation, List previous pull, Map next pull, Stats content/edge
 Back and standard Sport mix compact/expanded content. Pull-request CI and pushes
 to main select this profile only for native,
@@ -503,7 +503,7 @@ it conservatively. Web-only changes skip the native app job. It has an
 18-minute cold-build limit, eight-minute test limit and 35-minute job limit.
 This is not the full UI matrix.
 
-The full profile runs 38 selected suites, including all 54 UI methods, with the
+The full profile runs 39 selected suites, including all 57 UI methods, with the
 same 18-minute build limit, a 45-minute test limit and a 75-minute manual CI job.
 The seven action-matrix configurations run as independent methods so each has
 its own result and execution allowance.
@@ -570,11 +570,20 @@ reproduced those same failures. This rendering limitation needs separate review.
 
 ## Matched places
 
-The active route shows server-matched peaks, passes and huts on the map. Combine
-shows places for its filter-visible selected group. A map tap's chooser results
-alone do not request or display places. Tap a
-marker for its name, kind and elevation; shared places show the selected-route
-count. The elevation curve includes separate marks for repeated encounters.
+Selected, filter-visible routes show server-matched peaks, passes and huts on the
+map, including overlapping-route chooser results. **Layers → Activities →
+Show places on map** adds cached matches from every displayed activity, following
+filters and Only selected. Shared places appear once. The overview uses the same
+48-point grouping, 80-marker limit and zoom-12 labels as web. Counted clusters
+zoom in; clusters remaining at zoom 18 open a place chooser. An inspected place
+stays separate from clusters. The toggle starts off and resets on account change.
+
+Tapping a place on the activity open in Map detail preserves that detail and
+selection. Other overview places use the normal route picker: one matching
+activity opens detail, several open the activity chooser. Cards contain only
+place information and the activity count. A new map pick or Clear selection
+dismisses the previous place focus; an empty Combine pick keeps both. The
+elevation curve includes separate marks for repeated encounters.
 Place icons use a neutral palette and an angular pass glyph. Opening a map card
 preserves both its marker anchor and camera position.
 Profile icons open their place directly, without a context menu or lift
@@ -597,8 +606,11 @@ after one day online; current saved results remain available offline regardless
 of age. First-time uncached routes
 still need connectivity. No reference catalogue or matcher is downloaded.
 
-The API can later read persisted server relations without replacing this native
-cache/UI. Library-wide batch catch-up remains a later server-sync feature.
+The overview reads committed SwiftData matches in one scoped batch without
+requesting every activity. Direct-read fallback stays limited to selected routes.
+Sync replacements, stream invalidations and matching-version changes refresh the
+overview; incomplete/zero replacements remove old visits. Web and iOS share
+`shared/parity/map-places.v1.json` for grouping parity.
 See [the implementation plan](../../docs/activity-places-ios-plan.md).
 
 `ActivityPlacesTests` covers durable/offline reuse, disk-schema upgrade, account
@@ -609,3 +621,9 @@ style; it covers marker interaction, repeated visits, style changes and selectio
 preservation, plus active-route/Combine display scope. Unit checks include a
 100-result chooser and cancellation when demand shrinks. The journey is
 included in the PR and full native profiles.
+
+`MapPlaceTests` covers shared layout policy, 10,000-point grouping, contextual
+selection, filters and scope reset. The two overview journeys in
+`ActivityPlacesUITests` cover layer controls, cluster zoom, coincident-place
+choice, visited/unvisited activity behavior, clearing, filters, rotation and
+style replacement using offline synthetic data.

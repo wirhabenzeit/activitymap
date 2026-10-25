@@ -55,6 +55,58 @@ nonisolated private final class PlacesSaveFailure: @unchecked Sendable {
         checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: version)
         return checkpoint
     }
+    @Test func mapOverviewReadsInBatchWithoutRequestsAndTracksZeroVersionAndAccountChanges() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let version = String(repeating: "a", count: 64)
+        let original = try syncedActivity(version: version)
+        try await storage.apply([.upsertActivity(original), .upsertActivity(try Fixtures.activity(["id": "2"]))],
+            checkpoint: placesCheckpoint(version: version), scope: scope)
+        let probe = PlacesProbe(result())
+        let loader = ActivityPlacesLoader(source: { _ in probe })
+        await loader.configure(SyncFixtures.session(), storage: storage)
+        let owner = UUID()
+        loader.demand([], owner: owner, cachedOnly: [id, "2", "missing"])
+        let readDeadline = Date().addingTimeInterval(5)
+        while loader.overviewLoading, Date() < readDeadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(!loader.overviewLoading)
+        #expect(loader.result(id)?.places.count == 1)
+        #expect(loader.result("2") == nil)
+        #expect(await probe.calls == 0)
+        #expect(loader.loading.isEmpty)
+        loader.focus = .init(activityID: id, placeID: original.placeMatches!.places[0].id)
+        try await storage.apply([.upsertActivity(try syncedActivity(version: version, empty: true))],
+            checkpoint: placesCheckpoint(version: version, cursor: "overview-zero"), scope: scope)
+        let deadline = Date().addingTimeInterval(5)
+        while loader.result(id)?.places.isEmpty != true, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(loader.result(id)?.places.isEmpty == true)
+        #expect(loader.focus == nil)
+        try await storage.apply([], checkpoint: placesCheckpoint(version: String(repeating: "b", count: 64)), scope: scope)
+        let invalidationDeadline = Date().addingTimeInterval(5)
+        while loader.result(id) != nil, Date() < invalidationDeadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(loader.result(id) == nil)
+        #expect(await probe.calls == 0)
+        await loader.configure(SyncFixtures.session(id: "bob"), storage: storage)
+        loader.demand([], owner: owner, cachedOnly: [id])
+        let accountDeadline = Date().addingTimeInterval(5)
+        while loader.overviewLoading, Date() < accountDeadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(!loader.overviewLoading)
+        #expect(loader.overviewResults.isEmpty)
+        #expect(loader.result(id) == nil)
+        #expect(await probe.calls == 0)
+        loader.reset()
+    }
+    @Test func mapOverviewRejectsPlacesSupersededByAStoredSummary() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let version = String(repeating: "a", count: 64)
+        try await storage.apply([.upsertActivity(try syncedActivity(version: version))],
+            checkpoint: placesCheckpoint(version: version), scope: scope)
+        #expect(try await storage.cachedMapPlaces(activityIDs: [id], scope: scope)[id]?.places.count == 1)
+        let fence = await storage.streamFence()
+        #expect(try await storage.saveStreamSummary(summaryResponse(revision: "2").payload,
+            scope: scope, fence: fence) == .stored)
+        #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope) == nil)
+        #expect(try await storage.cachedMapPlaces(activityIDs: [id], scope: scope).isEmpty)
+    }
     private func summaryResponse(revision: String, activityID: String? = nil) throws -> SummarySourceProbe.Response {
         let body = StreamFixtures.envelope(StreamFixtures.summaryJSON(id: activityID ?? id, revision: revision))
         let payload = try ActivityMapAPI.makeDecoder().decode(

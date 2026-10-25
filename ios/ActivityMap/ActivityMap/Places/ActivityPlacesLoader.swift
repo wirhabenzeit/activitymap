@@ -9,6 +9,8 @@ private actor PlacesWorker {
 
 @MainActor @Observable final class ActivityPlacesLoader {
     private(set) var results: [String: ActivityMapAPI.ActivityPlaces] = [:]
+    private(set) var overviewResults: [String: ActivityMapAPI.ActivityPlaces] = [:]
+    private(set) var overviewLoading = false
     private(set) var loading: Set<String> = []
     private(set) var failures: [String: String] = [:]
     private(set) var sessionRevision = 0
@@ -18,6 +20,9 @@ private actor PlacesWorker {
     @ObservationIgnored private var worker: PlacesWorker?
     @ObservationIgnored private var epoch = 0
     @ObservationIgnored private var demands: [UUID: Set<String>] = [:]
+    @ObservationIgnored private var overviewDemands: [UUID: Set<String>] = [:]
+    @ObservationIgnored private var overviewTask: Task<Void, Never>?
+    @ObservationIgnored private var overviewGeneration = 0
     @ObservationIgnored private var priority: String?
     @ObservationIgnored private var queue: [String] = []
     @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]
@@ -35,12 +40,14 @@ private actor PlacesWorker {
     }, invalidate: @escaping (String) -> Void = { _ in }) {
         self.now = now; self.source = source; self.invalidate = invalidate
     }
-    deinit { observer?.cancel(); for task in tasks.values { task.cancel() }; for task in cacheTasks.values { task.cancel() } }
+    deinit { observer?.cancel(); overviewTask?.cancel(); for task in tasks.values { task.cancel() }; for task in cacheTasks.values { task.cancel() } }
     func reset() {
         epoch += 1; sessionRevision += 1
         tasks.values.forEach { $0.cancel() }; tasks.removeAll()
         cacheTasks.values.forEach { $0.cancel() }; cacheTasks.removeAll()
         observer?.cancel(); observer = nil;
+        overviewTask?.cancel(); overviewTask = nil; overviewGeneration += 1
+        overviewDemands.removeAll(); overviewResults.removeAll(); overviewLoading = false
         demands.removeAll(); queue.removeAll(); loading.removeAll(); failures.removeAll()
         results.removeAll(); retryAt.removeAll(); sourceRetries.removeAll(); focus = nil; session = nil; worker = nil
         validatedAt.removeAll()
@@ -59,7 +66,9 @@ private actor PlacesWorker {
             for await change in changes {
                 guard let self, !Task.isCancelled, self.epoch == current else { return }
                 guard change.scope == nil || change.scope == next.scope.key else { continue }
-                let ids = change.activityIDs ?? Set(self.results.keys).union(self.loading)
+                let ids = change.activityIDs ?? Set(self.results.keys).union(self.loading).union(self.overviewResults.keys)
+                for id in ids { self.overviewResults[id] = nil }
+                self.refreshOverview()
                 if !change.cancelsRequests {
                     // A summary becoming available need not change its input.
                     // Preserve shared in-flight matching; its disk write checks
@@ -89,15 +98,43 @@ private actor PlacesWorker {
     private var usable: Bool {
         session?.user.stravaConnected == true && (session?.user.authentication.sessionExpiresAt ?? .distantPast) > .now
     }
-    func result(_ id: String) -> ActivityMapAPI.ActivityPlaces? { usable ? results[id] : nil }
-    func demand(_ ids: Set<String>, owner: UUID, priority: String? = nil) {
+    func result(_ id: String) -> ActivityMapAPI.ActivityPlaces? { usable ? (results[id] ?? overviewResults[id]) : nil }
+    func demand(_ ids: Set<String>, owner: UUID, priority: String? = nil, cachedOnly: Set<String> = []) {
         demands[owner] = ids; if let priority { self.priority = priority }
+        if overviewDemands[owner] != cachedOnly {
+            overviewDemands[owner] = cachedOnly
+            refreshOverview()
+        }
         cancelUndemanded()
         enqueueDemand()
     }
     func release(_ owner: UUID) {
         demands[owner] = nil
+        overviewDemands[owner] = nil
+        refreshOverview()
         cancelUndemanded()
+    }
+    private func refreshOverview() {
+        overviewGeneration += 1
+        let generation = overviewGeneration, current = epoch
+        overviewTask?.cancel()
+        let ids = overviewDemands.values.reduce(into: Set<String>()) { $0.formUnion($1) }
+        overviewResults = overviewResults.filter { ids.contains($0.key) }
+        guard usable, !ids.isEmpty, let session, let storage else {
+            overviewLoading = false
+            return
+        }
+        overviewLoading = true
+        overviewTask = Task { [weak self] in
+            guard let self else { return }
+            defer { if current == self.epoch, generation == self.overviewGeneration { self.overviewLoading = false } }
+            do {
+                let cached = try await storage.cachedMapPlaces(activityIDs: ids, scope: session.scope)
+                try Task.checkCancellation()
+                guard current == self.epoch, generation == self.overviewGeneration, self.usable else { return }
+                self.overviewResults = cached
+            } catch { /* Existing valid results stay available while offline. */ }
+        }
     }
     private func cancelUndemanded() {
         let wanted = demanded
@@ -202,6 +239,11 @@ private actor PlacesWorker {
                     }
                     guard current == self.epoch, !Task.isCancelled else { return }
                     if let identity = PlaceMatchingIdentity(dto) {
+                        let outdated = self.overviewResults.compactMap { id, result in
+                            PlaceMatchingIdentity(result).map { $0 != identity } == true ? id : nil
+                        }
+                        for id in outdated { self.overviewResults[id] = nil }
+                        if !outdated.isEmpty { self.refreshOverview() }
                         for (otherID, result) in self.results {
                             if let other = PlaceMatchingIdentity(result), other != identity {
                                 self.cacheTasks[otherID]?.cancel()

@@ -269,6 +269,7 @@ export default function InteractiveMap() {
     threeDim,
     toggleThreeDim,
     showPhotos,
+    showPlaces,
     compactList,
     uploadedGeoJson,
     isGuest,
@@ -290,6 +291,7 @@ export default function InteractiveMap() {
     hydrateMapState: state.hydrateMapState,
     threeDim: state.threeDim,
     showPhotos: state.showPhotos,
+    showPlaces: state.showPlaces,
     toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
     uploadedGeoJson: state.uploadedGeoJson,
@@ -764,6 +766,15 @@ export default function InteractiveMap() {
     </div>
   );
 
+  const handleMapPick = useCallback((ids: number[]) => {
+    const state = store.getState();
+    const hits = state.pickActivities(ids);
+    if (state.combineSelections && !hits.length) return;
+    setDetailId(!state.combineSelections && hits.length === 1 ? hits[0]! : 0);
+    setPanelExpanded(false);
+    setPickCount((count) => count + 1);
+  }, []);
+
   // Part of #132: a visitor who arrived via a legacy `/map?user=`/
   // `/map?activities=` share link gets an explicit "no longer works"
   // message instead of a silently empty map - see
@@ -836,18 +847,7 @@ export default function InteractiveMap() {
         <Overlay position="top-right">
           <UploadControl />
         </Overlay>
-        <Selection
-          onSelection={(ids) => {
-            const state = store.getState();
-            const hits = state.pickActivities(ids);
-            if (state.combineSelections && !hits.length) return;
-            setDetailId(
-              !state.combineSelections && hits.length === 1 ? hits[0]! : 0,
-            );
-            setPanelExpanded(false);
-            setPickCount((count) => count + 1);
-          }}
-        />
+        <Selection onSelection={handleMapPick} />
         <Overlay position="top-left">
           <LayerSwitcher />
         </Overlay>
@@ -890,6 +890,10 @@ export default function InteractiveMap() {
         <ActivityPlacesLayers
           activities={activityDict}
           selectedIds={visibleSelected}
+          visibleIds={visibleIDs}
+          showAllPlaces={showPlaces}
+          inspectedActivityId={detailId || undefined}
+          onPickActivities={handleMapPick}
           highlighted={highlighted}
         />
         {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}

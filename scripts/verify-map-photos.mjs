@@ -1,11 +1,12 @@
 // Exercise the production photo UI against synthetic image responses, without a backend.
 import assert from 'node:assert/strict';
-import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
 import { mkdir, mkdtemp, readFile, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { chromium } from 'playwright-core';
 import { createServer } from 'node:http';
+import { createRequire } from 'node:module';
+import { tmpdir } from 'node:os';
+import { dirname, join, resolve } from 'node:path';
+
+import { chromium } from 'playwright-core';
 
 const require = createRequire(import.meta.url);
 const { build } = require(
@@ -308,12 +309,15 @@ try {
   await photoToggle.waitFor();
   assert.equal(await photoToggle.getAttribute('aria-checked'), 'true');
   await photoToggle.click();
+  // Independent layer choices deliberately keep this preference menu open.
+  await page.keyboard.press('Escape');
   await page.getByRole('menu').waitFor({ state: 'hidden' });
   await page.locator('[data-map-photo]').waitFor({ state: 'hidden' });
   await page.getByRole('button', { name: 'Map layers', exact: true }).click();
   await photoToggle.waitFor();
   assert.equal(await photoToggle.getAttribute('aria-checked'), 'false');
   await photoToggle.click();
+  await page.keyboard.press('Escape');
   await page.getByRole('menu').waitFor({ state: 'hidden' });
   await stack.waitFor();
   await page.getByRole('button', { name: 'Map layers', exact: true }).click();

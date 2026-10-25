@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 import { type StateCreator } from 'zustand';
-import { createStore } from 'zustand/vanilla';
 import { immer } from 'zustand/middleware/immer';
+import { createStore } from 'zustand/vanilla';
 
-import { createSelectionSlice, type SelectionSlice } from './selection';
-import { createFilterSlice } from './filter';
-import { createAuthSlice } from './auth';
-import type { RootState } from './index';
 import type { CurrentUserDTO } from '~/server/db/dto';
+
+import { useActivityPlaceFocus } from './activity-place-focus';
+import { createAuthSlice } from './auth';
+import { createFilterSlice } from './filter';
+import type { RootState } from './index';
+import { type SelectionSlice, createSelectionSlice } from './selection';
 
 void test('the active route is always part of the selected routes', () => {
   const store = createStore<SelectionSlice>()(
@@ -283,4 +286,43 @@ void test('map input returns eligible hits and rejects stale rendered features',
   store.getState().setOnlySelected(false);
   assert.deepEqual(store.getState().pickActivities([2, 2, 99]), [2]);
   assert.deepEqual(store.getState().selected, [1, 2]);
+});
+
+void test('map picks and explicit clearing dismiss place focus along with the activity chooser', () => {
+  const store = createStore<RootState>()(
+    immer((...args) => ({ ...createSelectionSlice(...args) }) as RootState),
+  );
+  const focus = () =>
+    useActivityPlaceFocus.getState().setFocus({
+      userId: 'test',
+      activityId: '1',
+      placeId: 'summit',
+      visitIndex: 0,
+      source: 'map',
+    });
+  store.getState().reconcileSelection([1, 2], [1, 2]);
+  store.getState().setSelected([1, 2]);
+  focus();
+  store.getState().pickActivities([]);
+  assert.deepEqual(store.getState().selected, []);
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+
+  store.getState().setSelected([1]);
+  focus();
+  store.getState().pickActivities([2]);
+  assert.deepEqual(store.getState().selected, [2]);
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+
+  focus();
+  store.getState().setCombineSelections(true);
+  store.getState().pickActivities([]);
+  assert.deepEqual(store.getState().selected, [2]);
+  assert.equal(useActivityPlaceFocus.getState().focus?.placeId, 'summit');
+  store.getState().pickActivities([1]);
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+
+  focus();
+  store.getState().clearSelection();
+  assert.deepEqual(store.getState().selected, []);
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
 });

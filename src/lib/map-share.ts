@@ -15,6 +15,7 @@ export type SharedMapStateSnapshot = {
   position: SharedViewState;
   threeDim: boolean;
   showPhotos: boolean;
+  showPlaces: boolean;
 };
 
 export type SharedMapStatePatch = Partial<SharedMapStateSnapshot>;
@@ -73,6 +74,7 @@ export const appendMapShareParams = (
   url.searchParams.set('mpitch', state.position.pitch.toFixed(1));
   url.searchParams.set('m3d', state.threeDim ? '1' : '0');
   url.searchParams.set('mph', state.showPhotos ? '1' : '0');
+  url.searchParams.set('mpl', state.showPlaces ? '1' : '0');
 };
 
 export const parseMapShareParams = (
@@ -87,7 +89,8 @@ export const parseMapShareParams = (
     searchParams.has('mbearing') ||
     searchParams.has('mpitch') ||
     searchParams.has('m3d') ||
-    searchParams.has('mph');
+    searchParams.has('mph') ||
+    searchParams.has('mpl');
 
   const hasPositionRequest =
     searchParams.has('mlng') ||
@@ -137,11 +140,7 @@ export const parseMapShareParams = (
       max: 85,
     }) ?? defaultMapPosition.pitch;
 
-  if (
-    longitude !== undefined &&
-    latitude !== undefined &&
-    zoom !== undefined
-  ) {
+  if (longitude !== undefined && latitude !== undefined && zoom !== undefined) {
     patch.position = {
       longitude,
       latitude,
@@ -160,6 +159,10 @@ export const parseMapShareParams = (
   const showPhotos = parseBoolean(searchParams.get('mph'));
   if (showPhotos !== undefined) {
     patch.showPhotos = showPhotos;
+  }
+  const showPlaces = parseBoolean(searchParams.get('mpl'));
+  if (showPlaces !== undefined) {
+    patch.showPlaces = showPlaces;
   }
 
   return {
