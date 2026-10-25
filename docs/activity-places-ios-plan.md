@@ -41,8 +41,10 @@ and stream revisions remain decimal strings throughout transport and storage.
 
 SwiftData keeps the latest accepted result per deployment/account/activity,
 including successful empty results. Map and detail share one loader and request
-queue, with at most two simultaneous activity reads. An inspected activity takes
-priority. One consumer leaving does not cancel another consumer's demand.
+queue, with at most two simultaneous network requests. Saved-place reads run
+independently so slow requests cannot hide cached places from other chooser
+results. An inspected activity takes priority. One consumer leaving does not
+cancel another consumer's demand.
 
 | Situation                                             | Behavior                                                                      |
 | ----------------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -76,30 +78,37 @@ library. There is no library-wide places bootstrap/batch operation yet.
 
 ## Map and elevation presentation
 
-In ordinary browsing, the map renders places for the active route only. A map
-tap's chooser candidates do not request or display places until a route becomes
-active. Combine opts into places for its filter-visible selected group. The
-same scope controls requests, markers and hit testing; narrowing it
+The map renders places for every selected, filter-visible route, matching the
+web. A map tap's selected chooser results contribute places immediately,
+regardless of which route is active or whether Combine is enabled. The
+elevation profile remains specific to the active route. The same selected scope
+controls map requests, markers and hit testing; narrowing it
 cancels requests no longer needed by either the map or an open profile.
 Shared UUIDs become one marker with a distinct contributing-route count. Tapping opens a compact card
-with name, kind, mapped elevation and OSM attribution, while preserving route
+with name and mapped elevation, while preserving route
 selection and camera position. Markers keep a fixed center anchor; the card uses
 a separate bottom anchor so opening it cannot move its icon. The focused card
-stays above neighboring markers and survives map style changes. Monochrome
-mountain, angular pass and house symbols identify kinds, with an inverted circle
-for focus and the same category precedence as the web.
+stays above neighboring markers and survives map style changes. OSM attribution
+is available through the map's attribution control. Shared vector definitions
+generate matching web and native peak, curved pass and overhanging-roof hut
+symbols. Map and profile use small monochrome circles with blue selection.
+Geographic annotations remain visible in both landscape orientations.
 
 The profile keeps repeated encounters as separate symbols/actions. Projection
 requires an exact stream-generation/revision match, subtracts the profile's
 first provider-distance value and interpolates onto the supplied elevation
 curve. It never substitutes mapped place altitude for recorded profile altitude.
-Null/out-of-range distances and ambiguous repeated-distance positions are omitted
-from the chart while remaining eligible for the map.
+Visits outside the averaged summary's distance range are clamped to its endpoints.
+Null distances and ambiguous repeated-distance positions are omitted from the
+chart while remaining eligible for the map. Symbols sit just above the profile
+with light dashed guides beneath them and room at both endpoints.
 
 Selecting a profile encounter in Map detail focuses the matching map card and
-highlights its place symbols, revealing the place on the map when needed.
-List/Stats detail uses a compact local card rather
-than switching tabs. Profile symbols open their place directly with a plain
+highlights its place symbol, revealing the place on the map when needed.
+The selected encounter's name, distance and recorded altitude appear in a blue
+readout above the chart. List/Stats detail uses that local readout without
+switching tabs. A stationary chart tap dismisses the place, while scrubbing
+preserves it. Profile symbols select their place directly with a plain
 button, without a menu's lift animation. Repeated encounters retain separate
 marks, and named VoiceOver actions reach every encounter, including overlaps.
 There is no additional Places button beside the profile. Sample scrubbing and horizontal
@@ -134,11 +143,17 @@ headers, ordinary v1-envelope enforcement, error/backoff handling, lossless IDs,
 wrong-activity rejection, shared demand, daily revalidation, offline reuse,
 completed zeroes, disk-schema upgrade, account isolation, source/context/deletion
 fences, bounded request priority, stale-source recovery and profile projection.
+It also checks that saved chooser results appear while other routes' requests
+are blocked and that all visible selected routes contribute places regardless
+of the active route or Combine mode.
 
 `ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection` uses production
 map/profile components with synthetic offline data and an inline style. It
 checks marker cards, separate repeated-visit actions, style replacement, focus
 and route-selection preservation. It is included in both native harness profiles.
+The overlapping-route tap journey starts with no selection and verifies places
+from both routes before either is activated, with shared places rendered once.
+The rotation journey covers portrait, both landscape orientations and style changes.
 
 Run `pnpm check` plus the affected native cache/transport suites and places UI
 journey. The broader native PR profile also covers existing browsing, sharing,

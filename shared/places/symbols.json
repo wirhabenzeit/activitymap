@@ -1,0 +1,34 @@
+{
+  "peak": {
+    "commands": [["M", 5, 19], ["L", 12, 5], ["L", 19, 19], ["Z"]],
+    "strokeWidth": 0,
+    "chartSize": 18,
+    "chartDiameter": 20
+  },
+  "pass": {
+    "commands": [
+      ["M", 7, 5],
+      ["Q", 12, 12, 7, 19],
+      ["M", 17, 5],
+      ["Q", 12, 12, 17, 19]
+    ],
+    "strokeWidth": 2.5,
+    "chartSize": 18,
+    "chartDiameter": 20
+  },
+  "hut": {
+    "commands": [
+      ["M", 3, 12],
+      ["L", 12, 4],
+      ["L", 21, 12],
+      ["L", 18, 12],
+      ["L", 18, 20],
+      ["L", 6, 20],
+      ["L", 6, 12],
+      ["Z"]
+    ],
+    "strokeWidth": 0,
+    "chartSize": 16,
+    "chartDiameter": 20
+  }
+}

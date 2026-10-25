@@ -243,26 +243,30 @@ nonisolated private final class PlacesSaveFailure: @unchecked Sendable {
         #expect(try await storage.cachedActivityPlaces(activityID: id, scope: scope)?.dto.places.count == 1)
         #expect(await source.steps.isEmpty)
     }
-    @Test func mapChooserCandidatesDoNotContributePlacesUntilActivatedOrCombined() {
+    @Test func mapPlacesIncludeAllVisibleSelectedRoutesRegardlessOfActiveRouteOrCombine() {
         let store = ActivityStore(activities: (1...100).map { ActivityStoreSelectionTests.activity($0) })
         let picker = RoutePicker()
         picker.apply(ids: Array(1...100), adding: false, request: picker.invalidateQuery(), store: store)
         #expect(picker.candidateIDs.count == 100)
-        #expect(store.mapPlacesActivityIDs.isEmpty)
+        #expect(store.activeActivityID == nil)
+        #expect(store.mapPlacesActivityIDs == Set(1...100))
         picker.showDetail(42, store: store)
-        #expect(store.mapPlacesActivityIDs == [42])
+        #expect(store.activeActivityID == 42)
+        #expect(store.mapPlacesActivityIDs == Set(1...100))
         picker.showDetail(99, store: store)
-        #expect(store.mapPlacesActivityIDs == [99])
+        #expect(store.activeActivityID == 99)
+        #expect(store.mapPlacesActivityIDs == Set(1...100))
         store.toggleActive(99)
-        #expect(store.mapPlacesActivityIDs.isEmpty)
+        #expect(store.activeActivityID == nil)
+        #expect(store.mapPlacesActivityIDs == Set(1...100))
         store.setCombine(true)
         #expect(store.mapPlacesActivityIDs == Set(1...100))
         store.removeFromSelection(3...100)
         #expect(store.mapPlacesActivityIDs == [1, 2])
         store.setCombine(false)
-        #expect(store.mapPlacesActivityIDs.isEmpty)
+        #expect(store.mapPlacesActivityIDs == [1, 2])
         store.activate(1)
-        #expect(store.mapPlacesActivityIDs == [1])
+        #expect(store.mapPlacesActivityIDs == [1, 2])
         store.activeSportTypes.remove(.run)
         #expect(store.mapPlacesActivityIDs.isEmpty)
         store.setCombine(true)
@@ -270,6 +274,28 @@ nonisolated private final class PlacesSaveFailure: @unchecked Sendable {
         #expect(store.selectedActivityIDs == [1, 2])
         store.clearSelection()
         #expect(store.mapPlacesActivityIDs.isEmpty)
+    }
+    @Test func chooserDisplaysSavedPlacesWhileOtherRoutesAreStillLoading() async throws {
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let original = try activity()
+        let metadata = try JSONSerialization.jsonObject(with: ActivityMapAPI.makeEncoder().encode(original.streams))
+        try await storage.apply([.upsertActivity(original),
+            .upsertActivity(try Fixtures.activity(["id": "1", "streams": metadata])),
+            .upsertActivity(try Fixtures.activity(["id": "2", "streams": metadata]))], scope: scope)
+        let hut = ActivityMapAPI.MatchedPlace(id: "saved-hut", name: "Saved hut", kinds: [.hut],
+            longitude: 8, latitude: 47, elevationM: 500, visits: [.init(distanceM: 100)])
+        #expect(try await storage.saveActivityPlaces(result(places: [hut]), scope: scope,
+            fence: await storage.streamFence(), now: .now))
+        let source = GatedPlacesProbe(result())
+        let loader = ActivityPlacesLoader(source: { _ in source })
+        await loader.configure(SyncFixtures.session(), storage: storage)
+        loader.demand(["1", "2", id], owner: UUID())
+        let deadline = Date().addingTimeInterval(2)
+        while loader.result(id) == nil, Date() < deadline { try await Task.sleep(for: .milliseconds(5)) }
+        #expect(loader.result(id)?.places.map(\.id) == ["saved-hut"],
+            "Cached chooser places must not wait behind other routes' network requests")
+        loader.reset()
+        await source.finish("1"); await source.finish("2"); await source.finish(id)
     }
     @Test func narrowingDemandCancelsUnneededRequestsButPreservesSharedProfileDemand() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
@@ -406,15 +432,26 @@ nonisolated private final class PlacesSaveFailure: @unchecked Sendable {
         let dto = result(places: [place])
         let metadata = try #require(activity().streams)
         let projected = ProfilePlace.project(dto, onto: profile, metadata: metadata)
-        #expect(projected.map(\.distance) == [50, 150])
-        #expect(projected.map(\.altitude) == [450, 450])
-        #expect(Set(projected.map(\.id)).count == 2)
+        #expect(projected.map(\.distance) == [50, 150, 0])
+        #expect(projected.map(\.altitude) == [450, 450, 400])
+        #expect(Set(projected.map(\.id)).count == 3)
         #expect(ProfilePlace.project(dto, onto: profile, metadata: try #require(activity(revision: "2").streams)).isEmpty)
         let ambiguous = ActivityMapAPI.StreamSummary(version: 1, basis: .distance, time: nil,
             distance: [100, 200, 200, 300], latlng: nil, altitude: [400, 500, 550, 400], watts: nil, heartrate: nil)
         let exact = ActivityMapAPI.MatchedPlace(id: "p", name: "Pass", kinds: [.pass], longitude: 8, latitude: 47,
             elevationM: nil, visits: [.init(distanceM: 200)])
         #expect(ProfilePlace.project(result(places: [exact]), onto: try #require(ElevationProfile.make(ambiguous)), metadata: metadata).isEmpty)
+    }
+    @Test func endpointVisitsSurviveAveragedSummaryBounds() throws {
+        let summary = ActivityMapAPI.StreamSummary(version: 1, basis: .distance, time: nil,
+            distance: [10, 90], latlng: nil, altitude: [100, 200], watts: nil, heartrate: nil)
+        let profile = try #require(ElevationProfile.make(summary))
+        let hut = ActivityMapAPI.MatchedPlace(id: "hut", name: "Endpoint hut", kinds: [.hut], longitude: 8, latitude: 47,
+            elevationM: 9999, visits: [.init(distanceM: 0), .init(distanceM: 100)])
+        let projected = ProfilePlace.project(result(places: [hut]), onto: profile, metadata: try #require(activity().streams))
+        #expect(projected.map(\.distance) == [0, 80])
+        #expect(projected.map(\.altitude) == [100, 200])
+        #expect(projected.map(\.id) == ["hut:0", "hut:1"])
     }
     @Test func requestQueueBoundsConcurrencyAndPrioritizesInspectedActivity() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))

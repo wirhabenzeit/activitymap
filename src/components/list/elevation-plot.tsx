@@ -21,7 +21,7 @@ import {
   elevationSelectionLabel,
   nearestElevationSample,
 } from '~/lib/elevation-profile';
-import { primaryPlaceKind } from '~/lib/place-symbols';
+import { placeChartSymbol, primaryPlaceKind } from '~/lib/place-symbols';
 import { measurementScale, measurementUnit } from '~/lib/units';
 
 const EMPTY_PLACES: MatchedPlace[] = [];
@@ -29,11 +29,12 @@ const EMPTY_PLACES: MatchedPlace[] = [];
 /** Linear, sample-preserving plot with one interaction surface for mouse, touch and keyboard. */
 export function ElevationPlot({
   profile,
-  height = 165,
+  height = 177,
   onSelection = () => undefined,
   places = EMPTY_PLACES,
   focusedPlaceKey,
   onPlaceSelect,
+  onPlaceDismiss,
   placesStatus,
 }: {
   profile: ElevationProfile;
@@ -44,6 +45,7 @@ export function ElevationPlot({
   onPlaceSelect?: (
     marker: ReturnType<typeof elevationPlaceMarkers>[number],
   ) => void;
+  onPlaceDismiss?: () => void;
   placesStatus?: ReactNode;
 }) {
   const units = useDisplayUnits();
@@ -65,6 +67,16 @@ export function ElevationPlot({
     index: number | null;
   }>({ profile, index: null });
 
+  const press = useRef<{
+    id: number;
+    x: number;
+    y: number;
+    moved: boolean;
+  } | null>(null);
+  const dismissPlace = () => {
+    setHoveredPlaceKey(null);
+    onPlaceDismiss?.();
+  };
   const [hoveredPlaceKey, setHoveredPlaceKey] = useState<string | null>(null);
   const placeMarkers = useMemo(
     () => elevationPlaceMarkers(profile, places),
@@ -85,7 +97,8 @@ export function ElevationPlot({
   const plotHeight = height - headerHeight;
   const left = 48,
     right = Math.max(left + 1, width - 12),
-    top = 8,
+    // Leave room above the highest point for the icon and its touch target.
+    top = placeMarkers.length ? 40 : 8,
     bottom = plotHeight - 38;
   const { divisor: distanceDivisor, unit: distanceUnit } =
     elevationDistanceAxis(span, units);
@@ -136,9 +149,41 @@ export function ElevationPlot({
         className="flex h-7 items-center justify-between gap-2 text-xs"
         data-testid="elevation-readout-row"
       >
-        <span className="text-muted-foreground">
-          Elevation ({elevationUnit})
-        </span>
+        {activePlace && selected === null ? (
+          <div
+            className="flex min-w-0 items-center gap-1.5"
+            data-testid="elevation-place-readout"
+            role="status"
+            style={{
+              color:
+                focusedPlaceKey === activePlace.key
+                  ? 'var(--activity-accent)'
+                  : undefined,
+            }}
+          >
+            <PlaceSymbol
+              kind={primaryPlaceKind(activePlace)}
+              className="size-4 shrink-0"
+            />
+            <span className="truncate font-medium">{activePlace.name}</span>
+            <span className="shrink-0">
+              {elevationDistanceLabel(
+                activePlace.distanceM - start,
+                span,
+                units,
+              )}{' '}
+              ·{' '}
+              {Math.round(
+                activePlace.altitudeM / elevationDivisor,
+              ).toLocaleString()}{' '}
+              {elevationUnit}
+            </span>
+          </div>
+        ) : (
+          <span className="text-muted-foreground">
+            Elevation ({elevationUnit})
+          </span>
+        )}
         <div className="flex min-w-0 items-center justify-end">
           <span
             data-testid="elevation-selection-readout"
@@ -148,7 +193,7 @@ export function ElevationPlot({
           >
             {selected === null ? ' ' : value(selected)}
           </span>
-          {selected === null && placesStatus}
+          {selected === null && !activePlace && placesStatus}
         </div>
       </div>
       <div
@@ -164,10 +209,22 @@ export function ElevationPlot({
         style={{ height: plotHeight }}
         onPointerDown={(event) => {
           if (event.button !== 0) return;
+          press.current = {
+            id: event.pointerId,
+            x: event.clientX,
+            y: event.clientY,
+            moved: false,
+          };
           event.currentTarget.setPointerCapture(event.pointerId);
           selectPointer(event);
         }}
         onPointerMove={(event) => {
+          const origin = press.current;
+          if (
+            origin?.id === event.pointerId &&
+            Math.hypot(event.clientX - origin.x, event.clientY - origin.y) > 6
+          )
+            origin.moved = true;
           if (
             event.pointerType === 'mouse' ||
             event.currentTarget.hasPointerCapture(event.pointerId)
@@ -175,17 +232,33 @@ export function ElevationPlot({
             selectPointer(event);
         }}
         onPointerUp={(event) => {
+          const origin = press.current;
+          const tapped =
+            origin?.id === event.pointerId &&
+            !origin.moved &&
+            Math.hypot(event.clientX - origin.x, event.clientY - origin.y) <= 6;
+          press.current = null;
           if (event.currentTarget.hasPointerCapture(event.pointerId))
             event.currentTarget.releasePointerCapture(event.pointerId);
           select(null);
+          if (tapped) dismissPlace();
         }}
         onPointerLeave={(event) => {
           if (!event.currentTarget.hasPointerCapture(event.pointerId))
             select(null);
         }}
-        onPointerCancel={() => select(null)}
-        onLostPointerCapture={() => select(null)}
-        onBlur={() => select(null)}
+        onPointerCancel={() => {
+          press.current = null;
+          select(null);
+        }}
+        onLostPointerCapture={() => {
+          press.current = null;
+          select(null);
+        }}
+        onBlur={() => {
+          press.current = null;
+          select(null);
+        }}
         onKeyDown={(event) => {
           let next: number | null;
           switch (event.key) {
@@ -207,6 +280,7 @@ export function ElevationPlot({
               next = profile.distance.length - 1;
               break;
             case 'Escape':
+              dismissPlace();
               next = null;
               break;
             default:
@@ -292,13 +366,14 @@ export function ElevationPlot({
           {placeMarkers.map((marker) => (
             <line
               key={marker.key}
+              data-testid="elevation-place-guide"
               x1={x(marker.distanceM)}
               x2={x(marker.distanceM)}
-              y1={y(marker.altitudeM / elevationDivisor)}
+              y1={y(marker.altitudeM / elevationDivisor) - 4}
               y2={bottom}
-              stroke={activePlaceKey === marker.key ? '#f97316' : '#0f766e'}
-              strokeOpacity={0.3}
-              strokeDasharray="2 3"
+              stroke="currentColor"
+              strokeOpacity={0.16}
+              strokeDasharray="2 4"
             />
           ))}
           {selected !== null && (
@@ -324,7 +399,7 @@ export function ElevationPlot({
         </svg>
       </div>
       {placeMarkers.map((marker) => {
-        const active = activePlaceKey === marker.key;
+        const symbol = placeChartSymbol(primaryPlaceKind(marker));
         const label =
           marker.name +
           ' at ' +
@@ -339,11 +414,13 @@ export function ElevationPlot({
             data-place-kind={primaryPlaceKind(marker)}
             aria-label={'Highlight ' + label}
             aria-pressed={focusedPlaceKey === marker.key}
-            title={label}
             className="group absolute flex size-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full outline-none"
             style={{
               left: x(marker.distanceM),
-              top: headerHeight + y(marker.altitudeM / elevationDivisor),
+              top:
+                headerHeight +
+                y(marker.altitudeM / elevationDivisor) -
+                symbol.offset,
             }}
             onMouseEnter={() => setHoveredPlaceKey(marker.key)}
             onMouseLeave={() => setHoveredPlaceKey(null)}
@@ -352,39 +429,25 @@ export function ElevationPlot({
             onClick={() => onPlaceSelect?.(marker)}
           >
             <span
-              className={
-                'flex size-6 items-center justify-center rounded-full border bg-background shadow-sm group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background ' +
-                (active
-                  ? 'border-orange-500 text-orange-600 dark:text-orange-400'
-                  : 'border-border text-teal-700 dark:text-teal-400')
-              }
+              className="flex items-center justify-center rounded-full bg-foreground text-background group-focus-visible:ring-2 group-focus-visible:ring-ring group-focus-visible:ring-offset-2 group-focus-visible:ring-offset-background"
+              style={{
+                width: symbol.diameter,
+                height: symbol.diameter,
+                backgroundColor:
+                  focusedPlaceKey === marker.key
+                    ? 'var(--activity-accent)'
+                    : undefined,
+                color: focusedPlaceKey === marker.key ? '#ffffff' : undefined,
+              }}
             >
               <PlaceSymbol
                 kind={primaryPlaceKind(marker)}
-                className="size-3.5"
+                style={{ width: symbol.size, height: symbol.size }}
               />
             </span>
           </button>
         );
       })}
-      {activePlace && (
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute z-10 max-w-[min(220px,80%)] -translate-x-1/2 truncate rounded-md border border-border bg-popover px-2 py-1 text-xs font-medium text-popover-foreground shadow-sm"
-          style={{
-            left: Math.max(
-              100,
-              Math.min(width - 100, x(activePlace.distanceM)),
-            ),
-            top:
-              headerHeight +
-              y(activePlace.altitudeM / elevationDivisor) +
-              (y(activePlace.altitudeM / elevationDivisor) < 40 ? 18 : -34),
-          }}
-        >
-          {activePlace.name}
-        </div>
-      )}
     </div>
   );
 }

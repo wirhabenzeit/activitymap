@@ -236,7 +236,7 @@ export function ElevationChart({
       }}
     />
   ) : null;
-  const height = 165;
+  const height = 177;
   const canRetry = canManuallyRetryStreamSummary(query.data, retryClock);
 
   return (
@@ -257,6 +257,9 @@ export function ElevationChart({
             }
             height={height}
             placesStatus={placesStatus}
+            onPlaceDismiss={() =>
+              useActivityPlaceFocus.setState({ focus: null })
+            }
             onPlaceSelect={(marker) =>
               useActivityPlaceFocus.getState().setFocus({
                 userId,

@@ -5,14 +5,10 @@ import { Loader2, X } from 'lucide-react';
 import { memo, useEffect, useMemo, useRef } from 'react';
 import { Layer, Popup, Source, useMap } from 'react-map-gl/mapbox';
 
-import { PlaceSymbol } from '~/components/place-symbol';
 import { useSelectedActivityPlaces } from '~/hooks/use-activity-places';
 import { useDisplayUnits } from '~/hooks/use-display-preferences';
 import type { Activity } from '~/lib/activity';
-import {
-  MATCHED_PLACES_HIT_LAYER,
-  placeKindLabel,
-} from '~/lib/activity-places';
+import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
 import {
   type PlaceKind,
   placeSymbolId,
@@ -59,13 +55,12 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
           kind: primaryPlaceKind(place),
           icon: placeSymbolId(
             primaryPlaceKind(place),
-            place.id === selected?.id ||
-              place.activityIds.includes(String(highlighted)),
+            place.id === selected?.id,
           ),
         },
       })),
     }),
-    [query.places, selected?.id, highlighted],
+    [query.places, selected?.id],
   );
   useEffect(() => {
     if (!map) return;
@@ -99,8 +94,9 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
       for (const kind of ['peak', 'pass', 'hut'] as PlaceKind[])
         for (const active of [false, true]) {
           const id = placeSymbolId(kind, active);
-          if (!raw.hasImage(id))
-            raw.addImage(id, placeSymbolImage(kind, active), { pixelRatio: 2 });
+          const image = placeSymbolImage(kind, active);
+          if (raw.hasImage(id)) raw.updateImage(id, image);
+          else raw.addImage(id, image, { pixelRatio: 2 });
         }
     };
     const missing = (event: { id: string }) => {
@@ -109,9 +105,17 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
     if (raw.isStyleLoaded()) register();
     raw.on('style.load', register);
     raw.on('styleimagemissing', missing);
+    const themeObserver = new MutationObserver(() => {
+      if (raw.isStyleLoaded()) register();
+    });
+    themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['class', 'style'],
+    });
     return () => {
       raw.off('style.load', register);
       raw.off('styleimagemissing', missing);
+      themeObserver.disconnect();
     };
   }, [map]);
   useEffect(() => {
@@ -124,6 +128,10 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
       const activityId = place.activityIds.includes(String(highlighted))
         ? String(highlighted)
         : place.activityIds[0]!;
+      if (useActivityPlaceFocus.getState().focus?.placeId === place.id) {
+        useActivityPlaceFocus.setState({ focus: null });
+        return;
+      }
       setFocus({
         userId: query.userId!,
         activityId,
@@ -148,6 +156,15 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
         duration: 350,
       });
   }, [focus, selected, map]);
+  useEffect(() => {
+    if (!selected) return;
+    const dismiss = (event: KeyboardEvent) => {
+      if (event.key === 'Escape')
+        useActivityPlaceFocus.setState({ focus: null });
+    };
+    document.addEventListener('keydown', dismiss);
+    return () => document.removeEventListener('keydown', dismiss);
+  }, [selected]);
   if (!query.userId || !selectedIds.length) return null;
   return (
     <>
@@ -203,6 +220,8 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
           }}
+          // Keep route places legible when terrain would otherwise hide them.
+          paint={{ 'icon-occlusion-opacity': 1 }}
         />
         <Layer
           id="matched-places-labels"
@@ -218,12 +237,20 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
             'text-color': '#111827',
             'text-halo-color': '#ffffff',
             'text-halo-width': 1.5,
+            'text-occlusion-opacity': 1,
           }}
         />
         <Layer
           id={MATCHED_PLACES_HIT_LAYER}
-          type="circle"
-          paint={{ 'circle-radius': 22, 'circle-opacity': 0 }}
+          type="symbol"
+          layout={{
+            'icon-image': ['get', 'icon'],
+            // Sprites occupy 32 logical pixels, including transparent padding.
+            'icon-size': 44 / 32,
+            'icon-allow-overlap': true,
+            'icon-ignore-placement': true,
+          }}
+          paint={{ 'icon-opacity': 0, 'icon-occlusion-opacity': 1 }}
         />
       </Source>
       {selected && (
@@ -231,51 +258,48 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
           className="matched-place-popup"
           closeButton={false}
           focusAfterOpen={false}
-          offset={18}
+          offset={14}
           longitude={selected.longitude}
           latitude={selected.latitude}
           closeOnClick={false}
           onClose={() => useActivityPlaceFocus.setState({ focus: null })}
-          maxWidth="280px"
+          maxWidth="220px"
         >
           <div
-            className="relative flex w-64 max-w-[calc(100vw_-_4rem)] items-start gap-3 p-3 pr-12 text-popover-foreground"
+            className="flex max-w-[220px] items-center pl-3 text-popover-foreground"
             data-map-place
           >
-            <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-teal-700/10 text-teal-700 dark:text-teal-400">
-              <PlaceSymbol
-                kind={primaryPlaceKind(selected)}
-                className="size-5"
-              />
-            </span>
-            <div className="min-w-0 py-0.5">
-              <div className="text-sm leading-snug font-semibold">
+            <div className="max-w-40 min-w-0 py-2">
+              <div
+                className="line-clamp-2 text-xs leading-snug font-semibold break-words"
+                style={{ color: 'var(--activity-accent)' }}
+              >
                 {selected.name}
               </div>
-              <div className="mt-1 text-xs text-muted-foreground">
-                {placeKindLabel(selected)}
+              <div className="mt-0.5 text-[11px] text-muted-foreground">
                 {selected.elevationM !== null &&
-                  ' · ' +
-                    Math.round(
-                      selected.elevationM /
-                        measurementScale('elevation', units),
-                    ).toLocaleString() +
+                  Math.round(
+                    selected.elevationM / measurementScale('elevation', units),
+                  ).toLocaleString() +
                     ' ' +
                     measurementUnit('elevation', units)}
+                {selected.activityIds.length > 1 && (
+                  <>
+                    {selected.elevationM !== null ? ' · ' : ''}
+                    <span>{selected.activityIds.length} selected routes</span>
+                  </>
+                )}
               </div>
-              {selected.activityIds.length > 1 && (
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {selected.activityIds.length} selected routes
-                </div>
-              )}
             </div>
             <button
               type="button"
               aria-label="Close place"
-              className="absolute top-0 right-0 flex size-11 items-center justify-center rounded-xl text-muted-foreground outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+              className="group flex size-11 shrink-0 items-center justify-center text-muted-foreground outline-none hover:text-foreground"
               onClick={() => useActivityPlaceFocus.setState({ focus: null })}
             >
-              <X className="size-3.5" aria-hidden="true" />
+              <span className="flex size-6 items-center justify-center rounded-md group-hover:bg-muted group-focus-visible:ring-2 group-focus-visible:ring-ring">
+                <X className="size-3" aria-hidden="true" />
+              </span>
             </button>
           </div>
         </Popup>
