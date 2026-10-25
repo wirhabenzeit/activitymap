@@ -34,6 +34,7 @@ import {
   nativeSuiteEligibility,
   nativeSuites,
   nativeTestProfile,
+  runNativeHarness,
   selectNativeSimulator,
   validateNativeSuites,
   validateNativeSummary,
@@ -329,6 +330,138 @@ test('native results reject zero executed, skipped, or failed tests', () => {
     /failures/,
   );
 });
+
+for (const failure of [
+  undefined,
+  'build-for-testing',
+  'test-without-building',
+]) {
+  test(`native cache readiness and evidence survive ${failure ?? 'a passing run'}`, async (t) => {
+    const root = await temporary(t);
+    const output = join(root, 'evidence');
+    const buildStatusPath = join(root, 'step-output');
+    const calls = [];
+    const runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0';
+    const phone = { name: 'iPhone 17 Pro', identifier: 'phone17' };
+    const suites = nativeTestProfile('pr').suites;
+    const run = async (command, args) => {
+      calls.push({ command, args });
+      if (command === 'xcodebuild') {
+        if (args[0] === '-version') return 'Xcode 27.1\nBuild version 27A9275';
+        if (args[0] === failure)
+          throw Object.assign(new Error('Xcode failed'), { exitCode: 65 });
+        return '';
+      }
+      if (args[0] === 'xcresulttool') {
+        if (args.includes('summary'))
+          return JSON.stringify({
+            passedTests: suites.length,
+            failedTests: failure ? 1 : 0,
+            skippedTests: 0,
+            result: failure ? 'Failed' : 'Passed',
+            testFailures: failure
+              ? [
+                  {
+                    testIdentifierString: 'PhotoGalleryTests/example',
+                    failureText: 'Photo missing',
+                  },
+                ]
+              : [],
+          });
+        return JSON.stringify({
+          testNodes: suites.map((selector) => {
+            const [target, name, method = 'example'] = selector.split('/');
+            return {
+              nodeType: 'Test Suite',
+              nodeIdentifier: `${target}/${name}`,
+              children: [
+                {
+                  nodeType: 'Test Case',
+                  nodeIdentifier: `${name}/${method}()`,
+                  result: 'Passed',
+                },
+              ],
+            };
+          }),
+        });
+      }
+      if (args[1] === 'create') return 'owned-phone\n';
+      if (args[2] === 'runtimes')
+        return JSON.stringify({
+          runtimes: [
+            {
+              identifier: runtime,
+              version: '27.0',
+              isAvailable: true,
+              supportedDeviceTypes: [phone],
+            },
+          ],
+        });
+      if (args[2] === 'devicetypes')
+        return JSON.stringify({ devicetypes: [phone] });
+      if (args[2] === 'devices')
+        return JSON.stringify({
+          devices: {
+            [runtime]: [
+              { udid: 'owned-phone', isAvailable: true, state: 'Shutdown' },
+            ],
+          },
+        });
+      return '';
+    };
+    const result = runNativeHarness({
+      root,
+      output,
+      profile: 'pr',
+      run,
+      platform: 'darwin',
+      buildStatusPath,
+    });
+    if (failure) await assert.rejects(result, { exitCode: 65 });
+    else await result;
+    const summary = JSON.parse(
+      await readFile(join(output, 'summary.json'), 'utf8'),
+    );
+    assert.equal(summary.passed, !failure);
+    assert.equal(summary.phases.build.passed, failure !== 'build-for-testing');
+    assert.equal(
+      summary.phases.test?.passed,
+      failure === 'build-for-testing' ? undefined : !failure,
+    );
+    for (const phase of Object.values(summary.phases))
+      assert(phase.durationMs >= 0);
+    if (failure === 'build-for-testing')
+      await assert.rejects(access(buildStatusPath));
+    else
+      assert.equal(
+        await readFile(buildStatusPath, 'utf8'),
+        'build_succeeded=true\n',
+      );
+    assert.deepEqual(
+      calls
+        .filter(({ args }) => ['shutdown', 'delete'].includes(args[1]))
+        .map(({ args }) => args),
+      [
+        ['simctl', 'shutdown', 'owned-phone'],
+        ['simctl', 'delete', 'owned-phone'],
+      ],
+    );
+    const build = calls.find(
+      ({ args }) => args[0] === 'build-for-testing',
+    ).args;
+    for (const flag of [
+      '-onlyUsePackageVersionsFromResolvedFile',
+      '-skipPackageUpdates',
+      'ONLY_ACTIVE_ARCH=YES',
+      'COMPILER_INDEX_STORE_ENABLE=NO',
+    ])
+      assert(build.includes(flag));
+    assert.deepEqual(
+      build.filter((arg) => arg.startsWith('-only-testing:')),
+      suites.map((suite) => `-only-testing:${suite}`),
+    );
+  });
+}
 
 // Exercise the real ownership/finally boundary before a browser or server exists.
 test('early startup failure cleans its workspace and still writes evidence', async (t) => {

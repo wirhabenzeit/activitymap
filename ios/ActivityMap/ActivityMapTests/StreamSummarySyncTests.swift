@@ -58,8 +58,12 @@ struct StreamSummarySyncTests {
         return sync
     }
 
-    @Test(arguments: [206, 5_000])
-    func existingLibraryCatchesUpNewestFirstInBoundedBatchesAndReadsOffline(_ count: Int) async throws {
+    @Test
+    func existingLibraryCatchesUpNewestFirstInBoundedBatchesAndReadsOffline() async throws {
+        // Three batches exercise continuation and a partial final batch. The
+        // former 5,000-row repeat asserted the same behavior while dominating
+        // this suite's runtime; it had no separate performance assertion.
+        let count = 206
         let newest = String(count)
         let rows = try (1..<count).map { try activity(String($0)) }
             + [activity(newest, date: "2026-10-01T12:00:00.000Z")]
