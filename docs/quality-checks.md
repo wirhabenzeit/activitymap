@@ -13,8 +13,8 @@ explicit disposable Postgres service.
 | `pnpm test:browser:install`            | Provision the lockfile-matched Playwright Chromium; append `--with-deps` on Linux                                                 |
 | `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
 | `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
-| `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all 31 selected unit/app-hosted suites and six real UI smoke methods on iOS 27                        |
-| `pnpm test:ios`                        | Build and run the full 38-suite native selection, including all 54 selected real UI methods, on iOS 27                            |
+| `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all selected unit/app-hosted suites and focused real UI smoke methods on iOS 27                       |
+| `pnpm test:ios`                        | Build and run the full native selection, including every method in the selected UI suites, on iOS 27                              |
 | `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
 | `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
 | `pnpm format:check src/path.ts`        | Check explicit files                                                                                                              |
@@ -82,9 +82,12 @@ Pull-request CI and pushes to main explicitly use `IOS_TEST_PROFILE=pr` when
 native-related files change. A cheap Ubuntu diff check covers iOS sources, shared
 fixtures/catalogs, contracts/OpenAPI, stream codecs, native/testflight tooling and
 the relevant workflows. Web-only changes skip the native app job; an unavailable
-or invalid comparison conservatively runs it. This builds the real app and runs all 31 selected unit/app-hosted suites plus six
-real UI smoke methods on iOS 27:
+or invalid comparison conservatively runs it. This builds the real app and runs
+all selected unit/app-hosted suites plus the following real UI smoke methods on
+iOS 27:
 
+- Visited-place clustering, filtering and contextual activity picking:
+  `ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking`.
 - Offline matched places on the map/profile, repeated encounters, style replacement and selection preservation:
   `ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection`.
 - Native GPX sharing, repeated cancellation and departure cleanup:
@@ -102,9 +105,8 @@ This is a smoke boundary, not the complete UI matrix. The
 [Full iOS runtime workflow](../.github/workflows/ios-full.yml) is manually
 requested with **Actions → Full iOS runtime → Run workflow**, selecting the
 branch or tag to test. It explicitly uses `IOS_TEST_PROFILE=full`, runs the same
-31 unit/app-hosted suites and all seven selected UI suites (38 suites and 54 UI
-methods in total on iOS 27), and has no automatic schedule. Run either profile
-locally with:
+unit/app-hosted selection and every method in the selected UI suites, and has no
+automatic schedule. Run either profile locally with:
 
 ```sh
 IOS_TEST_PROFILE=pr pnpm test:ios
@@ -125,6 +127,9 @@ The shared unit/app-hosted selection covers:
 - `SyncControllerTests`, `IngestionStatusTests`, `StravaImportTests`,
   `StreamsAPITests`, `StreamSummaryLoaderTests`, `StreamSummarySyncTests`,
   `SpeedDisplayTests`: sync/import/stream lifecycle and display policies.
+  Catch-up batching uses 206 activities to cover three batches, a partial final
+  batch, ordering, repeat-start idempotence and offline reads. The redundant
+  5,000-activity run repeated these same assertions without a performance bound.
 - `PresentationTests`, `DisplayPreferencesTests`, `StravaConnectTests`:
   semantic catalog, preference and connection policies.
 - `ActivityFilterTests`, `ActivityStoreSelectionTests`, `SelectionFixtureTests`:
@@ -144,8 +149,24 @@ Those additional journeys are not certified by a passing PR smoke run.
 | Limit                                       | PR profile | Full profile |
 | ------------------------------------------- | ---------- | ------------ |
 | Cold `build-for-testing`                    | 18 minutes | 18 minutes   |
-| `test-without-building`                     | 8 minutes  | 45 minutes   |
+| `test-without-building`                     | 12 minutes | 45 minutes   |
 | CI job, including setup and artifact upload | 35 minutes | 75 minutes   |
+
+Both workflows cache Swift packages, compiled products and compiler modules.
+Cache compatibility includes the runner architecture, Xcode/SDK/OS fingerprint,
+resolved package versions, project/scheme/configuration and harness. Each commit
+gets a new cache entry, restoring the newest compatible entry as its starting
+point. Xcode still builds and checks changed sources; no test execution is
+cached. A completed build is saved even if runtime tests subsequently fail;
+failed or cancelled builds cannot populate the cache. Indexes, test results and
+logs are excluded. Cache restore/save are optional and each has a two-minute
+deadline. The first compatible run still has a cold build.
+
+Builds use only the simulator's active architecture, disable indexing, and use
+the committed `Package.resolved` without remote update checks. Superseded runs
+for the same pull request are cancelled. `summary.json` records separate boot,
+build and test durations, and failures print their test identifiers and messages
+in the Actions log.
 
 Both profiles retain three-minute simulator boot readiness, disabled parallel
 test execution, and enabled per-test timeouts configured with a 90-second default
@@ -189,10 +210,17 @@ harnesses against the same simulator or DerivedData directory.
 `IOS_DERIVED_DATA` can reuse a caller-owned build cache; otherwise
 `.quality/ios-derived` is retained for later runs.
 
+The photo-viewer rendering test waits for fixture pixels before checking text.
+Vision recognition runs off MainActor: cold OCR initialization on a fresh
+simulator previously blocked photo publication past the rendering deadline.
+Pixel visibility, page number, caption and selection assertions remain required.
+
 Build settings use inert API/Mapbox fixture values. UI journeys launch DEBUG-only
 offline app fixtures; app-hosted suites supply isolated stores and fixtures within
 their tests. Both workflows retain stream DTO compatibility and compact-codec
-prechecks. Evidence in `output/quality/ios/<timestamp>/` records the profile and
+prechecks. The DTO check compiles the baseline separately only when its generated
+source differs; the current proof already includes all baseline assertions.
+Evidence in `output/quality/ios/<timestamp>/` records the profile and
 selection, separate `xcodebuild-build.log` and `xcodebuild-test.log`, toolchain,
 boot logs, summary, per-test tree and `Results.xcresult`. Open the bundle in Xcode
 for attachments and failures. Both workflows upload evidence even when a job

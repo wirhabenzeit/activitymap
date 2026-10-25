@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { access, mkdir, writeFile } from 'node:fs/promises';
+import { access, appendFile, mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -103,8 +103,7 @@ export function nativeTestProfile(name = 'full') {
             ...nativePRUISelectors,
           ]
         : [...nativeSuites],
-    // The hosted PR suite exceeded eight minutes while passing tests; allow
-    // time for all seven UI journeys. The full matrix retains its existing bound.
+    // Keep runtime separate from compilation; every selected UI journey must run.
     runtimeTimeoutMs: (name === 'pr' ? 12 : 45) * 60 * 1000,
   };
 }
@@ -229,10 +228,13 @@ export async function runNativeHarness({
   output,
   simulator = process.env.IOS_SIMULATOR_UDID,
   profile = process.env.IOS_TEST_PROFILE ?? 'full',
+  run = runCommand,
+  platform = process.platform,
+  buildStatusPath = process.env.GITHUB_OUTPUT,
 }) {
   const selectedProfile = nativeTestProfile(profile);
   assert.equal(
-    process.platform,
+    platform,
     'darwin',
     'Native runtime checks require macOS and Xcode 27',
   );
@@ -254,7 +256,7 @@ export async function runNativeHarness({
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
   const command = (args, log, timeoutMs = 60000) =>
-    runCommand('xcrun', args, {
+    run('xcrun', args, {
       cwd: root,
       signal: abort.signal,
       timeoutMs,
@@ -267,10 +269,26 @@ export async function runNativeHarness({
     runtimeTimeoutMs: selectedProfile.runtimeTimeoutMs,
     suites: selectedProfile.suites,
     startedAt: new Date().toISOString(),
+    phases: {},
     passed: false,
   };
+  const phase = async (name, work) => {
+    const started = performance.now();
+    const result = (manifest.phases[name] = { passed: false });
+    console.log(`Native ${name} started.`);
+    try {
+      const value = await work();
+      result.passed = true;
+      return value;
+    } finally {
+      result.durationMs = Math.round(performance.now() - started);
+      console.log(
+        `Native ${name} ${result.passed ? 'passed' : 'failed'} in ${(result.durationMs / 1000).toFixed(1)}s.`,
+      );
+    }
+  };
   try {
-    const version = await runCommand('xcodebuild', ['-version'], {
+    const version = await run('xcodebuild', ['-version'], {
       timeoutMs: 30000,
       echo: false,
     });
@@ -340,13 +358,15 @@ export async function runNativeHarness({
       console.log(
         `Not eligible on iOS ${item.actual}: ${item.suite} requires ${item.requires} (${item.reason}).`,
       );
-    if (device.state !== 'Booted')
-      await command(['simctl', 'boot', simulator], 'boot.log');
-    await command(
-      ['simctl', 'bootstatus', simulator, '-b'],
-      'boot-status.log',
-      180000,
-    );
+    await phase('boot', async () => {
+      if (device.state !== 'Booted')
+        await command(['simctl', 'boot', simulator], 'boot.log');
+      await command(
+        ['simctl', 'bootstatus', simulator, '-b'],
+        'boot-status.log',
+        180000,
+      );
+    });
     const commonArguments = [
       '-project',
       'ios/ActivityMap/ActivityMap.xcodeproj',
@@ -363,44 +383,54 @@ export async function runNativeHarness({
         process.env.IOS_DERIVED_DATA || join(root, '.quality/ios-derived'),
       ),
       ...suites.map((suite) => `-only-testing:${suite}`),
+      '-onlyUsePackageVersionsFromResolvedFile',
+      '-skipPackageUpdates',
+      'ONLY_ACTIVE_ARCH=YES',
+      'COMPILER_INDEX_STORE_ENABLE=NO',
       'CODE_SIGNING_ALLOWED=NO',
       'ACTIVITYMAP_API_BASE_URL=http:$(SLASH)$(SLASH)127.0.0.1:1',
       'MAPBOX_ACCESS_TOKEN=pk.offline-test',
     ];
     // The first hosted run spent 11m37s compiling before tests could launch.
     // Give cold compilation its own bound so it cannot consume runtime's budget.
-    await runCommand('xcodebuild', ['build-for-testing', ...commonArguments], {
-      cwd: root,
-      log: join(output, 'xcodebuild-build.log'),
-      timeoutMs: 18 * 60 * 1000,
-      signal: abort.signal,
-      echo: false,
-    });
-    await runCommand(
-      'xcodebuild',
-      [
-        'test-without-building',
-        ...commonArguments,
-        '-resultBundlePath',
-        resultBundle,
-        '-parallel-testing-enabled',
-        'NO',
-        '-test-timeouts-enabled',
-        'YES',
-        '-default-test-execution-time-allowance',
-        '90',
-        '-maximum-test-execution-time-allowance',
-        '180',
-      ],
-      {
+    await phase('build', () =>
+      run('xcodebuild', ['build-for-testing', ...commonArguments], {
         cwd: root,
-        log: join(output, 'xcodebuild-test.log'),
-        // PR smoke keeps all unit suites and five focused UI journeys. The
-        // full matrix has its own runtime budget, separate from cold builds.
-        timeoutMs: selectedProfile.runtimeTimeoutMs,
+        log: join(output, 'xcodebuild-build.log'),
+        timeoutMs: 18 * 60 * 1000,
         signal: abort.signal,
         echo: false,
-      },
+      }),
+    );
+    // Preserve a good build cache even when a runtime regression fails later.
+    if (buildStatusPath)
+      await appendFile(buildStatusPath, 'build_succeeded=true\n');
+    await phase('test', () =>
+      run(
+        'xcodebuild',
+        [
+          'test-without-building',
+          ...commonArguments,
+          '-resultBundlePath',
+          resultBundle,
+          '-parallel-testing-enabled',
+          'NO',
+          '-test-timeouts-enabled',
+          'YES',
+          '-default-test-execution-time-allowance',
+          '90',
+          '-maximum-test-execution-time-allowance',
+          '180',
+        ],
+        {
+          cwd: root,
+          log: join(output, 'xcodebuild-test.log'),
+          // The full matrix has its own runtime budget, separate from cold builds.
+          timeoutMs: selectedProfile.runtimeTimeoutMs,
+          signal: abort.signal,
+          echo: false,
+        },
+      ),
     );
     const summary = JSON.parse(
       await command([
@@ -445,7 +475,7 @@ export async function runNativeHarness({
       ['tests', 'tests.json'],
     ]) {
       try {
-        const result = await runCommand(
+        const result = await run(
           'xcrun',
           [
             'xcresulttool',
@@ -459,6 +489,12 @@ export async function runNativeHarness({
           { timeoutMs: 30000, echo: false },
         );
         await writeFile(join(output, filename), result);
+        if (kind === 'summary') {
+          for (const failure of JSON.parse(result).testFailures ?? [])
+            console.error(
+              `${failure.testIdentifierString}: ${failure.failureText}`,
+            );
+        }
       } catch {
         /* An interrupted build may not have produced a result bundle. */
       }
@@ -469,7 +505,7 @@ export async function runNativeHarness({
     if (ownedSimulator) {
       // Never shut down or delete a simulator supplied by the caller.
       for (const action of ['shutdown', 'delete']) {
-        await runCommand('xcrun', ['simctl', action, simulator], {
+        await run('xcrun', ['simctl', action, simulator], {
           timeoutMs: 30000,
           echo: false,
         }).catch((error) => {

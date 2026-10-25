@@ -54,5 +54,11 @@ swiftc -D STREAMS_ENABLED "$wire_path" "$support_path" "$proof_dir/main.swift" -
 # Also compile the actual pre-streams generated DTOs, rather than a hand-written
 # approximation. CI fetches main before this check. A caller may supply a ref.
 git show "${1:-origin/main}:$wire_path" > "$proof_dir/previous.swift"
+if cmp -s "$wire_path" "$proof_dir/previous.swift"; then
+  # The current proof includes every baseline assertion plus stream decoding.
+  # Most app-only changes leave these DTOs identical, including pushes to main.
+  echo "Baseline Swift DTOs are identical; decoding was already verified"
+  exit 0
+fi
 swiftc "$proof_dir/previous.swift" "$support_path" "$proof_dir/main.swift" -o "$proof_dir/previous"
 "$proof_dir/previous" "$proof_dir"
