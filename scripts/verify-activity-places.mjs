@@ -63,6 +63,7 @@ import {ElevationChart} from '~/components/list/elevation-chart';import {Matched
 import {Selection} from '~/components/map/selection-control';import {useShallowStore} from '~/store';
 import {encodeStreamSummary} from '~/lib/streams/compact-summary';import {streamSummaryQueryKey} from '~/lib/activity-stream-summary';
 import {activityPlacesQueryRoot} from '~/lib/activity-places';
+import {placeSymbolImage} from '~/lib/place-symbols';window.fixturePlaceImage=placeSymbolImage;
 import {applyV1SyncPage,getV1SyncState} from '~/lib/sync/v1-store';
 import {getLibraryOwner} from '~/lib/sync/library-owner';
 import fixtureDTOs from './shared/sync-integrity-fixtures.v1.json';
@@ -208,7 +209,7 @@ try {
                   longitude: 8.0015,
                   latitude: 47.0015,
                   elevationM: 440,
-                  visits: [{ distanceM: 150 }],
+                  visits: [{ distanceM: 150 }, { distanceM: 220 }],
                 },
               ]
             : [],
@@ -222,7 +223,7 @@ try {
       window.fixtureMap.getSource('matched-places')?._data?.features.length ===
         3,
   );
-  assert.equal(await page.getByTestId('elevation-place-marker').count(), 4);
+  assert.equal(await page.getByTestId('elevation-place-marker').count(), 5);
   assert.equal(
     requests.filter((request) => request.id === '1').length,
     1,
@@ -251,6 +252,22 @@ try {
     0,
     'Place buttons are separate from the chart slider',
   );
+  const endpoint = page.getByRole('button', {
+    name: 'Highlight Alpine test hut at 200 m',
+    exact: true,
+  });
+  await endpoint.waitFor();
+  const endpointCircle = await endpoint.locator('span').boundingBox();
+  const profileBounds = await page
+    .getByRole('region', { name: 'Elevation profile', exact: true })
+    .boundingBox();
+  assert(
+    endpointCircle.x >= profileBounds.x &&
+      endpointCircle.x + endpointCircle.width <=
+        profileBounds.x + profileBounds.width,
+    'Endpoint circle stays fully visible',
+  );
+  assert.equal(await page.getByTestId('elevation-place-guide').count(), 5);
   const beforeReopen = requests.length;
   await page.evaluate(() =>
     window.fixtureState.setState({ showProfile: false }),
@@ -320,6 +337,46 @@ try {
     .click();
   await page.mouse.move(650, 600);
   await page.screenshot({ path: join(output, 'desktop.png') });
+  const selectedCircle = page
+    .getByRole('button', {
+      name: 'Highlight Alpine test peak at 100 m',
+      exact: true,
+    })
+    .locator('span');
+  assert.equal(
+    await selectedCircle.evaluate(
+      (node) => getComputedStyle(node).backgroundColor,
+    ),
+    await page
+      .locator(
+        '[data-testid="elevation-plot-area"] path[stroke="var(--activity-accent)"]',
+      )
+      .evaluate((node) => getComputedStyle(node).stroke),
+    'Selected place matches the profile colour',
+  );
+  const spriteColour = await page.evaluate(() => {
+    const sprite = window.fixturePlaceImage('peak', true);
+    const offset = (16 * sprite.width + 32) * 4;
+    return 'rgb(' + [...sprite.data.slice(offset, offset + 3)].join(', ') + ')';
+  });
+  assert.equal(
+    spriteColour,
+    await selectedCircle.evaluate(
+      (node) => getComputedStyle(node).backgroundColor,
+    ),
+    'Map selection matches the profile colour',
+  );
+  const card = await page
+    .locator('.matched-place-popup [data-map-place]')
+    .boundingBox();
+  assert(
+    card.width <= 220 && card.height <= 60,
+    'Map place callout remains compact',
+  );
+  await page.evaluate(() => document.activeElement?.blur());
+  await page
+    .getByRole('region', { name: 'Elevation profile', exact: true })
+    .screenshot({ path: join(output, 'elevation-light.png') });
   await page.evaluate(() => document.documentElement.classList.add('dark'));
   await page.setViewportSize({ width: 390, height: 720 });
   await page.waitForFunction(
@@ -341,7 +398,84 @@ try {
       .evaluate((element) => getComputedStyle(element).color),
     'rgb(163, 163, 163)',
   );
+  const darkSpriteColour = await page.evaluate(() => {
+    const sprite = window.fixturePlaceImage('peak', true);
+    const offset = (16 * sprite.width + 32) * 4;
+    return 'rgb(' + [...sprite.data.slice(offset, offset + 3)].join(', ') + ')';
+  });
+  assert.equal(
+    darkSpriteColour,
+    await selectedCircle.evaluate(
+      (node) => getComputedStyle(node).backgroundColor,
+    ),
+    'Map selection matches the profile in dark mode',
+  );
   await page.screenshot({ path: join(output, 'mobile-dark.png') });
+  await page
+    .getByRole('region', { name: 'Elevation profile', exact: true })
+    .screenshot({ path: join(output, 'elevation-dark.png') });
+  await page.getByTestId('elevation-place-readout').waitFor();
+  assert.equal(
+    await page
+      .getByRole('button', { name: 'Clear highlighted place', exact: true })
+      .count(),
+    0,
+    'Place readout has no close button',
+  );
+  const readoutColour = await page
+    .getByTestId('elevation-place-readout')
+    .evaluate((node) => getComputedStyle(node).color);
+  assert.equal(
+    readoutColour,
+    await page
+      .getByRole('button', {
+        name: 'Highlight Alpine test peak at 100 m',
+        exact: true,
+      })
+      .locator('span')
+      .evaluate((node) => getComputedStyle(node).backgroundColor),
+    'Readout matches selected marker blue',
+  );
+  const surface = await page.getByRole('slider').boundingBox();
+  const scrubY = surface.y + surface.height - 8;
+  const scrubX = surface.x + surface.width * 0.4;
+  await page.mouse.move(scrubX, scrubY);
+  await page.mouse.down();
+  await page.mouse.move(surface.x + surface.width * 0.7, scrubY, { steps: 8 });
+  await page.mouse.move(scrubX, scrubY, { steps: 8 });
+  await page.mouse.up();
+  assert.equal(
+    await page.locator('.mapboxgl-popup').count(),
+    1,
+    'Scrubbing out and back does not dismiss the place',
+  );
+  await page
+    .getByRole('slider')
+    .click({ position: { x: 100, y: surface.height - 8 } });
+  assert.equal(
+    await page.locator('.mapboxgl-popup').count(),
+    0,
+    'A chart tap dismisses the place and its map card',
+  );
+  await page
+    .getByRole('button', {
+      name: 'Highlight Alpine test peak at 100 m',
+      exact: true,
+    })
+    .click();
+  await page.keyboard.press('Escape');
+  assert.equal(
+    await page.locator('.mapboxgl-popup').count(),
+    0,
+    'Escape dismisses a place',
+  );
+  await page
+    .getByRole('button', {
+      name: 'Highlight Alpine test peak at 100 m',
+      exact: true,
+    })
+    .click();
+
   assert(
     await page
       .locator('body')
@@ -427,7 +561,7 @@ try {
   await page.waitForFunction(
     () =>
       document.querySelectorAll('[data-testid="elevation-place-marker"]')
-        .length === 4,
+        .length === 5,
   );
   const beforeVersionChange = requests.length;
   matchingVersion = 'b'.repeat(64);
@@ -491,7 +625,7 @@ try {
     profileHeight,
     'Loading preserves chart/card height',
   );
-  assert.equal(profileHeight, 165);
+  assert.equal(profileHeight, 177);
   await page.screenshot({ path: join(output, 'loading.png') });
   holdResponse = false;
   releaseResponse();

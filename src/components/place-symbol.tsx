@@ -14,7 +14,14 @@ export function PlaceSymbol({
       aria-hidden="true"
       {...props}
     >
-      <path d={glyph.path} />
+      <path
+        d={glyph.path}
+        fill={glyph.strokeWidth ? 'none' : 'currentColor'}
+        stroke={glyph.strokeWidth ? 'currentColor' : undefined}
+        strokeWidth={glyph.strokeWidth || undefined}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

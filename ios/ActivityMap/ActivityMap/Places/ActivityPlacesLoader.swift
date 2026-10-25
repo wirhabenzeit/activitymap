@@ -21,6 +21,7 @@ private actor PlacesWorker {
     @ObservationIgnored private var priority: String?
     @ObservationIgnored private var queue: [String] = []
     @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var cacheTasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var sourceRetries: Set<String> = []
     @ObservationIgnored private var retryAt: [String: Date] = [:]
     @ObservationIgnored private var observer: Task<Void, Never>?
@@ -34,10 +35,11 @@ private actor PlacesWorker {
     }, invalidate: @escaping (String) -> Void = { _ in }) {
         self.now = now; self.source = source; self.invalidate = invalidate
     }
-    deinit { observer?.cancel(); for task in tasks.values { task.cancel() } }
+    deinit { observer?.cancel(); for task in tasks.values { task.cancel() }; for task in cacheTasks.values { task.cancel() } }
     func reset() {
         epoch += 1; sessionRevision += 1
         tasks.values.forEach { $0.cancel() }; tasks.removeAll()
+        cacheTasks.values.forEach { $0.cancel() }; cacheTasks.removeAll()
         observer?.cancel(); observer = nil;
         demands.removeAll(); queue.removeAll(); loading.removeAll(); failures.removeAll()
         results.removeAll(); retryAt.removeAll(); sourceRetries.removeAll(); focus = nil; session = nil; worker = nil
@@ -76,7 +78,8 @@ private actor PlacesWorker {
                 for id in ids {
                     self.results[id] = nil; self.failures[id] = nil; self.retryAt[id] = nil
                     // Cancelled tasks still occupy a queue slot until they retire.
-                    self.tasks[id]?.cancel()
+                    self.tasks[id]?.cancel(); self.cacheTasks[id]?.cancel()
+                    self.queue.removeAll { $0 == id }
                 }
                 if self.focus.map({ ids.contains($0.activityID) }) == true { self.focus = nil }
                 self.enqueueDemand()
@@ -100,20 +103,70 @@ private actor PlacesWorker {
         let wanted = demanded
         queue.removeAll { !wanted.contains($0) }
         for (id, task) in tasks where !wanted.contains(id) { task.cancel() }
+        for (id, task) in cacheTasks where !wanted.contains(id) { task.cancel() }
     }
     private var demanded: Set<String> { demands.values.reduce(into: Set<String>()) { $0.formUnion($1) } }
     private func enqueueDemand() {
         guard usable else { return }
-        for id in demanded.sorted() where tasks[id] == nil && !queue.contains(id) {
+        var ids = demanded.sorted()
+        if let priority, let index = ids.firstIndex(of: priority) { ids.remove(at: index); ids.insert(priority, at: 0) }
+        for id in ids where tasks[id] == nil && cacheTasks[id] == nil && !queue.contains(id) {
             if results[id]?.status == .complete && (!(session?.verified ?? false) || validatedAt[id].map { now().timeIntervalSince($0) < 86400 } == true) { continue }
             if let retry = retryAt[id], retry > .now { continue }
-            queue.append(id)
+            readCache(id)
         }
-        if let priority, let index = queue.firstIndex(of: priority) { queue.remove(at: index); queue.insert(priority, at: 0) }
         pump()
+    }
+    /// Disk reads must not share the two network slots: one slow route must
+    /// never hold back saved places belonging to the other chooser results.
+    private func readCache(_ id: String) {
+        guard let session, let storage else { return }
+        let current = epoch
+        loading.insert(id)
+        cacheTasks[id] = Task { [weak self] in
+            guard let self else { return }
+            defer {
+                if current == self.epoch {
+                    self.cacheTasks[id] = nil
+                    if self.tasks[id] == nil { self.loading.remove(id) }
+                    self.enqueueDemand()
+                }
+            }
+            do {
+                let cached = try await storage.cachedActivityPlaces(activityID: id, scope: session.scope)
+                try Task.checkCancellation()
+                if let cached {
+                    guard current == self.epoch else { return }
+                    self.results[id] = cached.dto; self.validatedAt[id] = cached.storedAt
+                    if cached.synchronized && cached.dto.status != .pending {
+                        if cached.dto.status != .complete { self.retryAt[id] = .distantFuture }
+                        return
+                    }
+                    if cached.dto.status == .complete {
+                        if !session.verified || self.now().timeIntervalSince(cached.storedAt) < 86400 { return }
+                    } else if cached.dto.status != .pending && cached.storedAt.addingTimeInterval(900) > .now {
+                        self.retryAt[id] = cached.storedAt.addingTimeInterval(900); return
+                    }
+                }
+                guard session.verified else {
+                    self.failures[id] = "Places not saved offline. Connect to load them."
+                    self.retryAt[id] = .now.addingTimeInterval(60); return
+                }
+                guard current == self.epoch, self.usable, self.demanded.contains(id) else { return }
+                self.queue.append(id)
+                self.pump()
+            } catch is CancellationError {
+                // Selection and source changes cancel local reads too.
+            } catch {
+                guard current == self.epoch, !Task.isCancelled else { return }
+                self.failures[id] = "Couldn’t load places."
+                self.retryAt[id] = .now.addingTimeInterval(60)
+            }
+        }
     }
     private func pump() {
         guard usable, let session, let storage, let worker else { return }
+        if let priority, let index = queue.firstIndex(of: priority) { queue.remove(at: index); queue.insert(priority, at: 0) }
         while tasks.count < 2, !queue.isEmpty {
             let id = queue.removeFirst(); let current = epoch
             guard demanded.contains(id) else { continue }
@@ -128,25 +181,6 @@ private actor PlacesWorker {
                     }
                 }
                 do {
-                    let cached = try await storage.cachedActivityPlaces(activityID: id, scope: session.scope)
-                    try Task.checkCancellation()
-                    if let cached {
-                        guard current == self.epoch else { return }
-                        self.results[id] = cached.dto; self.validatedAt[id] = cached.storedAt
-                        if cached.synchronized && cached.dto.status != .pending {
-                            if cached.dto.status != .complete { self.retryAt[id] = .distantFuture }
-                            return
-                        }
-                        if cached.dto.status == .complete {
-                            if !session.verified || self.now().timeIntervalSince(cached.storedAt) < 86400 { return }
-                        } else if cached.dto.status != .pending && cached.storedAt.addingTimeInterval(900) > .now {
-                            self.retryAt[id] = cached.storedAt.addingTimeInterval(900); return
-                        }
-                    }
-                    guard session.verified else {
-                        self.failures[id] = "Places not saved offline. Connect to load them."
-                        self.retryAt[id] = .now.addingTimeInterval(60); return
-                    }
                     let fence = await storage.streamFence()
                     let dto = try await worker.places(id)
                     try Task.checkCancellation()
@@ -170,6 +204,7 @@ private actor PlacesWorker {
                     if let identity = PlaceMatchingIdentity(dto) {
                         for (otherID, result) in self.results {
                             if let other = PlaceMatchingIdentity(result), other != identity {
+                                self.cacheTasks[otherID]?.cancel()
                                 self.results[otherID] = nil; self.validatedAt[otherID] = nil; self.retryAt[otherID] = nil
                                 if self.focus?.activityID == otherID { self.focus = nil }
                             }

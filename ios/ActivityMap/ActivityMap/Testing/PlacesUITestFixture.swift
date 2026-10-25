@@ -12,6 +12,7 @@ struct PlacesUITestFixture: View {
     @State private var dark = false
     @State private var scopeStep = 0
     @State private var storage: LocalStore?
+    private let chooserTest = ProcessInfo.processInfo.arguments.contains("--places-chooser-ui-testing")
     private let places = ActivityPlacesLoader(source: { _ in PlacesFixtureOfflineSource() })
     private let summaries = StreamSummaryLoader(source: { _ in PlacesFixtureOfflineSource() })
     var body: some View {
@@ -30,6 +31,7 @@ struct PlacesUITestFixture: View {
                 }.font(.caption).accessibilityIdentifier("places-route-scope")
             }.buttonStyle(.bordered)
             Text("Selected routes: \(store.selectedActivityIDs.count)").accessibilityIdentifier("places-selection-count")
+                .accessibilityValue("Active route: \(store.activeActivityID.map(String.init) ?? "none")")
             if ready {
                 MapScreen(store: store, picker: picker)
                     .environment(\.mapStyleOverride, MapStyle(json: dark
@@ -53,7 +55,14 @@ struct PlacesUITestFixture: View {
                     "start_date": "2026-10-23T09:00:00Z", "start_date_local": "2026-10-23T11:00:00Z", "timezone": "Europe/Zurich",
                     "geometry_state": "summary", "photos_state": "current", "distance": 1000]
                 let dto = try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.Activity.self, from: JSONSerialization.data(withJSONObject: fields))
-                try await storage.apply([.upsertActivity(dto)], scope: session.scope)
+                var dtos = [dto]
+                if chooserTest {
+                    var secondFields = fields
+                    secondFields["id"] = "2"; secondFields["name"] = "Second alpine loop"
+                    dtos.append(try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.Activity.self,
+                        from: JSONSerialization.data(withJSONObject: secondFields)))
+                }
+                try await storage.apply(dtos.map { .upsertActivity($0) }, scope: session.scope)
                 let metadata = ActivityMapAPI.StreamMetadata(generation: "g", revision: "1", state: .current,
                     fetchStatus: .succeeded, availableTypes: [.distance, .latlng, .altitude], fetchedAt: .now, expiresAt: nil)
                 let summary = ActivityMapAPI.StreamSummary(version: 1, basis: .distance, time: nil,
@@ -64,7 +73,7 @@ struct PlacesUITestFixture: View {
                 let fence = await storage.streamFence()
                 _ = try await storage.saveStreamSummary(compact, scope: session.scope, fence: fence)
                 let hut = ActivityMapAPI.MatchedPlace(id: "hut", name: "Alpine hut", kinds: [.hut], longitude: 8.001, latitude: 47.001,
-                    elevationM: 500, visits: [.init(distanceM: 350), .init(distanceM: 850)])
+                    elevationM: 500, visits: [.init(distanceM: 350), .init(distanceM: 850), .init(distanceM: 1105)])
                 let peak = ActivityMapAPI.MatchedPlace(id: "peak", name: "Test summit", kinds: [.peak], longitude: 8.002, latitude: 47.002,
                     elevationM: 600, visits: [.init(distanceM: 600)])
                 let pass = ActivityMapAPI.MatchedPlace(id: "pass", name: "Test pass", kinds: [.pass], longitude: 8.0035, latitude: 47.0025,
@@ -73,6 +82,17 @@ struct PlacesUITestFixture: View {
                     streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic", matchingVersion: nil, resultRevision: nil,
                     places: [hut, peak, pass])
                 _ = try await storage.saveActivityPlaces(result, scope: session.scope, fence: fence, now: .now)
+                if chooserTest {
+                    let secondSummary = ActivityMapAPI.ActivityCompactStreamSummary(activityID: "2", metadata: metadata,
+                        summary: try CompactStreamCodec.encode(summary), lastError: nil, nextRetryAt: nil)
+                    _ = try await storage.saveStreamSummary(secondSummary, scope: session.scope, fence: fence)
+                    let secondHut = ActivityMapAPI.MatchedPlace(id: "second-hut", name: "Second route hut", kinds: [.hut],
+                        longitude: 8.003, latitude: 47.003, elevationM: 500, visits: [.init(distanceM: 850)])
+                    let secondResult = ActivityMapAPI.ActivityPlaces(userID: session.scope.userID, activityID: "2", status: .complete,
+                        streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic",
+                        matchingVersion: nil, resultRevision: nil, places: [peak, secondHut])
+                    _ = try await storage.saveActivityPlaces(secondResult, scope: session.scope, fence: fence, now: .now)
+                }
                 await places.configure(session, storage: storage)
                 await summaries.configure(session, storage: storage)
                 var activity = Activity(id: 1, name: "Alpine loop", sportType: .hike, startDate: .now, startDateLocal: .now,
@@ -80,9 +100,18 @@ struct PlacesUITestFixture: View {
                     totalElevationGain: 200, averageSpeed: 1, commute: false,
                     coordinates: [.init(latitude: 47, longitude: 8), .init(latitude: 47.004, longitude: 8.004)])
                 activity.streams = metadata
-                store.activities = [activity]; store.selectedTab = .map; store.replaceSelection(with: [1])
+                var activities = [activity]
+                if chooserTest {
+                    var second = Activity(id: 2, name: "Second alpine loop", sportType: .hike, startDate: .now, startDateLocal: .now,
+                        timezone: "Europe/Zurich", distance: 1000, movingTime: 900, elapsedTime: 1000,
+                        totalElevationGain: 200, averageSpeed: 1, commute: false, coordinates: activity.coordinates)
+                    second.streams = metadata
+                    activities.append(second)
+                }
+                store.activities = activities; store.selectedTab = .map
+                store.replaceSelection(with: chooserTest ? [] : [1])
                 store.activityPlaces = places; store.streamSummaries = summaries
-                picker.detailID = 1; picker.isPresented = true; picker.detent = .medium
+                picker.detailID = chooserTest ? nil : 1; picker.isPresented = !chooserTest; picker.detent = .medium
                 store.mapContext.record(CameraState(center: .init(latitude: 47.002, longitude: 8.002), padding: UIEdgeInsets(top: 0, left: 0, bottom: 400, right: 0), zoom: 15, bearing: 0, pitch: 0))
                 ready = true
             } catch { self.error = String(describing: error) }
