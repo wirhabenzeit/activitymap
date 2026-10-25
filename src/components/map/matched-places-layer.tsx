@@ -1,14 +1,21 @@
 'use client';
 
 import type { FeatureCollection, Point } from 'geojson';
-import { Loader2, X } from 'lucide-react';
-import { memo, useEffect, useMemo, useRef } from 'react';
-import { Layer, Popup, Source, useMap } from 'react-map-gl/mapbox';
+import { Loader2, MapPin, X } from 'lucide-react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Layer, Marker, Popup, Source, useMap } from 'react-map-gl/mapbox';
 
+import { PlaceSymbol } from '~/components/place-symbol';
 import { useSelectedActivityPlaces } from '~/hooks/use-activity-places';
 import { useDisplayUnits } from '~/hooks/use-display-preferences';
 import type { Activity } from '~/lib/activity';
 import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
+import {
+  groupMapPlaces,
+  mapPlaceClusterKind,
+  mapPlacePolicy,
+} from '~/lib/map-places';
+import type { MapPointGroup } from '~/lib/map-point-groups';
 import {
   type PlaceKind,
   placeSymbolId,
@@ -18,20 +25,46 @@ import {
 import { measurementScale, measurementUnit } from '~/lib/units';
 import { useActivityPlaceFocus } from '~/store/activity-place-focus';
 
+import { MapMarkerPin } from './map-marker-pin';
+
+const noActivityIds: number[] = [];
+
 export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
   activities,
   selectedIds,
+  visibleIds = noActivityIds,
+  showAllPlaces = false,
+  inspectedActivityId,
+  onPickActivities,
   highlighted,
 }: {
   activities: ReadonlyMap<number, Activity>;
   selectedIds: number[];
+  visibleIds?: number[];
+  showAllPlaces?: boolean;
+  inspectedActivityId?: number;
+  onPickActivities?: (ids: number[]) => void;
   highlighted: number;
 }) {
-  const query = useSelectedActivityPlaces(activities, selectedIds);
+  const query = useSelectedActivityPlaces(
+    activities,
+    selectedIds,
+    showAllPlaces ? visibleIds : noActivityIds,
+  );
   const { focus, setFocus } = useActivityPlaceFocus();
   const { current: map } = useMap();
   const handledFocus = useRef(0);
   const units = useDisplayUnits();
+  const [layout, setLayout] = useState<{
+    userId?: string;
+    groups: MapPointGroup[];
+  }>({ groups: [] });
+  const groups = layout.userId === query.userId ? layout.groups : [];
+  const [openGroupId, setOpenGroupId] = useState<string | null>(null);
+  const byId = useMemo(
+    () => new Map(query.places.map((place) => [place.id, place])),
+    [query.places],
+  );
   const selected =
     focus && focus.userId === query.userId
       ? query.places.find(
@@ -40,10 +73,98 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
             place.activityIds.includes(focus.activityId),
         )
       : undefined;
+  useEffect(() => {
+    if (!map || !showAllPlaces) return;
+    const raw = map.getMap();
+    const refresh = () => {
+      const { clientWidth: width, clientHeight: height } = raw.getContainer();
+      const center = raw.getCenter().lng;
+      const points = query.places.map((place) => {
+        const longitude =
+          place.longitude + 360 * Math.round((center - place.longitude) / 360);
+        const point = raw.project([longitude, place.latitude]);
+        return { id: place.id, x: point.x, y: point.y };
+      });
+      const next = {
+        userId: query.userId,
+        groups: groupMapPlaces(points, { width, height }, selected?.id),
+      };
+      setLayout((old) =>
+        JSON.stringify(old) === JSON.stringify(next) ? old : next,
+      );
+    };
+    refresh();
+    raw.on('load', refresh);
+    raw.on('style.load', refresh);
+    raw.on('moveend', refresh);
+    raw.on('resize', refresh);
+    return () => {
+      raw.off('load', refresh);
+      raw.off('style.load', refresh);
+      raw.off('moveend', refresh);
+      raw.off('resize', refresh);
+    };
+  }, [map, showAllPlaces, query.places, query.userId, selected?.id]);
+  const displayedPlaces = showAllPlaces
+    ? groups
+        .filter((group) => group.pointIDs.length === 1)
+        .flatMap((group) => byId.get(group.id) ?? [])
+    : query.places;
+  const openGroup = showAllPlaces
+    ? groups.find(
+        (group) =>
+          `${query.userId}:${group.id}` === openGroupId &&
+          group.pointIDs.length > 1,
+      )
+    : undefined;
+  const groupAnchor = openGroup ? byId.get(openGroup.id) : undefined;
+  const focusedGroup = selected
+    ? groups.find((group) => group.id === selected.id)
+    : undefined;
+  const openPlace = useCallback(
+    (id: string) => {
+      const place = byId.get(id);
+      if (!place || !query.userId) return;
+      setOpenGroupId(null);
+      const inspectedVisit = place.activityIds.includes(
+        String(inspectedActivityId),
+      )
+        ? String(inspectedActivityId)
+        : undefined;
+      // Looking up a place along the open activity should not replace its
+      // detail with every other activity that happened to visit the same place.
+      if (showAllPlaces && !inspectedVisit)
+        onPickActivities?.(place.activityIds.map(Number));
+      if (useActivityPlaceFocus.getState().focus?.placeId === place.id) {
+        useActivityPlaceFocus.setState({ focus: null });
+        return;
+      }
+      setFocus({
+        userId: query.userId,
+        activityId:
+          inspectedVisit ??
+          (place.activityIds.includes(String(highlighted))
+            ? String(highlighted)
+            : place.activityIds[0]!),
+        placeId: place.id,
+        visitIndex: 0,
+        source: 'map',
+      });
+    },
+    [
+      byId,
+      query.userId,
+      highlighted,
+      setFocus,
+      showAllPlaces,
+      inspectedActivityId,
+      onPickActivities,
+    ],
+  );
   const data = useMemo<FeatureCollection<Point>>(
     () => ({
       type: 'FeatureCollection',
-      features: query.places.map((place) => ({
+      features: displayedPlaces.map((place) => ({
         type: 'Feature',
         geometry: {
           type: 'Point',
@@ -60,7 +181,7 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
         },
       })),
     }),
-    [query.places, selected?.id],
+    [displayedPlaces, selected?.id],
   );
   useEffect(() => {
     if (!map) return;
@@ -123,28 +244,13 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
     const click = (event: mapboxgl.MapLayerMouseEvent) => {
       if (event.originalEvent.shiftKey) return;
       const id: unknown = event.features?.[0]?.properties?.id;
-      const place = query.places.find((place) => place.id === id);
-      if (!place) return;
-      const activityId = place.activityIds.includes(String(highlighted))
-        ? String(highlighted)
-        : place.activityIds[0]!;
-      if (useActivityPlaceFocus.getState().focus?.placeId === place.id) {
-        useActivityPlaceFocus.setState({ focus: null });
-        return;
-      }
-      setFocus({
-        userId: query.userId!,
-        activityId,
-        placeId: place.id,
-        visitIndex: 0,
-        source: 'map',
-      });
+      if (typeof id === 'string') openPlace(id);
     };
     map.on('click', MATCHED_PLACES_HIT_LAYER, click);
     return () => {
       map.off('click', MATCHED_PLACES_HIT_LAYER, click);
     };
-  }, [map, query.places, query.userId, highlighted, setFocus]);
+  }, [map, query.userId, openPlace]);
   useEffect(() => {
     if (!focus || !selected || !map || handledFocus.current === focus.sequence)
       return;
@@ -157,15 +263,17 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
       });
   }, [focus, selected, map]);
   useEffect(() => {
-    if (!selected) return;
+    if (!selected && !openGroup) return;
     const dismiss = (event: KeyboardEvent) => {
-      if (event.key === 'Escape')
+      if (event.key === 'Escape') {
         useActivityPlaceFocus.setState({ focus: null });
+        setOpenGroupId(null);
+      }
     };
     document.addEventListener('keydown', dismiss);
     return () => document.removeEventListener('keydown', dismiss);
-  }, [selected]);
-  if (!query.userId || !selectedIds.length) return null;
+  }, [selected, openGroup]);
+  if (!query.userId || (!selectedIds.length && !showAllPlaces)) return null;
   return (
     <>
       {(query.isLoading || query.isError) && (
@@ -226,7 +334,7 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
         <Layer
           id="matched-places-labels"
           type="symbol"
-          minzoom={10}
+          minzoom={showAllPlaces ? mapPlacePolicy.labelZoom : 10}
           layout={{
             'text-field': ['get', 'name'],
             'text-size': 12,
@@ -253,6 +361,114 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
           paint={{ 'icon-opacity': 0, 'icon-occlusion-opacity': 1 }}
         />
       </Source>
+      {showAllPlaces &&
+        groups
+          .filter((group) => group.pointIDs.length > 1)
+          .map((group) => {
+            const anchor = byId.get(group.id);
+            if (!anchor) return null;
+            const kind = mapPlaceClusterKind(
+              group.pointIDs.flatMap((id) => byId.get(id) ?? []),
+            );
+            return (
+              <Marker
+                key={group.id}
+                longitude={anchor.longitude}
+                latitude={anchor.latitude}
+                anchor="center"
+                offset={
+                  focusedGroup &&
+                  Math.hypot(
+                    group.x - focusedGroup.x,
+                    group.y - focusedGroup.y,
+                  ) < mapPlacePolicy.pinSpacing
+                    ? [40, 24]
+                    : undefined
+                }
+                onClick={(event) => event.originalEvent.stopPropagation()}
+              >
+                <button
+                  type="button"
+                  data-map-place
+                  data-place-cluster={group.id}
+                  aria-label={`Explore ${group.pointIDs.length} visited places`}
+                  className="flex size-11 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onDoubleClick={(event) => event.stopPropagation()}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (!map) return;
+                    if (map.getZoom() >= 18) {
+                      setOpenGroupId(`${query.userId}:${group.id}`);
+                      return;
+                    }
+                    setOpenGroupId(null);
+                    map.easeTo({
+                      center: [anchor.longitude, anchor.latitude],
+                      zoom: Math.min(18, map.getZoom() + 2),
+                      duration: 450,
+                    });
+                  }}
+                >
+                  <MapMarkerPin
+                    count={group.pointIDs.length}
+                    data-place-cluster-kind={kind}
+                  >
+                    {kind === 'mixed' ? (
+                      <MapPin size={14} aria-hidden="true" />
+                    ) : (
+                      <PlaceSymbol kind={kind} className="size-[22px]" />
+                    )}
+                  </MapMarkerPin>
+                </button>
+              </Marker>
+            );
+          })}
+      {openGroup && groupAnchor && (
+        <Popup
+          className="matched-place-popup"
+          longitude={groupAnchor.longitude}
+          latitude={groupAnchor.latitude}
+          closeButton={false}
+          closeOnClick={false}
+          offset={18}
+          maxWidth="260px"
+          onClose={() => setOpenGroupId(null)}
+        >
+          <div data-map-place className="w-56 p-2 text-popover-foreground">
+            <div className="flex items-center justify-between pl-2 text-xs font-semibold">
+              {openGroup.pointIDs.length} visited places
+              <button
+                type="button"
+                aria-label="Close places"
+                className="flex size-11 items-center justify-center"
+                onClick={() => setOpenGroupId(null)}
+              >
+                <X className="size-3" />
+              </button>
+            </div>
+            <div className="max-h-56 overflow-y-auto">
+              {openGroup.pointIDs.map((id) => {
+                const place = byId.get(id);
+                return place ? (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => openPlace(id)}
+                    className="flex min-h-11 w-full items-center gap-2 rounded-md px-2 text-left text-xs hover:bg-muted focus-visible:outline focus-visible:outline-ring"
+                  >
+                    <PlaceSymbol
+                      kind={primaryPlaceKind(place)}
+                      className="size-4 shrink-0"
+                    />
+                    {place.name}
+                  </button>
+                ) : null;
+              })}
+            </div>
+          </div>
+        </Popup>
+      )}
       {selected && (
         <Popup
           className="matched-place-popup"
@@ -286,7 +502,10 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
                 {selected.activityIds.length > 1 && (
                   <>
                     {selected.elevationM !== null ? ' · ' : ''}
-                    <span>{selected.activityIds.length} selected routes</span>
+                    <span>
+                      {selected.activityIds.length}{' '}
+                      {showAllPlaces ? 'activities' : 'selected routes'}
+                    </span>
                   </>
                 )}
               </div>

@@ -15,6 +15,10 @@ const PlaceDebugLayer = dynamic(
 export function ActivityPlacesLayers(props: {
   activities: ReadonlyMap<number, Activity>;
   selectedIds: number[];
+  visibleIds?: number[];
+  showAllPlaces?: boolean;
+  inspectedActivityId?: number;
+  onPickActivities?: (ids: number[]) => void;
   highlighted: number;
 }) {
   const access = usePlaceDebugAccess(false);

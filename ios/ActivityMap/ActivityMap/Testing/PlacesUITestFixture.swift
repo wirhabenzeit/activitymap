@@ -12,7 +12,9 @@ struct PlacesUITestFixture: View {
     @State private var dark = false
     @State private var scopeStep = 0
     @State private var storage: LocalStore?
-    private let chooserTest = ProcessInfo.processInfo.arguments.contains("--places-chooser-ui-testing")
+    private let overviewTest = ProcessInfo.processInfo.arguments.contains("--places-overview-ui-testing")
+    private let markerStyleTest = ProcessInfo.processInfo.arguments.contains("--places-marker-style-ui-testing")
+    private var chooserTest: Bool { overviewTest || ProcessInfo.processInfo.arguments.contains("--places-chooser-ui-testing") }
     private let places = ActivityPlacesLoader(source: { _ in PlacesFixtureOfflineSource() })
     private let summaries = StreamSummaryLoader(source: { _ in PlacesFixtureOfflineSource() })
     var body: some View {
@@ -32,6 +34,15 @@ struct PlacesUITestFixture: View {
             }.buttonStyle(.bordered)
             Text("Selected routes: \(store.selectedActivityIDs.count)").accessibilityIdentifier("places-selection-count")
                 .accessibilityValue("Active route: \(store.activeActivityID.map(String.init) ?? "none")")
+            if overviewTest {
+                HStack {
+                    Button("Inspect first") { store.replaceSelection(with: [1]); picker.showDetail(1, store: store) }
+                        .accessibilityIdentifier("places-inspect-first")
+                    Button("Hide second route") { store.activeSportTypes.remove(.ride) }
+                        .accessibilityIdentifier("places-hide-second")
+                    Text("Detail: \(picker.detailID.map(String.init) ?? "none")").accessibilityIdentifier("places-detail-state")
+                }.font(.caption).buttonStyle(.bordered)
+            }
             if ready {
                 MapScreen(store: store, picker: picker)
                     .environment(\.mapStyleOverride, MapStyle(json: dark
@@ -72,11 +83,11 @@ struct PlacesUITestFixture: View {
                     summary: try CompactStreamCodec.encode(summary), lastError: nil, nextRetryAt: nil)
                 let fence = await storage.streamFence()
                 _ = try await storage.saveStreamSummary(compact, scope: session.scope, fence: fence)
-                let hut = ActivityMapAPI.MatchedPlace(id: "hut", name: "Alpine hut", kinds: [.hut], longitude: 8.001, latitude: 47.001,
+                let hut = ActivityMapAPI.MatchedPlace(id: "hut", name: "Alpine hut", kinds: [.hut], longitude: overviewTest ? 8.002 : 8.001, latitude: overviewTest ? 47.002 : 47.001,
                     elevationM: 500, visits: [.init(distanceM: 350), .init(distanceM: 850), .init(distanceM: 1105)])
                 let peak = ActivityMapAPI.MatchedPlace(id: "peak", name: "Test summit", kinds: [.peak], longitude: 8.002, latitude: 47.002,
                     elevationM: 600, visits: [.init(distanceM: 600)])
-                let pass = ActivityMapAPI.MatchedPlace(id: "pass", name: "Test pass", kinds: [.pass], longitude: 8.0035, latitude: 47.0025,
+                let pass = ActivityMapAPI.MatchedPlace(id: "pass", name: "Test pass", kinds: [.pass], longitude: overviewTest ? 8.002 : 8.0035, latitude: overviewTest ? 47.002 : 47.0025,
                     elevationM: 550, visits: [.init(distanceM: 725)])
                 let result = ActivityMapAPI.ActivityPlaces(userID: session.scope.userID, activityID: "1", status: .complete,
                     streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic", matchingVersion: nil, resultRevision: nil,
@@ -87,7 +98,7 @@ struct PlacesUITestFixture: View {
                         summary: try CompactStreamCodec.encode(summary), lastError: nil, nextRetryAt: nil)
                     _ = try await storage.saveStreamSummary(secondSummary, scope: session.scope, fence: fence)
                     let secondHut = ActivityMapAPI.MatchedPlace(id: "second-hut", name: "Second route hut", kinds: [.hut],
-                        longitude: 8.003, latitude: 47.003, elevationM: 500, visits: [.init(distanceM: 850)])
+                        longitude: overviewTest ? 8.002 : 8.003, latitude: overviewTest ? 47.002 : 47.003, elevationM: 500, visits: [.init(distanceM: 850)])
                     let secondResult = ActivityMapAPI.ActivityPlaces(userID: session.scope.userID, activityID: "2", status: .complete,
                         streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic",
                         matchingVersion: nil, resultRevision: nil, places: [peak, secondHut])
@@ -102,7 +113,7 @@ struct PlacesUITestFixture: View {
                 activity.streams = metadata
                 var activities = [activity]
                 if chooserTest {
-                    var second = Activity(id: 2, name: "Second alpine loop", sportType: .hike, startDate: .now, startDateLocal: .now,
+                    var second = Activity(id: 2, name: "Second alpine loop", sportType: overviewTest ? .ride : .hike, startDate: .now, startDateLocal: .now,
                         timezone: "Europe/Zurich", distance: 1000, movingTime: 900, elapsedTime: 1000,
                         totalElevationGain: 200, averageSpeed: 1, commute: false, coordinates: activity.coordinates)
                     second.streams = metadata
@@ -111,8 +122,17 @@ struct PlacesUITestFixture: View {
                 store.activities = activities; store.selectedTab = .map
                 store.replaceSelection(with: chooserTest ? [] : [1])
                 store.activityPlaces = places; store.streamSummaries = summaries
+                if markerStyleTest {
+                    let location = CLLocationCoordinate2D(latitude: 47.002, longitude: 8.06)
+                    store.photos = ["marker-photo-a", "marker-photo-b"].map {
+                        Photo(id: $0, activityID: "1", caption: nil, urls: [:], location: location, createdAt: nil)
+                    }
+                    store.mapContext.showPhotos = true
+                }
                 picker.detailID = chooserTest ? nil : 1; picker.isPresented = !chooserTest; picker.detent = .medium
-                store.mapContext.record(CameraState(center: .init(latitude: 47.002, longitude: 8.002), padding: UIEdgeInsets(top: 0, left: 0, bottom: 400, right: 0), zoom: 15, bearing: 0, pitch: 0))
+                // Keep overview anchors in the real viewport in short landscape
+                // layouts too. The legacy profile fixture reserves its tall sheet.
+                store.mapContext.record(CameraState(center: .init(latitude: 47.002, longitude: 8.002), padding: UIEdgeInsets(top: 0, left: 0, bottom: overviewTest ? 200 : 400, right: 0), zoom: markerStyleTest ? 11 : overviewTest ? 12 : 15, bearing: 0, pitch: 0))
                 ready = true
             } catch { self.error = String(describing: error) }
         }

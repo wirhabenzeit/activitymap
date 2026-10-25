@@ -4,6 +4,8 @@ import SwiftUI
 struct MatchedPlacesLayer: MapContent {
     let places: [DisplayMatchedPlace]
     let loader: ActivityPlacesLoader
+    var overview = false
+    var onSelect: ((DisplayMatchedPlace) -> Void)?
     private var attributionSource: GeoJSONSource {
         var source = GeoJSONSource(id: "matched-places-attribution")
         source.data = .featureCollection(.init(features: []))
@@ -12,18 +14,30 @@ struct MatchedPlacesLayer: MapContent {
     }
     var body: some MapContent {
         attributionSource
+        if overview {
+            GeoJSONSource(id: "matched-places-labels").data(.featureCollection(.init(features: places.map { entry in
+                var feature = Feature(geometry: .point(Point(CLLocationCoordinate2D(latitude: entry.place.latitude, longitude: entry.place.longitude))))
+                feature.properties = ["name": .string(entry.place.name)]
+                return feature
+            })))
+            SymbolLayer(id: "matched-places-labels-layer", source: "matched-places-labels")
+                .minZoom(Double(MapPlaceLayout.labelZoom)).textField(Exp(.get) { "name" })
+                .textSize(12).textAnchor(.top).textOffset(x: 0, y: 1.4)
+                .textColor(UIColor.black).textHaloColor(UIColor.white).textHaloWidth(1.5)
+        }
         ForEvery(places) { entry in
             let coordinate = CLLocationCoordinate2D(latitude: entry.place.latitude, longitude: entry.place.longitude)
             MapViewAnnotation(coordinate: coordinate) {
                 Button {
-                    loader.focus = loader.focus?.placeID == entry.id ? nil
-                        : PlaceFocus(activityID: entry.activityIDs[0], placeID: entry.id)
+                    if let onSelect { onSelect(entry) }
+                    else { loader.focus = loader.focus?.placeID == entry.id ? nil
+                        : PlaceFocus(activityID: entry.activityIDs[0], placeID: entry.id) }
                 } label: {
-                    MatchedPlaceSymbol(place: entry.place, active: loader.focus?.placeID == entry.id)
+                    MatchedPlaceSymbol(place: entry.place, active: loader.focus?.placeID == entry.id, mapMarker: true)
                         .frame(width: 44, height: 44).contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("\(entry.place.name), \(entry.place.kindLabel), \(entry.activityIDs.count) selected routes")
+                .accessibilityLabel("\(entry.place.name), \(entry.place.kindLabel), \(entry.activityIDs.count) \(overview ? "activities" : "selected routes")")
                 .accessibilityAddTraits(loader.focus?.placeID == entry.id ? .isSelected : [])
                 .accessibilityIdentifier("matched-place-\(entry.id)")
             }
@@ -38,7 +52,7 @@ struct MatchedPlacesLayer: MapContent {
                 // The card has its own bottom anchor. Its changing size must
                 // never change the marker's fixed 44pt centered annotation.
                 MapViewAnnotation(coordinate: coordinate) {
-                    MatchedPlaceCard(place: entry.place, routeCount: entry.activityIDs.count) { loader.focus = nil }
+                    MatchedPlaceCard(place: entry.place, routeCount: entry.activityIDs.count, overview: overview) { loader.focus = nil }
                         .padding(.bottom, 16)
                 }
                 .variableAnchors([ViewAnnotationAnchorConfig(anchor: .bottom)])

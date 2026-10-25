@@ -234,12 +234,16 @@ final class ActivityStore {
     var onlySelected: Bool { selectionSnapshot.onlySelected }
     func setCombine(_ enabled: Bool) { selection.setCombine(enabled) }
     func setOnlySelected(_ enabled: Bool) { selection.setOnlySelected(enabled) }
-    func pickActivities(_ ids: some Sequence<Int>) { selection.pick(existing(ids)) }
+    func pickActivities(_ ids: some Sequence<Int>) {
+        let hits = existing(ids).filter { visibleActivityIDs.contains($0) }
+        if !isCombining || !hits.isEmpty { activityPlaces?.focus = nil }
+        selection.pick(hits)
+    }
     func toggleMember(_ id: Int) { if activityIndex.contains(id) { selection.toggleMember(id) } }
     var browsingActivities: [Activity] { onlySelected ? filteredActivities.filter { selectedActivityIDs.contains($0.id) } : filteredActivities }
     var visibleSelectedActivityIDs: Set<Int> { selectedActivityIDs.intersection(visibleActivityIDs) }
-    /// Show places for every selected, filter-visible route, matching the web map.
-    var mapPlacesActivityIDs: Set<Int> { visibleSelectedActivityIDs }
+    /// Selected-route places remain available; the overview adds the browsing scope.
+    var mapPlacesActivityIDs: Set<Int> { mapContext.showPlaces ? visibleActivityIDs : visibleSelectedActivityIDs }
     /// The selected, filter-visible activity emphasised on the map.
     var activeActivityID: Int? { selectionSnapshot.active }
     /// The list detail opened independently of selection.
@@ -411,11 +415,14 @@ final class ActivityStore {
     func deselectAllFiltered() { guard isCombining else { return }; selection.deselectAllVisible() }
 
     /// Clears the whole selection, including filter-hidden activities.
-    func clearSelection() { selection.clearSelection() }
+    func clearSelection() { activityPlaces?.focus = nil; selection.clearSelection() }
 
-    func activate(_ activityID: Int) { selection.activate(activityID) }
+    func activate(_ activityID: Int) {
+        if activeActivityID != activityID { activityPlaces?.focus = nil }
+        selection.activate(activityID)
+    }
 
-    func toggleActive(_ activityID: Int) { selection.toggleActive(activityID) }
+    func toggleActive(_ activityID: Int) { activityPlaces?.focus = nil; selection.toggleActive(activityID) }
 
     func inspect(_ activityID: Int) { selection.inspect(activityID) }
 

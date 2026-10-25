@@ -1,12 +1,14 @@
+import { type LngLatBounds, type ViewState } from 'react-map-gl/mapbox';
 import { type StateCreator } from 'zustand';
-import { type RootState } from './index';
-import { type ViewState, type LngLatBounds } from 'react-map-gl/mapbox';
+
 import {
   baseMaps,
-  overlayMaps,
-  defaultMapPosition,
   defaultMapBounds,
+  defaultMapPosition,
+  overlayMaps,
 } from '~/settings/map';
+
+import { type RootState } from './index';
 
 export type MapState = {
   baseMap: keyof typeof baseMaps;
@@ -15,12 +17,14 @@ export type MapState = {
   bbox: LngLatBounds;
   threeDim: boolean;
   showPhotos: boolean;
+  showPlaces: boolean;
   uploadedGeoJson: GeoJSON.FeatureCollection | null;
   routeFitRequest: { id: string; activityIDs: number[] } | null;
 };
 
 export type MapActions = {
   togglePhotos: () => void;
+  togglePlaces: () => void;
   setBaseMap: (key: keyof typeof baseMaps) => void;
   toggleOverlayMap: (key: keyof typeof overlayMaps) => void;
   toggleThreeDim: () => void;
@@ -29,7 +33,12 @@ export type MapActions = {
     mapState: Partial<
       Pick<
         MapState,
-        'baseMap' | 'overlayMaps' | 'position' | 'threeDim' | 'showPhotos'
+        | 'baseMap'
+        | 'overlayMaps'
+        | 'position'
+        | 'threeDim'
+        | 'showPhotos'
+        | 'showPlaces'
       >
     >,
   ) => void;
@@ -56,6 +65,7 @@ export const createMapSlice: StateCreator<
   bbox: defaultMapBounds,
   threeDim: false,
   showPhotos: false,
+  showPlaces: false,
   uploadedGeoJson: null,
   routeFitRequest: null,
 
@@ -74,6 +84,10 @@ export const createMapSlice: StateCreator<
   togglePhotos: () =>
     set((state: RootState) => {
       state.showPhotos = !state.showPhotos;
+    }),
+  togglePlaces: () =>
+    set((state) => {
+      state.showPlaces = !state.showPlaces;
     }),
 
   setBaseMap: (key) =>
@@ -114,6 +128,9 @@ export const createMapSlice: StateCreator<
       }
       if (mapState.showPhotos !== undefined) {
         state.showPhotos = mapState.showPhotos;
+      }
+      if (mapState.showPlaces !== undefined) {
+        state.showPlaces = mapState.showPlaces;
       }
     }),
 

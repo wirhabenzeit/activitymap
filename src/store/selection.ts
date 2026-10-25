@@ -1,13 +1,16 @@
+import { type Dispatch, type SetStateAction } from 'react';
 import { type StateCreator } from 'zustand';
-import { type RootState } from './index';
+
 import {
-  emptySelection,
-  selectionTransition,
-  selectionPickIDs,
   type ActivitySelection,
   type SelectionEvent,
+  emptySelection,
+  selectionPickIDs,
+  selectionTransition,
 } from '~/lib/activity-selection';
-import { type Dispatch, type SetStateAction } from 'react';
+
+import { resetActivityPlaceFocus } from './activity-place-focus';
+import { type RootState } from './index';
 
 export type SelectionState = {
   combineSelections: boolean;
@@ -73,7 +76,11 @@ export const createSelectionSlice: StateCreator<
   setOnlySelected: (enabled) =>
     set((state) => apply(state, { type: 'set_only_selected', enabled })),
   pickActivities: (ids) => {
-    const hits = selectionPickIDs(model(get()), ids);
+    const state = get();
+    const hits = selectionPickIDs(model(state), ids);
+    // A fresh map pick replaces the place interaction too. An empty Combine
+    // pick is a no-op, so it keeps both the current group and place focus.
+    if (!state.combineSelections || hits.length) resetActivityPlaceFocus();
     set((state) => apply(state, { type: 'pick', ids: hits }));
     return hits;
   },
@@ -83,7 +90,10 @@ export const createSelectionSlice: StateCreator<
     set((state) => apply(state, { type: 'add', ids })),
   removeSelectedActivities: (ids) =>
     set((state) => apply(state, { type: 'remove', ids })),
-  clearSelection: () => set((state) => apply(state, { type: 'clear' })),
+  clearSelection: () => {
+    resetActivityPlaceFocus();
+    set((state) => apply(state, { type: 'clear' }));
+  },
   resetSelectionScope: () =>
     set((state) => apply(state, { type: 'clear_scope' })),
   selectForMap: (id) =>

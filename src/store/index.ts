@@ -1,33 +1,34 @@
 import { create } from 'zustand';
 import {
+  type StateStorage,
+  createJSONStorage,
   devtools,
   persist,
-  createJSONStorage,
-  type StateStorage,
 } from 'zustand/middleware';
 import { immer } from 'zustand/middleware/immer';
 import { useShallow } from 'zustand/shallow';
 
-import { type ListSlice, createListSlice } from './list';
-import { type SelectionSlice, createSelectionSlice } from './selection';
-import { type MapSlice, createMapSlice } from './map';
+import { baseMaps, defaultMapPosition, overlayMaps } from '~/settings/map';
+
 import { type ActivitySlice, createActivitySlice } from './activity';
+import { type AuthSlice, createAuthSlice } from './auth';
 import {
+  type FilterSlice,
+  type ValueColumn,
+  createFilterSlice,
   deriveSportGroups,
   initializeValues,
   sanitizePersistedBinary,
   sanitizePersistedDateRange,
   toPersistedValues,
-  type FilterSlice,
-  type ValueColumn,
-  createFilterSlice,
 } from './filter';
-import { type AuthSlice, createAuthSlice } from './auth';
+import { type ListSlice, createListSlice } from './list';
+import { type MapSlice, createMapSlice } from './map';
 import {
   type NotificationSlice,
   createNotificationSlice,
 } from './notifications';
-import { baseMaps, overlayMaps, defaultMapPosition } from '~/settings/map';
+import { type SelectionSlice, createSelectionSlice } from './selection';
 
 // Combine all slice types into the root state type
 export type RootState = ListSlice &
@@ -45,6 +46,7 @@ type PersistedUiState = Pick<
   | 'position'
   | 'threeDim'
   | 'showPhotos'
+  | 'showPlaces'
   | 'sportType'
   | 'sportGroup'
   | 'dateRange'
@@ -162,6 +164,7 @@ export const store = create<RootState>()(
           position: state.position,
           threeDim: state.threeDim,
           showPhotos: state.showPhotos,
+          showPlaces: state.showPlaces,
           sportType: state.sportType,
           sportGroup: state.sportGroup,
           dateRange: state.dateRange,
@@ -210,6 +213,10 @@ export const store = create<RootState>()(
               typeof persisted.showPhotos === 'boolean'
                 ? persisted.showPhotos
                 : currentState.showPhotos,
+            showPlaces:
+              typeof persisted.showPlaces === 'boolean'
+                ? persisted.showPlaces
+                : currentState.showPlaces,
             sportType,
             sportGroup: deriveSportGroups(sportType),
             dateRange: sanitizePersistedDateRange(persisted.dateRange),

@@ -45,8 +45,9 @@ await build({
         builder.onLoad({ filter: /.*/, namespace: 'fixture' }, () => ({
           resolveDir: root,
           contents: `
-import {create} from 'zustand';import {useShallow} from 'zustand/shallow';
-export const state=create(()=>({user:{id:'fixture',stravaConnected:true},isInitialized:true,isGuest:false,selected:[1],highlighted:1,visible:true,showProfile:true}));
+import {create} from 'zustand';import {useShallow} from 'zustand/shallow';import {immer} from 'zustand/middleware/immer';
+import {createSelectionSlice} from '~/store/selection';
+export const state=create(immer((...args)=>({...createSelectionSlice(...args),user:{id:'fixture',stravaConnected:true},isInitialized:true,isGuest:false,selected:[1],highlighted:1,visible:true,showProfile:true})));
 export const useShallowStore=selector=>state(useShallow(selector));window.fixtureState=state;
 `,
         }));
@@ -66,6 +67,7 @@ import {activityPlacesQueryRoot} from '~/lib/activity-places';
 import {placeSymbolImage} from '~/lib/place-symbols';window.fixturePlaceImage=placeSymbolImage;
 import {applyV1SyncPage,getV1SyncState} from '~/lib/sync/v1-store';
 import {getLibraryOwner} from '~/lib/sync/library-owner';
+import {resetActivityPlaceFocus} from '~/store/activity-place-focus';window.clearPlaceFocus=resetActivityPlaceFocus;
 import fixtureDTOs from './shared/sync-integrity-fixtures.v1.json';
 const metadata={generation:'g1',revision:'1',state:'current',fetch_status:'succeeded',available_types:['distance','altitude','latlng'],fetched_at:null,expires_at:null};
 const latlng=[[47,8],[47.001,8.001],[47.002,8.002]];
@@ -77,16 +79,18 @@ window.refreshPlaces=()=>client.resetQueries({queryKey:['library','auth:'+window
 window.replaceProfile=()=>client.setQueryData(streamSummaryQueryKey('fixture','1'),{...source,metadata:{...metadata,revision:'2'}});
 window.saveSyncedPlaces=async(bundle,version)=>{
  const scope='auth:fixture';const state={scope,bootstrapCursor:'snapshot',bootstrapComplete:true,changesCursor:bundle?.resultRevision??'version',lastSyncAt:new Date().toISOString(),updatedAt:new Date().toISOString(),placeMatchingVersion:version,placesSyncReady:true};
- const mutations=bundle?[{sequence:'1',entityType:'activity',operation:'upsert',id:'1',activity:{...fixtureDTOs.activity,id:'1',streams:metadata,placeMatches:bundle}}]:[];
+ const mutations=bundle?[{sequence:'1',entityType:'activity',operation:'upsert',id:bundle.activityId,activity:{...fixtureDTOs.activity,id:bundle.activityId,streams:metadata,placeMatches:bundle}}]:[];
  await applyV1SyncPage(scope,mutations,state);await getLibraryOwner(client,scope).load();
 };
 window.restoreProfile=()=>client.setQueryData(streamSummaryQueryKey('fixture','1'),source);
 window.selectionCalls=0;
+window.placePicks=[];
 function App(){const s=useShallowStore(state=>state);const ids=s.visible?s.selected:[];return <QueryClientProvider client={client}>
 <Map preserveDrawingBuffer={true} ref={ref=>{if(ref)window.fixtureMap=ref.getMap();}} onIdle={()=>window.mapReady=true} initialViewState={{longitude:8.001,latitude:47.001,zoom:14}} mapboxAccessToken="pk.offline-test" style={{height:260,width:'100%'}} mapStyle={{version:8,glyphs:window.location.origin+'/fonts/{fontstack}/{range}.pbf',sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e9efea'}}]}}>
 <Source id="routeSource" type="geojson" data={{type:'Feature',id:1,properties:{},geometry:{type:'LineString',coordinates:latlng.map(([lat,lng])=>[lng,lat])}}}><Layer id="routeLayerBG" type="line" paint={{'line-color':'#777','line-width':5}}/></Source>
-<Selection onSelection={ids=>{window.selectionCalls++;window.fixtureState.setState({selected:ids});}}/>
-<MatchedPlacesLayer activities={activities} selectedIds={ids} highlighted={s.highlighted}/></Map>
+<Selection onSelection={ids=>{window.selectionCalls++;window.fixtureState.getState().pickActivities(ids);}}/>
+<MatchedPlacesLayer activities={activities} selectedIds={ids} visibleIds={s.visibleIDs??ids} showAllPlaces={s.showAllPlaces??false} inspectedActivityId={s.inspectedActivityId} highlighted={s.highlighted}
+onPickActivities={ids=>{window.placePicks.push(ids);window.fixtureState.getState().pickActivities(ids);window.fixtureState.setState({inspectedActivityId:ids.length===1?ids[0]:undefined});}}/></Map>
 {s.showProfile&&s.selected.includes(1)&&<ElevationChart activityId="1" userId={s.user.id} streamMetadata={metadata}/>}
 </QueryClientProvider>;}createRoot(document.getElementById('root')).render(<App/>);
 `,
@@ -759,6 +763,270 @@ try {
     0,
     'Manifest-only invalidation hides profile visits',
   );
+  // Overview: synced results from every displayed route, with no selection and
+  // no per-activity requests, shared place identities counted only once.
+  const overviewBundle = {
+    ...bundle,
+    matchingVersion,
+    places: [
+      bundle.places[0],
+      {
+        ...bundle.places[0],
+        id: '00000000-0000-4000-8000-000000000002',
+        name: 'Synced pass',
+        kinds: ['pass'],
+      },
+    ],
+  };
+  const secondBundle = {
+    ...overviewBundle,
+    activityId: '2',
+    places: [
+      bundle.places[0],
+      {
+        ...bundle.places[0],
+        id: '00000000-0000-4000-8000-000000000003',
+        name: 'Synced hut',
+        kinds: ['hut'],
+      },
+    ],
+  };
+  const beforeOverview = requests.length;
+  await page.evaluate(
+    async ({ first, second, version }) => {
+      window.clearPlaceFocus();
+      window.fixtureState.setState({ selected: [], showProfile: false });
+      await window.saveSyncedPlaces(first, version);
+      await window.saveSyncedPlaces(second, version);
+      window.fixtureState.setState({
+        selected: [],
+        highlighted: 0,
+        showProfile: false,
+        visibleIDs: [1, 2],
+        showAllPlaces: true,
+      });
+      window.fixtureMap.jumpTo({ center: [8.001, 47.001], zoom: 10 });
+    },
+    { first: overviewBundle, second: secondBundle, version: matchingVersion },
+  );
+  const overviewCluster = page.getByRole('button', {
+    name: 'Explore 3 visited places',
+    exact: true,
+  });
+  await overviewCluster.waitFor();
+  assert.equal(
+    await page.locator('[data-place-cluster-kind="mixed"]').count(),
+    1,
+    'A group spanning peak, pass and hut uses a mixed-place pin',
+  );
+  assert.equal(
+    requests.length,
+    beforeOverview,
+    'Overview uses synchronized bundles without per-activity requests',
+  );
+  assert.equal(await page.locator('[data-place-cluster]').count(), 1);
+  const selectionCalls = await page.evaluate(() => window.selectionCalls);
+  await overviewCluster.click();
+  await page.waitForFunction(
+    () => !window.fixtureMap.isMoving() && window.fixtureMap.getZoom() === 12,
+  );
+  assert.equal(
+    await page.evaluate(() => window.selectionCalls),
+    selectionCalls,
+    'Cluster click preserves route selection',
+  );
+  await page.screenshot({ path: join(output, 'places-overview.png') });
+  await page.evaluate(() => window.fixtureMap.jumpTo({ zoom: 18 }));
+  await overviewCluster.click();
+  await page
+    .getByRole('button', { name: 'Synced summit', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Close place', exact: true })
+    .waitFor();
+  await page
+    .getByRole('button', { name: 'Explore 2 visited places', exact: true })
+    .waitFor();
+  assert.equal(
+    await page.locator('.mapboxgl-popup a[href^="/list?activity="]').count(),
+    0,
+    'Place tooltip contains no activity list',
+  );
+  assert.deepEqual(
+    await page.evaluate(() => window.placePicks),
+    [[1, 2]],
+    'Shared place picks all associated activities',
+  );
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      selected: window.fixtureState.getState().selected,
+      highlighted: window.fixtureState.getState().highlighted,
+    })),
+    { selected: [1, 2], highlighted: 0 },
+    'Shared place uses the multiple-route chooser state',
+  );
+  await page.waitForFunction(
+    () =>
+      window.fixtureMap.getSource('matched-places')?._data.features.length ===
+      1,
+  );
+  await page.screenshot({ path: join(output, 'places-focused.png') });
+  await page.waitForFunction(
+    () =>
+      window.fixtureMap.getLayer('routeLayerBG') &&
+      !window.fixtureMap.isMoving(),
+  );
+  const backgroundPixel = await page.evaluate(() => {
+    const rect = window.fixtureMap.getCanvas().getBoundingClientRect();
+    return { x: rect.x + 60, y: rect.y + 50 };
+  });
+  await page.mouse.click(backgroundPixel.x, backgroundPixel.y);
+  await page
+    .getByRole('button', { name: 'Close place', exact: true })
+    .waitFor({ state: 'hidden' });
+  assert.deepEqual(
+    await page.evaluate(() => window.fixtureState.getState().selected),
+    [],
+    'A background map click clears the activities and the focused place together',
+  );
+  await page.evaluate(() =>
+    window.fixtureState.setState({ selected: [], visibleIDs: [2] }),
+  );
+  await page
+    .getByRole('button', { name: 'Explore 2 visited places', exact: true })
+    .waitFor();
+  await page
+    .getByRole('button', { name: 'Explore 2 visited places', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Synced hut', exact: true }).click();
+  assert.deepEqual(
+    await page.evaluate(() => window.placePicks),
+    [[1, 2], [2]],
+    'Filtered place picks only its displayed activities',
+  );
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      selected: window.fixtureState.getState().selected,
+      highlighted: window.fixtureState.getState().highlighted,
+    })),
+    { selected: [2], highlighted: 2 },
+    'A single matching activity uses the single-route detail state',
+  );
+  await page.getByRole('button', { name: 'Close place', exact: true }).click();
+  const beforeInspectingPlace = await page.evaluate(
+    () => window.placePicks.length,
+  );
+  await page.evaluate(() =>
+    window.fixtureState.setState({
+      selected: [1],
+      highlighted: 1,
+      inspectedActivityId: 1,
+      visibleIDs: [1, 2],
+    }),
+  );
+  await page
+    .getByRole('button', { name: 'Explore 3 visited places', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Synced summit', exact: true })
+    .click();
+  await page
+    .getByRole('button', { name: 'Close place', exact: true })
+    .waitFor();
+  assert.equal(
+    await page.evaluate(() => window.placePicks.length),
+    beforeInspectingPlace,
+    'A place on the inspected activity does not pick other activities',
+  );
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      selected: window.fixtureState.getState().selected,
+      highlighted: window.fixtureState.getState().highlighted,
+      inspectedActivityId: window.fixtureState.getState().inspectedActivityId,
+    })),
+    { selected: [1], highlighted: 1, inspectedActivityId: 1 },
+    'Looking up a shared place preserves the inspected activity and selection',
+  );
+  await page.getByRole('button', { name: 'Close place', exact: true }).click();
+  await page
+    .getByRole('button', { name: 'Explore 3 visited places', exact: true })
+    .click();
+  await page.getByRole('button', { name: 'Synced hut', exact: true }).click();
+  assert.equal(
+    await page.evaluate(() => window.placePicks.length),
+    beforeInspectingPlace + 1,
+    'A place outside the inspected activity still picks matching activities',
+  );
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      selected: window.fixtureState.getState().selected,
+      inspectedActivityId: window.fixtureState.getState().inspectedActivityId,
+    })),
+    { selected: [2], inspectedActivityId: 2 },
+    'An unvisited place switches to its matching activity',
+  );
+  await page.getByRole('button', { name: 'Close place', exact: true }).click();
+  await page.evaluate(() =>
+    window.fixtureState.setState({
+      selected: [],
+      inspectedActivityId: undefined,
+      visibleIDs: [2],
+    }),
+  );
+  await page.evaluate(
+    async ({ second, version }) => {
+      await window.saveSyncedPlaces(
+        { ...second, places: [], resultRevision: 'overview-zero' },
+        version,
+      );
+    },
+    { second: secondBundle, version: matchingVersion },
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll('[data-place-cluster]').length === 0 &&
+      window.fixtureMap.getSource('matched-places')?._data.features.length ===
+        0,
+  );
+  await page.evaluate(() => window.fixtureState.setState({ visibleIDs: [1] }));
+  await page
+    .getByRole('button', { name: 'Explore 2 visited places', exact: true })
+    .waitFor();
+  await page.evaluate(() =>
+    window.fixtureState.setState({ showAllPlaces: false }),
+  );
+  await page.waitForFunction(
+    () =>
+      !window.fixtureMap.getSource('matched-places') &&
+      document.querySelectorAll('[data-place-cluster]').length === 0,
+  );
+  assert.equal(
+    requests.length,
+    beforeOverview,
+    'Filtering, focus and toggling never fetch unselected activities',
+  );
+  await page.evaluate(() =>
+    window.fixtureState.setState({ showAllPlaces: true }),
+  );
+  await page
+    .getByRole('button', { name: 'Explore 2 visited places', exact: true })
+    .waitFor();
+  await page.evaluate(() =>
+    window.fixtureState.setState({
+      user: { id: 'other', stravaConnected: true },
+    }),
+  );
+  await page.waitForFunction(
+    () =>
+      document.querySelectorAll('[data-place-cluster]').length === 0 &&
+      window.fixtureMap.getSource('matched-places')?._data.features.length ===
+        0,
+  );
+  assert.equal(
+    requests.length,
+    beforeOverview,
+    'Changing accounts never loads unselected activities or retains the previous overview',
+  );
   assert.deepEqual(errors, []);
   await writeFile(
     join(output, 'result.json'),
@@ -787,8 +1055,24 @@ try {
           'coverage state',
           'account isolation',
           'deselection',
+          'overview without selection or per-activity requests',
+          'overview deduplication and filter scope',
+          'cluster zoom preserves selection',
+          'coincident place chooser and focused symbol',
+          'place pick uses associated activities without tooltip links',
+          'single and filtered place pick',
+          'background map click clears place focus with activities',
+          'visited place preserves activity detail; unvisited place picks matches',
+          'overview zero replacement and toggle',
+          'overview account isolation',
         ],
-        screenshots: ['desktop.png', 'mobile-dark.png', 'loading.png'],
+        screenshots: [
+          'desktop.png',
+          'mobile-dark.png',
+          'loading.png',
+          'places-overview.png',
+          'places-focused.png',
+        ],
       },
       null,
       2,

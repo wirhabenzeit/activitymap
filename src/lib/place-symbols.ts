@@ -50,14 +50,13 @@ export function placeSymbolImage(kind: PlaceKind, active: boolean) {
   context.beginPath();
   context.arc(16, 16, placeChartSymbol(kind).diameter / 2, 0, Math.PI * 2);
   const theme = getComputedStyle(document.documentElement);
-  const foreground =
-    'hsl(' + theme.getPropertyValue('--foreground').trim() + ')';
-  const background =
-    'hsl(' + theme.getPropertyValue('--background').trim() + ')';
   context.fillStyle = active
     ? theme.getPropertyValue('--activity-accent').trim()
-    : foreground;
+    : '#262626';
   context.fill();
+  context.strokeStyle = '#ffffff';
+  context.lineWidth = 1.5;
+  context.stroke();
   const glyph = PLACE_SYMBOLS[kind];
   const size = placeChartSymbol(kind).size;
   const scale = Math.min(size / glyph.width, size / glyph.height);
@@ -66,7 +65,7 @@ export function placeSymbolImage(kind: PlaceKind, active: boolean) {
     16 - (glyph.height * scale) / 2,
   );
   context.scale(scale, scale);
-  context.fillStyle = active ? '#ffffff' : background;
+  context.fillStyle = '#ffffff';
   const path = new Path2D(glyph.path);
   if (glyph.strokeWidth) {
     context.strokeStyle = context.fillStyle;
