@@ -60,22 +60,16 @@ final class MapRotationUITests: XCTestCase {
         filters.tap()
         let close = app.buttons["filters-done"]
         XCTAssertTrue(close.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertLessThan(close.frame.maxX, app.frame.width * 0.6)
-        capture(app, name: "Landscape filters over Map")
-        app.buttons["activity-search-open"].tap()
-        let search = app.textFields["activity-name-search"]
-        XCTAssertTrue(search.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        search.typeText("Rotation")
-        app.buttons["place-search-done"].tap()
-        XCTAssertTrue(search.waitForNonExistence(timeout: 5))
-        app.buttons["Clear Search"].tap()
+        capture(app, name: "Landscape filter sheet over Map")
+        app.searchActivities("Rotation")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        app.buttons["filter-reset"].tap()
         close.tap()
         let returned = try await state(in: app) { $0.ready && $0.presentationDepth == 1 }
         XCTAssertEqual(returned.selection, landscape.selection)
         XCTAssertEqual(returned.candidates, landscape.candidates)
         XCTAssertEqual(returned.detent, landscape.detent)
-        XCTAssertTrue(resultsScroll(in: app).isHittable, "Map results return after the drawer closes")
+        XCTAssertTrue(resultsScroll(in: app).isHittable, "Map results return after the sheet closes")
     }
 
     func testActivityDetailAndUnderlyingResultsSurviveRotation() async throws {

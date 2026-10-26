@@ -18,13 +18,6 @@ struct RenderedFilterTests {
         #expect(!BrowsePaneLayout.filtersUseSidebar(width: 1194, regular: true, accessibilityText: true))
     }
 
-    @Test func landscapePhonesUseASlideOverWithoutChangingTabletOrAccessibilityLayouts() {
-        #expect(BrowsePaneLayout.filtersUseSlideOver(width: 740, regular: false, compactHeight: true, accessibilityText: false))
-        #expect(!BrowsePaneLayout.filtersUseSlideOver(width: 390, regular: false, compactHeight: false, accessibilityText: false))
-        #expect(!BrowsePaneLayout.filtersUseSlideOver(width: 1194, regular: true, compactHeight: true, accessibilityText: false))
-        #expect(!BrowsePaneLayout.filtersUseSlideOver(width: 740, regular: false, compactHeight: true, accessibilityText: true))
-    }
-
     @Test func filterButtonAndRailReadTheActiveFilters() {
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
         #expect(FilterCountBadge.label(count: store.activeFilterCount) == "Filters")
@@ -317,12 +310,22 @@ struct RenderedFilterTests {
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(250))
         sheets.showsFilters = true
-        try await filterWait { host.showsFilterPanel }
-        #expect(host.host.presentedViewController == nil, "Landscape filters slide over the content")
-        #expect(!host.showsFilterRail, "The phone does not reserve a permanent rail")
-        try host.save(host.snapshot(), name: "landscape-phone-filter-slide-over")
+        let presentationDeadline = Date().addingTimeInterval(3)
+        while (host.host.presentedViewController == nil || host.host.presentedViewController?.isBeingPresented == true)
+            && Date() < presentationDeadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
+        let presented = try #require(host.host.presentedViewController)
+        try await Task.sleep(for: .milliseconds(150))
+        let image = UIGraphicsImageRenderer(bounds: presented.view.bounds).image { _ in
+            presented.view.drawHierarchy(in: presented.view.bounds, afterScreenUpdates: true)
+        }
+        try host.save(image, name: "compact-height-filter-sheet")
         sheets.showsFilters = false
-        try await filterWait { !host.showsFilterPanel }
+        let deadline = Date().addingTimeInterval(3)
+        while host.host.presentedViewController != nil && Date() < deadline {
+            try await Task.sleep(for: .milliseconds(50))
+        }
         #expect(host.host.presentedViewController == nil)
         #expect(StatsFilterScope(store) == filters && store.dateDayRange == dates)
         #expect(store.selectedTab == .list)

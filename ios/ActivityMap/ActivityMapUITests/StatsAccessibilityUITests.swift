@@ -157,14 +157,8 @@ extension StatsUITests {
         XCTAssertTrue(filters.isHittable)
         if UIDevice.current.userInterfaceIdiom == .phone { XCTAssertFalse(settings.isHittable) }
         filters.tap()
-        let launcher = app.buttons["activity-search-open"]
-        XCTAssertTrue(launcher.waitForExistence(timeout: 10), app.debugDescription)
-        launcher.tap()
-        let search = app.textFields["activity-name-search"]
-        XCTAssertTrue(search.waitForExistence(timeout: 5), app.debugDescription)
-        search.typeText("No matching activity")
-        app.buttons["place-search-done"].tap()
-        XCTAssertTrue(search.waitForNonExistence(timeout: 5))
+        app.searchActivities("No matching activity")
+        XCTAssertTrue(app.buttons["place-search-done"].waitForNonExistence(timeout: 5))
         axCloseFilters(app, filters: filters, scenario: scenario)
         XCTAssertTrue(detail.staticTexts["No matching activities"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(detail.staticTexts["Calculating…"].exists)

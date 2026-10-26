@@ -44,7 +44,7 @@ struct PlaceSearchUITestFixture: View {
     private var inlinePanel: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                FilterPanel(store: store)
+                FilterPanel(store: store, inNavigationStack: true)
                 Text("Visible: \(store.filteredActivities.map { String($0.id) }.joined(separator: ","))")
                     .accessibilityIdentifier("place-search-visible")
                 Text("Stats: \(store.statsActivities.map { String($0.id) }.joined(separator: ","))")

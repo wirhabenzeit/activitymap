@@ -103,7 +103,7 @@ test('native profiles retain all unit suites and select exactly the intended PR 
     suite.startsWith('ActivityMapTests/'),
   );
   const expectedUI = [
-    'ActivityMapUITests/FilterPanelUITests/testSearchUsesKeyboardPlaceHintsAndRestoresFilterHeight',
+    'ActivityMapUITests/FilterPanelUITests/testSearchUsesSystemPlaceSuggestionsAndKeepsFilters',
     'ActivityMapUITests/PlaceSearchUITests/testPlaceAutocompleteFilteringDetailsAndStatsHistory',
     'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
     'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
