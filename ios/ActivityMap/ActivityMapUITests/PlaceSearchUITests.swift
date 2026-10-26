@@ -7,7 +7,7 @@ import XCTest
         app.launchArguments = ["--places-ui-testing", "--place-search-ui-testing"]
         app.launch()
         defer { app.terminate() }
-        let search = app.searchFields.firstMatch
+        let search = app.activitySearchField
         XCTAssertTrue(search.waitForExistence(timeout: 15), app.debugDescription)
         XCTAssertTrue(app.staticTexts["place-search-visible"].waitForExistence(timeout: 5))
         app.buttons["2026 only"].tap()
@@ -19,7 +19,7 @@ import XCTest
         let second = app.buttons["place-suggestion-00000000-0000-4000-8000-000000000002"]
         XCTAssertTrue(first.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(second.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertLessThan(first.frame.midY, second.frame.midY, "Place suggestions form a list")
+        XCTAssertEqual(first.frame.midY, second.frame.midY, accuracy: 2, "Place matches share one row")
         first.tap()
         XCTAssertEqual(app.staticTexts["place-search-visible"].label, "Visible: 2")
         XCTAssertEqual(app.staticTexts["place-search-stats"].label, "Stats: 1,2")
@@ -33,10 +33,8 @@ import XCTest
         app.searchActivities("Morning")
         XCTAssertEqual(app.staticTexts["place-search-visible"].label, "Visible: ")
         XCTAssertEqual(app.staticTexts["place-search-stats"].label, "Stats: 1")
-        // Backspacing past the text selects the token, then removes it.
-        search.tap()
-        search.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: "Morning".count + 2))
-        app.cancelSearch()
+        app.clearActivitySearch()
+        app.buttons["remove-place-filter"].tap()
         XCTAssertTrue(detail.waitForNonExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["place-search-visible"].label, "Visible: 2,3")
     }

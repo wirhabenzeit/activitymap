@@ -158,6 +158,16 @@ struct AppShell: View {
             if old == nil, id != nil, store.selectedTab == .list, panelTight, sheets.showsFilters {
                 setFiltersExpanded(false)
             }
+            // The phone filter sheet leaves the list usable behind it; an
+            // opened activity takes the screen.
+            if id != nil, sheets.showsFilters, !filterSidebarAvailable { sheets.showsFilters = false }
+        }
+        // Likewise for routes picked on the map behind the sheet, whose
+        // results need the sheet's place. Filters never change the selection.
+        .onChange(of: store.selectedActivityIDs) { _, selected in
+            if store.selectedTab == .map, !selected.isEmpty, sheets.showsFilters, !filterSidebarAvailable {
+                sheets.showsFilters = false
+            }
         }
         // Destinations never change filter visibility (#354).
         .onChange(of: store.selectedTab) { _, tab in
@@ -214,7 +224,7 @@ struct AppShell: View {
                             .environment(\.stackedShellSheet, StackedShellSheet(
                                 request: Binding(get: { shellRequest(sidebarAvailable: sidebarAvailable) },
                                                  set: { if $0 == nil { clearShellRequest() } }),
-                                content: { AnyView(shellSheet($0)) }))
+                                content: { AnyView(shellSheet($0, overMapResults: true)) }))
                     }
                 }
                 // While the map's results sheet is up, it presents these itself.
@@ -333,17 +343,12 @@ struct AppShell: View {
         sheets.accountDestination = nil
     }
 
-    @ViewBuilder private func shellSheet(_ destination: ShellSheet) -> some View {
+    /// Over the map's results sheet, filters keep the system's modal backdrop:
+    /// closing the results from behind would take them along unannounced.
+    @ViewBuilder private func shellSheet(_ destination: ShellSheet, overMapResults: Bool = false) -> some View {
         switch destination {
         case .filters:
-            NavigationStack {
-                FilterPanel(store: store, scope: filterScope, inNavigationStack: true) {
-                    sheets.showsFilters = false
-                }
-            }
-            .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
-            .presentationContentInteraction(.scrolls)
-            .presentationDragIndicator(.visible)
+            FilterSheet(store: store, scope: filterScope, interactiveBackground: !overMapResults) { sheets.showsFilters = false }
         case .account(let account):
             AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
         }

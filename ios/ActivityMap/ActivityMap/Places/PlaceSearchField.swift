@@ -1,103 +1,38 @@
 import SwiftUI
 
-extension PlaceFilter: Identifiable {}
+/// Place matches as one row of chips, choosing one filters to that place.
+private struct PlaceMatchRow: View {
+    let options: [LibraryPlace]
+    let hasQuery: Bool
+    let units: UnitSystem
+    let select: (LibraryPlace) -> Void
 
-extension View {
-    /// System search for activity names and places: the selected place is a
-    /// search token and place hints are search suggestions, so the system owns
-    /// keyboard avoidance and replaces the content while suggestions show.
-    func placeSearch(store: ActivityStore, isPresented: Binding<Bool>, onSelectPlace: @escaping () -> Void = {},
-                     onSubmit: @escaping () -> Void = {}) -> some View {
-        modifier(PlaceSearch(store: store, isPresented: isPresented, onSelectPlace: onSelectPlace, onSubmit: onSubmit))
-    }
-}
-
-private struct PlaceSearch: ViewModifier {
-    @Bindable var store: ActivityStore
-    @Binding var isPresented: Bool
-    let onSelectPlace: () -> Void
-    let onSubmit: () -> Void
-    // Leaving system search empties its field and tokens. The field edits a
-    // copy that reaches the store only while searching, so Cancel keeps the
-    // filter; it is cleared in the field or by Reset. Ending search from code
-    // clears the field after its animation, too late to restore typed text,
-    // so Search only hides the keyboard.
-    @State private var query: String
-    @State private var tokens: [PlaceFilter]
-    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
-    private var units: UnitSystem { preferences?.units ?? .metric }
-    private var hasQuery: Bool { !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
-    private var options: [LibraryPlace] { hasQuery ? store.placeLibrary.search(query).places : [] }
-    private var storeTokens: [PlaceFilter] { store.selectedPlace.map { [$0] } ?? [] }
-
-    init(store: ActivityStore, isPresented: Binding<Bool>, onSelectPlace: @escaping () -> Void, onSubmit: @escaping () -> Void) {
-        self.store = store
-        _isPresented = isPresented
-        self.onSelectPlace = onSelectPlace
-        self.onSubmit = onSubmit
-        _query = State(initialValue: store.searchText)
-        _tokens = State(initialValue: store.selectedPlace.map { [$0] } ?? [])
-    }
-
-    func body(content: Content) -> some View {
-        content
-            .searchable(text: $query, tokens: $tokens, isPresented: $isPresented,
-                        placement: .navigationBarDrawer(displayMode: .always),
-                        prompt: Text(tokens.isEmpty ? "Activities or places" : "Activity name")) { token in
-                Label(token.name, systemImage: "mappin")
-            }
-            .searchSuggestions {
+    var body: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 8) {
+                if options.isEmpty {
+                    Text(hasQuery ? "No matching places" : "Type to filter by name or find a place")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 4)
+                }
                 ForEach(options) { item in
-                    suggestion(item)
-                        .searchCompletion(PlaceFilter(id: item.id, name: item.place.name, userID: store.placeUserID ?? ""))
+                    Button { select(item) } label: {
+                        Label { Text(item.place.name).lineLimit(1) } icon: {
+                            PlaceGlyph(kind: item.place.kind).frame(width: 14, height: 14)
+                        }
+                        .font(.subheadline)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                    .accessibilityLabel("Place: \(item.place.name). \(placeDescription(item))")
+                    .accessibilityIdentifier("place-suggestion-\(item.id)")
                 }
             }
-            .textInputAutocapitalization(.never)
-            .autocorrectionDisabled()
-            .onSubmit(of: .search, onSubmit)
-            .onChange(of: query) { _, value in
-                if isPresented { store.searchText = value } else if value != store.searchText { restoreField() }
-            }
-            .onChange(of: tokens) { _, value in
-                // One place at a time: a newly completed token replaces the old one.
-                if let added = value.last, added != store.selectedPlace, let place = store.placeLibrary.byID[added.id] {
-                    store.selectPlace(place)
-                    // Choosing a place ends search (the system may already
-                    // have) and clears the text, so only the token needs
-                    // redrawing once the field has emptied itself.
-                    isPresented = false
-                    tokens = []
-                    onSelectPlace()
-                } else if value != storeTokens {
-                    if isPresented { store.selectedPlace = value.last } else { restoreField() }
-                }
-            }
-            .onChange(of: store.searchText) { _, value in if query != value { restoreField() } }
-            .onChange(of: store.selectedPlace) { _, _ in if tokens != storeTokens { restoreField() } }
-    }
-
-    /// The field finishes clearing itself after search ends; restoring in
-    /// the same update would leave it showing nothing.
-    private func restoreField() {
-        DispatchQueue.main.async {
-            query = store.searchText
-            tokens = storeTokens
+            .padding(.horizontal, 16)
+            .frame(minHeight: 44)
         }
-    }
-
-    private func suggestion(_ item: LibraryPlace) -> some View {
-        HStack(spacing: 12) {
-            PlaceGlyph(kind: item.place.kind)
-                .frame(width: 16, height: 16)
-                .foregroundStyle(Color.secondary)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(item.place.name).foregroundStyle(Color.primary).lineLimit(1)
-                Text(placeDescription(item)).font(.caption).foregroundStyle(Color.secondary).lineLimit(1)
-            }
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Place: \(item.place.name). \(placeDescription(item))")
-        .accessibilityIdentifier("place-suggestion-\(item.id)")
+        .scrollIndicators(.hidden)
     }
 
     private func placeDescription(_ item: LibraryPlace) -> String {
@@ -106,49 +41,115 @@ private struct PlaceSearch: ViewModifier {
     }
 }
 
-/// The selected place inside a filter form whose search lives in the
-/// navigation bar; the token there removes it, this row inspects it.
-struct SelectedPlaceRow: View {
+/// Activity-name and place search as rows of a filter form, so it scrolls
+/// with the other filters. Typing filters immediately; place matches show
+/// under the field while it has text and focus, and the chosen place sits in
+/// the field as a pill.
+struct InlinePlaceSearch: View {
+    @Bindable var store: ActivityStore
+    var autofocus = false
+    /// Called when Search is pressed.
+    var onFinish: () -> Void = {}
+    @FocusState private var focused: Bool
+    @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    private var units: UnitSystem { preferences?.units ?? .metric }
+    private var hasQuery: Bool { !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
+            SelectedPlacePill(store: store)
+            TextField(store.selectedPlace == nil ? "Activities or places" : "Activity name", text: $store.searchText)
+                .focused($focused)
+                .submitLabel(.search)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onSubmit { focused = false; onFinish() }
+                .onAppear { if autofocus { focused = true } }
+                .accessibilityIdentifier("activity-search")
+            if !store.searchText.isEmpty {
+                Button { store.searchText = "" } label: {
+                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Clear search")
+                .accessibilityIdentifier("clear-activity-search")
+            }
+        }
+        if let selected = store.selectedPlace, store.placeLibrary.byID[selected.id] == nil {
+            Text("No activities for this place.").font(.caption).foregroundStyle(.secondary)
+        }
+        if focused, hasQuery {
+            // Selecting a place clears the name text and keeps the keyboard.
+            PlaceMatchRow(options: store.placeLibrary.search(store.searchText).places, hasQuery: true, units: units) {
+                store.selectPlace($0)
+            }
+            .listRowInsets(EdgeInsets())
+        }
+    }
+}
+
+/// The selected place as a pill: its name opens the details, the cross removes
+/// it. Beside a field it takes at most half the row, truncating long names.
+struct SelectedPlacePill: View {
     @Bindable var store: ActivityStore
     @Environment(\.dismiss) private var dismiss
+    @State private var detail: LibraryPlace?
 
     var body: some View {
         if let selected = store.selectedPlace {
-            if let current = store.placeLibrary.byID[selected.id] {
-                NavigationLink {
-                    PlaceDetailView(item: current, showsDone: false) { destination in
-                        store.show(current, in: destination)
-                        dismiss()
+            HStack(spacing: 0) {
+                Button { detail = store.placeLibrary.byID[selected.id] } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "mappin").font(.caption)
+                        Text(selected.name).font(.subheadline.weight(.medium))
+                            .lineLimit(1).truncationMode(.tail)
                     }
-                } label: {
-                    Label { Text(selected.name).lineLimit(1) } icon: {
-                        PlaceGlyph(kind: current.place.kind).frame(width: 16, height: 16)
-                    }
+                    .frame(minHeight: 44)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .disabled(store.placeLibrary.byID[selected.id] == nil)
                 .accessibilityLabel("Place: \(selected.name). View details")
-                .accessibilityIdentifier("selected-place-token")
-            } else {
-                Text("No activities for this place.").font(.caption).foregroundStyle(.secondary)
+                .accessibilityIdentifier("selected-place-details")
+                .layoutPriority(1)
+                Button { store.selectedPlace = nil } label: {
+                    Image(systemName: "xmark").font(.caption.weight(.semibold))
+                        .frame(width: 44, height: 44).contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove place filter: \(selected.name)")
+                .accessibilityIdentifier("remove-place-filter")
+            }
+            .padding(.leading, 10)
+            .foregroundStyle(AppTheme.accent)
+            .background(AppTheme.accent.opacity(0.12), in: Capsule())
+            .accessibilityElement(children: .contain)
+            .accessibilityIdentifier("selected-place-token")
+            .sheet(item: $detail) { item in
+                NavigationStack {
+                    if let current = store.placeLibrary.byID[item.id] {
+                        PlaceDetailView(item: current) { destination in
+                            store.show(current, in: destination)
+                            detail = nil
+                            dismiss()
+                        }
+                    } else { Text("No activities for this place.").padding() }
+                }
             }
         }
     }
 }
 
-/// Where the form cannot host system search (the iPad sidebar and rail), a
-/// launcher opens it in its own sheet.
+/// The iPad sidebar and rail show a launcher row that opens the inline search
+/// in its own sheet, with the selected place as a removable pill beside it.
 struct PlaceSearchField: View {
     @Bindable var store: ActivityStore
-    @Environment(\.dismiss) private var dismiss
     @State private var searchPresented = false
-    @State private var detail: LibraryPlace?
-    @State private var fieldWidth: CGFloat = 320
 
     var body: some View {
         HStack(spacing: 8) {
-            if store.selectedPlace != nil {
-                selectedPlaceToken
-                    .frame(maxWidth: fieldWidth * (store.searchText.isEmpty ? 0.65 : 0.5), alignment: .leading)
-            }
+            SelectedPlacePill(store: store)
             Button { searchPresented = true } label: {
                 HStack(spacing: 10) {
                     Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
@@ -171,71 +172,24 @@ struct PlaceSearchField: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("activity-search-field")
-        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { fieldWidth = $0 }
         .sheet(isPresented: $searchPresented) { PlaceSearchSheet(store: store) }
-        .sheet(item: $detail) { item in detailContent(item) }
-        .onChange(of: store.placeUserID) { _, _ in detail = nil; searchPresented = false }
+        .onChange(of: store.placeUserID) { _, _ in searchPresented = false }
         .onChange(of: store.filterResetRevision) { _, _ in searchPresented = false }
         if let selected = store.selectedPlace, store.placeLibrary.byID[selected.id] == nil {
             Text("No activities for this place.").font(.caption).foregroundStyle(.secondary)
         }
     }
-
-    @ViewBuilder private var selectedPlaceToken: some View {
-        if let selected = store.selectedPlace {
-            HStack(spacing: 0) {
-                Button { detail = store.placeLibrary.byID[selected.id] } label: {
-                    HStack(spacing: 5) {
-                        Image(systemName: "mappin").font(.caption)
-                        Text(selected.name).font(.subheadline.weight(.medium))
-                            .lineLimit(1).truncationMode(.tail)
-                    }
-                    .frame(minHeight: 44)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .disabled(store.placeLibrary.byID[selected.id] == nil)
-                .accessibilityLabel("Place: \(selected.name). View details")
-                .layoutPriority(1)
-                Button { store.selectedPlace = nil } label: {
-                    Image(systemName: "xmark").font(.caption.weight(.semibold))
-                        .frame(width: 44, height: 44).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove place filter: \(selected.name)")
-            }
-            .padding(.leading, 10)
-            .foregroundStyle(AppTheme.accent)
-            .background(AppTheme.accent.opacity(0.12), in: Capsule())
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("selected-place-token")
-        }
-    }
-
-    private func detailContent(_ item: LibraryPlace) -> some View {
-        NavigationStack {
-            if let current = store.placeLibrary.byID[item.id] {
-                PlaceDetailView(item: current) { destination in
-                    store.show(current, in: destination)
-                    detail = nil
-                    dismiss()
-                }
-            } else { Text("No activities for this place.").padding() }
-        }
-    }
 }
 
-/// System search in its own sheet, focused on open. Choosing a place, Search
-/// or Done returns to the form; name text keeps filtering as it is typed.
+/// The inline search in its own sheet, focused on open. Search or Done
+/// returns to the form; name text and places filter as they are chosen.
 private struct PlaceSearchSheet: View {
     @Bindable var store: ActivityStore
     @Environment(\.dismiss) private var dismiss
-    @State private var searching = true
 
     var body: some View {
         NavigationStack {
-            ContentUnavailableView("Search activity names or places", systemImage: "magnifyingglass")
-                .placeSearch(store: store, isPresented: $searching, onSelectPlace: { dismiss() }, onSubmit: { dismiss() })
+            Form { InlinePlaceSearch(store: store, autofocus: true) { dismiss() } }
                 .navigationTitle("Search").navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .confirmationAction) {

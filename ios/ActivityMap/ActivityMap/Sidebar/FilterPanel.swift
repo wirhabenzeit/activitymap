@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// The phone filter sheet: one short height that leaves the map, list or Stats
+/// visible and usable while searching. A keyboard lifts a sheet to its largest
+/// detent, so a second height would jump in as the keyboard comes; with one,
+/// the keyboard raises the whole sheet in the system's own animation.
+/// Landscape and accessibility sizes use the full-height sheet.
+struct FilterSheet: View {
+    @Bindable var store: ActivityStore
+    var scope: FilterScope
+    /// The list or map behind the sheet stays usable.
+    var interactiveBackground = true
+    let onDismiss: () -> Void
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        NavigationStack {
+            FilterPanel(store: store, scope: scope, inNavigationStack: true, onDismiss: onDismiss)
+        }
+        .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.fraction(0.4)])
+        .presentationBackgroundInteraction(interactiveBackground ? .enabled : .automatic)
+        .presentationDragIndicator(.visible)
+        .presentationContentInteraction(.scrolls)
+    }
+}
+
 struct FilterPanel: View {
     @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
     private var units: UnitSystem { preferences?.units ?? .metric }
@@ -7,11 +32,10 @@ struct FilterPanel: View {
     var scope: FilterScope = .browsing
     /// One part alone, as the iPad filter rail's popovers show it; nil is the whole panel.
     var part: FilterPart? = nil
-    /// Hosted in a navigation stack: search moves into the navigation bar,
-    /// and the count, Reset and Close into its title and toolbar.
+    /// Hosted in a navigation stack: the count, Reset and Close move into its
+    /// title and toolbar, and search is the form's first row.
     var inNavigationStack = false
     var onDismiss: (() -> Void)? = nil
-    @State private var searchPresented = false
     @State private var editingCustomDates = false
     @State private var contentScrolled = false
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -25,7 +49,6 @@ struct FilterPanel: View {
     var body: some View {
         if inNavigationStack {
             form
-                .placeSearch(store: store, isPresented: $searchPresented)
                 .navigationTitle(Text(AppMessages.navigationFilters(locale: locale)))
                 .navigationSubtitle(resultSummary)
                 .navigationBarTitleDisplayMode(.inline)
@@ -126,7 +149,11 @@ struct FilterPanel: View {
     }
 
     @ViewBuilder private var searchField: some View {
-        if inNavigationStack { SelectedPlaceRow(store: store) } else { PlaceSearchField(store: store) }
+        if inNavigationStack {
+            InlinePlaceSearch(store: store)
+        } else {
+            PlaceSearchField(store: store)
+        }
     }
 
     private var activitySection: some View {
