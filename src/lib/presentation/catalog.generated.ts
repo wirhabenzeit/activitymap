@@ -1053,6 +1053,16 @@ export const presentation = {
       "arguments": {},
       "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
     },
+    "filters.group.totals": {
+      "source": "Totals",
+      "arguments": {},
+      "context": "Section heading for the distance, elevation gain and elapsed time filters."
+    },
+    "filters.group.flags": {
+      "source": "Flags",
+      "arguments": {},
+      "context": "Section heading for the commute, private and flagged activity filters."
+    },
     "navigation.settings": {
       "source": "Settings",
       "arguments": {},
@@ -3300,6 +3310,8 @@ export type MessageArguments = {
   "navigation.stats": Record<never, never>;
   "navigation.account": Record<never, never>;
   "navigation.filters": Record<never, never>;
+  "filters.group.totals": Record<never, never>;
+  "filters.group.flags": Record<never, never>;
   "navigation.settings": Record<never, never>;
   "navigation.categories": Record<never, never>;
   "navigation.view": Record<never, never>;

@@ -686,7 +686,7 @@ struct MapScreen: View {
                     Button {
                         context.showPhotos.toggle()
                     } label: {
-                        Label("Show photos on map", systemImage: context.showPhotos ? "checkmark" : "photo")
+                        Label("Photos", systemImage: context.showPhotos ? "checkmark" : "photo")
                     }
                     .accessibilityValue(context.showPhotos ? "On" : "Off")
                     if context.showPhotos, !store.photos.contains(where: {
@@ -695,7 +695,7 @@ struct MapScreen: View {
                         Text("No located photos in the current filter")
                     }
                     Button { context.showPlaces.toggle() } label: {
-                        Label("Show places on map", systemImage: context.showPlaces ? "checkmark" : "mountain.2")
+                        Label("Places", systemImage: context.showPlaces ? "checkmark" : "mountain.2")
                     }
                     .accessibilityValue(context.showPlaces ? "On" : "Off")
                     if context.showPlaces, placeModels.isEmpty, store.activityPlaces?.overviewLoading != true {

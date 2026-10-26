@@ -51,6 +51,27 @@ final class MapRotationUITests: XCTestCase {
                        "Round-trip rotation must retain the scrolled position within one row")
     }
 
+    func testLandscapeFiltersReturnToTheMapSelection() async throws {
+        let app = launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let initial = try await state(in: app) { $0.ready }
+        let landscape = try await rotate(.landscapeLeft, app: app, previous: initial)
+        let filters = try XCTUnwrap(app.buttons.matching(identifier: "browse-filters").allElementsBoundByIndex.first(where: \.isHittable))
+        filters.tap()
+        let close = app.buttons["filters-done"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10), app.debugDescription)
+        capture(app, name: "Landscape filter sheet over Map")
+        app.searchActivities("Rotation")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        app.buttons["filter-reset"].tap()
+        close.tap()
+        let returned = try await state(in: app) { $0.ready && $0.presentationDepth == 1 }
+        XCTAssertEqual(returned.selection, landscape.selection)
+        XCTAssertEqual(returned.candidates, landscape.candidates)
+        XCTAssertEqual(returned.detent, landscape.detent)
+        XCTAssertTrue(resultsScroll(in: app).isHittable, "Map results return after the sheet closes")
+    }
+
     func testActivityDetailAndUnderlyingResultsSurviveRotation() async throws {
         let app = launch()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }

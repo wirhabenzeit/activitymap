@@ -57,6 +57,7 @@ export const nativeSuites = [
   'ActivityMapTests/StravaImportTests',
   'ActivityMapTests/StreamsAPITests',
   'ActivityMapTests/ActivityPlacesTests',
+  'ActivityMapTests/PlaceLibraryTests',
   'ActivityMapTests/StreamSummaryLoaderTests',
   'ActivityMapTests/StreamSummarySyncTests',
   'ActivityMapTests/SpeedDisplayTests',
@@ -72,6 +73,8 @@ export const nativeSuites = [
   'ActivityMapTests/ActivityContinuationTests',
   'ActivityMapTests/PhotoGalleryTests',
   'ActivityMapUITests/ActivityPlacesUITests',
+  'ActivityMapUITests/PlaceSearchUITests',
+  'ActivityMapUITests/FilterPanelUITests',
   'ActivityMapUITests/ActivityActionUITests',
   'ActivityMapUITests/StatsUITests',
   'ActivityMapUITests/MapPhotoUITests',
@@ -81,6 +84,8 @@ export const nativeSuites = [
 ];
 
 export const nativePRUISelectors = [
+  'ActivityMapUITests/FilterPanelUITests/testSearchRowRidesOnTheKeyboardAndKeepsFilters',
+  'ActivityMapUITests/PlaceSearchUITests/testPlaceAutocompleteFilteringDetailsAndStatsHistory',
   'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
   'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
   'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',

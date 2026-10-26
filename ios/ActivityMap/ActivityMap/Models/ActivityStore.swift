@@ -34,6 +34,7 @@ nonisolated struct NumericFilter: Hashable, Sendable {
 /// reconcile its final predicates once. Selected-only scope stays in the reducer.
 struct ActivityFilterState: Equatable {
     var searchText = ""
+    var place: PlaceFilter?
     var activeSportTypes = Set(SportType.allCases)
     var dateDayRange: ActivityDayRange?
     var distanceFilter: NumericFilter?
@@ -57,6 +58,32 @@ final class ActivityStore {
     /// data (e.g. the map's route source) only when the activities change.
     private(set) var activitiesRevision = 0
     private var filterRevision = 0
+    private(set) var placeUserID: String?
+    private(set) var placeMatchingVersion: String?
+    private var placeHistoryComplete = false
+    @ObservationIgnored private var placeLibrarySnapshot: (revision: Int, library: PlaceLibrary)?
+
+    var placeLibrary: PlaceLibrary {
+        let revision = activitiesRevision
+        if let cached = placeLibrarySnapshot, cached.revision == revision { return cached.library }
+        let library = PlaceLibrary(activities: activities, userID: placeUserID, libraryComplete: placeHistoryComplete)
+        placeLibrarySnapshot = (revision, library)
+        return library
+    }
+
+    func replaceSyncedActivities(_ snapshot: StoreSnapshot, scope: StoreScope) throws {
+        let version = snapshot.checkpoint?.freshness?.placeMatchingVersion
+        let projected = try snapshot.activities.map { dto in
+            var activity = try StoredModelMapper.activity(dto)
+            activity.placeMatches = PlaceLibrary.currentResult(dto, userID: scope.userID, version: version)
+            return activity
+        }
+        if placeUserID != scope.userID { selectedPlace = nil }
+        placeUserID = scope.userID
+        placeMatchingVersion = version
+        placeHistoryComplete = snapshot.checkpoint?.bootstrapComplete == true
+        activities = projected
+    }
     @ObservationIgnored private var filteredSnapshot: (data: Int, filters: Int, activities: [Activity])?
     @ObservationIgnored private var listedSnapshot: (data: Int, filters: Int, sort: ActivityListSort, selected: Set<Int>?, restricted: Bool, activities: [Activity])?
     @ObservationIgnored private(set) var filterBuildCount = 0
@@ -128,7 +155,7 @@ final class ActivityStore {
     /// The sync coordinator will call this after a committed sync pass.
     func load(from store: LocalStore, scope: StoreScope) async throws {
         let snapshot = try await store.snapshot(scope: scope)
-        activities = try snapshot.activities.map(StoredModelMapper.activity)
+        try replaceSyncedActivities(snapshot, scope: scope)
     }
 
     // Every filter change reconciles selection visibility: hidden selections
@@ -146,6 +173,14 @@ final class ActivityStore {
     var searchText: String {
         get { filters.searchText }
         set { updateFilters { $0.searchText = newValue } }
+    }
+    var selectedPlace: PlaceFilter? {
+        get { filters.place }
+        set { updateFilters { $0.place = newValue } }
+    }
+    func selectPlace(_ place: LibraryPlace) {
+        guard let userID = placeUserID else { return }
+        updateFilters { $0.place = PlaceFilter(id: place.id, name: place.place.name, userID: userID); $0.searchText = "" }
     }
     var activeSportTypes: Set<SportType> {
         get { filters.activeSportTypes }
@@ -274,6 +309,7 @@ final class ActivityStore {
     }
 
     private func matchesFilters(_ activity: Activity, query: String, includeDate: Bool) -> Bool {
+        if let selectedPlace, activity.placeMatches?.userID != selectedPlace.userID || !PlaceLibrary.effectivePlaces(activity).contains(where: { $0.id == selectedPlace.id }) { return false }
         if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
         guard activeSportTypes.contains(activity.sportType) else { return false }
 
@@ -313,6 +349,7 @@ final class ActivityStore {
         var count = searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? 0 : 1
         count += activeSportTypes == Set(SportType.allCases) ? 0 : 1
         count += dateDayRange == nil ? 0 : 1
+        count += selectedPlace == nil ? 0 : 1
         count += distanceFilter == nil ? 0 : 1
         count += elevationFilter == nil ? 0 : 1
         count += durationFilter == nil ? 0 : 1
@@ -459,6 +496,11 @@ final class ActivityStore {
 
     /// Logout, account or deployment transition.
     func clearScope() {
+        selectedPlace = nil
+        placeUserID = nil
+        placeMatchingVersion = nil
+        placeHistoryComplete = false
+        placeLibrarySnapshot = nil
         photos = []
         photoImages.reset()
         elevationCursor = nil

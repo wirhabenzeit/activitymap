@@ -103,6 +103,8 @@ test('native profiles retain all unit suites and select exactly the intended PR 
     suite.startsWith('ActivityMapTests/'),
   );
   const expectedUI = [
+    'ActivityMapUITests/FilterPanelUITests/testSearchRowRidesOnTheKeyboardAndKeepsFilters',
+    'ActivityMapUITests/PlaceSearchUITests/testPlaceAutocompleteFilteringDetailsAndStatsHistory',
     'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
     'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
     'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
@@ -111,14 +113,14 @@ test('native profiles retain all unit suites and select exactly the intended PR 
     'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
     'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
   ];
-  assert.equal(unitSuites.length, 32);
+  assert.equal(unitSuites.length, 33);
   assert.deepEqual(nativePRUISelectors, expectedUI);
   assert.deepEqual(pr.suites, [...unitSuites, ...expectedUI]);
-  assert.equal(new Set(pr.suites).size, 39);
+  assert.equal(new Set(pr.suites).size, 42);
   assert.equal(pr.name, 'pr');
   assert.equal(pr.runtimeTimeoutMs, 12 * 60 * 1000);
   assert.deepEqual(full.suites, nativeSuites);
-  assert.equal(full.suites.length, 39);
+  assert.equal(full.suites.length, 42);
   assert.equal(full.name, 'full');
   assert.equal(full.runtimeTimeoutMs, 45 * 60 * 1000);
   assert.deepEqual(nativeTestProfile('full'), full);
@@ -150,7 +152,7 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
       (item) => item.actual === '26.2' && item.requires === 'iOS 27+',
     ),
   );
-  assert.equal(result.suites.length, 34);
+  assert.equal(result.suites.length, 37);
   assert(
     result.suites.includes(
       'ActivityMapTests/StatsCalendarScrollRenderingTests',
@@ -162,6 +164,8 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
     nativePRUISelectors.filter(
       (selector) =>
         selector.includes('/ActivityPlacesUITests/') ||
+        selector.includes('/PlaceSearchUITests/') ||
+        selector.includes('/FilterPanelUITests/') ||
         selector.includes('/ActivityActionUITests/'),
     ),
   );

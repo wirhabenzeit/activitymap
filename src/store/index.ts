@@ -8,6 +8,7 @@ import {
 import { immer } from 'zustand/middleware/immer';
 import { useShallow } from 'zustand/shallow';
 
+import { sanitizePlaceFilter } from '~/lib/place-library';
 import { baseMaps, defaultMapPosition, overlayMaps } from '~/settings/map';
 
 import { type ActivitySlice, createActivitySlice } from './activity';
@@ -52,6 +53,7 @@ type PersistedUiState = Pick<
   | 'dateRange'
   | 'values'
   | 'search'
+  | 'place'
   | 'binary'
 >;
 
@@ -170,10 +172,12 @@ export const store = create<RootState>()(
           dateRange: state.dateRange,
           values: toPersistedValues(state.values),
           search: state.search,
+          place: state.place,
           binary: state.binary,
         }),
         merge: (persistedState, currentState) => {
           const persisted = (persistedState ?? {}) as Partial<PersistedUiState>;
+          const place = sanitizePlaceFilter(persisted.place);
 
           const baseMap =
             typeof persisted.baseMap === 'string' &&
@@ -229,6 +233,12 @@ export const store = create<RootState>()(
             // not user choices, so only the explicit Any/Yes/No modes carry
             // forward.
             binary: sanitizePersistedBinary(persisted.binary),
+            place:
+              !currentState.isInitialized ||
+              (currentState.user?.stravaConnected &&
+                place?.userId === currentState.user.id)
+                ? place
+                : undefined,
           };
         },
       },

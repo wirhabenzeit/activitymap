@@ -1,8 +1,8 @@
 import { categorySettings } from '~/settings/category';
 import {
-  applyFilters,
   type FilterState,
   type FilterableActivity,
+  applyFilters,
 } from '~/store/filter';
 
 // Preserve comparison history. Every other sidebar constraint applies equally
@@ -35,6 +35,7 @@ export function statsFilterScope(state: FilterState) {
               : ' (some types)'),
         );
   if (state.search.trim()) labels.push(`Search: ${state.search.trim()}`);
+  if (state.place) labels.push(`Place: ${state.place.name}`);
   for (const [key, mode] of Object.entries(state.binary)) {
     if (mode !== 'any')
       labels.push(`${key[0]!.toUpperCase()}${key.slice(1)}: ${mode}`);

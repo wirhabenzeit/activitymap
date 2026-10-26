@@ -1,5 +1,30 @@
 import SwiftUI
 
+/// The phone filter sheet: one short height that leaves the map, list or Stats
+/// visible and usable while searching. A keyboard lifts a sheet to its largest
+/// detent, so a second height would jump in as the keyboard comes; with one,
+/// the keyboard raises the whole sheet in the system's own animation.
+/// Landscape and accessibility sizes use the full-height sheet.
+struct FilterSheet: View {
+    @Bindable var store: ActivityStore
+    var scope: FilterScope
+    /// The list or map behind the sheet stays usable.
+    var interactiveBackground = true
+    let onDismiss: () -> Void
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.dynamicTypeSize) private var typeSize
+
+    var body: some View {
+        NavigationStack {
+            FilterPanel(store: store, scope: scope, inNavigationStack: true, onDismiss: onDismiss)
+        }
+        .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.fraction(0.4)])
+        .presentationBackgroundInteraction(interactiveBackground ? .enabled : .automatic)
+        .presentationDragIndicator(.visible)
+        .presentationContentInteraction(.scrolls)
+    }
+}
+
 struct FilterPanel: View {
     @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
     private var units: UnitSystem { preferences?.units ?? .metric }
@@ -7,8 +32,14 @@ struct FilterPanel: View {
     var scope: FilterScope = .browsing
     /// One part alone, as the iPad filter rail's popovers show it; nil is the whole panel.
     var part: FilterPart? = nil
+    /// Hosted in a navigation stack: the count, Reset and Close move into its
+    /// title and toolbar, and search is the form's first row.
+    var inNavigationStack = false
+    var onDismiss: (() -> Void)? = nil
     @State private var editingCustomDates = false
+    @State private var contentScrolled = false
     @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.locale) private var locale
     @State private var startDate = Date()
     @State private var endDate = Date()
 
@@ -16,12 +47,42 @@ struct FilterPanel: View {
     private var activeCount: Int { scope == .stats ? store.activeStatsFilterCount : store.activeFilterCount }
 
     var body: some View {
+        if inNavigationStack {
+            form
+                .navigationTitle(Text(AppMessages.navigationFilters(locale: locale)))
+                .navigationSubtitle(resultSummary)
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .topBarLeading) { FilterResetButton(store: store, scope: scope) }
+                    if let onDismiss {
+                        ToolbarItem(placement: .topBarTrailing) {
+                            Button(role: .close, action: onDismiss)
+                                .accessibilityLabel("Close filters")
+                                .accessibilityIdentifier("filters-done")
+                        }
+                    }
+                }
+        } else {
+            VStack(spacing: 0) {
+                if part == nil { summaryHeader }
+                form
+            }
+        }
+    }
+
+    private var form: some View {
         Form {
             if let part { single(part) } else { full }
         }
+        .scrollContentBackground(inNavigationStack ? .automatic : .hidden)
         .listSectionSpacing(.compact)
         .contentMargins(.top, 8, for: .scrollContent)
         .scrollDismissesKeyboard(.interactively)
+        .onScrollGeometryChange(for: Bool.self) {
+            $0.contentOffset.y + $0.contentInsets.top > 1
+        } action: { _, scrolled in
+            contentScrolled = scrolled
+        }
         .onChange(of: store.filterResetRevision) { _, _ in
             editingCustomDates = false
             loadDateDraft()
@@ -41,19 +102,6 @@ struct FilterPanel: View {
 
     @ViewBuilder private var full: some View {
         Section {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(count) of \(store.activities.count) activities")
-                        .font(.subheadline.weight(.semibold))
-                        .accessibilityIdentifier("filter-result-count")
-                    if activeCount > 0 {
-                        Text("\(activeCount) active filters").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                FilterResetButton(store: store, scope: scope)
-                    .font(.caption)
-            }
             searchField
             if scope != .stats { selectionFilter }
         }
@@ -63,27 +111,48 @@ struct FilterPanel: View {
         binarySection
     }
 
+    private var summaryHeader: some View {
+        HStack(spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text("\(count) of \(store.activities.count) activities")
+                    .font(.subheadline.weight(.semibold))
+                    .accessibilityValue("\(activeCount) active filters")
+                    .accessibilityIdentifier("filter-result-count")
+                if activeCount > 0 {
+                    Text("\(activeCount) active filters")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            FilterResetButton(store: store, scope: scope)
+                .font(.subheadline)
+                .fixedSize(horizontal: true, vertical: false)
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 4)
+        .padding(.bottom, 4)
+        .overlay(alignment: .bottom) {
+            if contentScrolled { Divider() }
+        }
+    }
+
+    private var resultSummary: String {
+        let total = "\(count) of \(store.activities.count) activities"
+        return activeCount > 0 ? "\(total) · \(activeCount) active" : total
+    }
+
     private var selectionFilter: some View {
         Toggle("Only selected activities", isOn: Binding(get: { store.onlySelected }, set: { store.setOnlySelected($0) }))
             .disabled(store.selectedActivityIDs.isEmpty)
             .accessibilityIdentifier("only-selected-filter")
     }
 
-    private var searchField: some View {
-        HStack {
-            TextField("Search activity names", text: $store.searchText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .accessibilityIdentifier("activity-name-search")
-                .accessibilityLabel("Search activity names")
-            if !store.searchText.isEmpty {
-                Button { store.searchText = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.borderless).accessibilityLabel("Clear Search")
-            }
+    @ViewBuilder private var searchField: some View {
+        if inNavigationStack {
+            InlinePlaceSearch(store: store)
+        } else {
+            PlaceSearchField(store: store)
         }
     }
 
@@ -321,7 +390,7 @@ enum FilterPart: CaseIterable, Identifiable {
     @MainActor func isActive(_ store: ActivityStore) -> Bool {
         switch self {
         case .selection: store.onlySelected
-        case .search: !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .search: store.selectedPlace != nil || !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .sports: store.activeSportTypes != Set(SportType.allCases)
         case .dates: store.dateDayRange != nil
         case .distance: store.distanceFilter != nil

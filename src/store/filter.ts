@@ -3,6 +3,7 @@ import { type StateCreator } from 'zustand';
 
 import type { SportType } from '~/contracts/sport';
 import type { Activity } from '~/lib/activity';
+import { type PlaceFilter, effectiveActivityPlaces } from '~/lib/place-library';
 import { type CategorySetting, categorySettings } from '~/settings/category';
 import { type inequalityFilters } from '~/settings/filter';
 
@@ -39,6 +40,7 @@ export type FilterState = {
   dateRange: DateRange | undefined;
   values: Record<ValueColumn, ValueFilter | undefined>;
   search: string;
+  place?: PlaceFilter;
   binary: Record<BinaryColumn, BinaryFilterMode>;
 };
 
@@ -56,6 +58,7 @@ export type FilterActions = {
     operator: ValueFilter['operator'],
   ) => void;
   setSearch: (update: SetStateAction<string>) => void;
+  setPlace: (place: PlaceFilter | undefined) => void;
   setBinary: (
     update: SetStateAction<Record<BinaryColumn, BinaryFilterMode>>,
   ) => void;
@@ -77,6 +80,7 @@ export type FilterableActivity = Pick<
   | 'name'
 > & {
   start_date_local: Date | string;
+  placeMatches?: Activity['placeMatches'];
 };
 
 const calendarDatePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -294,6 +298,14 @@ export const applyFilters = (
   state: FilterState,
   activity: FilterableActivity,
 ): boolean => {
+  if (
+    state.place &&
+    (activity.placeMatches?.userId !== state.place.userId ||
+      !effectiveActivityPlaces(activity).some(
+        (place) => place.id === state.place!.id,
+      ))
+  )
+    return false;
   if (!state.sportType[activity.sport_type]) return false;
 
   if (state.dateRange) {
@@ -410,6 +422,12 @@ export const createFilterSlice: StateCreator<
       });
     },
 
+    setPlace: (place) => {
+      set((state) => {
+        state.place = place;
+      });
+    },
+
     setBinary: (update) => {
       set((state) => {
         state.binary =
@@ -423,6 +441,7 @@ export const createFilterSlice: StateCreator<
         state.sportGroup = initializeSportGroup();
         state.values = initializeValues();
         state.search = '';
+        state.place = undefined;
         state.binary = initializeBinary();
       });
     },
@@ -435,6 +454,7 @@ export const createFilterSlice: StateCreator<
         state.dateRange = undefined;
         state.values = initializeValues();
         state.search = '';
+        state.place = undefined;
         state.binary = initializeBinary();
       });
     },
