@@ -416,6 +416,12 @@ nonisolated enum AppMessages {
     static func navigationFilters(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("navigation.filters", defaultValue: "Filters", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
     }
+    static func filtersGroupTotals(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.group.totals", defaultValue: "Totals", table: "Presentation", locale: locale, comment: "Section heading for the distance, elevation gain and elapsed time filters.")
+    }
+    static func filtersGroupFlags(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.group.flags", defaultValue: "Flags", table: "Presentation", locale: locale, comment: "Section heading for the commute, private and flagged activity filters.")
+    }
     static func navigationSettings(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("navigation.settings", defaultValue: "Settings", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
     }

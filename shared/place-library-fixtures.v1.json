@@ -1,0 +1,521 @@
+{
+  "version": 1,
+  "userId": "alice",
+  "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "activities": [
+    {
+      "id": "1",
+      "name": "Morning ridge",
+      "sport_type": "Hike",
+      "start_date_local": "2025-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "1",
+        "status": "complete",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-1",
+        "places": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "Pilátus",
+            "kinds": ["peak", "pass"],
+            "latitude": 46.98,
+            "longitude": 8.25,
+            "elevationM": 2128,
+            "visits": [
+              {
+                "distanceM": 10
+              },
+              {
+                "distanceM": 20
+              }
+            ]
+          },
+          {
+            "id": "00000000-0000-4000-8000-000000000003",
+            "name": "Alpine hut",
+            "kinds": ["hut"],
+            "latitude": 46.99,
+            "longitude": 8.26,
+            "elevationM": 0,
+            "visits": [
+              {
+                "distanceM": 30
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "2",
+      "name": "Evening outing",
+      "sport_type": "Ride",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "2",
+        "status": "complete",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-2",
+        "places": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "Pilátus",
+            "kinds": ["peak", "pass"],
+            "latitude": 46.98,
+            "longitude": 8.25,
+            "elevationM": 2128,
+            "visits": [
+              {
+                "distanceM": 10
+              },
+              {
+                "distanceM": 20
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "3",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "3",
+        "status": "complete",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-3",
+        "places": [
+          {
+            "id": "00000000-0000-4000-8000-000000000002",
+            "name": "Pilátus",
+            "kinds": ["peak"],
+            "latitude": 47.1,
+            "longitude": 9.25,
+            "elevationM": null,
+            "visits": [
+              {
+                "distanceM": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "4",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "4",
+        "status": "complete",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-4",
+        "places": []
+      }
+    },
+    {
+      "id": "5",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "5",
+        "status": "pending",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-5",
+        "places": []
+      }
+    },
+    {
+      "id": "6",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "6",
+        "status": "partial",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-6",
+        "places": []
+      }
+    },
+    {
+      "id": "7",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "7",
+        "status": "uncovered",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-7",
+        "places": []
+      }
+    },
+    {
+      "id": "8",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "8",
+        "status": "missing_streams",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-8",
+        "places": []
+      }
+    },
+    {
+      "id": "9",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "9",
+        "status": "complete",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "resultRevision": "result-9",
+        "places": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "Pilátus",
+            "kinds": ["peak", "pass"],
+            "latitude": 46.98,
+            "longitude": 8.25,
+            "elevationM": 2128,
+            "visits": [
+              {
+                "distanceM": 10
+              },
+              {
+                "distanceM": 20
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "10",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "other",
+        "activityId": "10",
+        "status": "complete",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-10",
+        "places": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "Pilátus",
+            "kinds": ["peak", "pass"],
+            "latitude": 46.98,
+            "longitude": 8.25,
+            "elevationM": 2128,
+            "visits": [
+              {
+                "distanceM": 10
+              },
+              {
+                "distanceM": 20
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "11",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "11",
+        "status": "complete",
+        "streamGeneration": "old",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-11",
+        "places": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "Pilátus",
+            "kinds": ["peak", "pass"],
+            "latitude": 46.98,
+            "longitude": 8.25,
+            "elevationM": 2128,
+            "visits": [
+              {
+                "distanceM": 10
+              },
+              {
+                "distanceM": 20
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "12",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "12",
+        "status": "unavailable",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-12",
+        "places": []
+      }
+    },
+    {
+      "id": "13",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "stale",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      },
+      "placeMatches": {
+        "userId": "alice",
+        "activityId": "13",
+        "status": "complete",
+        "streamGeneration": "g1",
+        "streamRevision": "1",
+        "catalogueSnapshotId": "catalogue",
+        "matcherVersion": "matcher",
+        "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "resultRevision": "result-13",
+        "places": [
+          {
+            "id": "00000000-0000-4000-8000-000000000001",
+            "name": "Pilátus",
+            "kinds": ["peak", "pass"],
+            "latitude": 46.98,
+            "longitude": 8.25,
+            "elevationM": 2128,
+            "visits": [
+              {
+                "distanceM": 10
+              },
+              {
+                "distanceM": 20
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "14",
+      "name": "Evening outing",
+      "sport_type": "Hike",
+      "start_date_local": "2026-05-01T12:00:00.000Z",
+      "streams": {
+        "generation": "g1",
+        "revision": "1",
+        "state": "current",
+        "fetch_status": "succeeded",
+        "available_types": ["distance", "altitude", "latlng"],
+        "fetched_at": null,
+        "expires_at": null
+      }
+    }
+  ],
+  "expected": {
+    "counts": {
+      "00000000-0000-4000-8000-000000000001": 2,
+      "00000000-0000-4000-8000-000000000002": 1,
+      "00000000-0000-4000-8000-000000000003": 1
+    },
+    "statusCounts": {
+      "complete": 4,
+      "pending": 1,
+      "partial": 1,
+      "uncovered": 1,
+      "missing_streams": 1,
+      "unavailable": 1,
+      "unknown": 5
+    },
+    "placeFilter": "00000000-0000-4000-8000-000000000001",
+    "browsingIds": [2],
+    "statsIds": [1, 2]
+  }
+}

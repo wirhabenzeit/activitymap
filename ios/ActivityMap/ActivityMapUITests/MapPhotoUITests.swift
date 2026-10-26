@@ -11,7 +11,7 @@ final class MapPhotoUITests: XCTestCase {
         let layers = app.buttons["Map layers"]
         XCTAssertTrue(layers.waitForExistence(timeout: 15), app.debugDescription)
         layers.tap()
-        let photos = app.buttons["Show photos on map"]
+        let photos = app.buttons["Photos"]
         XCTAssertTrue(photos.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertTrue(photos.isEnabled)
         let basemaps = app.buttons["Standard"]
@@ -103,7 +103,7 @@ final class MapPhotoUITests: XCTestCase {
         XCTAssertFalse(deleted.selectionChangedDuringViewer)
 
         app.buttons["Map layers"].tap()
-        let toggle = app.buttons["Show photos on map"]
+        let toggle = app.buttons["Photos"]
         XCTAssertTrue(toggle.waitForExistence(timeout: 5))
         toggle.tap()
         let hidden = try await state(in: app) { !$0.showPhotos }

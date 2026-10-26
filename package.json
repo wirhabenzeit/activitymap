@@ -74,6 +74,7 @@
     "test:browsing-ui": "tsx --test src/components/list/*.test.tsx",
     "db:test-on-demand-places": "tsx --conditions=react-server scripts/database/test-on-demand-places.ts",
     "test:activity-places-ui": "node scripts/verify-activity-places.mjs",
+    "test:place-search-ui": "node scripts/verify-place-search.mjs",
     "test:place-debug-ui": "node scripts/verify-place-debug.mjs",
     "db:test-place-matching": "tsx --conditions=react-server scripts/database/test-place-matching.ts",
     "places:match-local": "tsx --conditions=react-server scripts/match-activity-places.ts",

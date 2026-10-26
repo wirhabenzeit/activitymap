@@ -303,7 +303,7 @@ try {
   }));
   await page.getByRole('button', { name: 'Map layers', exact: true }).click();
   const photoToggle = page.getByRole('menuitemcheckbox', {
-    name: 'Show photos on map',
+    name: 'Photos',
     exact: true,
   });
   await photoToggle.waitFor();

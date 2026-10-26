@@ -15,7 +15,11 @@ import { createFeature } from '~/lib/activity-utils';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { libraryQueryState } from '~/lib/sync/library-query-state';
 import { fetchAndPersistPage } from '~/lib/sync/persisted-page';
-import { type ActivityWithStreams, dtoToActivity } from '~/lib/sync/v1-mappers';
+import {
+  type ActivityWithStreams,
+  dtoToActivity,
+  dtoToActivityWithPlaces,
+} from '~/lib/sync/v1-mappers';
 import { getCachedActivityDTOs, upsertActivityDTOs } from '~/lib/sync/v1-store';
 import {
   getPublicActivities,
@@ -207,10 +211,18 @@ export function useActivities() {
 
   const activityDTOs = library.snapshot?.activities;
   const loaded = library.snapshot?.loaded;
+  const matchingVersion = library.snapshot?.syncState?.placeMatchingVersion;
+  const placeUserId = useShallowStore((state) =>
+    !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
+  );
   const authenticatedData = useMemo(
     () =>
-      loaded && activityDTOs ? activityDTOs.map(dtoToActivity) : undefined,
-    [loaded, activityDTOs],
+      loaded && activityDTOs
+        ? activityDTOs.map((dto) =>
+            dtoToActivityWithPlaces(dto, placeUserId ?? '', matchingVersion),
+          )
+        : undefined,
+    [loaded, activityDTOs, placeUserId, matchingVersion],
   );
   const authenticatedState = useMemo(
     () =>
@@ -221,13 +233,18 @@ export function useActivities() {
       ),
     [library.snapshot, library.sync, authenticatedData?.length],
   );
-  if (library.scope)
-    return {
+  // A search-only render must not publish a new browsing-context value before
+  // its deferred projection changes. Preserve query identity for that pass.
+  const authenticatedQuery = useMemo(
+    () => ({
       ...authenticatedState,
       data: authenticatedData,
       refetch: library.refetch,
       fetchNextPage: library.refetch,
-    };
+    }),
+    [authenticatedState, authenticatedData, library.refetch],
+  );
+  if (library.scope) return authenticatedQuery;
 
   // Streaming logic moved to <ActivityStreamer /> to avoid duplicate fetches
   // when this hook is used in multiple components.

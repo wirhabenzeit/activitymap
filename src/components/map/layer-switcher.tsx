@@ -75,7 +75,7 @@ export function LayerSwitcher() {
           className="gap-2"
         >
           <Camera className="h-4 w-4" aria-hidden="true" />
-          Show photos on map
+          Photos
         </PreferenceMenuCheckboxItem>
         <PreferenceMenuCheckboxItem
           checked={showPlaces}
@@ -83,7 +83,7 @@ export function LayerSwitcher() {
           className="gap-2"
         >
           <Mountain className="h-4 w-4" aria-hidden="true" />
-          Show places on map
+          Places
         </PreferenceMenuCheckboxItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Base Map</DropdownMenuLabel>

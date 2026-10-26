@@ -4,6 +4,7 @@ import { Filter } from 'lucide-react';
 import { useMemo } from 'react';
 
 import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
+import { useDeferredActivityFilters } from '~/hooks/use-deferred-activity-filters';
 import {
   filterStatsActivities,
   statsFilterScope,
@@ -13,14 +14,7 @@ import { useShallowStore } from '~/store';
 
 export function useStatsActivities() {
   const { query } = useBrowsingLibrary();
-  const state = useShallowStore((s) => ({
-    sportType: s.sportType,
-    sportGroup: s.sportGroup,
-    dateRange: s.dateRange,
-    values: s.values,
-    binary: s.binary,
-    search: s.search,
-  }));
+  const state = useDeferredActivityFilters();
   const reset = useShallowStore((s) => s.resetActivityFilters);
   const activities = useMemo(
     () => filterStatsActivities(query.data ?? [], state).map(toStatsActivity),

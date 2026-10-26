@@ -184,6 +184,13 @@ enum BrowsePaneLayout {
         supportsDetail(width: width, regular: regular, accessibilityText: accessibilityText)
     }
 
+    /// A landscape phone keeps the underlying Map or List visible beside a
+    /// dismissible panel, without reserving a permanent rail.
+    static func filtersUseSlideOver(width: CGFloat, regular: Bool, compactHeight: Bool, accessibilityText: Bool) -> Bool {
+        compactHeight && width >= 600 && !accessibilityText
+            && !filtersUseSidebar(width: width, regular: regular, accessibilityText: accessibilityText)
+    }
+
     /// The full panel leaves no room for List and its adjacent detail, but the
     /// collapsed rail does, as in 11-inch portrait (#354).
     static func panelSqueezesDetail(width: CGFloat) -> Bool {

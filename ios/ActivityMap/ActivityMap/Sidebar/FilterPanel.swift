@@ -7,7 +7,9 @@ struct FilterPanel: View {
     var scope: FilterScope = .browsing
     /// One part alone, as the iPad filter rail's popovers show it; nil is the whole panel.
     var part: FilterPart? = nil
+    var onDismiss: (() -> Void)? = nil
     @State private var editingCustomDates = false
+    @State private var contentScrolled = false
     @Environment(\.dynamicTypeSize) private var typeSize
     @State private var startDate = Date()
     @State private var endDate = Date()
@@ -16,12 +18,21 @@ struct FilterPanel: View {
     private var activeCount: Int { scope == .stats ? store.activeStatsFilterCount : store.activeFilterCount }
 
     var body: some View {
-        Form {
-            if let part { single(part) } else { full }
+        VStack(spacing: 0) {
+            if part == nil { summaryHeader }
+            Form {
+                if let part { single(part) } else { full }
+            }
+            .scrollContentBackground(.hidden)
+            .listSectionSpacing(.compact)
+            .contentMargins(.top, 8, for: .scrollContent)
+            .scrollDismissesKeyboard(.interactively)
+            .onScrollGeometryChange(for: Bool.self) {
+                $0.contentOffset.y + $0.contentInsets.top > 1
+            } action: { _, scrolled in
+                contentScrolled = scrolled
+            }
         }
-        .listSectionSpacing(.compact)
-        .contentMargins(.top, 8, for: .scrollContent)
-        .scrollDismissesKeyboard(.interactively)
         .onChange(of: store.filterResetRevision) { _, _ in
             editingCustomDates = false
             loadDateDraft()
@@ -41,19 +52,6 @@ struct FilterPanel: View {
 
     @ViewBuilder private var full: some View {
         Section {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(count) of \(store.activities.count) activities")
-                        .font(.subheadline.weight(.semibold))
-                        .accessibilityIdentifier("filter-result-count")
-                    if activeCount > 0 {
-                        Text("\(activeCount) active filters").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
-                Spacer()
-                FilterResetButton(store: store, scope: scope)
-                    .font(.caption)
-            }
             searchField
             if scope != .stats { selectionFilter }
         }
@@ -63,29 +61,68 @@ struct FilterPanel: View {
         binarySection
     }
 
+    private var summaryHeader: some View {
+        HStack(spacing: 12) {
+            Group {
+                if onDismiss != nil {
+                    ViewThatFits(in: .horizontal) {
+                        resultCount(compact: false).fixedSize()
+                        resultCount(compact: true)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.75)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 2) {
+                        resultCount(compact: false)
+                        if activeCount > 0 {
+                            Text("\(activeCount) active filters")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            FilterResetButton(store: store, scope: scope, iconOnly: onDismiss != nil && typeSize.isAccessibilitySize)
+                .font(.subheadline)
+                .fixedSize(horizontal: true, vertical: false)
+            if let onDismiss {
+                Button(action: onDismiss) {
+                    Image(systemName: "xmark")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: AppTheme.minimumTarget, height: AppTheme.minimumTarget)
+                        .background(.quaternary, in: Circle())
+                        .contentShape(Circle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close filters")
+                .accessibilityIdentifier("filters-done")
+            }
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, onDismiss == nil ? 4 : 16)
+        .padding(.bottom, 4)
+        .overlay(alignment: .bottom) {
+            if contentScrolled { Divider() }
+        }
+    }
+
+    private func resultCount(compact: Bool) -> some View {
+        Text(compact ? "\(count) / \(store.activities.count)" : "\(count) of \(store.activities.count) activities")
+            .font(.subheadline.weight(.semibold))
+            .accessibilityLabel("\(count) of \(store.activities.count) activities")
+            .accessibilityValue("\(activeCount) active filters")
+            .accessibilityIdentifier("filter-result-count")
+    }
+
     private var selectionFilter: some View {
         Toggle("Only selected activities", isOn: Binding(get: { store.onlySelected }, set: { store.setOnlySelected($0) }))
             .disabled(store.selectedActivityIDs.isEmpty)
             .accessibilityIdentifier("only-selected-filter")
     }
 
-    private var searchField: some View {
-        HStack {
-            TextField("Search activity names", text: $store.searchText)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .submitLabel(.search)
-                .accessibilityIdentifier("activity-name-search")
-                .accessibilityLabel("Search activity names")
-            if !store.searchText.isEmpty {
-                Button { store.searchText = "" } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                        .frame(width: 44, height: 44)
-                }
-                .buttonStyle(.borderless).accessibilityLabel("Clear Search")
-            }
-        }
-    }
+    private var searchField: some View { PlaceSearchField(store: store) }
 
     private var activitySection: some View {
         Section {
@@ -321,7 +358,7 @@ enum FilterPart: CaseIterable, Identifiable {
     @MainActor func isActive(_ store: ActivityStore) -> Bool {
         switch self {
         case .selection: store.onlySelected
-        case .search: !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .search: store.selectedPlace != nil || !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .sports: store.activeSportTypes != Set(SportType.allCases)
         case .dates: store.dateDayRange != nil
         case .distance: store.distanceFilter != nil

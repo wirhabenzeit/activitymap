@@ -12,6 +12,64 @@ retain separate distances. A place shared by selected routes has one map marker.
 Choosing a profile symbol focuses its map popup; clicking the marker preserves
 the activity selection. This delivery changes web UI only.
 
+## Searching the personal place library
+
+Web and iOS build a local place index from the current activity bundles already
+delivered by library sync. Search does not download the catalogue, call a matching
+endpoint, or fetch one result per activity. The web projection and native
+`PlaceLibrary.currentResult` check account/activity identity, matching version and
+stream generation/revision before exposing memberships. A changed global version
+also invalidates the native projection when activity payloads themselves have not
+changed. Completed empty replacements and deletions remove previous memberships.
+
+Typing in the activity filter remains activity-name search. Choosing a labelled
+place suggestion consumes that query and creates one explicit Place chip;
+subsequent text is an independent AND constraint. Removing the chip preserves
+text and other filters; Clear filters removes it. Stats applies the same place
+predicate while retaining earlier history for its own reporting/comparison
+periods. Suggestions always cover known visits across all dates and sports,
+including when other filters currently yield no activities.
+
+On web, text entry remains urgent while activity projections and autocomplete
+use deferred search values. The browsing query retains its identity during the
+urgent pass so it does not cause a context-wide results render on each key.
+Other filters and clearing search remain immediate. Deferred suggestions cannot
+be selected while they belong to an older query. Normalized place names are
+cached when the synced place index changes, rather than rebuilt while typing.
+
+The index exposes stable place identities, related activity IDs, distinct-activity
+counts, first/latest known activity-local visit dates and separate matching-status
+counts. Repeated encounters do not inflate membership counts; they remain intact
+in the route/profile bundles. Multi-kind memberships retain all kinds. Callers can
+build an index over a filtered activity scope using the shared activity predicate;
+they must retain the source library's completeness rather than infer completeness
+from positive memberships alone. Suggestions are paged/bounded and distinguish
+identically named places with kind and elevation. Current sync bundles
+contain display names only, so alternate-name search awaits a future additive
+metadata change; this slice changes no server contract or database schema.
+
+The compact place detail uses the all-date/all-sport index.
+Opening it does not change selection or camera; Show activities / Show on map are
+explicit filter/navigation actions and preserve the existing other activity
+constraints. Account changes hide old details and clear the place constraint.
+Web persists only the account-scoped filter identity/name with existing UI
+preferences; native keeps it in memory like its other ordinary filters. Offline
+reads use the existing authorized cached library. Unknown/pending, missing GPS,
+uncovered and incomplete results remain distinct internally; the search and detail
+UI omit coverage caveats and scope captions.
+
+`effectiveActivityPlaces` / `PlaceLibrary.effectivePlaces` are the common
+membership boundary for future personal include/exclude overrides (#463). This
+delivery does not implement correction writes or fabricate manual encounter
+positions.
+
+Verification: `shared/place-library-fixtures.v1.json` supplies cross-client
+counts, freshness and filter cases; `pnpm test:place-search-ui` checks production
+web controls with synthetic activities, including keyboard selection, restored
+filters, comparison history, completed-zero replacement, account changes and zero
+API requests. `PlaceLibraryTests` and `PlaceSearchUITests` cover the native model
+and the real filter/detail interaction and are registered in the native harness.
+
 ## Request and data flow
 
 `GET /api/activities/{id}/places` resolves the authenticated actor and reads the

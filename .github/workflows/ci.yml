@@ -83,6 +83,8 @@ jobs:
         run: pnpm test:browser
       - name: Verify selected-route place markers and elevation annotations
         run: pnpm test:activity-places-ui
+      - name: Verify local place autocomplete, filters and details
+        run: pnpm test:place-search-ui
       - name: Verify account-scoped place matching experiments
         run: pnpm test:place-debug-ui
       - name: Upload browser logs, traces, screenshots and result counts

@@ -76,10 +76,11 @@ struct AppShell: View {
         .environment(\.activitySharing, sync?.sharing)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { old, new in
             shellSize = new
-            // A resize that switches between sheet and sidebar closes the old
+            // A resize that switches filter presentation closes the old
             // host rather than reopening filters in the other one. The first
             // layout (from zero) keeps filters as requested.
-            if old.width > 0, filterSidebarAvailable(width: old.width) != filterSidebarAvailable(width: new.width) {
+            if old.width > 0, (filterSidebarAvailable(width: old.width) != filterSidebarAvailable(width: new.width)
+                || filterSlideOverAvailable(width: old.width) != filterSlideOverAvailable(width: new.width)) {
                 sheets.showsFilters = false
             }
         }
@@ -145,7 +146,7 @@ struct AppShell: View {
         // The presenter belongs to the stationary shell, so Settings can
         // open from either the dashboard or a focused chart.
         .sheet(item: Binding(
-            get: { usesStatsNavigation && shellSize.width > 0 && !sheets.mapResultsPresented ? shellRequest(sidebarAvailable: filterSidebarAvailable) : nil },
+            get: { usesStatsNavigation && shellSize.width > 0 && !sheets.mapResultsPresented ? shellRequest(sidebarAvailable: filterSidebarAvailable, slideOverAvailable: filterSlideOverAvailable) : nil },
             set: { if usesStatsNavigation && !sheets.mapResultsPresented && $0 == nil { clearShellRequest() } }
         ), onDismiss: { sheets.shellSheetPresented = false }) { destination in
             shellSheet(destination).onAppear { sheets.shellSheetPresented = true }
@@ -183,6 +184,7 @@ struct AppShell: View {
         VStack(spacing: 0) {
             GeometryReader { geometry in
                 let sidebarAvailable = filterSidebarAvailable(width: geometry.size.width)
+                let slideOverAvailable = filterSlideOverAvailable(width: geometry.size.width)
                 // Rotation must choose the filter host and content width from
                 // the same geometry pass, before shellSize's callback arrives.
                 let panelTight = panelTight(width: geometry.size.width)
@@ -200,7 +202,10 @@ struct AppShell: View {
                         && !(store.selectedTab == .map && nativeMapHeader) {
                         shellHeader(sidebarAvailable: sidebarAvailable).zIndex(1)
                     }
-                    filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats) {
+                    filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats,
+                                    slideOverAvailable: slideOverAvailable,
+                                    slideOverTopInset: (store.selectedTab == .list && nativeListHeader)
+                                        || (store.selectedTab == .stats && nativeStatsHeader) ? toolbarLayout.height : 0) {
                         navigableContent(nativeListHeader: nativeListHeader, sidebarAvailable: sidebarAvailable)
                             .environment(\.browsePaneWidth, contentWidth)
                             .environment(\.statsFocusZoom, statsZoom)
@@ -208,18 +213,19 @@ struct AppShell: View {
                             .environment(\.listRootHeader, toolbarLayout.isCompact && nativeListHeader ? browseRootToolbar(sidebarAvailable: sidebarAvailable) : nil)
                             .environment(\.filtersCollapseForDetail, panelTight && sheets.showsFilters && !panelFloats)
                             // Filters and Settings stack over the map's results sheet
-                            // instead of waiting for it to dismiss first.
-                            .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented)
+                            // instead of waiting for it to dismiss first. The landscape
+                            // drawer temporarily moves results out of its way.
+                            .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented || (slideOverAvailable && sheets.showsFilters))
                             .environment(\.mapResultsPresentationChanged, { sheets.mapResultsPresented = $0 })
                             .environment(\.stackedShellSheet, StackedShellSheet(
-                                request: Binding(get: { shellRequest(sidebarAvailable: sidebarAvailable) },
+                                request: Binding(get: { shellRequest(sidebarAvailable: sidebarAvailable, slideOverAvailable: slideOverAvailable) },
                                                  set: { if $0 == nil { clearShellRequest() } }),
                                 content: { AnyView(shellSheet($0)) }))
                     }
                 }
                 // While the map's results sheet is up, it presents these itself.
                 .sheet(item: Binding(
-                    get: { usesStatsNavigation || sheets.mapResultsPresented ? nil : shellRequest(sidebarAvailable: sidebarAvailable) },
+                    get: { usesStatsNavigation || sheets.mapResultsPresented ? nil : shellRequest(sidebarAvailable: sidebarAvailable, slideOverAvailable: slideOverAvailable) },
                     set: { value in
                         guard !usesStatsNavigation, !sheets.mapResultsPresented, value == nil else { return }
                         clearShellRequest()
@@ -257,6 +263,7 @@ struct AppShell: View {
 
     /// The filter host persists beside the dashboard and focused charts.
     private func filterWorkspace<Content: View>(sidebarAvailable: Bool, panelFloats: Bool,
+                                                slideOverAvailable: Bool, slideOverTopInset: CGFloat,
                                                 @ViewBuilder content: () -> Content) -> some View {
         let expanded = sidebarAvailable && sheets.showsFilters
         return HStack(spacing: 0) {
@@ -270,25 +277,26 @@ struct AppShell: View {
             content()
         }
         .overlay(alignment: .leading) {
-            if expanded && panelFloats {
+            if (expanded && panelFloats) || (slideOverAvailable && sheets.showsFilters) {
                 ZStack(alignment: .leading) {
                     Color.black.opacity(0.12)
                         .contentShape(Rectangle())
                         .onTapGesture { setFiltersExpanded(false) }
                         .accessibilityHidden(true)
                         .transition(.opacity)
-                    filterPanel(floating: true)
+                    filterPanel(floating: true, dismissable: slideOverAvailable)
                         .overlay(alignment: .trailing) { Divider() }
                         .shadow(color: .black.opacity(0.15), radius: 8, x: 3)
                         .transition(.move(edge: .leading))
                 }
+                .padding(.top, slideOverAvailable ? slideOverTopInset : 0)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func shellRequest(sidebarAvailable: Bool) -> ShellSheet? {
-        sheets.showsFilters && !sidebarAvailable ? .filters : sheets.accountDestination.map(ShellSheet.account)
+    private func shellRequest(sidebarAvailable: Bool, slideOverAvailable: Bool) -> ShellSheet? {
+        sheets.showsFilters && !sidebarAvailable && !slideOverAvailable ? .filters : sheets.accountDestination.map(ShellSheet.account)
     }
 
     private var filterSidebarAvailable: Bool { filterSidebarAvailable(width: shellSize.width) }
@@ -296,6 +304,13 @@ struct AppShell: View {
     private func filterSidebarAvailable(width: CGFloat) -> Bool {
         BrowsePaneLayout.filtersUseSidebar(width: width, regular: sizeClass == .regular,
                                            accessibilityText: typeSize.isAccessibilitySize)
+    }
+
+    private var filterSlideOverAvailable: Bool { filterSlideOverAvailable(width: shellSize.width) }
+
+    private func filterSlideOverAvailable(width: CGFloat) -> Bool {
+        BrowsePaneLayout.filtersUseSlideOver(width: width, regular: sizeClass == .regular,
+            compactHeight: verticalSizeClass == .compact, accessibilityText: typeSize.isAccessibilitySize)
     }
 
     /// The full panel leaves no room for List and its adjacent detail, but
@@ -312,8 +327,9 @@ struct AppShell: View {
         withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) { sheets.showsFilters = expanded }
     }
 
-    private func filterPanel(floating: Bool) -> some View {
-        FilterPanel(store: store, scope: filterScope)
+    private func filterPanel(floating: Bool, dismissable: Bool = false) -> some View {
+        FilterPanel(store: store, scope: filterScope,
+                    onDismiss: dismissable ? { setFiltersExpanded(false) } : nil)
             .frame(width: BrowsePaneLayout.filterWidth)
             .frame(maxHeight: .infinity)
             .background(Color(uiColor: .secondarySystemBackground))
@@ -336,18 +352,11 @@ struct AppShell: View {
     @ViewBuilder private func shellSheet(_ destination: ShellSheet) -> some View {
         switch destination {
         case .filters:
-            NavigationStack {
-                FilterPanel(store: store, scope: filterScope)
-                    .navigationTitle(Text(AppMessages.navigationFilters(locale: locale)))
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button { sheets.showsFilters = false } label: { Text(AppMessages.actionDone(locale: locale)) }
-                                .accessibilityIdentifier("filters-done")
-                        }
-                    }
+            FilterPanel(store: store, scope: filterScope) {
+                sheets.showsFilters = false
             }
             .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
+            .presentationContentInteraction(.scrolls)
             .presentationDragIndicator(.visible)
         case .account(let account):
             AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
@@ -393,7 +402,7 @@ struct AppShell: View {
         // Expands the rail into the full panel (or opens the sheet) and back.
         let open = sheets.showsFilters
         return Button {
-            if sidebarAvailable { setFiltersExpanded(!open) }
+            if sidebarAvailable || filterSlideOverAvailable { setFiltersExpanded(!sheets.showsFilters) }
             else { sheets.showsFilters.toggle() }
         } label: {
             Image(systemName: "line.3.horizontal.decrease")

@@ -53,6 +53,8 @@ struct Activity: Identifiable {
     var endCoordinate: CLLocationCoordinate2D? = nil
     var photosState: ActivityMapAPI.PhotosState? = nil
     var streams: ActivityMapAPI.StreamMetadata? = nil
+    /// Only account/version/stream-validated synchronized bundles enter this projection.
+    var placeMatches: ActivityMapAPI.ActivityPlaces? = nil
     var lastUpdated: Date? = nil
     var lastSummarySeenAt: Date? = nil
     var lastDetailedFetchedAt: Date? = nil

@@ -56,6 +56,13 @@ export const createAuthSlice: StateCreator<
   initializeAuth: (auth) => {
     set((state) => {
       const nextUser = auth.currentUser ?? undefined;
+      if (
+        state.place &&
+        (state.place.userId !== nextUser?.id ||
+          !nextUser?.stravaConnected ||
+          auth.guestMode)
+      )
+        state.place = undefined;
       const accountChanged =
         state.user?.id !== nextUser?.id ||
         state.isGuest !== Boolean(auth.guestMode) ||

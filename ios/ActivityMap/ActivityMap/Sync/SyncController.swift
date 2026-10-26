@@ -395,10 +395,11 @@ final class SyncController {
         }
         let activitiesChanged = publishedActivities != snapshot.activities
             || publishedActivityRevision != activities.activitiesRevision
+            || activities.placeMatchingVersion != checkpoint.freshness?.placeMatchingVersion
         if activitiesChanged {
             // Actual edits/deletions still invalidate derived data and reconcile
             // selection/inspection. An identical cache reload leaves it intact.
-            activities.activities = try snapshot.activities.map(StoredModelMapper.activity)
+            try activities.replaceSyncedActivities(snapshot, scope: session.scope)
             publishedActivities = snapshot.activities
             publishedActivityRevision = activities.activitiesRevision
         }

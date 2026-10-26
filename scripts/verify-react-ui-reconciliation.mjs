@@ -214,7 +214,7 @@ try {
   await page.setViewportSize({ width: 844, height: 390 });
   await page.getByRole('button', { name: 'Map layers', exact: true }).click();
   const checkbox = page.getByRole('menuitemcheckbox', {
-    name: 'Show photos on map',
+    name: 'Photos',
   });
   const checked = await checkbox.getAttribute('aria-checked');
   await checkbox.click();

@@ -37,7 +37,9 @@ struct ActivityMapApp: App {
         WindowGroup {
             #if DEBUG
             if isPlacesUITesting {
-                PlacesUITestFixture()
+                if ProcessInfo.processInfo.arguments.contains("--place-search-ui-testing") {
+                    PlaceSearchUITestFixture()
+                } else { PlacesUITestFixture() }
             } else if isActivityActionsUITesting {
                 ActivityActionsUITestFixture()
             } else if isStatsUITesting {
