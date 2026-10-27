@@ -506,6 +506,16 @@ try {
       3,
   );
   await page.getByRole('button', { name: 'Close place', exact: true }).click();
+  // Closing redraws the place symbols; a click before the map has the place
+  // under the pointer again can miss it on a slow runner.
+  await page.waitForFunction(() => {
+    const map = window.fixtureMap;
+    const p = map.project([8.001, 47.001]);
+    return (
+      !document.querySelector('.mapboxgl-popup') &&
+      map.queryRenderedFeatures(p, { layers: ['matched-places-hit'] }).length
+    );
+  });
   const pixel = await page.evaluate(() => {
     const p = window.fixtureMap.project([8.001, 47.001]);
     const r = window.fixtureMap.getCanvas().getBoundingClientRect();
