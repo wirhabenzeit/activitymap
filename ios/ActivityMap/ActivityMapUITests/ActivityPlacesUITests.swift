@@ -15,8 +15,7 @@ import XCTest
         app.launch()
         defer { app.terminate() }
         XCTAssertTrue(app.buttons["Map layers"].waitForExistence(timeout: 20), app.debugDescription)
-        app.buttons["Map layers"].tap()
-        app.buttons["Places"].tap()
+        app.toggleMapLayer("Places")
         let places = app.buttons["place-cluster-hut"]
         let photos = app.buttons["map-photo-marker-photo-a"]
         XCTAssertTrue(places.waitForExistence(timeout: 10), app.debugDescription)
@@ -42,9 +41,7 @@ import XCTest
         defer { app.terminate() }
         XCTAssertTrue(app.buttons["Map layers"].waitForExistence(timeout: 20), app.debugDescription)
         XCTAssertEqual(app.staticTexts["places-selection-count"].label, "Selected routes: 0")
-        app.buttons["Map layers"].tap()
-        XCTAssertTrue(app.buttons["Places"].waitForExistence(timeout: 5), app.debugDescription)
-        app.buttons["Places"].tap()
+        app.toggleMapLayer("Places")
         let cluster = app.buttons["place-cluster-hut"]
         XCTAssertTrue(cluster.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(cluster.label, "Explore 4 visited places", "Shared summit is counted once")
@@ -79,8 +76,7 @@ import XCTest
         let filtered = NSPredicate(format: "label == %@", "Explore 3 visited places")
         expectation(for: filtered, evaluatedWith: cluster)
         waitForExpectations(timeout: 5)
-        app.buttons["Map layers"].tap()
-        app.buttons["Places"].tap()
+        app.toggleMapLayer("Places")
         XCTAssertFalse(cluster.exists)
     }
 
@@ -103,8 +99,7 @@ import XCTest
         app.launch()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         XCTAssertTrue(app.buttons["Map layers"].waitForExistence(timeout: 20), app.debugDescription)
-        app.buttons["Map layers"].tap()
-        app.buttons["Places"].tap()
+        app.toggleMapLayer("Places")
         let cluster = app.buttons["place-cluster-hut"]
         XCTAssertTrue(cluster.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(cluster.label, "Explore 4 visited places")
@@ -117,8 +112,7 @@ import XCTest
         app.buttons["places-change-style"].tap()
         XCTAssertTrue(cluster.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertEqual(app.staticTexts["places-selection-count"].label, "Selected routes: 0")
-        app.buttons["Map layers"].tap()
-        app.buttons["Places"].tap()
+        app.toggleMapLayer("Places")
         XCTAssertFalse(cluster.exists)
     }
 

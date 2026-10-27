@@ -73,6 +73,7 @@ import { useShallowStore } from '~/store';
 
 import { ActivityPlacesLayers } from './activity-places-layers';
 import { ElevationRouteMarker } from './elevation-route-marker';
+import { PlaceFilterPin } from './place-filter-pin';
 
 const skyLayer: SkyLayer = {
   id: 'sky',
@@ -278,6 +279,8 @@ export default function InteractiveMap() {
     routeFitRequest,
     requestRouteFit,
     completeRouteFit,
+    placeFlyRequest,
+    completePlaceFly,
     addNotification,
   } = useShallowStore((state) => ({
     selected: state.selected,
@@ -300,6 +303,8 @@ export default function InteractiveMap() {
     routeFitRequest: state.routeFitRequest,
     requestRouteFit: state.requestRouteFit,
     completeRouteFit: state.completeRouteFit,
+    placeFlyRequest: state.placeFlyRequest,
+    completePlaceFly: state.completePlaceFly,
     addNotification: state.addNotification,
     // Same conditions under which a route card shows its elevation profile.
     summaryUserId:
@@ -368,6 +373,26 @@ export default function InteractiveMap() {
     !!routeFitRequest ||
     sharedMapState.hasPositionRequest ||
     !isDefaultViewState(mapPosition);
+
+  useEffect(() => {
+    if (!placeFlyRequest || !mapLoaded) return;
+    const map = mapRefLoc.current?.getMap();
+    if (!map) return;
+    // Centre the chosen place beside any results panel, close enough to see
+    // the routes around it. Reduced motion jumps instead of flying.
+    const panel = panelRef.current?.getBoundingClientRect();
+    const padding = routeFitPadding(
+      map.getContainer().getBoundingClientRect(),
+      panel?.width && panel.height ? panel : null,
+    );
+    hasAutoCenteredOnLatest.current = true;
+    map.flyTo({
+      center: [placeFlyRequest.longitude, placeFlyRequest.latitude],
+      zoom: Math.min(Math.max(map.getZoom(), 13), 15),
+      ...(padding && { padding }),
+    });
+    completePlaceFly(placeFlyRequest.id);
+  }, [placeFlyRequest, mapLoaded, completePlaceFly]);
 
   useEffect(() => {
     if (!routeFitRequest || !mapLoaded || activitiesPending) return;
@@ -897,6 +922,7 @@ export default function InteractiveMap() {
           highlighted={highlighted}
         />
         {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}
+        <PlaceFilterPin />
       </ReactMapGL>
       {selected.length > 0 && (
         <div

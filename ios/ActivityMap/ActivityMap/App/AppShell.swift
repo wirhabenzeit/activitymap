@@ -220,11 +220,17 @@ struct AppShell: View {
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
                             .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented)
-                            .environment(\.mapResultsPresentationChanged, { sheets.mapResultsPresented = $0 })
+                            .environment(\.mapResultsPresentationChanged, { presented in
+                                // Filters stacked over the results close with them, as
+                                // when the map behind clears the selection, unannounced.
+                                if !presented, sheets.mapResultsPresented, store.selectedTab == .map,
+                                   sheets.showsFilters, !sidebarAvailable { sheets.showsFilters = false }
+                                sheets.mapResultsPresented = presented
+                            })
                             .environment(\.stackedShellSheet, StackedShellSheet(
                                 request: Binding(get: { shellRequest(sidebarAvailable: sidebarAvailable) },
                                                  set: { if $0 == nil { clearShellRequest() } }),
-                                content: { AnyView(shellSheet($0, overMapResults: true)) }))
+                                content: { AnyView(shellSheet($0)) }))
                     }
                 }
                 // While the map's results sheet is up, it presents these itself.
@@ -343,12 +349,10 @@ struct AppShell: View {
         sheets.accountDestination = nil
     }
 
-    /// Over the map's results sheet, filters keep the system's modal backdrop:
-    /// closing the results from behind would take them along unannounced.
-    @ViewBuilder private func shellSheet(_ destination: ShellSheet, overMapResults: Bool = false) -> some View {
+    @ViewBuilder private func shellSheet(_ destination: ShellSheet) -> some View {
         switch destination {
         case .filters:
-            FilterSheet(store: store, scope: filterScope, interactiveBackground: !overMapResults) { sheets.showsFilters = false }
+            FilterSheet(store: store, scope: filterScope) { sheets.showsFilters = false }
         case .account(let account):
             AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
         }

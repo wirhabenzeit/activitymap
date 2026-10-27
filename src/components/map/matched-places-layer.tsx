@@ -23,6 +23,7 @@ import {
   primaryPlaceKind,
 } from '~/lib/place-symbols';
 import { measurementScale, measurementUnit } from '~/lib/units';
+import { useShallowStore } from '~/store';
 import { useActivityPlaceFocus } from '~/store/activity-place-focus';
 
 import { MapMarkerPin } from './map-marker-pin';
@@ -51,6 +52,17 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
     selectedIds,
     showAllPlaces ? visibleIds : noActivityIds,
   );
+  const filterPlaceId = useShallowStore((state) =>
+    state.place?.userId === query.userId ? state.place?.id : undefined,
+  );
+  // The place filter has its own pin.
+  const places = useMemo(
+    () =>
+      filterPlaceId
+        ? query.places.filter((place) => place.id !== filterPlaceId)
+        : query.places,
+    [query.places, filterPlaceId],
+  );
   const { focus, setFocus } = useActivityPlaceFocus();
   const { current: map } = useMap();
   const handledFocus = useRef(0);
@@ -62,12 +74,12 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
   const groups = layout.userId === query.userId ? layout.groups : [];
   const [openGroupId, setOpenGroupId] = useState<string | null>(null);
   const byId = useMemo(
-    () => new Map(query.places.map((place) => [place.id, place])),
-    [query.places],
+    () => new Map(places.map((place) => [place.id, place])),
+    [places],
   );
   const selected =
     focus && focus.userId === query.userId
-      ? query.places.find(
+      ? places.find(
           (place) =>
             place.id === focus.placeId &&
             place.activityIds.includes(focus.activityId),
@@ -79,7 +91,7 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
     const refresh = () => {
       const { clientWidth: width, clientHeight: height } = raw.getContainer();
       const center = raw.getCenter().lng;
-      const points = query.places.map((place) => {
+      const points = places.map((place) => {
         const longitude =
           place.longitude + 360 * Math.round((center - place.longitude) / 360);
         const point = raw.project([longitude, place.latitude]);
@@ -104,12 +116,12 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
       raw.off('moveend', refresh);
       raw.off('resize', refresh);
     };
-  }, [map, showAllPlaces, query.places, query.userId, selected?.id]);
+  }, [map, showAllPlaces, places, query.userId, selected?.id]);
   const displayedPlaces = showAllPlaces
     ? groups
         .filter((group) => group.pointIDs.length === 1)
         .flatMap((group) => byId.get(group.id) ?? [])
-    : query.places;
+    : places;
   const openGroup = showAllPlaces
     ? groups.find(
         (group) =>

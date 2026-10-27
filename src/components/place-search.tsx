@@ -1,7 +1,7 @@
 'use client';
 
 import { MapPin, Search, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   useDeferredValue,
   useEffect,
@@ -33,6 +33,7 @@ export function PlaceSearch() {
   const { library, activities } = usePlaceLibrary();
   const units = useDisplayUnits();
   const router = useRouter();
+  const pathname = usePathname();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -64,7 +65,7 @@ export function PlaceSearch() {
       ? library.byId.get(inspection.id)
       : undefined;
   const selected = place?.userId === library.userId ? place : undefined;
-  const choose = (item: LibraryPlace) => {
+  const choose = (item: LibraryPlace, fly = true) => {
     if (!library.userId) return;
     // The suggestion consumes the name typed to find it. Subsequent text is
     // an independent activity-name constraint, combined with this chip by AND.
@@ -72,12 +73,15 @@ export function PlaceSearch() {
       place: { id: item.id, name: item.name, userId: library.userId },
       search: '',
     });
+    // On the map, the camera flies to the chosen place and its pin.
+    if (fly && pathname === '/map')
+      store.getState().requestPlaceFly(item.latitude, item.longitude);
     setOpen(false);
     setActive(0);
   };
   const show = (destination: 'map' | 'list') => {
     if (!detail) return;
-    choose(detail);
+    choose(detail, false);
     store.getState().setOnlySelected(false);
     if (destination === 'map') {
       store.setState({ showPlaces: true });

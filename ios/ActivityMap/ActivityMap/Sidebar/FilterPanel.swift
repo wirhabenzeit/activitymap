@@ -8,20 +8,60 @@ import SwiftUI
 struct FilterSheet: View {
     @Bindable var store: ActivityStore
     var scope: FilterScope
-    /// The list or map behind the sheet stays usable.
-    var interactiveBackground = true
     let onDismiss: () -> Void
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
+    static let restingFraction: CGFloat = 0.4
+    private var fullHeight: Bool { verticalSizeClass == .compact || typeSize.isAccessibilitySize }
 
     var body: some View {
         NavigationStack {
             FilterPanel(store: store, scope: scope, inNavigationStack: true, onDismiss: onDismiss)
         }
-        .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.fraction(0.4)])
-        .presentationBackgroundInteraction(interactiveBackground ? .enabled : .automatic)
+        .environment(\.mapSheetFraction, fullHeight ? 0 : Self.restingFraction)
+        .presentationDetents(fullHeight ? [.large] : [.fraction(Self.restingFraction)])
+        // The list or map behind the sheet stays usable.
+        .presentationBackgroundInteraction(.enabled)
+        .background(SheetWithoutPressStretch())
         .presentationDragIndicator(.visible)
         .presentationContentInteraction(.scrolls)
+    }
+}
+
+/// Liquid Glass sheets stretch under every press, which made the whole sheet
+/// bounce on each tap. The system adds the stretch as an interaction on the
+/// sheet's view; removing it keeps the glass, its colour and its slide-in.
+/// Changing the sheet's background effect instead jumped the slide-in to its
+/// end, and a background other than the system glass looked different.
+private struct SheetWithoutPressStretch: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) {}
+
+    final class Controller: UIViewController {
+        override func viewWillAppear(_ animated: Bool) {
+            super.viewWillAppear(animated)
+            removePressStretch()
+        }
+
+        // In case the sheet installs it again when its layout changes.
+        override func viewDidLayoutSubviews() {
+            super.viewDidLayoutSubviews()
+            removePressStretch()
+        }
+
+        private func removePressStretch() {
+            // From the sheet's own view up, as this one isn't in it yet before it appears.
+            var root: UIViewController = self
+            while let parent = root.parent { root = parent }
+            var view = root.viewIfLoaded
+            while let current = view {
+                for interaction in current.interactions
+                where String(describing: type(of: interaction)) == "_UIFlexInteraction" {
+                    current.removeInteraction(interaction)
+                }
+                view = current.superview
+            }
+        }
     }
 }
 
@@ -429,3 +469,5 @@ struct FilterResetButton: View {
         .accessibilityIdentifier("filter-reset")
     }
 }
+
+

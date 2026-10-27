@@ -56,7 +56,7 @@ await build({
           resolveDir: root,
           contents:
             args.path === 'navigation'
-              ? `export const useRouter=()=>({push:url=>{window.destination=url;}});`
+              ? `export const useRouter=()=>({push:url=>{window.destination=url;}});export const usePathname=()=>window.fixturePathname??'/list';`
               : args.path === 'actions'
                 ? `export function updateActivity(){throw Error('Unexpected external write');} export function deleteActivities(){throw Error('Unexpected external write');}`
                 : args.path === 'reads'
@@ -167,6 +167,11 @@ try {
   await input.press('Enter');
   await expectIDs('1,2');
   assert.equal(await input.inputValue(), '');
+  assert.equal(
+    await page.evaluate(() => window.fixtureState.getState().placeFlyRequest),
+    null,
+    'only the map flies to a chosen place',
+  );
   assert.equal(
     await page.getByRole('option').count(),
     0,
@@ -298,6 +303,33 @@ try {
     ),
     [2],
   );
+  assert.equal(
+    await page.evaluate(() => window.fixtureState.getState().placeFlyRequest),
+    null,
+    'Show on map fits the routes instead of flying',
+  );
+  await page.evaluate(() => {
+    window.fixturePathname = '/map';
+    window.fixtureState.setState({ place: undefined });
+  });
+  await input.fill('Pilatus');
+  await input.press('ArrowDown');
+  await input.press('Enter');
+  const flight = await page.evaluate(() => {
+    const { place, placeFlyRequest } = window.fixtureState.getState();
+    const matched = window.fixtureDTOs
+      .flatMap((activity) => activity.placeMatches?.places ?? [])
+      .find((candidate) => candidate.id === place.id);
+    return { placeFlyRequest, matched };
+  });
+  assert.deepEqual(
+    [flight.placeFlyRequest?.latitude, flight.placeFlyRequest?.longitude],
+    [flight.matched.latitude, flight.matched.longitude],
+    'choosing a place on the map flies to it',
+  );
+  await page.evaluate(() => {
+    window.fixturePathname = '/list';
+  });
   await input.fill('Pilatus');
   await page.screenshot({ path: join(output, 'autocomplete-phone.png') });
   await input.press('Escape');

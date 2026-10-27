@@ -20,6 +20,7 @@ export type MapState = {
   showPlaces: boolean;
   uploadedGeoJson: GeoJSON.FeatureCollection | null;
   routeFitRequest: { id: string; activityIDs: number[] } | null;
+  placeFlyRequest: { id: string; latitude: number; longitude: number } | null;
 };
 
 export type MapActions = {
@@ -45,6 +46,8 @@ export type MapActions = {
   setUploadedGeoJson: (geoJson: GeoJSON.FeatureCollection | null) => void;
   requestRouteFit: (activityIDs: number[]) => void;
   completeRouteFit: (id: string) => void;
+  requestPlaceFly: (latitude: number, longitude: number) => void;
+  completePlaceFly: (id: string) => void;
 };
 
 export type MapSlice = MapState & MapActions;
@@ -68,6 +71,7 @@ export const createMapSlice: StateCreator<
   showPlaces: false,
   uploadedGeoJson: null,
   routeFitRequest: null,
+  placeFlyRequest: null,
 
   // Actions
   requestRouteFit: (activityIDs) =>
@@ -80,6 +84,14 @@ export const createMapSlice: StateCreator<
   completeRouteFit: (id) =>
     set((state) => {
       if (state.routeFitRequest?.id === id) state.routeFitRequest = null;
+    }),
+  requestPlaceFly: (latitude, longitude) =>
+    set((state) => {
+      state.placeFlyRequest = { id: crypto.randomUUID(), latitude, longitude };
+    }),
+  completePlaceFly: (id) =>
+    set((state) => {
+      if (state.placeFlyRequest?.id === id) state.placeFlyRequest = null;
     }),
   togglePhotos: () =>
     set((state: RootState) => {
