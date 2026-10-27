@@ -76,6 +76,27 @@ struct MatchedPlaceSymbol: View {
     }
 }
 
+/// The place filter on the map: an accent pin whose tip marks the place.
+/// Taps pass through to the routes and places beneath.
+struct PlaceFilterPin: View {
+    let place: ActivityMapAPI.MatchedPlace
+    var body: some View {
+        VStack(spacing: -2) {
+            PlaceGlyph(kind: place.kind).fill(Color.white)
+                .frame(width: PlaceGlyph.chartSymbol(for: place.kind).size, height: PlaceGlyph.chartSymbol(for: place.kind).size)
+                .frame(width: 32, height: 32)
+                .background(Circle().fill(AppTheme.accent))
+                .overlay { Circle().stroke(.white, lineWidth: 2) }
+            Image(systemName: "arrowtriangle.down.fill").font(.system(size: 10)).foregroundStyle(AppTheme.accent)
+        }
+        .shadow(color: .black.opacity(0.3), radius: 3, y: 1)
+        .allowsHitTesting(false)
+        .accessibilityElement()
+        .accessibilityLabel("Place filter: \(place.name)")
+        .accessibilityIdentifier("place-filter-pin")
+    }
+}
+
 struct MatchedPlaceCard: View {
     let place: ActivityMapAPI.MatchedPlace
     var routeCount = 1

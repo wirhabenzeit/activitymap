@@ -52,6 +52,7 @@ struct InlinePlaceSearch: View {
     var onFinish: () -> Void = {}
     @FocusState private var focused: Bool
     @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
+    @Environment(\.mapSheetFraction) private var sheetFraction
     private var units: UnitSystem { preferences?.units ?? .metric }
     private var hasQuery: Bool { !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
@@ -80,9 +81,11 @@ struct InlinePlaceSearch: View {
             Text("No activities for this place.").font(.caption).foregroundStyle(.secondary)
         }
         if focused, hasQuery {
-            // Selecting a place clears the name text and keeps the keyboard.
+            // Choosing a place clears the name text and the keyboard, so the
+            // map can show it.
             PlaceMatchRow(options: store.placeLibrary.search(store.searchText).places, hasQuery: true, units: units) {
-                store.selectPlace($0)
+                focused = false
+                store.choosePlace($0, sheetFraction: sheetFraction)
             }
             .listRowInsets(EdgeInsets())
         }
@@ -229,7 +232,20 @@ struct PlaceDetailView: View {
     }
 }
 
+extension EnvironmentValues {
+    /// The share of the map's height a sheet covers at rest.
+    @Entry var mapSheetFraction: CGFloat = 0
+}
+
 extension ActivityStore {
+    /// Search filters to the chosen place; on the map, the camera flies there.
+    func choosePlace(_ place: LibraryPlace, sheetFraction: CGFloat = 0) {
+        selectPlace(place)
+        guard selectedTab == .map else { return }
+        mapContext.request(.place(latitude: place.place.latitude, longitude: place.place.longitude,
+                                  sheetFraction: sheetFraction))
+    }
+
     /// Place details' Show actions filter to the place in the chosen tab.
     func show(_ place: LibraryPlace, in destination: AppTab) {
         selectPlace(place)

@@ -225,6 +225,15 @@ struct MapScreen: View {
                         select: openPlace, close: { openPlaceGroupID = nil })
                 }
             }
+            if let place = filteredPlace {
+                MapViewAnnotation(coordinate: CLLocationCoordinate2D(latitude: place.place.latitude, longitude: place.place.longitude)) {
+                    PlaceFilterPin(place: place.place)
+                }
+                .variableAnchors([ViewAnnotationAnchorConfig(anchor: .bottom)])
+                .allowOverlap(true)
+                .ignoreCameraPadding(true)
+                .priority(3)
+            }
             if context.showPhotos {
                 ForEvery(photoGroups) { group in
                     if let photo = photoModels[group.id], let coordinate = photo.location,
@@ -382,7 +391,13 @@ struct MapScreen: View {
 
     private var availablePlaces: [DisplayMatchedPlace] {
         guard let loader = store.activityPlaces else { return [] }
+        // The place filter has its own pin.
         return DisplayMatchedPlace.aggregate(store.mapPlacesActivityIDs.compactMap { loader.result(String($0)) })
+            .filter { $0.id != store.selectedPlace?.id }
+    }
+
+    private var filteredPlace: LibraryPlace? {
+        store.selectedPlace.flatMap { store.placeLibrary.byID[$0.id] }
     }
 
     private var renderedPlaces: [DisplayMatchedPlace] {
@@ -615,6 +630,8 @@ struct MapScreen: View {
                 }
                 withViewportAnimation(.easeOut(duration: 0.5)) { viewport = target }
             }
+        case .place:
+            withViewportAnimation(.fly) { viewport = target }
         default:
             withViewportAnimation(.default(maxDuration: 0.5)) { viewport = target }
         }
@@ -682,22 +699,18 @@ struct MapScreen: View {
     private var mapControls: some View {
         VStack(spacing: 0) {
             Menu {
+                // Toggles tick in the same column as the base map, and keep the
+                // menu open so several layers can be switched in one go.
                 Section("Activities") {
-                    Button {
-                        context.showPhotos.toggle()
-                    } label: {
-                        Label("Photos", systemImage: context.showPhotos ? "checkmark" : "photo")
-                    }
-                    .accessibilityValue(context.showPhotos ? "On" : "Off")
+                    Toggle(isOn: $context.showPhotos) { Label("Photos", systemImage: "photo") }
+                        .menuActionDismissBehavior(.disabled)
                     if context.showPhotos, !store.photos.contains(where: {
                         Int($0.activityID).map(store.visibleActivityIDs.contains) == true && MapPhotoLayout.validLocation($0.location)
                     }) {
                         Text("No located photos in the current filter")
                     }
-                    Button { context.showPlaces.toggle() } label: {
-                        Label("Places", systemImage: context.showPlaces ? "checkmark" : "mountain.2")
-                    }
-                    .accessibilityValue(context.showPlaces ? "On" : "Off")
+                    Toggle(isOn: $context.showPlaces) { Label("Places", systemImage: "mountain.2") }
+                        .menuActionDismissBehavior(.disabled)
                     if context.showPlaces, placeModels.isEmpty, store.activityPlaces?.overviewLoading != true {
                         Text("No matched places saved in the current filter")
                     }
@@ -713,15 +726,8 @@ struct MapScreen: View {
 
                 Section("Overlays") {
                     ForEach(SharedMapCatalog.rasterOverlays) { overlay in
-                        Button {
-                            toggleOverlay(overlay)
-                        } label: {
-                            if context.activeOverlays.contains(overlay) {
-                                Label(overlay.label, systemImage: "checkmark")
-                            } else {
-                                Text(overlay.label)
-                            }
-                        }
+                        Toggle(overlay.label, isOn: overlayBinding(overlay))
+                            .menuActionDismissBehavior(.disabled)
                     }
                 }
             } label: {
@@ -797,11 +803,11 @@ struct MapScreen: View {
                           supported: terrainConfiguration != nil, restart: restart)
     }
 
-    private func toggleOverlay(_ overlay: SharedRasterOverlayDefinition) {
-        if context.activeOverlays.contains(overlay) {
-            context.activeOverlays.remove(overlay)
-        } else {
-            context.activeOverlays.insert(overlay)
+    private func overlayBinding(_ overlay: SharedRasterOverlayDefinition) -> Binding<Bool> {
+        Binding {
+            context.activeOverlays.contains(overlay)
+        } set: { on in
+            if on { context.activeOverlays.insert(overlay) } else { context.activeOverlays.remove(overlay) }
         }
     }
 

@@ -49,13 +49,16 @@ final class FilterPanelUITests: XCTestCase {
         first.tap()
         let place = app.buttons["Place: Pilátus. View details"]
         XCTAssertTrue(place.waitForExistence(timeout: 5))
-        XCTAssertTrue(keyboard.exists, "Choosing a place keeps the keyboard")
+        XCTAssertTrue(keyboard.waitForNonExistence(timeout: 5), "Choosing a place hides the keyboard")
+        XCTAssertEqual(done.frame.minY, restingY, accuracy: 2, "The sheet returns with the keyboard")
         XCTAssertEqual(place.frame.midY, field.frame.midY, accuracy: 4, "The place is a pill in the field")
         XCTAssertEqual(field.value as? String, "Activity name", "Choosing a place clears the text")
         XCTAssertEqual(count.label, "2 of 3 activities · 1 active")
         let selected = XCTAttachment(screenshot: app.screenshot())
         selected.name = "Selected place"; selected.lifetime = .keepAlways; add(selected)
 
+        field.tap()
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
         field.typeText("Evening\n")
         XCTAssertTrue(keyboard.waitForNonExistence(timeout: 5))
         XCTAssertEqual(done.frame.minY, restingY, accuracy: 2, "The sheet returns with the keyboard")
@@ -209,11 +212,58 @@ final class FilterPanelUITests: XCTestCase {
 
     private static let pilatus = "place-suggestion-00000000-0000-4000-8000-000000000001"
 
-    private func launchSheet(orientation: UIDeviceOrientation) -> XCUIApplication {
+    func testChosenPlaceFliesTheMapAboveTheSheetWithAPin() {
+        let app = launchSheet(orientation: .portrait, map: true)
+        defer { app.terminate() }
+        let done = app.buttons["filters-done"]
+        let field = app.activitySearchField
+        XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        let pin = app.otherElements["place-filter-pin"]
+        XCTAssertFalse(pin.exists, "Only a place filter has a pin")
+
+        field.tap()
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
+        field.typeText("Pilatus")
+        let first = app.buttons[Self.pilatus]
+        XCTAssertTrue(first.waitForExistence(timeout: 5), app.debugDescription)
+        first.tap()
+        XCTAssertTrue(keyboard.waitForNonExistence(timeout: 5), "Choosing a place hides the keyboard")
+        XCTAssertTrue(pin.waitForExistence(timeout: 5), app.debugDescription)
+        // The camera flies there: the pin settles centred above the sheet.
+        let window = app.windows.firstMatch.frame
+        let settled = NSPredicate { _, _ in
+            abs(pin.frame.midX - window.midX) < 8 && pin.frame.maxY < done.frame.minY - 24 && pin.frame.minY > window.minY + 60
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: nil)], timeout: 10), .completed,
+                       "\(pin.frame) in \(window), sheet at \(done.frame.minY)")
+        let flown = XCTAttachment(screenshot: app.screenshot())
+        flown.name = "Place pin above the sheet"; flown.lifetime = .keepAlways; add(flown)
+
+        // The map behind the sheet pans while the filters stay open.
+        let before = pin.frame
+        let map = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        // Slow, with a hold at the end, so the map does not fling on.
+        map.press(forDuration: 0.05, thenDragTo: map.withOffset(CGVector(dx: -80, dy: -40)),
+                  withVelocity: .slow, thenHoldForDuration: 0.3)
+        XCTAssertTrue(done.exists, "Panning keeps the filters")
+        let panned = NSPredicate { _, _ in
+            pin.exists && pin.frame.midX < before.midX - 40 && pin.frame.midY < before.midY - 20
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: panned, object: nil)], timeout: 5), .completed,
+                       "The map pans behind the sheet: \(before) → \(pin.frame)")
+
+        app.buttons["remove-place-filter"].tap()
+        XCTAssertTrue(pin.waitForNonExistence(timeout: 5), "Removing the place removes its pin")
+    }
+
+    private func launchSheet(orientation: UIDeviceOrientation, map: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = orientation
         let app = XCUIApplication()
         app.launchArguments = ["--places-ui-testing", "--place-search-ui-testing", "--place-search-sheet-ui-testing", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+            + (map ? ["--place-search-map-ui-testing"] : [])
         app.launch()
         return app
     }

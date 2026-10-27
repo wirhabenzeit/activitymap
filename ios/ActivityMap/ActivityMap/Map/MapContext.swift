@@ -40,6 +40,9 @@ final class MapContext {
     enum Action: Equatable {
         case activity(Int), fitActivity(Int), fitSelection, fitFiltered, resetBearing, resetView, pitch(CGFloat)
         case locate(latitude: Double, longitude: Double)
+        /// A place chosen in search, centred above the sheet covering this
+        /// fraction of the map's height.
+        case place(latitude: Double, longitude: Double, sheetFraction: CGFloat)
     }
 
     func record(_ state: CameraState) {

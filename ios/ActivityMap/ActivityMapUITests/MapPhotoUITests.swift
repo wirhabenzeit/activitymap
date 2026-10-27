@@ -22,13 +22,14 @@ final class MapPhotoUITests: XCTestCase {
         XCTAssertEqual(hidden.selection, initial.selection)
         XCTAssertFalse(hidden.pendingCamera)
         XCTAssertEqual(hidden.zoom, initial.zoom, accuracy: 0.01)
-        layers.tap()
-        XCTAssertTrue(photos.waitForExistence(timeout: 5))
+        // The menu stays open, so the layer switches back without reopening it.
+        XCTAssertTrue(photos.exists, app.debugDescription)
         photos.tap()
         let shown = try await state(in: app) { $0.showPhotos }
         XCTAssertEqual(shown.selection, initial.selection)
         XCTAssertFalse(shown.pendingCamera)
         XCTAssertEqual(shown.zoom, initial.zoom, accuracy: 0.01)
+        app.closeMapLayers()
     }
 
     func testPinsZoomToThumbnailsAndViewerPreservesSelection() async throws {
@@ -102,10 +103,7 @@ final class MapPhotoUITests: XCTestCase {
         XCTAssertEqual(deleted.selection, initial.selection)
         XCTAssertFalse(deleted.selectionChangedDuringViewer)
 
-        app.buttons["Map layers"].tap()
-        let toggle = app.buttons["Photos"]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 5))
-        toggle.tap()
+        app.toggleMapLayer("Photos")
         let hidden = try await state(in: app) { !$0.showPhotos }
         XCTAssertEqual(hidden.zoom, deleted.zoom, accuracy: 0.01)
         XCTAssertFalse(hidden.pendingCamera)
@@ -170,5 +168,25 @@ final class MapPhotoUITests: XCTestCase {
         } while Date() < deadline
         XCTFail("Fixture state did not settle: \(latest)\n\(app.debugDescription)", file: file, line: line)
         throw NSError(domain: "MapPhotoUITests", code: 1)
+    }
+}
+
+extension XCUIApplication {
+    /// Layer toggles keep the layers menu open, so this closes it after one.
+    func toggleMapLayer(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
+        let layers = buttons["Map layers"]
+        XCTAssertTrue(layers.waitForExistence(timeout: 20), debugDescription, file: file, line: line)
+        layers.tap()
+        let toggle = buttons[name]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 5), debugDescription, file: file, line: line)
+        toggle.tap()
+        closeMapLayers(file: file, line: line)
+    }
+
+    /// A tap outside the open menu, which covers the layers button, closes it
+    /// without reaching the map.
+    func closeMapLayers(file: StaticString = #filePath, line: UInt = #line) {
+        coordinate(withNormalizedOffset: CGVector(dx: 0.08, dy: 0.5)).tap()
+        XCTAssertTrue(buttons["Standard"].waitForNonExistence(timeout: 5), debugDescription, file: file, line: line)
     }
 }
