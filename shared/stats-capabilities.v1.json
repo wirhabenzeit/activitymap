@@ -81,7 +81,7 @@
       "expandable": true,
       "options": ["peak", "pass", "hut"],
       "defaultOption": "peak",
-      "compact": "Top five peaks, passes or huts this year by distinct activities whose synchronized route places include them; repeated encounters on one route count once. Ties use latest visit, then name, then place ID. Rows show kind symbol, name, elevation where it fits and activity count; pending, partial, uncovered or missing-stream results are disclosed and never presented as an exhaustive empty ranking.",
+      "compact": "Top five peaks, passes or huts this year by distinct activities whose synchronized route places include them; repeated encounters on one route count once. Ties use latest visit, then name, then place ID. Rows show kind symbol, name, elevation where it fits and activity count; pending, partial, uncovered or missing-stream results never produce an exhaustive empty ranking (“No … found yet” instead of “No … on your routes”).",
       "expanded": "Bounded ranking (top 50) of the same kind for This year or All time, with competition ranks for equal counts. Selecting a row opens the shared place detail with first/latest visit and Show activities / Show on map actions. Hut matches describe route vicinity, not entry or a stay.",
       "nativeOwner": 461,
       "uiOwner": 461

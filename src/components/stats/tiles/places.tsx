@@ -79,7 +79,8 @@ function useRanking(
   );
 }
 
-// Unknown results are never presented as "not visited".
+// A ranking with rows needs no caveat. An empty one only claims "no places"
+// once every activity in the window has a completed check.
 function coverageNote(
   ranking: PlaceRanking,
   kind: PlaceKind,
@@ -91,17 +92,10 @@ function coverageNote(
     return historyComplete
       ? `No activities${period}.`
       : 'Activity history is still loading.';
-  if (ranking.exhaustive)
-    return ranking.total === 0
-      ? `No ${plural[kind]} on your routes${period}.`
-      : null;
-  const unchecked = ranking.activities - ranking.checked;
-  if (unchecked === 0)
-    return 'Activity history is still loading; this ranking may be incomplete.';
-  const awaiting = `${unchecked} of ${ranking.activities} ${ranking.activities === 1 ? 'activity has' : 'activities have'} no completed place check yet`;
-  return ranking.total === 0
-    ? `No ${plural[kind]} found yet: ${awaiting}.`
-    : `May be incomplete: ${awaiting}.`;
+  if (ranking.total > 0) return null;
+  return ranking.exhaustive
+    ? `No ${plural[kind]} on your routes${period}.`
+    : `No ${plural[kind]} found yet.`;
 }
 
 function PlaceRankingList({

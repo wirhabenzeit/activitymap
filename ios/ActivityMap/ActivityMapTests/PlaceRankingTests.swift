@@ -94,9 +94,9 @@ import Testing
         }
         let note = StatsPlacesDetail.coverageNote
         #expect(note(ranking(activities: 1, checked: 1), "passes", false, true) == "No passes on your routes this year.")
-        #expect(note(ranking(activities: 2, checked: 1), "passes", false, true) == "No passes found yet: 1 of 2 activities have no completed place check yet.")
-        #expect(note(ranking(activities: 2, checked: 1, total: 3), "peaks", true, true) == "May be incomplete: 1 of 2 activities have no completed place check yet.")
-        #expect(note(ranking(activities: 1, checked: 1), "peaks", false, false) == "Activity history is still loading; this ranking may be incomplete.")
+        #expect(note(ranking(activities: 2, checked: 1), "passes", false, true) == "No passes found yet.")
+        #expect(note(ranking(activities: 2, checked: 1, total: 3), "peaks", true, true) == nil, "Rankings with rows carry no caveat")
+        #expect(note(ranking(activities: 1, checked: 1), "peaks", false, false) == "No peaks found yet.")
         #expect(note(ranking(activities: 1, checked: 1, total: 2), "peaks", false, true) == nil)
         let hut = StatsPlacesDetail.explanation(.hut)
         #expect(hut.contains("passed near each hut") && hut.contains("does not mean you stopped or stayed"))

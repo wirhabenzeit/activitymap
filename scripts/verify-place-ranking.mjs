@@ -156,9 +156,11 @@ try {
   );
   assert.match(compact[0], /^1\. Alpha Peak, 3,012 m, 3 activities\./);
   assert.match(compact[2], /^2\. Bravo Peak/, 'competition ranks for ties');
-  await tile
-    .getByText('May be incomplete: 3 of 9 activities have no completed')
-    .waitFor();
+  assert.equal(
+    await tile.locator('[role="status"]').count(),
+    0,
+    'a ranking with rows carries no coverage caveat',
+  );
   await tile.getByText('Top 5 of 6 peaks').waitFor();
   await page.screenshot({ path: join(output, 'dashboard-wide.png') });
 
@@ -230,11 +232,7 @@ try {
   await onlySports(['Run']);
   await tile.getByText('No peaks on your routes this year.').waitFor();
   await onlySports(['Walk']);
-  await tile
-    .getByText(
-      'No peaks found yet: 1 of 1 activity has no completed place check yet.',
-    )
-    .waitFor();
+  await tile.getByText('No peaks found yet.').waitFor();
   await page.evaluate(() => window.fixtureState.getState().resetFilters());
 
   // Narrow and enlarged layouts stay inside the tile.
@@ -270,7 +268,7 @@ try {
         passed: [
           'compact shared order and ranks',
           'kind switch',
-          'partial coverage disclosure',
+          'no caveat beside ranked rows',
           'shared detail and Show activities',
           'focus ranking and All time',
           'completed empty versus pending',

@@ -74,8 +74,8 @@ The Stats “Most visited places” tile (#461) is such a filtered-scope index: 
 Stats-filtered activities of its window go through the same index
 (`rankVisitedPlaces` on the web, `PlaceLibrary(evidence:)` inside the native
 Stats engine), ranked by distinct activities with latest-visit/name/ID tie-breaks.
-Unlike search, it discloses unchecked activities and incomplete history, so a
-pending or uncovered window is never shown as “no places”. Rows open the same
+An empty ranking says “no places” only when every activity in the window was
+checked and the history is loaded; otherwise it says none were found yet. Rows open the same
 compact detail. `shared/place-ranking-fixtures.v1.json` is checked by
 `src/lib/place-ranking.test.ts` and `PlaceRankingTests`; `pnpm
 test:place-ranking-ui` drives the real web dashboard with zero API requests.

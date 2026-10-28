@@ -38,17 +38,13 @@ struct StatsPlacesDetail: View {
             : "Counts activities whose route passed each \(kind.rawValue), once per activity; passing it several times on one route still counts once."
     }
 
-    /// Unknown results are never presented as "not visited".
+    /// A ranking with rows needs no caveat. An empty one only claims "no
+    /// places" once every activity in the window has a completed check.
     static func coverageNote(_ ranking: StatsPlaceRanking, plural: String, allTime: Bool, historyComplete: Bool) -> String? {
         let period = allTime ? "" : " this year"
         if ranking.activities == 0 { return historyComplete ? "No activities\(period)." : "Activity history is still loading." }
-        if ranking.exhaustive(historyComplete: historyComplete) {
-            return ranking.total == 0 ? "No \(plural) on your routes\(period)." : nil
-        }
-        let unchecked = ranking.activities - ranking.checked
-        if unchecked == 0 { return "Activity history is still loading; this ranking may be incomplete." }
-        let awaiting = "\(unchecked) of \(ranking.activities) \(ranking.activities == 1 ? "activity has" : "activities have") no completed place check yet"
-        return ranking.total == 0 ? "No \(plural) found yet: \(awaiting)." : "May be incomplete: \(awaiting)."
+        if ranking.total > 0 { return nil }
+        return ranking.exhaustive(historyComplete: historyComplete) ? "No \(plural) on your routes\(period)." : "No \(plural) found yet."
     }
 
     var body: some View {

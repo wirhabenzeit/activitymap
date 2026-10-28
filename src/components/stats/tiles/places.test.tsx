@@ -87,7 +87,7 @@ void test('compact Most visited places lists this year with accessible rows and 
   );
 });
 
-void test('completed empty rankings differ from pending or partial coverage', () => {
+void test('only a fully checked empty ranking says no places; rows carry no caveat', () => {
   const empty = render(
     view.face(
       context(source([activity(1, '2026-02-01', 'complete')])),
@@ -108,10 +108,7 @@ void test('completed empty rankings differ from pending or partial coverage', ()
       false,
     ),
   );
-  assert.match(
-    pending,
-    /No passes found yet: 1 of 2 activities have no completed place check yet\./,
-  );
+  assert.match(pending, /No passes found yet\./);
   assert.doesNotMatch(pending, /on your routes/);
   const partial = render(
     view.face(
@@ -125,10 +122,7 @@ void test('completed empty rankings differ from pending or partial coverage', ()
       false,
     ),
   );
-  assert.match(
-    partial,
-    /May be incomplete: 1 of 2 activities have no completed place check yet\./,
-  );
+  assert.doesNotMatch(partial, /role="status"/, 'rows carry no caveat');
   const loading = render(
     view.face(
       context(source([activity(1, '2026-02-01', 'complete')], false)),
@@ -136,7 +130,7 @@ void test('completed empty rankings differ from pending or partial coverage', ()
       false,
     ),
   );
-  assert.match(loading, /this ranking may be incomplete/);
+  assert.match(loading, /No peaks found yet\./);
   assert.doesNotMatch(loading, /on your routes/);
   assert.match(
     render(view.face(context(), 'peak', false)),
