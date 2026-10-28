@@ -707,11 +707,10 @@ try {
   );
 
   // Direct place corrections change the epoch, even without a new manifest.
-  const beforeVersion = await repository.version(actor);
+  const beforeVersion = (await repository.sync(actor, [id])).version;
   await client`UPDATE places SET display_name=display_name || ' corrected' WHERE id=(SELECT id FROM places ORDER BY id LIMIT 1)`;
-  assert.notDeepEqual(await repository.version(actor), beforeVersion);
   const invalidatedSync = await repository.sync(actor, [id]);
-  assert.notEqual(invalidatedSync.version, beforeVersion.version);
+  assert.notEqual(invalidatedSync.version, beforeVersion);
   assert.equal(invalidatedSync.results.get(id)?.status, 'pending');
   assert.equal(
     (await repository.sync(actor, [])).version,

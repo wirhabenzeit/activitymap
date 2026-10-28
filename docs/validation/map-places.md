@@ -6,9 +6,9 @@ filters and Only selected. The preference is initially off, persists locally and
 can be enabled in a local preview with `/map?mpl=1`. Places along selected routes
 remain available when the overview is off, including elevation-profile focus.
 
-The overview reads current synchronized place bundles. Only selected routes use
-the existing direct-read fallback; enabling the layer does not queue a request for
-every activity. Pending results appear as ordinary library sync catches up.
+The overview and selected routes read current synchronized place bundles only;
+no view requests places directly. Pending results appear as ordinary library sync
+catches up.
 Account, matching-version and stream checks apply before aggregation.
 
 Places are deduplicated by identity across activities. Screen-space grouping uses

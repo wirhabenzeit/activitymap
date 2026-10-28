@@ -109,7 +109,7 @@ final class SyncController {
         invalidate: @escaping (String) -> Void
     ) {
         self.summaries = StreamSummaryLoader(source: summarySource, invalidate: invalidate)
-        self.places = ActivityPlacesLoader(invalidate: invalidate)
+        self.places = ActivityPlacesLoader()
         activities.activityPlaces = self.places
         self.summarySync = StreamSummarySync(now: now, source: storedSummarySource, invalidate: invalidate)
         activities.streamSummaries = self.summaries

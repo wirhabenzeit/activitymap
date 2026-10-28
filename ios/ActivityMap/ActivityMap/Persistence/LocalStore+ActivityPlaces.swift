@@ -7,43 +7,22 @@ extension LocalStore {
         let order = StreamRevision.compare(metadata.revision, dto.streamRevision)
         return order == .orderedDescending || (order == .orderedSame && metadata.generation != dto.streamGeneration)
     }
-    // Places share the stream clock and source fences so replacement, deletion
-    // and cleanup still invalidate both read models. Place-only changes use
-    // separate keys so they cannot reject an unrelated elevation response.
-    private static func placesFenceKey(scopeKey: String, activityID: String? = nil) -> String {
-        StoreScope.key([scopeKey, "places"] + (activityID.map { [$0] } ?? []))
-    }
-    private func placesFenceIsCurrent(_ fence: StreamFence, activityID: String, scope: StoreScope) -> Bool {
-        summaryFenceIsCurrent(fence, activityID: activityID, scope: scope)
-            && streamFences.admits(fence, keys: [Self.placesFenceKey(scopeKey: scope.key),
-                Self.placesFenceKey(scopeKey: scope.key, activityID: activityID)])
-    }
     /// Called only after the place bundle/version and its checkpoint are saved.
     func placesChangesCommitted(scopeKey: String, activityIDs: Set<String>? = nil) {
-        if let activityIDs {
-            for id in activityIDs { streamFences.invalidate(Self.placesFenceKey(scopeKey: scopeKey, activityID: id)) }
-        } else { streamFences.invalidate(Self.placesFenceKey(scopeKey: scopeKey)) }
         notifySummaryChange(scope: scopeKey, activityIDs: activityIDs, affectsSummaries: false)
     }
 
-    func cachedActivityPlaces(activityID: String, scope: StoreScope) throws -> CachedActivityPlaces? {
+    /// The synchronized bundle for current inputs, including pending and
+    /// incomplete statuses. Nil means no current result has been synchronized.
+    func cachedActivityPlaces(activityID: String, scope: StoreScope) throws -> ActivityMapAPI.ActivityPlaces? {
         let context = makeContext()
         let key = StoreScope.key([scope.key, activityID])
-        let activity = try context.fetch(FetchDescriptor<StoredActivity>(predicate: #Predicate { $0.key == key })).first?.decoded()
-        let synchronized: CachedActivityPlaces?
-        if let dto = activity?.placeMatches, try placesInputCurrent(dto, scope: scope, context: context) {
-            synchronized = CachedActivityPlaces(dto: dto, storedAt: .now, synchronized: true)
-            if dto.status != .pending { return synchronized }
-        } else { synchronized = nil }
-        guard let row = try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.key == key })).first,
-              !row.invalidated else { return synchronized }
-        let dto = try StoreCodec.decode(ActivityMapAPI.ActivityPlaces.self, from: row.payload)
-        guard try placesInputCurrent(dto, scope: scope, context: context) else { return synchronized }
-        return CachedActivityPlaces(dto: dto, storedAt: row.storedAt)
+        guard let dto = try context.fetch(FetchDescriptor<StoredActivity>(predicate: #Predicate { $0.key == key })).first?.decoded().placeMatches,
+              try placesInputCurrent(dto, scope: scope, context: context) else { return nil }
+        return dto
     }
 
-    /// One scoped read for the map overview. Missing matches never trigger work
-    /// for individual routes; selected routes retain their direct-read fallback.
+    /// One scoped read for the map overview: completed synchronized visits only.
     func cachedMapPlaces(activityIDs: Set<String>, scope: StoreScope) throws -> [String: ActivityMapAPI.ActivityPlaces] {
         try Task.checkCancellation()
         guard !activityIDs.isEmpty else { return [:] }
@@ -51,9 +30,7 @@ extension LocalStore {
         let identity = try cachedPlacesContext(scope: scope)
         let activities = try context.fetch(FetchDescriptor<StoredActivity>(predicate: #Predicate { $0.scope == scopeKey }))
         let summaries = try context.fetch(FetchDescriptor<StoredStreamSummary>(predicate: #Predicate { $0.scope == scopeKey }))
-        let direct = try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.scope == scopeKey }))
         let summaryByID = Dictionary(uniqueKeysWithValues: summaries.filter { activityIDs.contains($0.activityID) && !$0.invalidated }.map { ($0.activityID, $0) })
-        let directByID = Dictionary(uniqueKeysWithValues: direct.filter { activityIDs.contains($0.activityID) && !$0.invalidated }.map { ($0.activityID, $0) })
         var results: [String: ActivityMapAPI.ActivityPlaces] = [:]
         for row in activities where activityIDs.contains(row.activityID) {
             try Task.checkCancellation()
@@ -66,18 +43,12 @@ extension LocalStore {
                 if let current = PlaceMatchingIdentity(dto), let identity, current != identity { return false }
                 return true
             }
-            if let synced = activity.placeMatches, valid(synced), synced.status != .pending {
-                // A synchronized zero or incomplete result replaces older visits.
-                if synced.status == .complete { results[row.activityID] = synced }
-            } else if let saved = directByID[row.activityID] {
-                let dto = try StoreCodec.decode(ActivityMapAPI.ActivityPlaces.self, from: saved.payload)
-                if dto.status == .complete, valid(dto) { results[row.activityID] = dto }
-            }
+            if let synced = activity.placeMatches, synced.status == .complete, valid(synced) { results[row.activityID] = synced }
         }
         return results
     }
 
-    private func placesInputCurrent(_ dto: ActivityMapAPI.ActivityPlaces, scope: StoreScope, context: ModelContext, checkIdentity: Bool = true) throws -> Bool {
+    private func placesInputCurrent(_ dto: ActivityMapAPI.ActivityPlaces, scope: StoreScope, context: ModelContext) throws -> Bool {
         let key = StoreScope.key([scope.key, dto.activityID])
         guard let row = try context.fetch(FetchDescriptor<StoredActivity>(predicate: #Predicate { $0.key == key })).first,
               dto.userID == scope.userID else { return false }
@@ -88,7 +59,7 @@ extension LocalStore {
             let metadata = try summary.decoded().metadata
             if Self.placesMetadataSupersedes(metadata, dto: dto) { return false }
         }
-        if checkIdentity, let identity = PlaceMatchingIdentity(dto),
+        if let identity = PlaceMatchingIdentity(dto),
            let known = try cachedPlacesContext(scope: scope), known != identity { return false }
         return true
     }
@@ -97,38 +68,12 @@ extension LocalStore {
         guard let row = try makeContext().fetch(FetchDescriptor<StoredPlacesContext>(predicate: #Predicate { $0.scope == key })).first else { return nil }
         return try? StoreCodec.decode(PlaceMatchingIdentity.self, from: row.payload)
     }
-    func saveActivityPlaces(_ dto: ActivityMapAPI.ActivityPlaces, scope: StoreScope, fence: StreamFence, now: Date) throws -> Bool {
-        guard placesFenceIsCurrent(fence, activityID: dto.activityID, scope: scope) else { return false }
-        let context = makeContext(); let key = StoreScope.key([scope.key, dto.activityID])
-        guard try placesInputCurrent(dto, scope: scope, context: context, checkIdentity: false) else { return false }
-        let identityKey = StoreScope.key([scope.key, "places-identity"])
-        let identity = PlaceMatchingIdentity(dto)
-        if let identity {
-            let scopeKey = scope.key
-            let row = try context.fetch(FetchDescriptor<StoredPlacesContext>(predicate: #Predicate { $0.scope == scopeKey })).first
-            let known = row.flatMap { try? StoreCodec.decode(PlaceMatchingIdentity.self, from: $0.payload) }
-            if known != identity && streamFences.wroteLater(than: fence, key: identityKey) { return false }
-            if let row { row.payload = try StoreCodec.encode(identity) }
-            else { context.insert(try StoredPlacesContext(scope: scopeKey, dto: identity)) }
-        }
-        let existing = try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.key == key })).first
-        if let existing {
-            existing.payload = try StoreCodec.encode(dto); existing.storedAt = now; existing.invalidated = false
-        } else { context.insert(try StoredActivityPlaces(scope: scope.key, dto: dto, now: now)) }
-        try Task.checkCancellation()
-        try save(context)
-        if identity != nil { streamFences.recordWrite(fence, key: identityKey) }
-        return true
-    }
+    /// Bundles travel inside the activity row; changed streams change which
+    /// bundle is current. Legacy direct-response rows are dropped on contact.
     func reconcilePlacesUpsert(_ dto: ActivityMapAPI.Activity, previous: ActivityMapAPI.Activity?, scopeKey: String, context: ModelContext) throws -> Bool {
         let key = StoreScope.key([scopeKey, dto.id])
-        let changed = dto.placeMatches != previous?.placeMatches
-        guard let cached = try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.key == key })).first else { return changed }
-        let places = try StoreCodec.decode(ActivityMapAPI.ActivityPlaces.self, from: cached.payload)
-        let invalidates = dto.streams.map { Self.placesMetadataSupersedes($0, dto: places) }
-            ?? previous.map { Self.summarySourceChanged($0, dto) } ?? false
-        if invalidates { cached.invalidated = true }
-        return invalidates || changed
+        for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.key == key })) { context.delete(row) }
+        return dto.placeMatches != previous?.placeMatches || dto.streams != previous?.streams
     }
     /// The sync manifest invalidates old bundles even on an empty feed page.
     /// Called inside the same save as the page and its cursor.
@@ -143,21 +88,6 @@ extension LocalStore {
         return true
     }
     func reconcilePlacesReplacement(_ activities: [ActivityMapAPI.Activity], scopeKey: String, context: ModelContext) throws {
-        let ids = Set(activities.map(\.id))
-        for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.scope == scopeKey })) {
-            if !ids.contains(row.activityID) { context.delete(row) }
-        }
-        for dto in activities {
-            let key = StoreScope.key([scopeKey, dto.id])
-            let previous = try context.fetch(FetchDescriptor<StoredActivity>(predicate: #Predicate { $0.key == key })).first?.decoded()
-            if let row = try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.key == key })).first,
-               let metadata = dto.streams {
-                let cached = try StoreCodec.decode(ActivityMapAPI.ActivityPlaces.self, from: row.payload)
-                if metadata.generation != cached.streamGeneration, previous?.streams?.generation != metadata.generation {
-                    row.invalidated = true
-                }
-            }
-            _ = try reconcilePlacesUpsert(dto, previous: previous, scopeKey: scopeKey, context: context)
-        }
+        for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.scope == scopeKey })) { context.delete(row) }
     }
 }

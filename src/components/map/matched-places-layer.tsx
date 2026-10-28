@@ -1,7 +1,7 @@
 'use client';
 
 import type { FeatureCollection, Point } from 'geojson';
-import { Loader2, MapPin, X } from 'lucide-react';
+import { Clock, Loader2, MapPin, X } from 'lucide-react';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Layer, Marker, Popup, Source, useMap } from 'react-map-gl/mapbox';
 
@@ -288,37 +288,37 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
   if (!query.userId || (!selectedIds.length && !showAllPlaces)) return null;
   return (
     <>
-      {(query.isLoading || query.isError) && (
+      {(query.isLoading || query.awaitingCount > 0) && (
         <div className="absolute bottom-10 left-3 z-10 max-w-[calc(100%_-_1.5rem)]">
           <div
             role="status"
             className="flex items-center gap-2 rounded-full border border-border bg-popover/95 px-3 py-1.5 text-xs text-muted-foreground shadow-sm"
             data-map-place
+            title={
+              query.isLoading
+                ? undefined
+                : 'Places appear after these routes are checked and synced.'
+            }
           >
-            {query.isError ? (
-              <>
-                Some places could not be loaded.{' '}
-                <button
-                  type="button"
-                  className="text-foreground underline"
-                  onClick={query.retry}
-                >
-                  Try again
-                </button>
-              </>
-            ) : (
+            {query.isLoading ? (
               <>
                 <Loader2
                   className="size-3 motion-safe:animate-spin"
                   aria-hidden="true"
                 />
+                <span>Loading places</span>
+              </>
+            ) : (
+              <>
+                <Clock className="size-3" aria-hidden="true" />
                 <span>
-                  Finding places
+                  Places pending
                   {query.totalCount > 1
                     ? ' · ' +
-                      (query.totalCount - query.pendingCount) +
+                      (query.totalCount - query.awaitingCount) +
                       '/' +
-                      query.totalCount
+                      query.totalCount +
+                      ' checked'
                     : ''}
                 </span>
               </>

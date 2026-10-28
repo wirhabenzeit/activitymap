@@ -108,8 +108,8 @@ const debugHandle = (current: Actor, debug = repository.debug) =>
   createPlaceDebugHandler({ resolveActor: async () => current, debug });
 const request = () =>
   new Request(`http://localhost/api/activities/${id}/places`);
-const handle = (current: Actor, match = repository.match) =>
-  createActivityPlacesHandler({ resolveActor: async () => current, match });
+const handle = (current: Actor, read = repository.match) =>
+  createActivityPlacesHandler({ resolveActor: async () => current, read });
 let imported = false;
 async function resetStreams() {
   await client`DELETE FROM activity_streams WHERE activity_id=${id}::bigint`;

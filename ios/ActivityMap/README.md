@@ -593,23 +593,18 @@ animation. Named VoiceOver actions reach every encounter without an additional
 Places button beside the profile, while retaining sample scrubbing.
 In Map detail, choosing an encounter focuses its map card; other
 activity details show a compact local card.
-Loading, empty results, unavailable coverage and request failures show no place
-status messages or retry controls. Available results appear normally, with
-offline caching and request backoff retained.
+Pending, empty results and unavailable coverage show no place status messages or
+retry controls. Available results appear normally and stay cached offline.
 
-The native app calls the existing `/api/activities/{id}/places` web endpoint
-with bearer authentication and decodes its shared generated DTO. No additional
-server endpoint or deployment is required. Matching uses stored GPS and never
-requests Strava streams. Results are saved in SwiftData, including completed zero-match
-checks. Reopening a route or the app reuses valid downloaded results offline.
+Backend jobs match stored GPS, and library sync delivers each result as part of
+its activity. The app never requests places directly: the loader reads
+synchronized bundles from SwiftData, including completed zero-match checks, and
+works offline. A route without a current result simply waits for a later sync.
 Stream changes, a newly observed catalogue/matcher version, deletion and account
-cleanup invalidate the corresponding data. Completed results revalidate lazily
-after one day online; current saved results remain available offline regardless
-of age. First-time uncached routes
-still need connectivity. No reference catalogue or matcher is downloaded.
+cleanup invalidate the corresponding data. No reference catalogue or matcher is
+downloaded.
 
-The overview reads committed SwiftData matches in one scoped batch without
-requesting every activity. Direct-read fallback stays limited to selected routes.
+The overview reads committed SwiftData matches in one scoped batch.
 Sync replacements, stream invalidations and matching-version changes refresh the
 overview; incomplete/zero replacements remove old visits. Web and iOS share
 `shared/parity/map-places.v1.json` for grouping parity.

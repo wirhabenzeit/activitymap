@@ -1,6 +1,9 @@
 import Foundation
 import SwiftData
 
+/// Legacy direct-response cache from before backend-only matching. Nothing
+/// reads or writes it; it stays in the schema so existing stores open without
+/// a migration, and sync or scope cleanup deletes the old rows.
 @Model nonisolated final class StoredActivityPlaces {
     @Attribute(.unique) var key: String
     var scope: String
@@ -23,13 +26,7 @@ import SwiftData
     }
 }
 
-nonisolated struct CachedActivityPlaces: Sendable {
-    let dto: ActivityMapAPI.ActivityPlaces
-    let storedAt: Date
-    var synchronized = false
-}
-
-/// Global matching identity from the sync manifest or a newer direct response.
+/// Global matching identity from the sync manifest.
 /// Optional version preserves decoding of the first Dev build's cached identity.
 nonisolated struct PlaceMatchingIdentity: Codable, Equatable, Sendable {
     let catalogueSnapshotID: String
