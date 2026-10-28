@@ -10,6 +10,7 @@ export type BrowsingValues = {
   'stats:calendarDay': number | null;
   'stats:monthDay': number | null;
   'stats:recordsPeriod': 'currentYear' | 'allTime';
+  'stats:placesPeriod': 'currentYear' | 'allTime';
   'stats:volumeGrouping': HistoryRange;
   'stats:comparison:year': number;
   'stats:comparison:month': number;

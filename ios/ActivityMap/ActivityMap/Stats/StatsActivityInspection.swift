@@ -29,5 +29,22 @@ struct StatsActivityInspection<Content: View>: View {
                 dashboard.inspectedActivityID = nil
             }, hostTab: .stats)
         }
+        // Only the visible surface presents; the dashboard stays mounted
+        // beneath a focus page.
+        .sheet(item: Binding(get: { active ? dashboard.inspectedPlaceID.map(StatsPlaceSelection.init) : nil },
+                             set: { dashboard.inspectedPlaceID = $0?.id })) { selection in
+            NavigationStack {
+                if let place = store.placeLibrary.byID[selection.id] {
+                    PlaceDetailView(item: place) { destination in
+                        dashboard.inspectedPlaceID = nil
+                        store.show(place, in: destination)
+                    }
+                } else { Text("No activities for this place.").padding() }
+            }
+        }
     }
+}
+
+private struct StatsPlaceSelection: Identifiable {
+    let id: String
 }

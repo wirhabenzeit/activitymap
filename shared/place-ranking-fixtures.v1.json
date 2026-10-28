@@ -1,0 +1,552 @@
+{
+  "version": 1,
+  "description": "Most visited places (#461). Each case applies the platform's real Stats filters (all sport types except those listed are disabled; place selects a place filter), then ranks by distinct activities over the window ending at today. Activity rows are shorthand: tests expand each into a synchronized activity whose placeMatches has the given status, and each place entry into a matched place with `encounters` visits.",
+  "userId": "alice",
+  "matchingVersion": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "today": "2026-10-28",
+  "places": {
+    "alpha": {
+      "id": "00000000-0000-4000-8000-000000000101",
+      "name": "Alpha Peak",
+      "kinds": ["peak"],
+      "latitude": 46.5,
+      "longitude": 8.0,
+      "elevationM": 3012
+    },
+    "bravo": {
+      "id": "00000000-0000-4000-8000-000000000102",
+      "name": "Bravo Peak",
+      "kinds": ["peak"],
+      "latitude": 46.51,
+      "longitude": 8.01,
+      "elevationM": 2504
+    },
+    "charlie": {
+      "id": "00000000-0000-4000-8000-000000000103",
+      "name": "Charlie",
+      "kinds": ["pass", "peak"],
+      "latitude": 46.52,
+      "longitude": 8.02,
+      "elevationM": 2210
+    },
+    "delta": {
+      "id": "00000000-0000-4000-8000-000000000104",
+      "name": "Delta Pass",
+      "kinds": ["pass"],
+      "latitude": 46.53,
+      "longitude": 8.03,
+      "elevationM": 1950
+    },
+    "echo": {
+      "id": "00000000-0000-4000-8000-000000000105",
+      "name": "Echo Hut",
+      "kinds": ["hut"],
+      "latitude": 46.54,
+      "longitude": 8.04,
+      "elevationM": null
+    },
+    "foxtrot": {
+      "id": "00000000-0000-4000-8000-000000000106",
+      "name": "Foxtrot Peak",
+      "kinds": ["peak"],
+      "latitude": 46.55,
+      "longitude": 8.05,
+      "elevationM": 2800
+    },
+    "golf": {
+      "id": "00000000-0000-4000-8000-000000000107",
+      "name": "Golf Peak",
+      "kinds": ["peak"],
+      "latitude": 46.56,
+      "longitude": 8.06,
+      "elevationM": 2650
+    },
+    "twinA": {
+      "id": "00000000-0000-4000-8000-000000000108",
+      "name": "Twin Peak",
+      "kinds": ["peak"],
+      "latitude": 46.57,
+      "longitude": 8.07,
+      "elevationM": 2100
+    },
+    "twinB": {
+      "id": "00000000-0000-4000-8000-000000000109",
+      "name": "Twin Peak",
+      "kinds": ["peak"],
+      "latitude": 46.58,
+      "longitude": 8.08,
+      "elevationM": 2120
+    }
+  },
+  "activities": [
+    {
+      "id": 1,
+      "sport_type": "Hike",
+      "start_date_local": "2026-02-01T08:00:00.000Z",
+      "status": "complete",
+      "places": [
+        {
+          "place": "alpha",
+          "encounters": 3
+        },
+        {
+          "place": "bravo",
+          "encounters": 1
+        },
+        {
+          "place": "echo",
+          "encounters": 1
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "sport_type": "Ride",
+      "start_date_local": "2026-03-01T08:00:00.000Z",
+      "status": "complete",
+      "places": [
+        {
+          "place": "alpha",
+          "encounters": 1
+        },
+        {
+          "place": "delta",
+          "encounters": 1
+        },
+        {
+          "place": "charlie",
+          "encounters": 1
+        }
+      ]
+    },
+    {
+      "id": 3,
+      "sport_type": "Hike",
+      "start_date_local": "2026-04-01T08:00:00.000Z",
+      "status": "complete",
+      "places": [
+        {
+          "place": "bravo",
+          "encounters": 1
+        },
+        {
+          "place": "charlie",
+          "encounters": 1
+        },
+        {
+          "place": "alpha",
+          "encounters": 1
+        },
+        {
+          "place": "alpha",
+          "encounters": 2
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "sport_type": "Hike",
+      "start_date_local": "2026-06-01T08:00:00.000Z",
+      "status": "complete",
+      "places": [
+        {
+          "place": "twinA",
+          "encounters": 1
+        },
+        {
+          "place": "twinB",
+          "encounters": 1
+        },
+        {
+          "place": "golf",
+          "encounters": 1
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "sport_type": "Hike",
+      "start_date_local": "2026-07-01T08:00:00.000Z",
+      "status": "complete",
+      "places": [
+        {
+          "place": "golf",
+          "encounters": 1
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "sport_type": "Hike",
+      "start_date_local": "2025-08-01T08:00:00.000Z",
+      "status": "complete",
+      "places": [
+        {
+          "place": "foxtrot",
+          "encounters": 1
+        },
+        {
+          "place": "alpha",
+          "encounters": 1
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "sport_type": "Walk",
+      "start_date_local": "2026-08-01T08:00:00.000Z",
+      "status": "pending",
+      "places": []
+    },
+    {
+      "id": 8,
+      "sport_type": "Hike",
+      "start_date_local": "2026-09-01T08:00:00.000Z",
+      "status": "uncovered",
+      "places": []
+    },
+    {
+      "id": 9,
+      "sport_type": "Hike",
+      "start_date_local": "2026-12-01T08:00:00.000Z",
+      "status": "complete",
+      "places": [
+        {
+          "place": "alpha",
+          "encounters": 1
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "sport_type": "Run",
+      "start_date_local": "2026-05-01T08:00:00.000Z",
+      "status": "complete",
+      "places": []
+    },
+    {
+      "id": 11,
+      "sport_type": "Hike",
+      "start_date_local": "2026-09-15T08:00:00.000Z",
+      "status": "missing_streams",
+      "places": []
+    },
+    {
+      "id": 12,
+      "sport_type": "Hike",
+      "start_date_local": "2025-03-01T08:00:00.000Z",
+      "status": "partial",
+      "places": [
+        {
+          "place": "foxtrot",
+          "encounters": 1
+        }
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "peaks this year: distinct activities, latest-visit/name/id ties, future and last year excluded",
+      "kind": "peak",
+      "range": "currentYear",
+      "expected": {
+        "rows": [
+          {
+            "place": "alpha",
+            "count": 3,
+            "rank": 1,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "golf",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-07-01"
+          },
+          {
+            "place": "bravo",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "charlie",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "twinA",
+            "count": 1,
+            "rank": 5,
+            "latestVisit": "2026-06-01"
+          },
+          {
+            "place": "twinB",
+            "count": 1,
+            "rank": 5,
+            "latestVisit": "2026-06-01"
+          }
+        ],
+        "total": 6,
+        "activities": 9,
+        "checked": 6,
+        "exhaustive": false
+      }
+    },
+    {
+      "name": "compact face keeps the first five of the same order",
+      "kind": "peak",
+      "range": "currentYear",
+      "limit": 5,
+      "expected": {
+        "rows": [
+          {
+            "place": "alpha",
+            "count": 3,
+            "rank": 1,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "golf",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-07-01"
+          },
+          {
+            "place": "bravo",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "charlie",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "twinA",
+            "count": 1,
+            "rank": 5,
+            "latestVisit": "2026-06-01"
+          }
+        ],
+        "total": 6,
+        "activities": 9,
+        "checked": 6,
+        "exhaustive": false
+      }
+    },
+    {
+      "name": "passes include multi-kind places",
+      "kind": "pass",
+      "range": "currentYear",
+      "expected": {
+        "rows": [
+          {
+            "place": "charlie",
+            "count": 2,
+            "rank": 1,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "delta",
+            "count": 1,
+            "rank": 2,
+            "latestVisit": "2026-03-01"
+          }
+        ],
+        "total": 2,
+        "activities": 9,
+        "checked": 6,
+        "exhaustive": false
+      }
+    },
+    {
+      "name": "huts",
+      "kind": "hut",
+      "range": "currentYear",
+      "expected": {
+        "rows": [
+          {
+            "place": "echo",
+            "count": 1,
+            "rank": 1,
+            "latestVisit": "2026-02-01"
+          }
+        ],
+        "total": 1,
+        "activities": 9,
+        "checked": 6,
+        "exhaustive": false
+      }
+    },
+    {
+      "name": "all time adds last year but never future or partial-result places",
+      "kind": "peak",
+      "range": "allTime",
+      "expected": {
+        "rows": [
+          {
+            "place": "alpha",
+            "count": 4,
+            "rank": 1,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "golf",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-07-01"
+          },
+          {
+            "place": "bravo",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "charlie",
+            "count": 2,
+            "rank": 2,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "twinA",
+            "count": 1,
+            "rank": 5,
+            "latestVisit": "2026-06-01"
+          },
+          {
+            "place": "twinB",
+            "count": 1,
+            "rank": 5,
+            "latestVisit": "2026-06-01"
+          },
+          {
+            "place": "foxtrot",
+            "count": 1,
+            "rank": 5,
+            "latestVisit": "2025-08-01"
+          }
+        ],
+        "total": 7,
+        "activities": 11,
+        "checked": 7,
+        "exhaustive": false
+      }
+    },
+    {
+      "name": "sport filter",
+      "kind": "peak",
+      "range": "currentYear",
+      "sports": ["Ride"],
+      "expected": {
+        "rows": [
+          {
+            "place": "alpha",
+            "count": 1,
+            "rank": 1,
+            "latestVisit": "2026-03-01"
+          },
+          {
+            "place": "charlie",
+            "count": 1,
+            "rank": 1,
+            "latestVisit": "2026-03-01"
+          }
+        ],
+        "total": 2,
+        "activities": 1,
+        "checked": 1,
+        "exhaustive": true
+      }
+    },
+    {
+      "name": "incomplete history is never exhaustive",
+      "kind": "peak",
+      "range": "currentYear",
+      "sports": ["Ride"],
+      "historyComplete": false,
+      "expected": {
+        "rows": [
+          {
+            "place": "alpha",
+            "count": 1,
+            "rank": 1,
+            "latestVisit": "2026-03-01"
+          },
+          {
+            "place": "charlie",
+            "count": 1,
+            "rank": 1,
+            "latestVisit": "2026-03-01"
+          }
+        ],
+        "total": 2,
+        "activities": 1,
+        "checked": 1,
+        "exhaustive": false
+      }
+    },
+    {
+      "name": "place filter keeps places shared with the chosen place's activities",
+      "kind": "peak",
+      "range": "currentYear",
+      "place": "bravo",
+      "expected": {
+        "rows": [
+          {
+            "place": "alpha",
+            "count": 2,
+            "rank": 1,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "bravo",
+            "count": 2,
+            "rank": 1,
+            "latestVisit": "2026-04-01"
+          },
+          {
+            "place": "charlie",
+            "count": 1,
+            "rank": 3,
+            "latestVisit": "2026-04-01"
+          }
+        ],
+        "total": 3,
+        "activities": 2,
+        "checked": 2,
+        "exhaustive": true
+      }
+    },
+    {
+      "name": "completed checks without places are an exhaustive empty ranking",
+      "kind": "peak",
+      "range": "currentYear",
+      "sports": ["Run"],
+      "expected": {
+        "rows": [],
+        "total": 0,
+        "activities": 1,
+        "checked": 1,
+        "exhaustive": true
+      }
+    },
+    {
+      "name": "pending results are not an empty ranking",
+      "kind": "peak",
+      "range": "currentYear",
+      "sports": ["Walk"],
+      "expected": {
+        "rows": [],
+        "total": 0,
+        "activities": 1,
+        "checked": 0,
+        "exhaustive": false
+      }
+    }
+  ]
+}

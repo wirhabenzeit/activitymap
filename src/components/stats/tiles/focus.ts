@@ -6,6 +6,7 @@ export const focusTiles = {
   'this-month': 'monthVsLastMonth',
   'year-to-date': 'yearToDate',
   records: 'records',
+  'most-visited-places': 'visitedPlaces',
   'activity-calendar': 'activityCalendar',
   'sport-mix': 'sportMix',
   hilliness: 'distanceVsElevation',

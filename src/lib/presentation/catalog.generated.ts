@@ -2045,6 +2045,11 @@ export const presentation = {
       "arguments": {},
       "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
     },
+    "stats.tile.visitedPlaces": {
+      "source": "Most visited places",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
     "stats.tile.totals": {
       "source": "Totals",
       "arguments": {},
@@ -2082,6 +2087,11 @@ export const presentation = {
     },
     "stats.toggle.sportMix": {
       "source": "Range",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.toggle.visitedPlaces": {
+      "source": "Place type",
       "arguments": {},
       "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
     },
@@ -3490,6 +3500,7 @@ export type MessageArguments = {
   "stats.tile.yearPace": Record<never, never>;
   "stats.toggle.yearPace": Record<never, never>;
   "stats.tile.records": Record<never, never>;
+  "stats.tile.visitedPlaces": Record<never, never>;
   "stats.tile.totals": Record<never, never>;
   "stats.toggle.totals": Record<never, never>;
   "stats.tile.activityCalendar": Record<never, never>;
@@ -3498,6 +3509,7 @@ export type MessageArguments = {
   "stats.toggle.consistency": Record<never, never>;
   "stats.tile.sportMix": Record<never, never>;
   "stats.toggle.sportMix": Record<never, never>;
+  "stats.toggle.visitedPlaces": Record<never, never>;
   "stats.tile.distanceVsElevation": Record<never, never>;
   "stats.tile.typicalWeek": Record<never, never>;
   "stats.tile.best30Days": Record<never, never>;

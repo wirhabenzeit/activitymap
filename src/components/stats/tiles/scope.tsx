@@ -16,13 +16,19 @@ export function useStatsActivities() {
   const { query } = useBrowsingLibrary();
   const state = useDeferredActivityFilters();
   const reset = useShallowStore((s) => s.resetActivityFilters);
-  const activities = useMemo(
-    () => filterStatsActivities(query.data ?? [], state).map(toStatsActivity),
+  // The full activities keep their synced place bundles for place rankings.
+  const placeActivities = useMemo(
+    () => filterStatsActivities(query.data ?? [], state),
     [query.data, state],
+  );
+  const activities = useMemo(
+    () => placeActivities.map(toStatsActivity),
+    [placeActivities],
   );
   return {
     query,
     activities,
+    placeActivities,
     scope: statsFilterScope(state),
     reset,
   };

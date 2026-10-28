@@ -7,11 +7,7 @@
       "group": "now",
       "visibility": "visible",
       "expandable": false,
-      "options": [
-        "distance",
-        "time",
-        "elevation"
-      ],
+      "options": ["distance", "time", "elevation"],
       "defaultOption": "distance",
       "compact": "Monday-first daily values; sum so far versus typical same weekday.",
       "expanded": "No expansion.",
@@ -23,12 +19,7 @@
       "group": "now",
       "visibility": "visible",
       "expandable": true,
-      "options": [
-        "distance",
-        "time",
-        "elevation",
-        "count"
-      ],
+      "options": ["distance", "time", "elevation", "count"],
       "defaultOption": "distance",
       "compact": "Month-to-date comparison with prior month capped at its last day; 5th–95th percentile band across completed historical months.",
       "expanded": "Current/prior-month cumulative curves and historical percentile band; daily sport bars with selected-day activity inspection; active days, activity count and measured-activity average; recent twelve same-date and completed-month totals. No past-month selector.",
@@ -40,12 +31,7 @@
       "group": "now",
       "visibility": "visible",
       "expandable": true,
-      "options": [
-        "distance",
-        "time",
-        "elevation",
-        "count"
-      ],
+      "options": ["distance", "time", "elevation", "count"],
       "defaultOption": "distance",
       "compact": "Last-28-day headline versus prior 28 days; 12-week trend with four-full-week average.",
       "expanded": "By week (last 12 weeks), By month (last 12 months), By year (all available years); stacked area by sport, four-completed-period average including offscreen history, lighter incomplete-period shading, and period totals by sport visible without a disclosure at every width. No historical-window or chart-type picker.",
@@ -57,12 +43,7 @@
       "group": "thisYear",
       "visibility": "visible",
       "expandable": true,
-      "options": [
-        "distance",
-        "time",
-        "elevation",
-        "count"
-      ],
+      "options": ["distance", "time", "elevation", "count"],
       "defaultOption": "distance",
       "compact": "Year-to-date headline versus same date last year; cumulative calendar-aligned curves with a min–max band across completed prior years.",
       "expanded": "Current/prior-year calendar-aligned curves and historical min–max band; paired monthly totals by sport through the reporting month; recorded-year same-date and completed totals. Current month compares through the same date, clamping leap days.",
@@ -74,11 +55,7 @@
       "group": "thisYear",
       "visibility": "visible",
       "expandable": false,
-      "options": [
-        "distance",
-        "time",
-        "elevation"
-      ],
+      "options": ["distance", "time", "elevation"],
       "defaultOption": "distance",
       "compact": "Projected year-end total with a labelled current/projection/previous-year reference bar; daily rates preserve small nonzero values.",
       "expanded": "No expansion.",
@@ -98,16 +75,23 @@
       "uiOwner": 363
     },
     {
+      "id": "visitedPlaces",
+      "group": "thisYear",
+      "visibility": "visible",
+      "expandable": true,
+      "options": ["peak", "pass", "hut"],
+      "defaultOption": "peak",
+      "compact": "Top five peaks, passes or huts this year by distinct activities whose synchronized route places include them; repeated encounters on one route count once. Ties use latest visit, then name, then place ID. Rows show kind symbol, name, elevation where it fits and activity count; pending, partial, uncovered or missing-stream results are disclosed and never presented as an exhaustive empty ranking.",
+      "expanded": "Bounded ranking (top 50) of the same kind for This year or All time, with competition ranks for equal counts. Selecting a row opens the shared place detail with first/latest visit and Show activities / Show on map actions. Hut matches describe route vicinity, not entry or a stay.",
+      "nativeOwner": 461,
+      "uiOwner": 461
+    },
+    {
       "id": "totals",
       "group": "thisYear",
       "visibility": "notRendered",
       "expandable": false,
-      "options": [
-        "distance",
-        "time",
-        "elevation",
-        "count"
-      ],
+      "options": ["distance", "time", "elevation", "count"],
       "defaultOption": "distance",
       "compact": "Not drawn; totals are represented by other tiles.",
       "expanded": "No separate tile.",
@@ -119,12 +103,7 @@
       "group": "patterns",
       "visibility": "visible",
       "expandable": true,
-      "options": [
-        "sport",
-        "distance",
-        "time",
-        "elevation"
-      ],
+      "options": ["sport", "distance", "time", "elevation"],
       "defaultOption": "sport",
       "compact": "Inclusive rolling year with year-qualified month labels, sport or numeric colouring, complete compact legend, striped mixed-sport days and accessible day inspection.",
       "expanded": "Rolling or selected calendar year with previous/next controls, direct cell inspection with a contrasting selected-day outline and inline activities with detail links. A collapsed-cell selection expands the tile. Keyboard/VoiceOver selection remains available; no separate date picker, popup or duplicate horizontal day strip.",
@@ -136,10 +115,7 @@
       "group": "patterns",
       "visibility": "notRendered",
       "expandable": false,
-      "options": [
-        "last12Weeks",
-        "last52Weeks"
-      ],
+      "options": ["last12Weeks", "last52Weeks"],
       "defaultOption": "last12Weeks",
       "compact": "Not drawn. Active days per week remains in Typical week; Activity calendar shows the pattern.",
       "expanded": "No standalone Consistency tile.",
@@ -151,10 +127,7 @@
       "group": "patterns",
       "visibility": "visible",
       "expandable": true,
-      "options": [
-        "currentYear",
-        "allTime"
-      ],
+      "options": ["currentYear", "allTime"],
       "defaultOption": "currentYear",
       "compact": "Moving-time shares in one stacked bar, complete wrapping sport legend and single-sport explanation.",
       "expanded": "Sport share, moving time, activity count, distance and climb in phone rows or a wide table.",
@@ -190,11 +163,7 @@
       "group": "patterns",
       "visibility": "inRecords",
       "expandable": false,
-      "options": [
-        "distance",
-        "time",
-        "elevation"
-      ],
+      "options": ["distance", "time", "elevation"],
       "defaultOption": "distance",
       "compact": "Not drawn separately; values appear in expanded Records.",
       "expanded": "Before Jan 30 explain no full window, without presenting partial comparison.",
@@ -218,10 +187,7 @@
       "group": "patterns",
       "visibility": "unspecified",
       "expandable": false,
-      "options": [
-        "last12Months",
-        "allTime"
-      ],
+      "options": ["last12Months", "allTime"],
       "defaultOption": "last12Months",
       "compact": "Unspecified optional analytics, not drawn.",
       "expanded": "Requires a separately accepted rule/fixture before implementation.",

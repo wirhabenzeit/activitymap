@@ -60,7 +60,8 @@ final class ActivityStore {
     private var filterRevision = 0
     private(set) var placeUserID: String?
     private(set) var placeMatchingVersion: String?
-    private var placeHistoryComplete = false
+    /// The synced history has finished its first full download.
+    private(set) var placeHistoryComplete = false
     @ObservationIgnored private var placeLibrarySnapshot: (revision: Int, library: PlaceLibrary)?
 
     var placeLibrary: PlaceLibrary {

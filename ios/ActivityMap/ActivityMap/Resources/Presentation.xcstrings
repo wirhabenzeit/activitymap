@@ -3877,6 +3877,18 @@
         }
       }
     },
+    "stats.tile.visitedPlaces": {
+      "comment": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Most visited places"
+          }
+        }
+      }
+    },
     "stats.tile.totals": {
       "comment": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.",
       "extractionState": "manual",
@@ -3969,6 +3981,18 @@
           "stringUnit": {
             "state": "translated",
             "value": "Range"
+          }
+        }
+      }
+    },
+    "stats.toggle.visitedPlaces": {
+      "comment": "Stats tile option group label; options are semantic IDs and preserve selected state.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Place type"
           }
         }
       }

@@ -70,6 +70,16 @@ filters, comparison history, completed-zero replacement, account changes and zer
 API requests. `PlaceLibraryTests` and `PlaceSearchUITests` cover the native model
 and the real filter/detail interaction and are registered in the native harness.
 
+The Stats “Most visited places” tile (#461) is such a filtered-scope index: the
+Stats-filtered activities of its window go through the same index
+(`rankVisitedPlaces` on the web, `PlaceLibrary(evidence:)` inside the native
+Stats engine), ranked by distinct activities with latest-visit/name/ID tie-breaks.
+Unlike search, it discloses unchecked activities and incomplete history, so a
+pending or uncovered window is never shown as “no places”. Rows open the same
+compact detail. `shared/place-ranking-fixtures.v1.json` is checked by
+`src/lib/place-ranking.test.ts` and `PlaceRankingTests`; `pnpm
+test:place-ranking-ui` drives the real web dashboard with zero API requests.
+
 ## Request and data flow
 
 `GET /api/activities/{id}/places` resolves the authenticated actor and reads the

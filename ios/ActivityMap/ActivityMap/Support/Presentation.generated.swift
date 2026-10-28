@@ -956,6 +956,9 @@ nonisolated enum AppMessages {
     static func statsTileRecords(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("stats.tile.records", defaultValue: "Records", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
     }
+    static func statsTileVisitedPlaces(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.tile.visitedPlaces", defaultValue: "Most visited places", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
+    }
     static func statsTileTotals(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("stats.tile.totals", defaultValue: "Totals", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")
     }
@@ -979,6 +982,9 @@ nonisolated enum AppMessages {
     }
     static func statsToggleSportMix(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("stats.toggle.sportMix", defaultValue: "Range", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
+    }
+    static func statsToggleVisitedPlaces(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.toggle.visitedPlaces", defaultValue: "Place type", table: "Presentation", locale: locale, comment: "Stats tile option group label; options are semantic IDs and preserve selected state.")
     }
     static func statsTileDistanceVsElevation(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("stats.tile.distanceVsElevation", defaultValue: "Hilliness", table: "Presentation", locale: locale, comment: "Stats tile title; identifies the same drilldown and accessible chart on web and iOS.")

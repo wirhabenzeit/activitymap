@@ -37,7 +37,13 @@ const windowIDs = [
   'last12Months',
   'allTime',
 ] as const;
-const toggleOptionSchema = z.enum([...metricIDs, ...windowIDs, 'sport']);
+const placeKindIDs = ['peak', 'pass', 'hut'] as const;
+const toggleOptionSchema = z.enum([
+  ...metricIDs,
+  ...windowIDs,
+  'sport',
+  ...placeKindIDs,
+]);
 
 const gridSchema = z
   .object({

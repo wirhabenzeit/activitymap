@@ -136,9 +136,11 @@ struct StatsPresentation: Equatable {
 
     private func metadata(for store: ActivityStore, key: Key) -> [StatsActivity] {
         if scoped?.0 == key { return scoped!.1 }
+        let userID = store.placeUserID
         let metadata = store.statsActivities.map {
             StatsActivity(id: $0.id, name: $0.name, sport: $0.category, start: $0.startDateLocal,
-                          distance: $0.distance, movingTime: $0.movingTime.map(Double.init), elevation: $0.totalElevationGain)
+                          distance: $0.distance, movingTime: $0.movingTime.map(Double.init), elevation: $0.totalElevationGain,
+                          places: PlaceLibrary.evidence($0, userID: userID))
         }
         scoped = (key, metadata)
         return metadata
