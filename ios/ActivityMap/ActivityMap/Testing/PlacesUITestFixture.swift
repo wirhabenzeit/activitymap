@@ -15,7 +15,7 @@ struct PlacesUITestFixture: View {
     private let overviewTest = ProcessInfo.processInfo.arguments.contains("--places-overview-ui-testing")
     private let markerStyleTest = ProcessInfo.processInfo.arguments.contains("--places-marker-style-ui-testing")
     private var chooserTest: Bool { overviewTest || ProcessInfo.processInfo.arguments.contains("--places-chooser-ui-testing") }
-    private let places = ActivityPlacesLoader(source: { _ in PlacesFixtureOfflineSource() })
+    private let places = ActivityPlacesLoader()
     private let summaries = StreamSummaryLoader(source: { _ in PlacesFixtureOfflineSource() })
     var body: some View {
         VStack(spacing: 0) {
@@ -92,7 +92,7 @@ struct PlacesUITestFixture: View {
                 let result = ActivityMapAPI.ActivityPlaces(userID: session.scope.userID, activityID: "1", status: .complete,
                     streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic", matchingVersion: nil, resultRevision: nil,
                     places: [hut, peak, pass])
-                _ = try await storage.saveActivityPlaces(result, scope: session.scope, fence: fence, now: .now)
+                var synced = [try Self.synced(dto, places: result)]
                 if chooserTest {
                     let secondSummary = ActivityMapAPI.ActivityCompactStreamSummary(activityID: "2", metadata: metadata,
                         summary: try CompactStreamCodec.encode(summary), lastError: nil, nextRetryAt: nil)
@@ -102,8 +102,10 @@ struct PlacesUITestFixture: View {
                     let secondResult = ActivityMapAPI.ActivityPlaces(userID: session.scope.userID, activityID: "2", status: .complete,
                         streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic",
                         matchingVersion: nil, resultRevision: nil, places: [peak, secondHut])
-                    _ = try await storage.saveActivityPlaces(secondResult, scope: session.scope, fence: fence, now: .now)
+                    synced.append(try Self.synced(dtos[1], places: secondResult))
                 }
+                // Places arrive only through library sync, as from backend matching.
+                try await storage.apply(synced.map { .upsertActivity($0) }, scope: session.scope)
                 await places.configure(session, storage: storage)
                 await summaries.configure(session, storage: storage)
                 var activity = Activity(id: 1, name: "Alpine loop", sportType: .hike, startDate: .now, startDateLocal: .now,
@@ -137,9 +139,14 @@ struct PlacesUITestFixture: View {
             } catch { self.error = String(describing: error) }
         }
     }
+    private static func synced(_ dto: ActivityMapAPI.Activity, places: ActivityMapAPI.ActivityPlaces) throws -> ActivityMapAPI.Activity {
+        let encoder = ActivityMapAPI.makeEncoder()
+        guard var fields = try JSONSerialization.jsonObject(with: encoder.encode(dto)) as? [String: Any] else { throw CocoaError(.coderInvalidValue) }
+        fields["placeMatches"] = try JSONSerialization.jsonObject(with: encoder.encode(places))
+        return try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.Activity.self, from: JSONSerialization.data(withJSONObject: fields))
+    }
 }
-private actor PlacesFixtureOfflineSource: ActivityPlacesSource, CompactSummarySource {
-    func places(activityID: String) throws -> ActivityMapAPI.ActivityPlaces { throw APIClient.RequestError.transport("Offline fixture requested places") }
+private actor PlacesFixtureOfflineSource: CompactSummarySource {
     func summary(activityID: String, mode: StreamFetchMode) throws -> APIClient.Response<ActivityMapAPI.ActivityCompactStreamSummary> {
         throw APIClient.RequestError.transport("Offline fixture requested streams")
     }

@@ -10,16 +10,11 @@ import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 
 import {
-  activityPlacesQueryKey,
   elevationPlaceMarkers,
   placesMatchProfile,
   selectedMatchedPlaces,
   syncedActivityPlaces,
 } from './activity-places';
-import {
-  createPlaceRequestQueue,
-  fetchActivityPlaces,
-} from './activity-places-client';
 
 const place: MatchedPlace = {
   id: '00000000-0000-4000-8000-000000000001',
@@ -68,14 +63,6 @@ void test('profile annotations use the exact stream generation/revision and reta
     { ...metadata, state: 'stale' as const },
   ])
     assert.equal(placesMatchProfile(response(), changed), false);
-  assert.notDeepEqual(
-    activityPlacesQueryKey('u', '1', metadata),
-    activityPlacesQueryKey('other', '1', metadata),
-  );
-  assert.notDeepEqual(
-    activityPlacesQueryKey('u', '1', metadata),
-    activityPlacesQueryKey('u', '1', { ...metadata, revision: '3' }),
-  );
   const markers = elevationPlaceMarkers(
     { distance: [0, 100, 200], altitude: [100, 200, 100] },
     [place],
@@ -108,91 +95,6 @@ void test('endpoint bucket means clamp real endpoint encounters without using th
     ],
   );
 });
-void test('request queue bounds concurrency and cancels queued deselected work before fetch', async () => {
-  const run = createPlaceRequestQueue(1);
-  let release!: () => void;
-  let calls = 0;
-  const first = run(new AbortController().signal, async () => {
-    calls++;
-    await new Promise<void>((resolve) => (release = resolve));
-    return 1;
-  });
-  await Promise.resolve();
-  const cancelled = new AbortController();
-  const second = run(cancelled.signal, async () => {
-    calls++;
-    return 2;
-  });
-  const rejection = assert.rejects(second, { name: 'AbortError' });
-  cancelled.abort();
-  await rejection;
-  const third = run(new AbortController().signal, async () => {
-    calls++;
-    return 3;
-  });
-  assert.equal(calls, 1);
-  release();
-  assert.equal(await first, 1);
-  assert.equal(await third, 3);
-  assert.equal(calls, 2);
-});
-void test('client fetch validates actor/activity scope and never accepts a cached public response', async () => {
-  for (const wrong of [response('2'), response('1', 'other')])
-    await assert.rejects(
-      fetchActivityPlaces({
-        userId: 'u',
-        activityId: '1',
-        signal: new AbortController().signal,
-        fetchImpl: async () => Response.json(wrong),
-      }),
-      /account or activity changed/,
-    );
-  const result = await fetchActivityPlaces({
-    userId: 'u',
-    activityId: '1',
-    signal: new AbortController().signal,
-    fetchImpl: async (url, init) => {
-      assert.equal(url, '/api/activities/1/places');
-      assert.equal(init?.cache, 'no-store');
-      assert.equal(init?.credentials, 'same-origin');
-      return Response.json(response());
-    },
-  });
-  assert.deepEqual(result, response());
-});
-
-void test('an inspected route moves ahead of the remaining selected-route queue', async () => {
-  const run = createPlaceRequestQueue(1);
-  let release!: () => void;
-  const order: string[] = [];
-  const first = run(
-    new AbortController().signal,
-    async () => {
-      await new Promise<void>((resolve) => (release = resolve));
-    },
-    'running',
-  );
-  await Promise.resolve();
-  const earlier = run(
-    new AbortController().signal,
-    async () => {
-      order.push('earlier');
-    },
-    'earlier',
-  );
-  const inspected = run(
-    new AbortController().signal,
-    async () => {
-      order.push('inspected');
-    },
-    'inspected',
-  );
-  run.prioritize('inspected');
-  release();
-  await Promise.all([first, earlier, inspected]);
-  assert.deepEqual(order, ['inspected', 'earlier']);
-});
-
 void test('synchronized results require the account, activity, global version and current stream inputs', () => {
   const version = 'a'.repeat(64);
   const matches = { ...response(), matchingVersion: version };

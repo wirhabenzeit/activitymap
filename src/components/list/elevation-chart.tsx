@@ -2,15 +2,12 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2 } from 'lucide-react';
-import { useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 
 import { Button } from '~/components/ui/button';
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import { useActivityPlaces } from '~/hooks/use-activity-places';
-import {
-  activityPlacesQueryRoot,
-  placesMatchProfile,
-} from '~/lib/activity-places';
+import { placesMatchProfile } from '~/lib/activity-places';
 import {
   STREAM_SUMMARY_PREFETCH_BATCH,
   STREAM_SUMMARY_PREFETCH_CONCURRENCY,
@@ -195,45 +192,11 @@ export function ElevationChart({
     matchedPlaces.data,
     query.data?.metadata,
   );
-  const recheckedPlaceInput = useRef<string | null>(null);
-  useEffect(() => {
-    const metadata = query.data?.metadata;
-    const matches = matchedPlaces.data;
-    if (metadata?.state !== 'current' || !matches || matchedPlaces.isFetching)
-      return;
-    if (
-      matches.streamGeneration === metadata.generation &&
-      matches.streamRevision === metadata.revision
-    )
-      return;
-    const input = JSON.stringify([
-      userId,
-      activityId,
-      metadata.generation,
-      metadata.revision,
-    ]);
-    if (recheckedPlaceInput.current === input) return;
-    recheckedPlaceInput.current = input;
-    // Recheck only when a profile exposes newer input, not whenever its card opens.
-    void queryClient.invalidateQueries({
-      queryKey: activityPlacesQueryRoot(userId, activityId),
-    });
-  }, [
-    queryClient,
-    userId,
-    activityId,
-    query.data?.metadata,
-    matchedPlaces.data,
-    matchedPlaces.isFetching,
-  ]);
   const placesStatus = matchedPlaces.enabled ? (
     <ActivityPlacesStatus
       data={matchedPlaces.data}
-      isLoading={matchedPlaces.isFetching}
-      isError={matchedPlaces.isError}
-      retry={() => {
-        void matchedPlaces.refetch();
-      }}
+      isLoading={matchedPlaces.isLoading}
+      isAwaiting={matchedPlaces.isAwaiting}
     />
   ) : null;
   const height = 177;

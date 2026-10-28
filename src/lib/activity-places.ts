@@ -8,20 +8,6 @@ import type { ElevationProfile } from '~/lib/activity-stream-summary';
 import { nearestElevationSample } from '~/lib/elevation-profile';
 
 export const MATCHED_PLACES_HIT_LAYER = 'matched-places-hit';
-export const activityPlacesQueryRoot = (userId: string, activityId: string) =>
-  ['library', `auth:${userId}`, 'activity-places', activityId] as const;
-export const activityPlacesQueryKey = (
-  userId: string,
-  activityId: string,
-  metadata?: StreamMetadata,
-  matchingVersion?: string,
-) => [
-  ...activityPlacesQueryRoot(userId, activityId),
-  metadata?.generation ?? null,
-  metadata?.revision ?? '0',
-  metadata?.state ?? 'not_fetched',
-  ...(matchingVersion ? [matchingVersion] : []),
-];
 /** A synchronized bundle is authoritative only for its account, inputs and
  * global version. Retaining old data on disk never makes it current. */
 export function syncedActivityPlaces(

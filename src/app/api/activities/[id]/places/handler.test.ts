@@ -28,9 +28,9 @@ const result: ActivityPlacesResponse = {
 };
 const request = () =>
   new Request('https://activitymap.cc/api/activities/9007199254740993/places');
-void test('web matching requires authentication, validates IDs losslessly and returns private scoped results', async () => {
+void test('place reads require authentication, validate IDs losslessly and returns private scoped results', async () => {
   let calls = 0;
-  const match = async (current: Actor, id: string) => {
+  const read = async (current: Actor, id: string) => {
     calls++;
     assert.equal(current, actor);
     assert.equal(id, result.activityId);
@@ -38,13 +38,13 @@ void test('web matching requires authentication, validates IDs losslessly and re
   };
   const missing = await createActivityPlacesHandler({
     resolveActor: async () => null,
-    match,
+    read,
   })(request(), result.activityId);
   assert.equal(missing.status, 401);
   assert.equal(calls, 0);
   const handle = createActivityPlacesHandler({
     resolveActor: async () => actor,
-    match,
+    read,
   });
   assert.equal((await handle(request(), '1e3')).status, 400);
   assert.equal(calls, 0);
@@ -61,7 +61,7 @@ void test('ownership loss and concurrent input replacement cannot expose a stale
   ] as const) {
     const response = await createActivityPlacesHandler({
       resolveActor: async () => actor,
-      match: async () => {
+      read: async () => {
         throw error;
       },
     })(request(), result.activityId);
@@ -75,7 +75,7 @@ void test('ownership loss and concurrent input replacement cannot expose a stale
   ]) {
     const response = await createActivityPlacesHandler({
       resolveActor: async () => actor,
-      match: async () => bad,
+      read: async () => bad,
       onError: () => errors++,
     })(request(), result.activityId);
     assert.equal(response.status, 503);

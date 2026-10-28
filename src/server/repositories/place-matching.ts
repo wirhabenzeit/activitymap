@@ -478,24 +478,6 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         { isolationLevel: 'repeatable read', accessMode: 'read only' },
       );
     },
-    async version(actor: Actor) {
-      const row = (
-        await database.execute<{
-          snapshot_id: string | null;
-          revision: string;
-        }>(sql`
-        SELECT ${preferredCatalogue} AS snapshot_id,r.revision::text FROM "user" u CROSS JOIN place_catalogue_revision r
-        WHERE u.id=${actor.userId} AND u.athlete_id=${actor.athleteId} AND r.singleton AND ${connected}
-      `)
-      ).rows[0];
-      if (!row) throw new ActivityPlacesUnavailableError();
-      return {
-        version: matchingVersion({
-          snapshotId: row.snapshot_id,
-          revision: row.revision,
-        }),
-      };
-    },
     async read(
       actor: Actor,
       activityId: string,

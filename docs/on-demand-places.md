@@ -72,12 +72,18 @@ and the real filter/detail interaction and are registered in the native harness.
 
 ## Request and data flow
 
-`GET /api/activities/{id}/places` resolves the authenticated actor and reads the
-persisted private result for the current stream and matching version. It never
-fetches Strava. A stale result is hidden immediately on a server read and replaced
-by an explicit `pending` response; `after()` requests a bounded local matching
-pass for that activity. The periodic worker independently catches up all current
-stored streams, including new activities, without relying on anyone opening them.
+Backend jobs own all matching. The periodic worker discovers new, changed and
+stale activities from stored streams without anyone opening them, and library
+sync publishes each result to web and iOS. Opening, selecting or re-rendering a
+route never starts matching or requests places.
+
+`GET /api/activities/{id}/places` is a read-only compatibility route for shipped
+clients that predate sync-only places. It resolves the authenticated actor and
+reads the persisted private result for the current stream and matching version.
+It never fetches Strava and never schedules computation: a stale or unprocessed
+result reads as an explicit `pending` response until the scheduled matcher reaches
+it. Current web and iOS builds no longer call it; remove the route once supported
+iOS builds all read synchronized bundles.
 The combined Switzerland/Austria/Italy catalogue is preferred; Swiss-only local
 catalogues remain supported.
 
@@ -86,18 +92,19 @@ It compares stream generation/revision/source fingerprint, catalogue snapshot an
 revision, and algorithm/discovery/settings recipe. A second read outside its
 snapshot fences concurrent deletion, revocation, stream replacement or catalogue
 publication. A check completing for unchanged inputs may safely leave one final
-pending response, which keeps polling. HTTP responses are private/no-store.
+pending response. HTTP responses are private/no-store.
 
-The web reads `/api/places/version` on mount, window focus and every 30 seconds
-while observing places. That token follows the catalogue revision and matching
-recipe, and forms part of every account/activity/stream query key. Thus catalogue
-and algorithm updates refresh even completed zero-match results without a stream
-change. Pending checks poll (starting at three seconds, reduced for large
-selections); completed responses carry their own result revision. Results from a
-known mismatched token are hidden while the version is refreshed. Other account
-caches are never reused.
-Loading stays in a fixed-height chart header and a compact map status pill; it
-does not add rows to the card. The themed map card shows the place name, kind and
+Clients take the matching version from the sync manifest. It follows the
+catalogue revision and matching recipe, so catalogue and algorithm updates hide
+even completed zero-match results until their replacement arrives, without a
+stream change. Other account caches are never reused. The web library syncs on
+open, when the page becomes visible, when it reconnects and every two minutes
+while visible; iOS syncs every minute while active.
+
+Hydration, pending, unavailable, missing-GPS, partial and uncovered states each
+have their own fixed-height chart-header status, and selected routes awaiting a
+result show a compact map pill. Pending never reads as a completed empty result.
+None of these states add rows to the card. The themed map card shows the place name, kind and
 elevation, plus a route count when shared. Map and detail observers share in-flight requests. A cancellable queue permits
 two concurrent requests and prioritizes an inspected activity. Deselecting or
 filtering a route removes its markers; switching accounts changes the query scope.
@@ -465,18 +472,18 @@ it first receives the new manifest field. Failure leaves its completed offline
 library and cursor intact. Older apps ignore the additive fields. New clients can
 still decode responses from an older server that omits them.
 
-Web map/profile observers read synchronized bundles and share a 30-second/focus
-catch-up through the existing serialized library writer. Current synchronized
-results render offline without per-activity requests. The direct places endpoint
-remains a fallback for pending results or a cache that has not upgraded yet.
-The iOS loader likewise prefers synchronized bundles and observes committed
-activity/global invalidations. Pending direct responses poll every three seconds;
-completed synchronized results do not depend on the former daily revalidation.
+Web map/profile observers read synchronized bundles only, and updates arrive
+through the ordinary library sync. Current synchronized results render offline
+without per-activity requests. The iOS loader likewise reads synchronized bundles
+from SwiftData and rereads demanded routes when committed activity or global
+invalidations are observed. Neither client calls the direct places endpoint.
+Native direct-response rows from older builds are no longer read and are deleted
+as sync touches their activities.
 
 Verification includes browser IndexedDB transaction failure/rollback, zero-result
 replacement, account isolation, global invalidation on empty pages and deletion;
-native tests exercise offline rendering, late-response fencing, failed save and
-one-time upgrade; database proofs exercise atomic check/feed commits, concurrent
+native tests exercise offline rendering, pending-to-complete delivery, failed save
+and one-time upgrade; database proofs exercise atomic check/feed commits, concurrent
 sequence ordering, scoped reads and manifest invalidation. No additional migration
 or environment variable is required for the sync extension beyond migrations
 0026/0027 already needed by matching.

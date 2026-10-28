@@ -92,9 +92,6 @@ function fixture() {
     sync: async () => {
       throw new Error('unused');
     },
-    version: async () => {
-      throw new Error('unused');
-    },
   };
   return {
     repository,

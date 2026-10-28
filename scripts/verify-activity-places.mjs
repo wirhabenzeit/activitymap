@@ -1,5 +1,6 @@
-// Production React Query hooks, Mapbox layers and elevation UI, served locally
-// with invented API responses. Real SQL/authorization is proved separately by
+// Production place hooks, Mapbox layers and elevation UI, served locally with
+// invented synchronized bundles. Backend jobs own matching, so the page must
+// never request places directly. Real SQL/authorization is proved separately by
 // db:test-on-demand-places; no credentials, raw tracks or outside services here.
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
@@ -63,7 +64,6 @@ import Map,{Source,Layer} from 'react-map-gl/mapbox';import {QueryClient,QueryCl
 import {ElevationChart} from '~/components/list/elevation-chart';import {MatchedPlacesLayer} from '~/components/map/matched-places-layer';
 import {Selection} from '~/components/map/selection-control';import {useShallowStore} from '~/store';
 import {encodeStreamSummary} from '~/lib/streams/compact-summary';import {streamSummaryQueryKey} from '~/lib/activity-stream-summary';
-import {activityPlacesQueryRoot} from '~/lib/activity-places';
 import {placeSymbolImage} from '~/lib/place-symbols';window.fixturePlaceImage=placeSymbolImage;
 import {applyV1SyncPage,getV1SyncState} from '~/lib/sync/v1-store';
 import {getLibraryOwner} from '~/lib/sync/library-owner';
@@ -74,24 +74,25 @@ const latlng=[[47,8],[47.001,8.001],[47.002,8.002]];
 const source={metadata,summary:encodeStreamSummary({version:2,basis:'distance',distance:[0,100,200],altitude:[400,500,420],latlng}),requestedAgainst:metadata,status:'ready',message:null,retryAt:null,pollStartedAt:0,pollAttempts:0};
 const client=new QueryClient({defaultOptions:{queries:{retry:false,staleTime:Infinity}}});window.client=client;
 for(const user of ['fixture','other'])client.setQueryData(streamSummaryQueryKey(user,'1'),source);
-const activities=new globalThis.Map([[1,{id:1,streamsMetadata:metadata}],[2,{id:2,streamsMetadata:metadata}]]);
-window.refreshPlaces=()=>client.resetQueries({queryKey:['library','auth:'+window.fixtureState.getState().user.id,'activity-places']});
-window.replaceProfile=()=>client.setQueryData(streamSummaryQueryKey('fixture','1'),{...source,metadata:{...metadata,revision:'2'}});
-window.saveSyncedPlaces=async(bundle,version)=>{
- const scope='auth:fixture';const state={scope,bootstrapCursor:'snapshot',bootstrapComplete:true,changesCursor:bundle?.resultRevision??'version',lastSyncAt:new Date().toISOString(),updatedAt:new Date().toISOString(),placeMatchingVersion:version,placesSyncReady:true};
- const mutations=bundle?[{sequence:'1',entityType:'activity',operation:'upsert',id:bundle.activityId,activity:{...fixtureDTOs.activity,id:bundle.activityId,streams:metadata,placeMatches:bundle}}]:[];
+// A replaced recording reaches the route and the profile together, as after sync.
+window.replaceProfile=()=>{const next={...metadata,revision:'2'};client.setQueryData(streamSummaryQueryKey('fixture','1'),{...source,metadata:next,requestedAgainst:next});window.fixtureState.setState({streamRevision:'2'});};
+window.saveSyncedPlaces=async(bundle,version,owner='fixture')=>{
+ const scope='auth:'+owner;const state={scope,bootstrapCursor:'snapshot',bootstrapComplete:true,changesCursor:bundle?.resultRevision??'version',lastSyncAt:new Date().toISOString(),updatedAt:new Date().toISOString(),placeMatchingVersion:version,placesSyncReady:true};
+ const mutations=bundle?[{sequence:'1',entityType:'activity',operation:'upsert',id:bundle.activityId,activity:{...fixtureDTOs.activity,id:bundle.activityId,streams:{...metadata,revision:bundle.streamRevision},placeMatches:bundle}}]:[];
  await applyV1SyncPage(scope,mutations,state);await getLibraryOwner(client,scope).load();
 };
-window.restoreProfile=()=>client.setQueryData(streamSummaryQueryKey('fixture','1'),source);
+window.restoreProfile=()=>{client.setQueryData(streamSummaryQueryKey('fixture','1'),source);window.fixtureState.setState({streamRevision:undefined});};
 window.selectionCalls=0;
 window.placePicks=[];
-function App(){const s=useShallowStore(state=>state);const ids=s.visible?s.selected:[];return <QueryClientProvider client={client}>
+function App(){const s=useShallowStore(state=>state);const ids=s.visible?s.selected:[];
+const routeMetadata=React.useMemo(()=>s.streamRevision?{...metadata,revision:s.streamRevision}:metadata,[s.streamRevision]);
+const activities=React.useMemo(()=>new globalThis.Map([[1,{id:1,streamsMetadata:routeMetadata}],[2,{id:2,streamsMetadata:metadata}]]),[routeMetadata]);return <QueryClientProvider client={client}>
 <Map preserveDrawingBuffer={true} ref={ref=>{if(ref)window.fixtureMap=ref.getMap();}} onIdle={()=>window.mapReady=true} initialViewState={{longitude:8.001,latitude:47.001,zoom:14}} mapboxAccessToken="pk.offline-test" style={{height:260,width:'100%'}} mapStyle={{version:8,glyphs:window.location.origin+'/fonts/{fontstack}/{range}.pbf',sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e9efea'}}]}}>
 <Source id="routeSource" type="geojson" data={{type:'Feature',id:1,properties:{},geometry:{type:'LineString',coordinates:latlng.map(([lat,lng])=>[lng,lat])}}}><Layer id="routeLayerBG" type="line" paint={{'line-color':'#777','line-width':5}}/></Source>
 <Selection onSelection={ids=>{window.selectionCalls++;window.fixtureState.getState().pickActivities(ids);}}/>
 <MatchedPlacesLayer activities={activities} selectedIds={ids} visibleIds={s.visibleIDs??ids} showAllPlaces={s.showAllPlaces??false} inspectedActivityId={s.inspectedActivityId} highlighted={s.highlighted}
 onPickActivities={ids=>{window.placePicks.push(ids);window.fixtureState.getState().pickActivities(ids);window.fixtureState.setState({inspectedActivityId:ids.length===1?ids[0]:undefined});}}/></Map>
-{s.showProfile&&s.selected.includes(1)&&<ElevationChart activityId="1" userId={s.user.id} streamMetadata={metadata}/>}
+{s.showProfile&&s.selected.includes(1)&&<ElevationChart activityId="1" userId={s.user.id} streamMetadata={routeMetadata}/>}
 </QueryClientProvider>;}createRoot(document.getElementById('root')).render(<App/>);
 `,
   },
@@ -144,83 +145,81 @@ const browser = await chromium.launch({
 const requests = [],
   errors = [];
 let page;
-let owner = 'fixture',
-  mode = 'complete',
+let matchingVersion = 'a'.repeat(64),
+  resultSequence = 0;
+const fixturePlaces = (owner) => [
+  {
+    id: '00000000-0000-4000-8000-000000000001',
+    name: owner === 'fixture' ? 'Alpine test peak' : 'Other account peak',
+    kinds: ['peak'],
+    longitude: 8.001,
+    latitude: 47.001,
+    elevationM: 500,
+    visits: [{ distanceM: 100 }, { distanceM: 180 }],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000002',
+    name: 'Alpine test pass',
+    kinds: ['pass'],
+    longitude: 8.0004,
+    latitude: 47.0004,
+    elevationM: 450,
+    visits: [{ distanceM: 40 }],
+  },
+  {
+    id: '00000000-0000-4000-8000-000000000003',
+    name: 'Alpine test hut',
+    kinds: ['hut'],
+    longitude: 8.0015,
+    latitude: 47.0015,
+    elevationM: 440,
+    visits: [{ distanceM: 150 }, { distanceM: 220 }],
+  },
+];
+/** A backend-produced result as library sync delivers it. */
+const placesBundle = ({
+  owner = 'fixture',
+  activityId = '1',
+  status = 'complete',
   revision = '1',
-  matchingVersion = 'a'.repeat(64),
-  holdResponse = false,
-  releaseResponse;
+} = {}) => ({
+  userId: owner,
+  activityId,
+  status,
+  streamGeneration: 'g1',
+  streamRevision: revision,
+  catalogueSnapshotId: 'fixture-catalogue',
+  matcherVersion: 'fixture-matcher',
+  matchingVersion,
+  resultRevision: `result-${++resultSequence}`,
+  places: status === 'complete' ? fixturePlaces(owner) : [],
+});
 try {
   page = await browser.newPage({ viewport: { width: 700, height: 680 } });
   page.on('pageerror', (error) => errors.push(error.message));
   await page.route('https://**', (route) => route.abort());
-  await page.route('**/api/places/version', (route) =>
-    route.fulfill({ json: { version: matchingVersion } }),
-  );
-  await page.route('**/api/activities/*/places', async (route) => {
-    const id = new URL(route.request().url()).pathname.split('/')[3];
-    requests.push({ owner, id, mode });
-    if (holdResponse)
-      await new Promise((resolve) => {
-        releaseResponse = resolve;
-      });
-    if (mode === 'error') {
-      await route.fulfill({
-        status: 503,
-        contentType: 'application/json',
-        body: '{}',
-      });
-      return;
-    }
-    await route.fulfill({
-      json: {
-        userId: owner,
-        activityId: id,
-        status: mode,
-        streamGeneration: 'g1',
-        streamRevision: revision,
-        catalogueSnapshotId: 'fixture-catalogue',
-        matcherVersion: 'fixture-matcher',
-        matchingVersion,
-        places:
-          mode === 'complete'
-            ? [
-                {
-                  id: '00000000-0000-4000-8000-000000000001',
-                  name:
-                    owner === 'fixture'
-                      ? 'Alpine test peak'
-                      : 'Other account peak',
-                  kinds: ['peak'],
-                  longitude: 8.001,
-                  latitude: 47.001,
-                  elevationM: 500,
-                  visits: [{ distanceM: 100 }, { distanceM: 180 }],
-                },
-                {
-                  id: '00000000-0000-4000-8000-000000000002',
-                  name: 'Alpine test pass',
-                  kinds: ['pass'],
-                  longitude: 8.0004,
-                  latitude: 47.0004,
-                  elevationM: 450,
-                  visits: [{ distanceM: 40 }],
-                },
-                {
-                  id: '00000000-0000-4000-8000-000000000003',
-                  name: 'Alpine test hut',
-                  kinds: ['hut'],
-                  longitude: 8.0015,
-                  latitude: 47.0015,
-                  elevationM: 440,
-                  visits: [{ distanceM: 150 }, { distanceM: 220 }],
-                },
-              ]
-            : [],
-      },
+  // Opening, selecting or re-rendering routes must never ask for places.
+  for (const pattern of ['**/api/places/version', '**/api/activities/*/places'])
+    await page.route(pattern, (route) => {
+      requests.push(new URL(route.request().url()).pathname);
+      return route.abort();
     });
-  });
+  const sync = (...bundles) =>
+    page.evaluate(async (bundles) => {
+      for (const bundle of bundles)
+        await window.saveSyncedPlaces(
+          bundle,
+          bundle.matchingVersion,
+          bundle.userId,
+        );
+    }, bundles);
   await page.goto(`http://127.0.0.1:${address.port}/`);
+  await page
+    .getByRole('status', {
+      name: 'Places for this route have not been checked yet. They appear after the next sync.',
+    })
+    .waitFor();
+  await sync(placesBundle(), placesBundle({ activityId: '2' }));
   await page.waitForFunction(
     () =>
       window.mapReady &&
@@ -228,10 +227,10 @@ try {
         3,
   );
   assert.equal(await page.getByTestId('elevation-place-marker').count(), 5);
-  assert.equal(
-    requests.filter((request) => request.id === '1').length,
-    1,
-    'Map and profile share one in-flight request',
+  assert.deepEqual(
+    requests,
+    [],
+    'Map and profile render synchronized places without requests',
   );
   assert.equal(
     await page.getByRole('checkbox').count(),
@@ -285,7 +284,7 @@ try {
   assert.equal(
     requests.length,
     beforeReopen,
-    'Reopening a current profile reuses cached matching',
+    'Reopening a current profile reuses synchronized places',
   );
   await page
     .getByRole('button', {
@@ -570,8 +569,16 @@ try {
       document.querySelectorAll('[data-testid="elevation-place-marker"]')
         .length === 0,
   );
-  revision = '2';
-  await page.evaluate(() => window.refreshPlaces());
+  assert.equal(
+    await page
+      .getByRole('status', {
+        name: 'Places for this route have not been checked yet. They appear after the next sync.',
+      })
+      .count(),
+    1,
+    'A replaced recording awaits backend matching instead of showing zero places',
+  );
+  await sync(placesBundle({ revision: '2' }));
   await page.waitForFunction(
     () =>
       document.querySelectorAll('[data-testid="elevation-place-marker"]')
@@ -579,82 +586,74 @@ try {
   );
   const beforeVersionChange = requests.length;
   matchingVersion = 'b'.repeat(64);
-  mode = 'pending';
-  await page.evaluate(() =>
-    window.client.invalidateQueries({
-      queryKey: ['library', 'auth:fixture', 'place-matching-version'],
-    }),
+  await sync(
+    placesBundle({ status: 'pending', revision: '2' }),
+    placesBundle({ activityId: '2', status: 'pending' }),
   );
   await page.waitForFunction(
     () =>
       window.fixtureMap.getSource('matched-places')?._data?.features.length ===
       0,
   );
-  assert(
-    requests.length > beforeVersionChange,
-    'Catalogue change fetches again without a stream change',
-  );
   await page
     .locator('[data-map-place]')
-    .getByText(/^Finding places/)
+    .getByText('Places pending · 0/2 checked', { exact: true })
     .waitFor();
-  mode = 'complete';
+  await sync(
+    placesBundle({ revision: '2' }),
+    placesBundle({ activityId: '2' }),
+  );
   await page.waitForFunction(
     () =>
       window.fixtureMap.getSource('matched-places')?._data?.features.length ===
       3,
   );
-  mode = 'error';
-  await page.evaluate(() => window.refreshPlaces());
-  await page
-    .getByText('Some places could not be loaded.', { exact: false })
-    .waitFor();
-  mode = 'complete';
-  await page
-    .locator('[data-map-place]')
-    .getByRole('button', { name: 'Try again', exact: true })
-    .click();
-  await page.waitForFunction(
-    () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      3,
+  assert.equal(
+    requests.length,
+    beforeVersionChange,
+    'A catalogue change waits for synchronized results without requests',
   );
+  await sync(placesBundle({ status: 'unavailable', revision: '2' }));
+  await page
+    .getByRole('status', {
+      name: 'Places could not be checked for this route. They will be retried automatically.',
+    })
+    .waitFor();
+  assert.equal(await page.getByTestId('elevation-place-marker').count(), 0);
+  await sync(placesBundle({ revision: '2' }));
   await page.evaluate(() => window.fixtureState.setState({ selected: [1] }));
+  await page.getByTestId('elevation-place-marker').first().waitFor();
   const profileHeight = await page
     .getByRole('region', { name: 'Elevation profile', exact: true })
     .evaluate((node) => node.getBoundingClientRect().height);
-  holdResponse = true;
-  const refresh = page.evaluate(() => window.refreshPlaces());
+  await sync(placesBundle({ status: 'pending', revision: '2' }));
   await page
-    .getByRole('status', { name: 'Finding places', exact: true })
+    .getByRole('status', {
+      name: 'Places for this route have not been checked yet. They appear after the next sync.',
+    })
     .waitFor();
   await page
     .locator('[data-map-place]')
-    .getByText('Finding places', { exact: true })
+    .getByText('Places pending', { exact: true })
     .waitFor();
   assert.equal(
     await page
       .getByRole('region', { name: 'Elevation profile', exact: true })
       .evaluate((node) => node.getBoundingClientRect().height),
     profileHeight,
-    'Loading preserves chart/card height',
+    'Pending places preserve chart/card height',
   );
   assert.equal(profileHeight, 177);
-  await page.screenshot({ path: join(output, 'loading.png') });
-  holdResponse = false;
-  releaseResponse();
-  await refresh;
-  mode = 'uncovered';
-  await page.evaluate(() => window.refreshPlaces());
+  await page.screenshot({ path: join(output, 'pending.png') });
+  await sync(placesBundle({ status: 'uncovered', revision: '2' }));
   await page
     .getByRole('status', {
       name: 'Places are currently available for routes within Switzerland, Austria and Italy.',
     })
     .waitFor();
   assert.equal(await page.getByTestId('elevation-place-marker').count(), 0);
-  mode = 'complete';
-  owner = 'other';
-  revision = '1';
+  await page.evaluate(() => window.restoreProfile());
+  await sync(placesBundle({ owner: 'other' }));
   await page.evaluate(() =>
     window.fixtureState.setState({
       user: { id: 'other', stravaConnected: true },
@@ -677,12 +676,9 @@ try {
     () => !window.fixtureMap.getSource('matched-places'),
   );
   assert.equal(await page.getByTestId('elevation-place-marker').count(), 0);
-  // Synchronized bundles drive the actual map/profile while the direct API
-  // fails, including authoritative zeroes and a manifest-only invalidation.
+  // Synchronized bundles drive the actual map/profile, including
+  // authoritative zeroes and a manifest-only invalidation.
   await page.waitForFunction(() => window.client.isFetching() === 0);
-  mode = 'error';
-  owner = 'fixture';
-  revision = '1';
   const bundle = {
     userId: 'fixture',
     activityId: '1',
@@ -1026,17 +1022,22 @@ try {
       user: { id: 'other', stravaConnected: true },
     }),
   );
-  await page.waitForFunction(
-    () =>
-      document.querySelectorAll('[data-place-cluster]').length === 0 &&
-      window.fixtureMap.getSource('matched-places')?._data.features.length ===
-        0,
-  );
+  // The other account shows only its own synchronized places.
+  await page.waitForFunction(() => {
+    const names = (
+      window.fixtureMap.getSource('matched-places')?._data.features ?? []
+    ).map((feature) => feature.properties.name);
+    return (
+      names.includes('Other account peak') &&
+      !names.some((name) => name.startsWith('Synced'))
+    );
+  });
   assert.equal(
     requests.length,
     beforeOverview,
     'Changing accounts never loads unselected activities or retains the previous overview',
   );
+  assert.deepEqual(requests, [], 'No place requests from any route view');
   assert.deepEqual(errors, []);
   await writeFile(
     join(output, 'result.json'),
@@ -1045,14 +1046,15 @@ try {
         passed: true,
         requests,
         checks: [
-          'shared requests',
+          'no place requests',
           'cached profile reopen',
           'synchronized bundles without per-activity requests',
           'synchronized zero replacement',
           'manifest-only invalidation',
           'map style replacement',
           'distinct peak/pass/hut symbols',
-          'fixed-height loading',
+          'fixed-height pending state',
+          'pending distinct from completed zero',
           'no duplicate place list',
           'repeated profile positions',
           'keyboard place focus',
@@ -1061,7 +1063,7 @@ try {
           'filter removal',
           'place click preserves selection',
           'stream revision fencing',
-          'error/retry',
+          'unavailable state',
           'coverage state',
           'account isolation',
           'deselection',
@@ -1079,7 +1081,7 @@ try {
         screenshots: [
           'desktop.png',
           'mobile-dark.png',
-          'loading.png',
+          'pending.png',
           'places-overview.png',
           'places-focused.png',
         ],
@@ -1089,7 +1091,7 @@ try {
     ),
   );
   console.log(
-    'PASS web matching: actual Mapbox layers, profile annotations, shared requests, keyboard focus, multi-selection, filters, account isolation, stream replacement, retry and coverage states.',
+    'PASS web places: actual Mapbox layers, profile annotations, synchronized bundles without requests, keyboard focus, multi-selection, filters, account isolation, stream replacement, pending, unavailable and coverage states.',
   );
   console.log(`Evidence: ${output}`);
 } catch (error) {

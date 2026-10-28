@@ -1,31 +1,19 @@
 'use client';
-import { Info, Loader2 } from 'lucide-react';
+import { Clock, Info, Loader2, type LucideIcon } from 'lucide-react';
 
 import type { ActivityPlacesResponse } from '~/contracts/activity-places';
 
-/** A quiet, fixed-height chart-header status. Successful matches live in the plot. */
+/** A quiet, fixed-height chart-header status. Successful matches live in the plot.
+ * Matching runs in backend jobs; results arrive with library sync. */
 export function ActivityPlacesStatus({
   data,
   isLoading,
-  isError,
-  retry,
+  isAwaiting,
 }: {
   data: ActivityPlacesResponse | undefined;
   isLoading: boolean;
-  isError: boolean;
-  retry: () => void;
+  isAwaiting: boolean;
 }) {
-  if (isError || data?.status === 'unavailable')
-    return (
-      <button
-        type="button"
-        className="shrink-0 text-xs text-muted-foreground underline decoration-muted-foreground/40 underline-offset-2 hover:text-foreground"
-        onClick={retry}
-        title="Places could not be loaded. Try again."
-      >
-        Retry places
-      </button>
-    );
   if (isLoading)
     return (
       <span
@@ -40,29 +28,44 @@ export function ActivityPlacesStatus({
         Places
       </span>
     );
-  const notice =
-    data?.status === 'uncovered'
+  const notice: [string, string, LucideIcon] | null = isAwaiting
+    ? [
+        'Places pending',
+        'Places for this route have not been checked yet. They appear after the next sync.',
+        Clock,
+      ]
+    : data?.status === 'unavailable'
       ? [
-          'Outside place coverage',
-          'Places are currently available for routes within Switzerland, Austria and Italy.',
+          'Places unavailable',
+          'Places could not be checked for this route. They will be retried automatically.',
+          Info,
         ]
-      : data?.status === 'missing_streams'
-        ? ['GPS needed', 'Places need recorded GPS for this route.']
-        : data?.status === 'partial'
-          ? [
-              'Places incomplete',
-              'This recording could not be fully checked for places.',
-            ]
-          : null;
-  return notice ? (
+      : data?.status === 'uncovered'
+        ? [
+            'Outside place coverage',
+            'Places are currently available for routes within Switzerland, Austria and Italy.',
+            Info,
+          ]
+        : data?.status === 'missing_streams'
+          ? ['GPS needed', 'Places need recorded GPS for this route.', Info]
+          : data?.status === 'partial'
+            ? [
+                'Places incomplete',
+                'This recording could not be fully checked for places.',
+                Info,
+              ]
+            : null;
+  if (!notice) return null;
+  const [label, description, Icon] = notice;
+  return (
     <span
       role="status"
-      title={notice[1]}
-      aria-label={notice[1]}
+      title={description}
+      aria-label={description}
       className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
     >
-      <Info className="size-3 shrink-0" aria-hidden="true" />
-      <span className="truncate">{notice[0]}</span>
+      <Icon className="size-3 shrink-0" aria-hidden="true" />
+      <span className="truncate">{label}</span>
     </span>
-  ) : null;
+  );
 }

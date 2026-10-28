@@ -13,7 +13,7 @@ import { streamActivityIdSchema } from '~/server/strava/streams';
 
 export function createActivityPlacesHandler(deps: {
   resolveActor: () => Promise<Actor | null>;
-  match: (actor: Actor, activityId: string) => Promise<ActivityPlacesResponse>;
+  read: (actor: Actor, activityId: string) => Promise<ActivityPlacesResponse>;
   onError?: () => void;
 }) {
   return async (request: Request, activityId: string): Promise<Response> => {
@@ -35,7 +35,7 @@ export function createActivityPlacesHandler(deps: {
           'Invalid activity.',
         );
       const result = activityPlacesResponseSchema.parse(
-        await deps.match(actor, activityId),
+        await deps.read(actor, activityId),
       );
       if (result.userId !== actor.userId || result.activityId !== activityId)
         throw new Error('Matching scope mismatch');

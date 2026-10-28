@@ -3,6 +3,10 @@
 Implementation notes and remaining plan, 23 October 2026. Based on merged
 [PR #445](https://github.com/wirhabenzeit/activitymap/pull/445).
 
+> **Superseded (#449):** iOS no longer calls the direct places endpoint. Backend
+> jobs match activities and library sync delivers the results; see
+> [matching synchronization](on-demand-places.md#synchronizing-matched-places-to-web-and-ios).
+
 ## Decision
 
 Reuse the deployed web endpoint, `GET /api/activities/{id}/places`, with bearer
