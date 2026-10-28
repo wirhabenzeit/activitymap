@@ -24,6 +24,7 @@ import {
   useState,
 } from 'react';
 
+import { PlaceDetail, useShowPlace } from '~/components/place-detail';
 import {
   useBrowsingState,
   useRetainedScrollRef,
@@ -32,6 +33,7 @@ import {
   useDateFormat,
   useDisplayUnits,
 } from '~/hooks/use-display-preferences';
+import { usePlaceLibrary } from '~/hooks/use-place-library';
 import { useStatsFocus } from '~/hooks/use-stats-focus';
 import { bentoRowMinimums, placeBento } from '~/lib/stats/bento';
 import { isStatsHistoryLoading } from '~/lib/stats/loading';
@@ -52,6 +54,7 @@ import { Measure } from './charts';
 import { StatsChoices } from './choices';
 import { statsFormat } from './format';
 import { tilePalette } from './format';
+import type { StatsPlaceSource } from './places';
 import { FilterScope, useStatsActivities } from './scope';
 import {
   type TileContext,
@@ -85,9 +88,35 @@ const optionOf = (options: TileOptions, tile: StatsTile) =>
   options[tile.id] ?? toggleOf(tile)?.options[0];
 
 export default function StatsTiles() {
-  const { query, activities, scope, reset } = useStatsActivities();
+  const { query, activities, placeActivities, scope, reset } =
+    useStatsActivities();
   const empty = activities.length === 0;
   const loading = isStatsHistoryLoading(query, empty);
+  const { library } = usePlaceLibrary();
+  const showPlace = useShowPlace(query.data);
+  const [inspectedPlace, setInspectedPlace] = useState<{
+    id: string;
+    userId: string;
+  }>();
+  const historyComplete = query.data !== undefined && !query.hasNextPage;
+  const places: StatsPlaceSource | undefined = useMemo(
+    () =>
+      library.userId
+        ? {
+            activities: placeActivities,
+            userId: library.userId,
+            historyComplete,
+            onOpenPlace: (id) =>
+              setInspectedPlace({ id, userId: library.userId! }),
+          }
+        : undefined,
+    [placeActivities, library.userId, historyComplete],
+  );
+  // The account-wide index supplies the shared detail's visit history.
+  const placeDetail =
+    inspectedPlace && inspectedPlace.userId === library.userId
+      ? library.byId.get(inspectedPlace.id)
+      : undefined;
   return (
     <div className="flex h-full min-h-0 flex-col">
       <FilterScope labels={scope.labels} onReset={reset} />
@@ -130,6 +159,7 @@ export default function StatsTiles() {
               {(open, detailsOpen, inspection) => (
                 <StatsTileGrid
                   activities={activities}
+                  places={places}
                   filtered={scope.filtered}
                   singleSport={scope.singleSport}
                   onOpenActivity={open}
@@ -141,12 +171,27 @@ export default function StatsTiles() {
           </div>
         </>
       )}
+      <PlaceDetail
+        place={placeDetail}
+        onClose={() => setInspectedPlace(undefined)}
+        onShowActivities={() => {
+          if (placeDetail && library.userId)
+            showPlace(placeDetail, library.userId, 'list');
+          setInspectedPlace(undefined);
+        }}
+        onShowMap={() => {
+          if (placeDetail && library.userId)
+            showPlace(placeDetail, library.userId, 'map');
+          setInspectedPlace(undefined);
+        }}
+      />
     </div>
   );
 }
 
 export function StatsTileGrid({
   activities,
+  places,
   filtered = false,
   singleSport = false,
   onOpenActivity,
@@ -156,6 +201,7 @@ export function StatsTileGrid({
   reportingDay,
 }: {
   activities: StatsActivity[];
+  places?: StatsPlaceSource;
   filtered?: boolean;
   singleSport?: boolean;
   onOpenActivity?: (id: number) => void;
@@ -195,9 +241,11 @@ export function StatsTileGrid({
       selectedActivityId,
       palette: tilePalette(resolvedTheme === 'dark'),
       models,
+      places,
     }),
     [
       activities,
+      places,
       models,
       today,
       reportingDay,

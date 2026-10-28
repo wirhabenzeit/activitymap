@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import { statsTiles } from '~/settings/stats-tiles.generated';
 
-import { placeBento, bentoRowMinimums } from './bento';
+import { bentoRowMinimums, placeBento } from './bento';
 
 // The web places each group (Now, This year, Patterns) on its own grid.
 const groupSpans = (group: string) =>
@@ -22,7 +23,8 @@ void test('packs each group of starter tiles on the 4-column grid', () => {
   assert.deepEqual(placeBento(groupSpans('thisYear'), 4), [
     { column: 1, row: 1, columns: 2, rows: 1 }, // year to date
     { column: 3, row: 1, columns: 2, rows: 1 }, // pace, grown into the gap
-    { column: 1, row: 2, columns: 4, rows: 1 }, // records, grown into the row
+    { column: 1, row: 2, columns: 2, rows: 1 }, // records
+    { column: 3, row: 2, columns: 2, rows: 1 }, // most visited places
   ]);
   assert.deepEqual(placeBento(groupSpans('patterns'), 4), [
     { column: 1, row: 1, columns: 2, rows: 2 }, // activity calendar
@@ -45,6 +47,7 @@ void test('clamps spans to the 2-column grid and fills the gaps they leave', () 
     { column: 1, row: 1, columns: 2, rows: 1 },
     { column: 1, row: 2, columns: 2, rows: 1 },
     { column: 1, row: 3, columns: 2, rows: 1 },
+    { column: 1, row: 4, columns: 2, rows: 1 },
   ]);
   assert.deepEqual(placeBento(groupSpans('patterns'), 2), [
     { column: 1, row: 1, columns: 2, rows: 2 },

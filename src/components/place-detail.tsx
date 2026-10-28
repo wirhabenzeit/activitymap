@@ -1,5 +1,7 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
+
 import { PlaceSymbol } from '~/components/place-symbol';
 import { Button } from '~/components/ui/button';
 import {
@@ -9,10 +11,41 @@ import {
   DialogTitle,
 } from '~/components/ui/dialog';
 import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import type { Activity } from '~/lib/activity';
 import { placeKindLabel } from '~/lib/activity-places';
 import type { LibraryPlace } from '~/lib/place-library';
 import { primaryPlaceKind } from '~/lib/place-symbols';
 import { measurementScale, measurementUnit } from '~/lib/units';
+import { store } from '~/store';
+import { applyFilters } from '~/store/filter';
+
+/** The detail's Show actions: filter to the place (replacing name search)
+ * and open the destination, fitting the filtered routes on the map. */
+export function useShowPlace(activities: readonly Activity[] | undefined) {
+  const router = useRouter();
+  return (
+    place: Pick<LibraryPlace, 'id' | 'name'>,
+    userId: string,
+    destination: 'map' | 'list',
+  ) => {
+    store.setState({
+      place: { id: place.id, name: place.name, userId },
+      search: '',
+    });
+    store.getState().setOnlySelected(false);
+    if (destination === 'map') {
+      store.setState({ showPlaces: true });
+      store
+        .getState()
+        .requestRouteFit(
+          (activities ?? [])
+            .filter((activity) => applyFilters(store.getState(), activity))
+            .map((activity) => activity.id),
+        );
+    }
+    router.push(destination === 'map' ? '/map' : '/list');
+  };
+}
 
 /** Shared compact inspection. Opening it has no selection/filter/camera effects. */
 export function PlaceDetail({
