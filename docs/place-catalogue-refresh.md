@@ -54,7 +54,8 @@ pnpm places:prepare --region switzerland \
 ```
 
 This downloads the complete Geofabrik Swiss PBF and coverage `.poly`, runs the
-Node PBF reader and selective hut geometry resolver, and validates the source
+Node PBF reader and selective hut geometry resolver, measures pass and peak
+terrain (see [noise filter](#noise-filter-terrain-and-tags)), and validates the source
 hash, header timestamp, implementation provenance, counts and geometry. It
 normalizes named peaks, natural saddles, road/trail passes and mountain huts.
 Unsupported source representations are explicitly audited in the manifest;
@@ -64,15 +65,18 @@ Unnamed/unselected objects are excluded by the existing normalization policy.
 To prepare already downloaded files, supply both `--pbf /path/to/snapshot.osm.pbf`
 and `--poly /path/to/coverage.poly`. Switzerland, Austria and Italy have predefined
 URLs; other regions require `--source-url` and `--coverage-url`. Downloads are
-restricted to HTTPS `download.geofabrik.de` URLs.
+restricted to HTTPS `download.geofabrik.de` URLs. Terrain is always read from
+the public Copernicus bucket, so preparation needs network access even with
+local source files.
 The region identifier is included in new artifact identities. Old frozen v1
 artifacts remain readable, with an explicit publication region.
 
 The output directory must be new. The command produces `places.jsonl`,
 `coverage.geojson` and `manifest.json`, publishing the manifest last as the
 completion marker. The manifest binds the region, source timestamp/checksum,
-coverage, selector/resolver implementations, normalization, toolchain, counts,
-artifact checksum and OSM attribution. Preparation opens no database connection.
+coverage, selector/resolver implementations, normalization, terrain method and
+filter policy, toolchain, counts, artifact checksum and OSM and Copernicus
+attribution. Preparation opens no database connection.
 Temporary source files are removed afterwards. Retain the completed artifact
 for publication retries and reproduction; retain original downloads separately
 if you need to rerun the extraction itself.
@@ -144,6 +148,123 @@ its runtime SQL does not write activities, streams, accounts or activity evidenc
 - Activity evidence is not rewritten or recomputed. Existing snapshot guards
   invalidate old results after refresh, and retired places are excluded from
   positive place reads. Background publication remains experimental.
+
+## Noise filter: terrain and tags
+
+The OSM selectors include noise: lowland road crossings tagged as passes (Forch
+near Zürich) and Alm huts and restaurants tagged as `tourism=alpine_hut`.
+Since `osm-places-v2`, preparation measures every pass and peak on one global
+terrain model and applies one versioned rule set to passes and huts in all
+countries. Peaks are measured but never hidden. Hidden places stay in the artifact and the `places` table, with
+their metrics and a `hidden_reason`, so publication keeps their UUIDs and
+references. Candidate discovery and the batch matching catalogue skip them.
+A new filter policy or terrain method changes the catalogue snapshot identity,
+so existing activity results become stale and are rematched without the
+hidden places: visits already matched to a now-hidden place disappear too.
+
+### Terrain
+
+Preparation reads [Copernicus GLO-30](https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model)
+cloud-optimized GeoTIFFs from `https://copernicus-dem-30m.s3.amazonaws.com/`
+with HTTP range requests, using the pinned `geotiff` package. Only the internal
+1024 × 1024 blocks around passes and peaks are fetched and decoded, with a
+bounded in-memory cache; nothing is written to disk. Missing 1° tiles (HTTP 404)
+are sea and give no metrics. Every other failure is retried for about a minute
+and then fails the preparation, so a network problem cannot silently become
+"no terrain". The DEM is a surface model (forest canopy included) on a 1
+arc-second grid with pixel-is-point registration.
+
+- **Pass amplitude** (`pass_amp_m`). Circles of 200, 400, 800, 1,500 and 2,500 m
+  around the node, 72 bilinear samples each, minus the DEM height at the node
+  (`dem_elevation_m`). Per circle, `rise` is the second-highest maximum among
+  the arcs above the node (two flanks), `drop` the second-deepest arc below it
+  (two valleys), and `amp = min(rise, drop)`. The best circle wins. A road over
+  a plain slope scores zero.
+- **Peak local prominence** (`peak_prominence_m`). Start at the highest DEM cell
+  within 250 m of the node and run an 8-connected priority flood (highest cell
+  first) inside a ±3 km window. The lowest height popped before a cell higher
+  than the start is the key col. If the window edge is reached first, the drop
+  to that edge cell is stored with `peak_prominence_capped = true`: a lower
+  bound, for peaks that dominate their window. Prominence is stored for later
+  use (ranking, display) but hides nothing; see below.
+
+Metrics are rounded to decimetres. The method parameters are `TERRAIN_METHOD`
+in `src/server/places/terrain.ts`; its version and hash are recorded in the
+manifest under `terrain`, with the DEM URL and attribution.
+
+### Rules
+
+`PLACE_FILTER_POLICY` in `src/server/places/place-filter.ts` holds every
+threshold and pattern; its version and hash are also bound in the manifest.
+A `wikipedia` or `wikidata` tag keeps any place (Ornpass has only Wikidata).
+
+| Kind | Hidden when                                                                                                | `hidden_reason`     |
+| ---- | ---------------------------------------------------------------------------------------------------------- | ------------------- |
+| Pass | name is only an elevation or a generic word (`q. 2699`, `P2650`, `1557`, `Forcella`, `Joch`, `sea`)        | `generic_pass_name` |
+| Pass | elevation (OSM `ele`, else DEM) below 1,200 m and `amp` below 60 m                                         | `low_relief_pass`   |
+| Hut  | no club operator, no info tag, and an Alm, Malga, Casera, Baita, restaurant, inn, forestry or hunting name | `non_mountain_hut`  |
+
+Club operators match SAC, CAS, DAV, ÖAV, Alpenverein, CAI, Club Alpino, AVS,
+Naturfreunde, SAT and similar. Info tags are capacity, beds, website,
+contact:website, url, phone, contact:phone, reservation, opening_hours,
+wikipedia and wikidata. Missing terrain never hides a place. Same-name passes
+within 1 km are one pass (duplicate Ricken nodes scored 47 and 73 m): if any
+node is kept, all are. A place with several kinds is hidden only when every
+kind is hidden.
+
+Peaks are never hidden. A 30 m prominence rule would have hidden 26,639 of
+62,248 peaks (43%), including 92 of 432 peaks visited in local development
+data: mostly familiar local hills (Baldern, Haschberg) and named alpine
+shoulders whose 250 m snap reaches higher ground (Le Dôme des Diablerets,
+Donnerkogel). Peak noise is milder than pass noise and a wrongly hidden summit
+costs more than a kept bump, so the rule was dropped before release.
+
+Combining recomputes decisions over the combined rows, since a
+same-name group can cross a country border.
+
+The thresholds were fitted on the Swiss and Austrian gazetteer decisions of the
+per-country prominence research (draft PR #472), which needed national lidar
+models and about 15 GB per country. That research is not part of preparation.
+
+### Measured run (2026-10-31)
+
+The 20 October extracts were prepared again with terrain on a local machine,
+reading Copernicus over the network. The three countries ran in parallel.
+The run still had the peak rule; the counts below re-apply the final policy to
+its stored metrics, which the peak rule does not affect.
+
+| Country     | Places | Passes hidden | Huts hidden | DEM tiles / blocks |  Time |
+| ----------- | -----: | ------------: | ----------: | -----------------: | ----: |
+| Switzerland | 11,325 |    100 (4.1%) |   36 (4.2%) |           14 / 119 |  2:46 |
+| Austria     | 21,948 |     52 (1.8%) | 298 (18.9%) |           25 / 295 |  4:50 |
+| Italy       | 49,607 |   875 (10.8%) | 387 (12.0%) |           78 / 709 | 11:52 |
+
+The combined `ch-at-it` catalogue hides 1,731 of 80,366 places: 1,017 passes
+and 714 huts. Every pass and peak got terrain; a few transient S3 read
+failures recovered on retry.
+
+Against the research decisions these numbers reproduce the Python prototype.
+Pass agreement is 92.6% (CH), 82.1% (AT) and 51.9% (IT); 97.9% of Swiss and
+98.9% of Austrian gazetteer passes are kept. Almost all disagreements are
+alpine cols that the per-country rule hid and this rule keeps (Passo dei
+Volontari, Passo Ronchina, Vetternscharte). The stored peak prominence also
+matches the prototype: below 30 m it agrees with the research prominence on
+93.0% / 90.7% / 87.2% of matched peaks. Forch, Regensberger Pass, Sternenbergpass and Talhöchi are hidden; Buchenegg,
+Hulftegg, Furkapass, Ornpass, both Ricken nodes and Passo di Gavia are kept.
+
+### Compatibility
+
+`osm-places-v1` artifacts and manifests stay readable: they have no `terrain`
+section and no filter counts, and every place is listed. Already published v1
+catalogues keep serving until a v2 artifact is published. Migration
+`0029_place-terrain-filter` adds the nullable metric and `hidden_reason`
+columns; deploy it before backend code that reads them. `counts.filter` in the
+manifest reports hidden places by kind and reason and the passes and peaks
+without terrain. Publication dry runs list up to 20 hidden examples.
+
+Attribution: © DLR e.V. and Airbus, Copernicus programme. The Copernicus DEM is
+free to use with this attribution; the map layers that show places carry it
+next to the OSM attribution.
 
 ## Adopt an existing frozen local catalogue
 

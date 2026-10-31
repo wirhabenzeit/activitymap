@@ -19,6 +19,7 @@ import {
 } from './catalogue-combine';
 import { createSyntheticCatalogue } from './catalogue.fixture';
 import { parseCoverageGeometry } from './coverage';
+import type { NormalizedPlace } from './types';
 
 const rectangle = (west: number, east: number) =>
   parseCoverageGeometry({
@@ -158,5 +159,52 @@ void test('different snapshot epochs, versions and same-version contents are rej
   assert.throws(
     () => combineCatalogues('ch-at-it', [swiss, createSyntheticCatalogue()]),
     /named/,
+  );
+});
+void test('combining recomputes filter decisions across country extracts', () => {
+  // Duplicate Ricken nodes: one alone is hidden, together both are kept.
+  const ricken = (
+    rows: NormalizedPlace[],
+    amp: number,
+    osmId: string,
+    lon: number,
+  ) => ({
+    ...rows[1]!,
+    osm_id: osmId,
+    display_name: 'Ricken',
+    names: { name: 'Ricken' },
+    tags: { name: 'Ricken', mountain_pass: 'yes' },
+    location: { longitude: lon, latitude: 47.25 },
+    elevation_m: 790,
+    pass_amp_m: amp,
+  });
+  const swiss = createSyntheticCatalogue({
+    regionId: 'switzerland',
+    transformRows: (rows) => [rows[0]!, ricken(rows, 47, '1', 9)],
+  });
+  const austria = createSyntheticCatalogue({
+    regionId: 'austria',
+    transformRows: (rows) => [
+      rows[0]!,
+      ricken(rows, 47, '1', 9),
+      ricken(rows, 73, '2', 9.008),
+    ],
+  });
+  assert.equal(swiss.rows[1]!.hidden_reason, 'low_relief_pass');
+  assert.equal(austria.rows[1]!.hidden_reason, undefined);
+  const combined = combineCatalogues('ch-at', [swiss, austria]);
+  assert.deepEqual(
+    combined.rows.map((row) => row.hidden_reason),
+    [undefined, undefined, undefined],
+  );
+  assert.equal(combined.manifest.counts.filter?.hidden, 0);
+  assert.deepEqual(combined.manifest.terrain, swiss.manifest.terrain);
+  assert.throws(
+    () =>
+      combineCatalogues('ch-at', [
+        swiss,
+        createSyntheticCatalogue({ regionId: 'austria', legacy: true }),
+      ]),
+    /matching normalization\/terrain/,
   );
 });

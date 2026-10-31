@@ -20,11 +20,20 @@ export const PLACE_POINT_DERIVATIONS = [
   'validated_polygon_interior',
 ] as const;
 export const PLACE_EVIDENCE_VERSION = 2 as const;
+/** Catalogue noise rules (see place-filter.ts); hidden places are stored but
+ * never read as candidates. */
+export const PLACE_HIDDEN_REASONS = [
+  'generic_pass_name',
+  'low_relief_pass',
+  'non_mountain_hut',
+] as const;
 
 export const placeKindSchema = z.enum(PLACE_KINDS);
 export const placeSubtypeSchema = z.enum(PLACE_SUBTYPES);
 export const placeRelationSchema = z.enum(PLACE_RELATIONS);
 export const placePointDerivationSchema = z.enum(PLACE_POINT_DERIVATIONS);
+export const placeHiddenReasonSchema = z.enum(PLACE_HIDDEN_REASONS);
+export type PlaceHiddenReason = z.infer<typeof placeHiddenReasonSchema>;
 export type PlaceKind = z.infer<typeof placeKindSchema>;
 export type PlaceSubtype = z.infer<typeof placeSubtypeSchema>;
 export type PlaceRelation = z.infer<typeof placeRelationSchema>;
@@ -126,10 +135,34 @@ export const normalizedPlaceSchema = z
     osm_version: z.number().int().positive().max(2147483647),
     osm_updated_at: z.iso.datetime({ offset: true }),
     point_derivation: placePointDerivationSchema,
+    // Terrain metrics from the catalogue DEM (osm-places-v2 onwards).
+    dem_elevation_m: finite.optional(),
+    pass_amp_m: nonnegative.optional(),
+    peak_prominence_m: nonnegative.optional(),
+    peak_prominence_capped: z.boolean().optional(),
+    hidden_reason: placeHiddenReasonSchema.optional(),
     normalization_version: nonblank,
     catalogue_snapshot_id: nonblank,
   })
   .superRefine((place, context) => {
+    if (
+      (place.peak_prominence_m === undefined) !==
+      (place.peak_prominence_capped === undefined)
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['peak_prominence_capped'],
+        message: 'Peak prominence and its cap flag go together',
+      });
+    if (
+      (place.pass_amp_m !== undefined && !place.kinds.includes('pass')) ||
+      (place.peak_prominence_m !== undefined && !place.kinds.includes('peak'))
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['kinds'],
+        message: 'Terrain metrics must match the place kinds',
+      });
     const expected = new Set(
       place.subtypes.map((subtype) => subtypeKind[subtype]),
     );

@@ -8,12 +8,14 @@ import test from 'node:test';
 import {
   canonicalJson,
   catalogueSnapshotId,
+  listedPlaceCount,
   loadCatalogueArtifact,
   serializeCatalogueRows,
   sha256,
   validateCatalogue,
 } from './catalogue-artifact';
 import { createSyntheticCatalogue } from './catalogue.fixture';
+import type { NormalizedPlace } from './types';
 
 void test('canonical artifact retains exact source IDs, raw tags and original strings', () => {
   const catalogue = createSyntheticCatalogue({
@@ -181,4 +183,76 @@ void test('filesystem loader validates canonical contents and never accepts part
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+
+void test('terrain catalogues bind the filter; legacy catalogues stay readable', () => {
+  const lowPass = (rows: NormalizedPlace[]) => {
+    rows[1] = { ...rows[1]!, elevation_m: 680, pass_amp_m: 20 };
+    return rows;
+  };
+  const filtered = createSyntheticCatalogue({ transformRows: lowPass });
+  assert.equal(filtered.rows[1]!.hidden_reason, 'low_relief_pass');
+  assert.equal(filtered.manifest.counts.filter?.hidden, 1);
+  assert.equal(filtered.manifest.counts.filter?.hidden_by_kind.pass, 1);
+  // The fixture peak has no DEM metrics.
+  assert.equal(filtered.manifest.counts.filter?.without_terrain, 1);
+  assert.equal(listedPlaceCount(filtered.manifest), 2);
+  assert.equal(
+    filtered.manifest.terrain?.dem_attribution.text,
+    '© DLR e.V. and Airbus, Copernicus programme',
+  );
+
+  // A row whose decision disagrees with the current policy is rejected.
+  const tampered = filtered.rows.map((row, index) => {
+    if (index !== 1) return row;
+    const kept = { ...row };
+    delete kept.hidden_reason;
+    return kept;
+  });
+  const serialized = serializeCatalogueRows(tampered);
+  assert.throws(
+    () =>
+      validateCatalogue({
+        ...filtered,
+        rows: tampered,
+        manifest: {
+          ...filtered.manifest,
+          counts: {
+            ...filtered.manifest.counts,
+            filter: {
+              ...filtered.manifest.counts.filter!,
+              hidden: 0,
+              hidden_by_kind: { peak: 0, pass: 0, hut: 0 },
+              hidden_by_reason: {
+                ...filtered.manifest.counts.filter!.hidden_by_reason,
+                low_relief_pass: 0,
+              },
+            },
+          },
+          artifact: {
+            ...filtered.manifest.artifact,
+            sha256: sha256(serialized),
+            bytes: Buffer.byteLength(serialized),
+          },
+        },
+      }),
+    /disagree with the filter policy/,
+  );
+
+  const legacy = createSyntheticCatalogue({ legacy: true });
+  assert.equal(legacy.manifest.normalization_version, 'osm-places-v1');
+  assert.equal(legacy.manifest.terrain, undefined);
+  assert.equal(listedPlaceCount(legacy.manifest), 3);
+  assert.throws(
+    () => createSyntheticCatalogue({ legacy: true, transformRows: lowPass }),
+    /Legacy catalogue rows/,
+  );
+  assert.throws(
+    () =>
+      validateCatalogue({
+        ...legacy,
+        manifest: { ...legacy.manifest, terrain: filtered.manifest.terrain },
+      }),
+    /declares terrain/,
+  );
 });

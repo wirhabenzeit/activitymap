@@ -16,6 +16,7 @@ import {
   serializeCatalogueRows,
 } from '../../src/server/places/catalogue-artifact';
 import { prepareCatalogue } from '../../src/server/places/catalogue-prepare';
+import { CopernicusDem } from '../../src/server/places/copernicus-dem';
 
 const { values } = parseArgs({
   options: {
@@ -56,7 +57,7 @@ async function download(url: string, path: string) {
 }
 if (values.help) {
   console.log(
-    'Prepare a complete regional catalogue without database credentials:\n  pnpm places:prepare --region switzerland --out output/places/switzerland-YYYY-MM-DD\nSwitzerland, Austria and Italy have predefined Geofabrik URLs. Other regions require --source-url and --coverage-url. Supply --pbf and --poly together to use local source files. Runs entirely in TypeScript/Node; no external tools are required.',
+    'Prepare a complete regional catalogue without database credentials:\n  pnpm places:prepare --region switzerland --out output/places/switzerland-YYYY-MM-DD\nSwitzerland, Austria and Italy have predefined Geofabrik URLs. Other regions require --source-url and --coverage-url. Supply --pbf and --poly together to use local source files. Pass and peak terrain is read from Copernicus GLO-30 with HTTP range requests. Runs entirely in TypeScript/Node; no external tools are required.',
   );
 } else {
   const started = performance.now();
@@ -92,12 +93,14 @@ if (values.help) {
       await download(sourceUrl, pbfPath);
       await download(coverageUrl, polyPath);
     }
+    const dem = new CopernicusDem();
     const catalogue = await prepareCatalogue({
       regionId: region,
       pbfPath,
       polyPath,
       sourceUrl,
       coverageUrl,
+      dem,
       onProgress: (message) => console.error(message),
     });
     const artifact = join(temporary, 'artifact');
@@ -130,6 +133,7 @@ if (values.help) {
           directory: output,
           snapshotId: catalogue.manifest.catalogue_snapshot_id,
           counts: catalogue.manifest.counts,
+          dem: dem.stats,
           durationMs: Math.round(performance.now() - started),
         },
         null,

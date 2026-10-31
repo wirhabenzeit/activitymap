@@ -92,7 +92,14 @@ const other: Actor = {
   authentication: 'bearer',
 };
 const id = '9007199254740993';
-const catalogue = createSyntheticCatalogue({ regionId: 'ch-at-it' });
+// The synthetic pass is a lowland crossing the catalogue filter hides.
+const catalogue = createSyntheticCatalogue({
+  regionId: 'ch-at-it',
+  transformRows: (rows) =>
+    rows.map((row, index) =>
+      index === 1 ? { ...row, elevation_m: 680, pass_amp_m: 20 } : row,
+    ),
+});
 const peak = catalogue.rows[0]!;
 const stream = (type: string, data: number[] | number[][]) => ({
   type,
@@ -230,7 +237,11 @@ try {
     'Single-activity queries fetch only nearby places and deduplicate overlapping windows',
   );
   const full = await loadBatchPlaceCatalogue(database);
-  assert.equal(full.places.length, 3);
+  assert.equal(
+    full.places.length,
+    2,
+    'Matching reads skip places the catalogue filter hides',
+  );
   const hutId = full.places.find((place) => place.kinds.includes('hut'))!.id;
   await client`UPDATE places SET retired_at=now() WHERE id=${hutId}::uuid`;
   await assert.rejects(

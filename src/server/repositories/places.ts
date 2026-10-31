@@ -226,7 +226,9 @@ export function createPlaceDiscoveryRepository(database: {
       if (!facts[0].covered)
         return { candidates: [], covered: false, truncated: false };
 
-      // One batched query over validated continuous sections. ST_DWithin keeps
+      // One batched query over validated continuous sections. Places hidden by
+      // the catalogue filter are never candidates, so visits to them vanish
+      // when activities are rematched against that catalogue. ST_DWithin keeps
       // the indexed geography column bare; duplicate hits from multiple sections
       // collapse to a single place before applying the limit + 1 sentinel.
       // OFFSET 0 preserves the correlated spatial lookup: flattening the lateral
@@ -239,6 +241,7 @@ export function createPlaceDiscoveryRepository(database: {
           CROSS JOIN LATERAL (
             SELECT id FROM places
             WHERE catalogue_snapshot_id = ${snapshot} AND retired_at IS NULL
+              AND hidden_reason IS NULL
               AND ST_DWithin(location, sections.route, ${radiusM})
             OFFSET 0
           ) AS hit
