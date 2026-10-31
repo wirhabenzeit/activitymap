@@ -152,10 +152,10 @@ its runtime SQL does not write activities, streams, accounts or activity evidenc
 ## Noise filter: terrain and tags
 
 The OSM selectors include noise: lowland road crossings tagged as passes (Forch
-near Zürich), small bumps tagged as peaks, and Alm huts and restaurants tagged
-as `tourism=alpine_hut`. Since `osm-places-v2`, preparation measures every pass
-and peak on one global terrain model and applies one versioned rule set to
-all countries. Hidden places stay in the artifact and the `places` table, with
+near Zürich) and Alm huts and restaurants tagged as `tourism=alpine_hut`.
+Since `osm-places-v2`, preparation measures every pass and peak on one global
+terrain model and applies one versioned rule set to passes and huts in all
+countries. Peaks are measured but never hidden. Hidden places stay in the artifact and the `places` table, with
 their metrics and a `hidden_reason`, so publication keeps their UUIDs and
 references. Candidate discovery and the batch matching catalogue skip them.
 A new filter policy or terrain method changes the catalogue snapshot identity,
@@ -185,7 +185,8 @@ arc-second grid with pixel-is-point registration.
   first) inside a ±3 km window. The lowest height popped before a cell higher
   than the start is the key col. If the window edge is reached first, the drop
   to that edge cell is stored with `peak_prominence_capped = true`: a lower
-  bound, for peaks that dominate their window.
+  bound, for peaks that dominate their window. Prominence is stored for later
+  use (ranking, display) but hides nothing; see below.
 
 Metrics are rounded to decimetres. The method parameters are `TERRAIN_METHOD`
 in `src/server/places/terrain.ts`; its version and hash are recorded in the
@@ -197,12 +198,11 @@ manifest under `terrain`, with the DEM URL and attribution.
 threshold and pattern; its version and hash are also bound in the manifest.
 A `wikipedia` or `wikidata` tag keeps any place (Ornpass has only Wikidata).
 
-| Kind | Hidden when                                                                                                | `hidden_reason`       |
-| ---- | ---------------------------------------------------------------------------------------------------------- | --------------------- |
-| Pass | name is only an elevation or a generic word (`q. 2699`, `P2650`, `1557`, `Forcella`, `Joch`, `sea`)        | `generic_pass_name`   |
-| Pass | elevation (OSM `ele`, else DEM) below 1,200 m and `amp` below 60 m                                         | `low_relief_pass`     |
-| Peak | local prominence below 30 m and not capped                                                                 | `low_prominence_peak` |
-| Hut  | no club operator, no info tag, and an Alm, Malga, Casera, Baita, restaurant, inn, forestry or hunting name | `non_mountain_hut`    |
+| Kind | Hidden when                                                                                                | `hidden_reason`     |
+| ---- | ---------------------------------------------------------------------------------------------------------- | ------------------- |
+| Pass | name is only an elevation or a generic word (`q. 2699`, `P2650`, `1557`, `Forcella`, `Joch`, `sea`)        | `generic_pass_name` |
+| Pass | elevation (OSM `ele`, else DEM) below 1,200 m and `amp` below 60 m                                         | `low_relief_pass`   |
+| Hut  | no club operator, no info tag, and an Alm, Malga, Casera, Baita, restaurant, inn, forestry or hunting name | `non_mountain_hut`  |
 
 Club operators match SAC, CAS, DAV, ÖAV, Alpenverein, CAI, Club Alpino, AVS,
 Naturfreunde, SAT and similar. Info tags are capacity, beds, website,
@@ -210,7 +210,16 @@ contact:website, url, phone, contact:phone, reservation, opening_hours,
 wikipedia and wikidata. Missing terrain never hides a place. Same-name passes
 within 1 km are one pass (duplicate Ricken nodes scored 47 and 73 m): if any
 node is kept, all are. A place with several kinds is hidden only when every
-kind is hidden. Combining recomputes decisions over the combined rows, since a
+kind is hidden.
+
+Peaks are never hidden. A 30 m prominence rule would have hidden 26,639 of
+62,248 peaks (43%), including 92 of 432 peaks visited in local development
+data: mostly familiar local hills (Baldern, Haschberg) and named alpine
+shoulders whose 250 m snap reaches higher ground (Le Dôme des Diablerets,
+Donnerkogel). Peak noise is milder than pass noise and a wrongly hidden summit
+costs more than a kept bump, so the rule was dropped before release.
+
+Combining recomputes decisions over the combined rows, since a
 same-name group can cross a country border.
 
 The thresholds were fitted on the Swiss and Austrian gazetteer decisions of the
@@ -221,26 +230,26 @@ models and about 15 GB per country. That research is not part of preparation.
 
 The 20 October extracts were prepared again with terrain on a local machine,
 reading Copernicus over the network. The three countries ran in parallel.
+The run still had the peak rule; the counts below re-apply the final policy to
+its stored metrics, which the peak rule does not affect.
 
-| Country     | Places | Passes hidden |   Peaks hidden | Huts hidden | DEM tiles / blocks |  Time |
-| ----------- | -----: | ------------: | -------------: | ----------: | -----------------: | ----: |
-| Switzerland | 11,325 |    100 (4.1%) |  1,664 (20.8%) |   36 (4.2%) |           14 / 119 |  2:46 |
-| Austria     | 21,948 |     52 (1.8%) |  6,185 (35.3%) | 298 (18.9%) |           25 / 295 |  4:50 |
-| Italy       | 49,607 |   876 (10.8%) | 19,144 (50.0%) | 387 (12.0%) |           78 / 709 | 11:52 |
+| Country     | Places | Passes hidden | Huts hidden | DEM tiles / blocks |  Time |
+| ----------- | -----: | ------------: | ----------: | -----------------: | ----: |
+| Switzerland | 11,325 |    100 (4.1%) |   36 (4.2%) |           14 / 119 |  2:46 |
+| Austria     | 21,948 |     52 (1.8%) | 298 (18.9%) |           25 / 295 |  4:50 |
+| Italy       | 49,607 |   875 (10.8%) | 387 (12.0%) |           78 / 709 | 11:52 |
 
-The combined `ch-at-it` catalogue hides 28,370 of 80,366 places: 1,018 passes,
-26,639 peaks and 714 huts. Every pass and peak got terrain; a few transient S3
-read failures recovered on retry.
+The combined `ch-at-it` catalogue hides 1,731 of 80,366 places: 1,017 passes
+and 714 huts. Every pass and peak got terrain; a few transient S3 read
+failures recovered on retry.
 
 Against the research decisions these numbers reproduce the Python prototype.
 Pass agreement is 92.6% (CH), 82.1% (AT) and 51.9% (IT); 97.9% of Swiss and
 98.9% of Austrian gazetteer passes are kept. Almost all disagreements are
 alpine cols that the per-country rule hid and this rule keeps (Passo dei
-Volontari, Passo Ronchina, Vetternscharte). On peaks with a research summit,
-15.1% / 26.9% / 37.2% are hidden (research rule 12.6% / 23.5% / 31.4%) with
-93.0% / 90.7% / 87.2% the same decision. Peaks without any research summit
-within 250 m are mostly below 30 m, which is why the totals above are higher.
-Forch, Regensberger Pass, Sternenbergpass and Talhöchi are hidden; Buchenegg,
+Volontari, Passo Ronchina, Vetternscharte). The stored peak prominence also
+matches the prototype: below 30 m it agrees with the research prominence on
+93.0% / 90.7% / 87.2% of matched peaks. Forch, Regensberger Pass, Sternenbergpass and Talhöchi are hidden; Buchenegg,
 Hulftegg, Furkapass, Ornpass, both Ricken nodes and Passo di Gavia are kept.
 
 ### Compatibility

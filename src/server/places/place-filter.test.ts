@@ -7,7 +7,6 @@ import {
   hutReason,
   passGroups,
   passReason,
-  peakReason,
 } from './place-filter';
 import type { NormalizedPlace } from './types';
 
@@ -125,32 +124,12 @@ void test('low passes need relief or a Wikipedia/Wikidata tag', () => {
   );
 });
 
-void test('peaks under 30 m local prominence are hidden unless notable or capped', () => {
-  const peak = (fields: Partial<NormalizedPlace>) =>
-    place(['peak'], 'Bump', fields);
-  assert.equal(
-    peakReason(peak({ peak_prominence_m: 12, peak_prominence_capped: false })),
-    'low_prominence_peak',
-  );
-  assert.equal(
-    peakReason(peak({ peak_prominence_m: 30, peak_prominence_capped: false })),
-    null,
-  );
-  assert.equal(
-    peakReason(peak({ peak_prominence_m: 12, peak_prominence_capped: true })),
-    null,
-  );
-  assert.equal(
-    peakReason(
-      peak({
-        peak_prominence_m: 12,
-        peak_prominence_capped: false,
-        ...wikidata('Bump'),
-      }),
-    ),
-    null,
-  );
-  assert.equal(peakReason(peak({})), null);
+void test('peaks are never hidden, whatever their prominence', () => {
+  const bump = place(['peak'], 'Baldern', {
+    peak_prominence_m: 0,
+    peak_prominence_capped: false,
+  });
+  assert.equal(applyPlaceFilter([bump])[0]!.hidden_reason, undefined);
 });
 
 void test('huts named as Alm, inn or forestry hut are hidden without club or info tags', () => {
@@ -228,18 +207,26 @@ void test('same-name passes within 1 km share one decision', () => {
 });
 
 void test('a place is hidden only when every kind is hidden', () => {
-  const both = place(['peak', 'pass'], 'Sattelkopf', {
+  // A peak that is also mapped as a pass is always kept.
+  const summit = place(['peak', 'pass'], 'Sattelkopf', {
     elevation_m: 900,
-    pass_amp_m: 80,
-    peak_prominence_m: 5,
-    peak_prominence_capped: false,
+    pass_amp_m: 10,
   });
-  assert.equal(applyPlaceFilter([both])[0]!.hidden_reason, undefined);
-  const hidden = applyPlaceFilter([{ ...both, pass_amp_m: 10 }])[0]!;
-  assert.equal(hidden.hidden_reason, 'low_prominence_peak');
+  assert.equal(applyPlaceFilter([summit])[0]!.hidden_reason, undefined);
+  const both = place(['pass', 'hut'], 'Passalm', {
+    elevation_m: 900,
+    pass_amp_m: 10,
+  });
+  const hidden = applyPlaceFilter([both])[0]!;
+  assert.equal(hidden.hidden_reason, 'low_relief_pass');
+  assert.equal(
+    applyPlaceFilter([{ ...both, tags: { ...both.tags, capacity: '12' } }])[0]!
+      .hidden_reason,
+    undefined,
+  );
   // Reapplying clears a stale decision.
   assert.equal(
-    applyPlaceFilter([{ ...hidden, peak_prominence_m: 50 }])[0]!.hidden_reason,
+    applyPlaceFilter([{ ...hidden, pass_amp_m: 80 }])[0]!.hidden_reason,
     undefined,
   );
 });

@@ -25,7 +25,6 @@ export const PLACE_EVIDENCE_VERSION = 2 as const;
 export const PLACE_HIDDEN_REASONS = [
   'generic_pass_name',
   'low_relief_pass',
-  'low_prominence_peak',
   'non_mountain_hut',
 ] as const;
 

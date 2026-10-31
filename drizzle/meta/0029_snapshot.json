@@ -1,5 +1,5 @@
 {
-  "id": "2dd9cc80-b3e5-43dd-8310-fc3a7670543d",
+  "id": "efd1978b-ad21-4dc0-a83a-248e68a9518a",
   "prevId": "ba0d5969-39fc-40f6-a7db-c95f11b023f1",
   "version": "7",
   "dialect": "postgresql",
@@ -2526,7 +2526,7 @@
         },
         "places_hidden_reason_check": {
           "name": "places_hidden_reason_check",
-          "value": "\"places\".\"hidden_reason\" IS NULL OR \"places\".\"hidden_reason\" IN ('generic_pass_name', 'low_relief_pass', 'low_prominence_peak', 'non_mountain_hut')"
+          "value": "\"places\".\"hidden_reason\" IS NULL OR \"places\".\"hidden_reason\" IN ('generic_pass_name', 'low_relief_pass', 'non_mountain_hut')"
         },
         "places_point_derivation_check": {
           "name": "places_point_derivation_check",

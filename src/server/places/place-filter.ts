@@ -3,8 +3,10 @@ import type { NormalizedPlace, PlaceHiddenReason, PlaceKind } from './types';
 
 /**
  * Catalogue noise rules for issue #462: lowland road crossings tagged as
- * passes, small bumps tagged as peaks, and Alm huts or restaurants tagged as
- * alpine huts. Hidden places stay in the catalogue with their metrics but are
+ * passes and Alm huts or restaurants tagged as alpine huts. Peaks are never
+ * hidden: their prominence is stored, but low-prominence summits are mostly
+ * real named tops (shoulders, local hills) and a false hide costs more than a
+ * kept bump. Hidden places stay in the catalogue with their metrics but are
  * never read as candidates. Thresholds were fitted on the Swiss and Austrian
  * gazetteer decisions of the prominence research; change them only with a new
  * version, which changes the catalogue identity and so rematches activities.
@@ -21,7 +23,6 @@ export const PLACE_FILTER_POLICY = Object.freeze({
   passMinAmpM: 60,
   /** Same-name passes this close are one pass: duplicate nodes must agree. */
   passMergeDistanceM: 1_000,
-  peakMinProminenceM: 30,
   hutClubOperator:
     'SAC|CAS|DAV|ÖAV|OeAV|Alpenverein|CAI|Club Alpino|AVS|Naturfreunde|SAT|Alpenclub|Alpine Club|SEM|SAF',
   hutInfoTags: Object.freeze([
@@ -57,8 +58,6 @@ type FilterInput = Pick<
   | 'elevation_m'
   | 'dem_elevation_m'
   | 'pass_amp_m'
-  | 'peak_prominence_m'
-  | 'peak_prominence_capped'
 >;
 
 const hasTag = (place: FilterInput, keys: readonly string[]) =>
@@ -83,18 +82,6 @@ export function passReason(place: FilterInput): PlaceHiddenReason | null {
     : 'low_relief_pass';
 }
 
-export function peakReason(place: FilterInput): PlaceHiddenReason | null {
-  if (
-    notable(place) ||
-    place.peak_prominence_m === undefined ||
-    place.peak_prominence_capped
-  )
-    return null;
-  return place.peak_prominence_m < PLACE_FILTER_POLICY.peakMinProminenceM
-    ? 'low_prominence_peak'
-    : null;
-}
-
 export function hutReason(place: FilterInput): PlaceHiddenReason | null {
   if (
     hutClubOperator.test(place.tags.operator ?? '') ||
@@ -109,7 +96,7 @@ export function hutReason(place: FilterInput): PlaceHiddenReason | null {
 const rules: Record<
   PlaceKind,
   (place: FilterInput) => PlaceHiddenReason | null
-> = { peak: peakReason, pass: passReason, hut: hutReason };
+> = { peak: () => null, pass: passReason, hut: hutReason };
 
 /** Single-link groups of same-name passes within the merge distance. */
 export function passGroups(

@@ -7,4 +7,4 @@ ALTER TABLE "places" ADD CONSTRAINT "places_terrain_check" CHECK (("places"."pea
         AND ("places"."pass_amp_m" IS NULL OR ('pass' = ANY("places"."kinds") AND "places"."pass_amp_m" >= 0 AND "places"."pass_amp_m" < 'Infinity'::real))
         AND ("places"."peak_prominence_m" IS NULL OR ('peak' = ANY("places"."kinds") AND "places"."peak_prominence_m" >= 0 AND "places"."peak_prominence_m" < 'Infinity'::real))
         AND ("places"."dem_elevation_m" IS NULL OR ("places"."dem_elevation_m" > '-Infinity'::real AND "places"."dem_elevation_m" < 'Infinity'::real)));--> statement-breakpoint
-ALTER TABLE "places" ADD CONSTRAINT "places_hidden_reason_check" CHECK ("places"."hidden_reason" IS NULL OR "places"."hidden_reason" IN ('generic_pass_name', 'low_relief_pass', 'low_prominence_peak', 'non_mountain_hut'));
+ALTER TABLE "places" ADD CONSTRAINT "places_hidden_reason_check" CHECK ("places"."hidden_reason" IS NULL OR "places"."hidden_reason" IN ('generic_pass_name', 'low_relief_pass', 'non_mountain_hut'));
