@@ -11,6 +11,14 @@ Nothing here changes the application yet. All results live in a local
 [`scripts/places/prominence-research/`](../scripts/places/prominence-research/)
 reproduce them.
 
+> **Superseded for production.** A follow-up prototype in
+> [`scripts/places/saddle-test/`](../scripts/places/saddle-test/README.md)
+> scores simple rules on one global DEM (Copernicus GLO-30) and OSM tags
+> against the decisions below. They agree on 92% of Swiss passes and 87–93% of
+> peaks, keep 97–99% of gazetteer passes, and cover huts. They need no
+> per-country sources, so they were chosen over this pipeline. This note and
+> its tables remain the evaluation reference.
+
 ## Decisions so far
 
 - **Multi-source, not OSM-first.** A place that exists only in an official
