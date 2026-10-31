@@ -5,8 +5,23 @@ import { join } from 'node:path';
 import { z } from 'zod';
 
 import { type CoverageGeometry, parseCoverageGeometry } from './coverage';
-import { NORMALIZATION_VERSION, PLACE_SELECTORS } from './normalize-source';
-import { type NormalizedPlace, normalizedPlaceSchema } from './types';
+import {
+  NORMALIZATION_VERSION,
+  NORMALIZATION_VERSIONS,
+  PLACE_SELECTORS,
+} from './normalize-source';
+import { PLACE_FILTER_POLICY, applyPlaceFilter } from './place-filter';
+import {
+  COPERNICUS_ATTRIBUTION,
+  COPERNICUS_GLO30_URL,
+  TERRAIN_METHOD,
+} from './terrain';
+import {
+  type NormalizedPlace,
+  PLACE_HIDDEN_REASONS,
+  type PlaceHiddenReason,
+  normalizedPlaceSchema,
+} from './types';
 
 export const CATALOGUE_FORMAT_VERSION = 1;
 export const COVERAGE_NOTE =
@@ -40,9 +55,44 @@ const catalogueExclusionsSchema = z
     }),
   )
   .max(1000);
+/** Terrain method and filter policy of a v2 catalogue. Older method versions
+ * stay valid so a published catalogue is readable after a code change. */
+export function currentTerrainIdentity() {
+  return {
+    dem_url: COPERNICUS_GLO30_URL,
+    dem_attribution: { ...COPERNICUS_ATTRIBUTION },
+    method_version: TERRAIN_METHOD.version,
+    method_sha256: sha256(canonicalJson(TERRAIN_METHOD)),
+    filter_policy_version: PLACE_FILTER_POLICY.version,
+    filter_policy_sha256: sha256(canonicalJson(PLACE_FILTER_POLICY)),
+  };
+}
+const terrainSchema = z.strictObject({
+  dem_url: z.url(),
+  dem_attribution: z.strictObject({
+    text: z.literal(COPERNICUS_ATTRIBUTION.text),
+    url: z.literal(COPERNICUS_ATTRIBUTION.url),
+  }),
+  method_version: nonblank,
+  method_sha256: hash,
+  filter_policy_version: nonblank,
+  filter_policy_sha256: hash,
+});
+const byKind = z.strictObject({ peak: count, pass: count, hut: count });
+const filterCountsSchema = z.strictObject({
+  hidden: count,
+  hidden_by_kind: byKind,
+  hidden_by_reason: z.strictObject(
+    Object.fromEntries(
+      PLACE_HIDDEN_REASONS.map((reason) => [reason, count]),
+    ) as Record<PlaceHiddenReason, typeof count>,
+  ),
+  /** Passes and peaks outside the DEM, which no terrain rule can hide. */
+  without_terrain: count,
+});
 const countsSchema = z.strictObject({
   total: count.positive(),
-  by_kind: z.strictObject({ peak: count, pass: count, hut: count }),
+  by_kind: byKind,
   by_subtype: z.strictObject({
     peak: count,
     natural_saddle: count,
@@ -53,6 +103,7 @@ const countsSchema = z.strictObject({
   by_osm_type: z.strictObject({ node: count, way: count, relation: count }),
   derived_hut_points: count,
   localized_only_names: count,
+  filter: filterCountsSchema.optional(),
 });
 
 export const catalogueRegionSchema = z.string().regex(/^[a-z][a-z0-9-]{0,63}$/);
@@ -60,7 +111,7 @@ export const catalogueManifestSchema = z.strictObject({
   region_id: catalogueRegionSchema.optional(),
   format_version: z.literal(CATALOGUE_FORMAT_VERSION),
   catalogue_snapshot_id: z.string().regex(/^osm-places-v1:[0-9a-f]{64}$/),
-  normalization_version: z.literal(NORMALIZATION_VERSION),
+  normalization_version: z.enum(NORMALIZATION_VERSIONS),
   source: z.strictObject({
     provider: z.literal('Geofabrik'),
     url: z.url(),
@@ -93,6 +144,7 @@ export const catalogueManifestSchema = z.strictObject({
     url: z.literal(CATALOGUE_ATTRIBUTION.url),
     license: z.literal(CATALOGUE_ATTRIBUTION.license),
   }),
+  terrain: terrainSchema.optional(),
   counts: countsSchema,
   artifact: z.strictObject({
     file: z.literal('places.jsonl'),
@@ -153,6 +205,7 @@ export type CatalogueIdentity = Pick<
   | 'region_id'
   | 'components'
   | 'deduplication'
+  | 'terrain'
 >;
 export interface ValidatedCatalogue {
   manifest: CatalogueManifest;
@@ -191,6 +244,7 @@ export function catalogueSnapshotId(identity: CatalogueIdentity): string {
     region_id,
     components,
     deduplication,
+    terrain,
   } = identity;
   return `osm-places-v1:${sha256(
     canonicalJson({
@@ -204,6 +258,7 @@ export function catalogueSnapshotId(identity: CatalogueIdentity): string {
       ...(region_id === undefined ? {} : { region_id }),
       ...(components === undefined ? {} : { components }),
       ...(deduplication === undefined ? {} : { deduplication }),
+      ...(terrain === undefined ? {} : { terrain }),
     }),
   )}`;
 }
@@ -234,7 +289,30 @@ export function catalogueCounts(
     derived_hut_points: 0,
     localized_only_names: 0,
   };
+  const filter =
+    rows[0]?.normalization_version === NORMALIZATION_VERSION
+      ? {
+          hidden: 0,
+          hidden_by_kind: { peak: 0, pass: 0, hut: 0 },
+          hidden_by_reason: Object.fromEntries(
+            PLACE_HIDDEN_REASONS.map((reason) => [reason, 0]),
+          ) as Record<PlaceHiddenReason, number>,
+          without_terrain: 0,
+        }
+      : undefined;
   for (const row of rows) {
+    if (filter) {
+      if (row.hidden_reason) {
+        filter.hidden++;
+        filter.hidden_by_reason[row.hidden_reason]++;
+        for (const kind of row.kinds) filter.hidden_by_kind[kind]++;
+      }
+      if (
+        (row.kinds.includes('pass') && row.pass_amp_m === undefined) ||
+        (row.kinds.includes('peak') && row.peak_prominence_m === undefined)
+      )
+        filter.without_terrain++;
+    }
     for (const kind of row.kinds) result.by_kind[kind]++;
     for (const subtype of row.subtypes) result.by_subtype[subtype]++;
     result.by_osm_type[row.osm_type]++;
@@ -243,7 +321,12 @@ export function catalogueCounts(
     if (!row.names.name?.trim() && !row.names.int_name?.trim())
       result.localized_only_names++;
   }
-  return result;
+  return filter ? { ...result, filter } : result;
+}
+
+/** Places read as candidates: all rows except those the filter hides. */
+export function listedPlaceCount(manifest: Pick<CatalogueManifest, 'counts'>) {
+  return manifest.counts.total - (manifest.counts.filter?.hidden ?? 0);
 }
 
 /** Revalidate even typed callers; the importer must not trust a TypeScript cast. */
@@ -319,6 +402,15 @@ export function validateCatalogue(value: unknown): ValidatedCatalogue {
     throw new Error(
       'Unexpected duplicate report for a single-region catalogue',
     );
+  const filtered = manifest.normalization_version === NORMALIZATION_VERSION;
+  if (filtered !== !!manifest.terrain)
+    throw new Error('Only a current-normalization catalogue declares terrain');
+  if (
+    manifest.terrain?.filter_policy_version === PLACE_FILTER_POLICY.version &&
+    manifest.terrain.filter_policy_sha256 !==
+      currentTerrainIdentity().filter_policy_sha256
+  )
+    throw new Error('Filter policy changed without a new version');
   if (manifest.catalogue_snapshot_id !== catalogueSnapshotId(manifest)) {
     throw new Error(
       'Catalogue snapshot identity does not match its provenance',
@@ -356,6 +448,27 @@ export function validateCatalogue(value: unknown): ValidatedCatalogue {
       );
     }
   }
+  if (
+    !filtered &&
+    rows.some(
+      (row) =>
+        row.hidden_reason !== undefined ||
+        row.dem_elevation_m !== undefined ||
+        row.pass_amp_m !== undefined ||
+        row.peak_prominence_m !== undefined,
+    )
+  )
+    throw new Error(
+      'Legacy catalogue rows cannot carry terrain or filter data',
+    );
+  // Rows of the current policy must carry exactly its decisions.
+  if (
+    manifest.terrain?.filter_policy_version === PLACE_FILTER_POLICY.version &&
+    applyPlaceFilter(rows).some(
+      (row, index) => row.hidden_reason !== rows[index]!.hidden_reason,
+    )
+  )
+    throw new Error('Catalogue hidden places disagree with the filter policy');
   if (canonicalJson(catalogueCounts(rows)) !== canonicalJson(manifest.counts)) {
     throw new Error('Catalogue category counts do not match the manifest');
   }

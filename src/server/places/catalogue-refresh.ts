@@ -258,6 +258,14 @@ export async function refreshCatalogue(
           })
           .slice(0, 20)
           .map((row) => ({ source: sourceKey(row), name: row.display_name })),
+        hidden: catalogue.rows
+          .filter((row) => row.hidden_reason)
+          .slice(0, 20)
+          .map((row) => ({
+            source: sourceKey(row),
+            name: row.display_name,
+            reason: row.hidden_reason,
+          })),
         retired: retired.slice(0, 20).map((row) => ({
           source: sourceKey(fromStored(row)),
           name: row.displayName,
@@ -298,6 +306,11 @@ export async function refreshCatalogue(
             location: sql`excluded.location`,
             elevationM: sql`excluded.elevation_m`,
             tags: sql`excluded.tags`,
+            demElevationM: sql`excluded.dem_elevation_m`,
+            passAmpM: sql`excluded.pass_amp_m`,
+            peakProminenceM: sql`excluded.peak_prominence_m`,
+            peakProminenceCapped: sql`excluded.peak_prominence_capped`,
+            hiddenReason: sql`excluded.hidden_reason`,
             osmVersion: sql`excluded.osm_version`,
             osmUpdatedAt: sql`excluded.osm_updated_at`,
             pointDerivation: sql`excluded.point_derivation`,

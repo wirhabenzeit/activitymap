@@ -13,6 +13,7 @@ import {
   catalogueCounts,
   catalogueRegionSchema,
   catalogueSnapshotId,
+  currentTerrainIdentity,
   serializeCatalogueRows,
   sha256,
   validateCatalogue,
@@ -26,6 +27,8 @@ import {
   sourceDisplayName,
 } from './normalize-source';
 import { type OsmSource, scanPbf } from './osm-pbf';
+import { applyPlaceFilter } from './place-filter';
+import { type DemSource, measureTerrain } from './terrain';
 
 export async function fileSha256(path: string) {
   const hash = createHash('sha256');
@@ -76,6 +79,8 @@ export async function prepareCatalogue(input: {
   polyPath: string;
   sourceUrl: string;
   coverageUrl: string;
+  /** Terrain for pass and peak metrics: Copernicus GLO-30 in production. */
+  dem: DemSource;
   onProgress?: (message: string) => void;
 }) {
   const regionId = catalogueRegionSchema.parse(input.regionId);
@@ -84,6 +89,9 @@ export async function prepareCatalogue(input: {
       './osm-pbf.ts',
       './catalogue-prepare.ts',
       './normalize-source.ts',
+      './terrain.ts',
+      './copernicus-dem.ts',
+      './place-filter.ts',
     ]),
     implementationHash(['./hut-geometry.ts', './coverage.ts']),
   ]);
@@ -240,6 +248,9 @@ export async function prepareCatalogue(input: {
       './osm-pbf.ts',
       './catalogue-prepare.ts',
       './normalize-source.ts',
+      './terrain.ts',
+      './copernicus-dem.ts',
+      './place-filter.ts',
     ]),
     implementationHash(['./hut-geometry.ts', './coverage.ts']),
   ]);
@@ -288,9 +299,10 @@ export async function prepareCatalogue(input: {
     },
     selectors: PLACE_SELECTORS,
     attribution: CATALOGUE_ATTRIBUTION,
+    terrain: currentTerrainIdentity(),
   };
   const snapshotId = catalogueSnapshotId(identity);
-  const rows = ordered.flatMap((source) => {
+  const normalized = ordered.flatMap((source) => {
     if (excludedKeys.has(sourceKey(source))) return [];
     const place = normalizeSourceObject(source, points.get(sourceKey(source)), {
       catalogueSnapshotId: snapshotId,
@@ -298,6 +310,12 @@ export async function prepareCatalogue(input: {
     });
     return place ? [place] : [];
   });
+  input.onProgress?.('Measuring pass and peak terrain');
+  const rows = applyPlaceFilter(
+    await measureTerrain(normalized, input.dem, {
+      onProgress: input.onProgress,
+    }),
+  );
   const serialized = serializeCatalogueRows(rows);
   return validateCatalogue({
     manifest: {

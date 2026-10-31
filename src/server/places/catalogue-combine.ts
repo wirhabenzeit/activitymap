@@ -14,6 +14,7 @@ import {
   validateCatalogue,
 } from './catalogue-artifact';
 import { type CoverageGeometry, parseCoverageGeometry } from './coverage';
+import { applyPlaceFilter } from './place-filter';
 import type { NormalizedPlace } from './types';
 
 function polygon(coverage: CoverageGeometry): MultiPolygon {
@@ -48,8 +49,12 @@ export function catalogueCoverageContains(
   );
 }
 const key = (row: NormalizedPlace) => `${row.osm_type}/${row.osm_id}`;
+/** Hidden decisions can depend on same-name passes across a border, so they
+ * are recomputed for the combined rows rather than compared. */
 function sourceContent(row: NormalizedPlace) {
-  return canonicalJson({ ...row, catalogue_snapshot_id: 'comparison' });
+  const content = { ...row, catalogue_snapshot_id: 'comparison' };
+  delete content.hidden_reason;
+  return canonicalJson(content);
 }
 
 /** A single serving catalogue from aligned, independently validated country
@@ -83,11 +88,15 @@ export function combineCatalogues(
         catalogue.manifest.source.data_as_of !==
           first.manifest.source.data_as_of ||
         canonicalJson(catalogue.manifest.toolchain) !==
-          canonicalJson(first.manifest.toolchain),
+          canonicalJson(first.manifest.toolchain) ||
+        catalogue.manifest.normalization_version !==
+          first.manifest.normalization_version ||
+        canonicalJson(catalogue.manifest.terrain ?? null) !==
+          canonicalJson(first.manifest.terrain ?? null),
     )
   )
     throw new Error(
-      'Combine requires aligned timestamps and matching normalization/toolchains',
+      'Combine requires aligned timestamps and matching normalization/terrain/toolchains',
     );
   const sources = new Map<
     string,
@@ -209,12 +218,14 @@ export function combineCatalogues(
     toolchain: first.manifest.toolchain,
     selectors: first.manifest.selectors,
     attribution: first.manifest.attribution,
+    ...(first.manifest.terrain ? { terrain: first.manifest.terrain } : {}),
   };
   const snapshotId = catalogueSnapshotId(identity);
-  const rows = entries.map(({ row }) => ({
+  const combined = entries.map(({ row }) => ({
     ...row,
     catalogue_snapshot_id: snapshotId,
   }));
+  const rows = first.manifest.terrain ? applyPlaceFilter(combined) : combined;
   const serialized = serializeCatalogueRows(rows);
   return validateCatalogue({
     manifest: {

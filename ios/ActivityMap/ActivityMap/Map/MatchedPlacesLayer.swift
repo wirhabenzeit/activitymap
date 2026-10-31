@@ -9,7 +9,8 @@ struct MatchedPlacesLayer: MapContent {
     private var attributionSource: GeoJSONSource {
         var source = GeoJSONSource(id: "matched-places-attribution")
         source.data = .featureCollection(.init(features: []))
-        source.attribution = "<a href=\"https://www.openstreetmap.org/copyright\">© OpenStreetMap contributors</a>"
+        // Places come from OSM; Copernicus terrain decides which are listed.
+        source.attribution = "<a href=\"https://www.openstreetmap.org/copyright\">© OpenStreetMap contributors</a>, <a href=\"https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model\">© DLR e.V. and Airbus, Copernicus programme</a>"
         return source
     }
     var body: some MapContent {

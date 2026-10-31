@@ -10,6 +10,7 @@ import { prepareCatalogue } from './catalogue-prepare';
 import type { OsmSource } from './osm-pbf';
 import { createPbfFixture } from './osm-pbf.fixture';
 import { validatePublishedCatalogue } from './published-catalogue';
+import { syntheticDem } from './terrain.fixture';
 
 const sources: OsmSource[] = [
   {
@@ -91,6 +92,7 @@ void test('Node preparation streams fresh PBF snapshots, resolves selective depe
       polyPath,
       sourceUrl: 'https://example.invalid/source.osm.pbf',
       coverageUrl: 'https://example.invalid/source.poly',
+      dem: syntheticDem(),
     };
     const progress: string[] = [];
     const result = await prepareCatalogue({

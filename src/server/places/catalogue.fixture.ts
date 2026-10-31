@@ -7,11 +7,13 @@ import {
   canonicalJson,
   catalogueCounts,
   catalogueSnapshotId,
+  currentTerrainIdentity,
   serializeCatalogueRows,
   sha256,
   validateCatalogue,
 } from './catalogue-artifact';
 import { NORMALIZATION_VERSION, PLACE_SELECTORS } from './normalize-source';
+import { applyPlaceFilter } from './place-filter';
 import type { NormalizedPlace } from './types';
 
 /** Tiny invented catalogue for unit/database proofs; no private activity data. */
@@ -21,8 +23,13 @@ export function createSyntheticCatalogue(
     dataAsOf?: string;
     regionId?: string;
     transformRows?: (rows: NormalizedPlace[]) => NormalizedPlace[];
+    /** A pre-terrain artifact, as published before osm-places-v2. */
+    legacy?: boolean;
   } = {},
 ): ValidatedCatalogue {
+  const normalizationVersion = options.legacy
+    ? 'osm-places-v1'
+    : NORMALIZATION_VERSION;
   const coverage = {
     type: 'MultiPolygon',
     coordinates: [
@@ -40,7 +47,7 @@ export function createSyntheticCatalogue(
   const identity: CatalogueIdentity = {
     ...(options.regionId ? { region_id: options.regionId } : {}),
     format_version: CATALOGUE_FORMAT_VERSION,
-    normalization_version: NORMALIZATION_VERSION,
+    normalization_version: normalizationVersion,
     source: {
       provider: 'Geofabrik',
       url: 'https://example.invalid/synthetic.osm.pbf',
@@ -63,11 +70,12 @@ export function createSyntheticCatalogue(
     toolchain: { node: 'synthetic-fixed', icu: 'synthetic-fixed' },
     selectors: PLACE_SELECTORS,
     attribution: CATALOGUE_ATTRIBUTION,
+    ...(options.legacy ? {} : { terrain: currentTerrainIdentity() }),
   };
   const common = {
     osm_version: 1,
     osm_updated_at: '2026-10-20T20:23:47Z',
-    normalization_version: NORMALIZATION_VERSION,
+    normalization_version: normalizationVersion,
     catalogue_snapshot_id: catalogueSnapshotId(identity),
   };
   const initial: NormalizedPlace[] = [
@@ -109,7 +117,10 @@ export function createSyntheticCatalogue(
       point_derivation: 'validated_polygon_interior',
     },
   ];
-  const rows = options.transformRows ? options.transformRows(initial) : initial;
+  const transformed = options.transformRows
+    ? options.transformRows(initial)
+    : initial;
+  const rows = options.legacy ? transformed : applyPlaceFilter(transformed);
   const serialized = serializeCatalogueRows(rows);
   return validateCatalogue({
     manifest: {
