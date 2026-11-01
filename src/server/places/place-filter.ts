@@ -3,13 +3,13 @@ import type { NormalizedPlace, PlaceHiddenReason, PlaceKind } from './types';
 
 /**
  * Catalogue noise rules for issue #462: lowland road crossings tagged as
- * passes and Alm huts or restaurants tagged as alpine huts. Peaks are never
- * hidden: their prominence is stored, but low-prominence summits are mostly
- * real named tops (shoulders, local hills) and a false hide costs more than a
- * kept bump. Hidden places stay in the catalogue with their metrics but are
- * never read as candidates. Thresholds were fitted on the Swiss and Austrian
- * gazetteer decisions of the prominence research; change them only with a new
- * version, which changes the catalogue identity and so rematches activities.
+ * passes and Alm huts or restaurants tagged as alpine huts. Everything here is
+ * OSM data except one terrain number, the saddle amp of passes on minor roads,
+ * so the rules apply unchanged worldwide. Peaks are never hidden: low summits
+ * are mostly real named tops and a false hide costs more than a kept bump.
+ * Hidden places stay in the catalogue but are never read as candidates.
+ * Change a rule only with a new version, which changes the catalogue identity
+ * and so rematches activities.
  */
 export const PLACE_FILTER_POLICY = Object.freeze({
   version: 'places-filter-v1',
@@ -18,8 +18,18 @@ export const PLACE_FILTER_POLICY = Object.freeze({
   /** Names that are only an elevation label or a generic word. */
   genericPassName:
     '^(?:(?:q|quota|p|pt|pkt|punkt|cota|kote)\\.?\\s*)?\\d{3,4}(?:\\s*m)?$|^(?:sea|pass|passo|sattel|col|colle|forcella|bocchetta|joch|saddle|the saddle|skar|skaret|перевал|ашуу)$',
-  /** OSM `ele`, else DEM height. */
-  passMinElevationM: 1_200,
+  /** A pass on one of these roads is a through route and always kept. */
+  passMajorRoads: Object.freeze(['motorway', 'trunk', 'primary', 'secondary']),
+  /** Otherwise, a pass on one of these needs terrain: local roads over low
+   * hills (Regensberger Pass). Passes on trails or on no way are kept: most
+   * are real cols, and their road context cannot tell them apart. */
+  passMinorRoads: Object.freeze([
+    'tertiary',
+    'unclassified',
+    'residential',
+    'service',
+    'living_street',
+  ]),
   passMinAmpM: 60,
   /** Same-name passes this close are one pass: duplicate nodes must agree. */
   passMergeDistanceM: 1_000,
@@ -55,12 +65,7 @@ const hutNonMountainName = new RegExp(
 
 type FilterInput = Pick<
   NormalizedPlace,
-  | 'kinds'
-  | 'display_name'
-  | 'tags'
-  | 'elevation_m'
-  | 'dem_elevation_m'
-  | 'pass_amp_m'
+  'kinds' | 'display_name' | 'tags' | 'pass_highways' | 'pass_amp_m'
 >;
 
 const hasTag = (place: FilterInput, keys: readonly string[]) =>
@@ -68,18 +73,25 @@ const hasTag = (place: FilterInput, keys: readonly string[]) =>
 const notable = (place: FilterInput) =>
   hasTag(place, PLACE_FILTER_POLICY.notableTags);
 
-/** A missing metric never hides a place: no terrain is not low terrain. */
+const onAny = (place: FilterInput, roads: readonly string[]) =>
+  !!place.pass_highways?.some((highway) => roads.includes(highway));
+
+/** Passes whose decision needs `pass_amp_m`; terrain is measured for these. */
+export function passNeedsTerrain(place: FilterInput): boolean {
+  return (
+    !notable(place) &&
+    !genericPassName.test(place.display_name.trim()) &&
+    !onAny(place, PLACE_FILTER_POLICY.passMajorRoads) &&
+    onAny(place, PLACE_FILTER_POLICY.passMinorRoads)
+  );
+}
+
+/** A missing amp never hides a pass: no terrain is not low terrain. */
 export function passReason(place: FilterInput): PlaceHiddenReason | null {
   if (notable(place)) return null;
   if (genericPassName.test(place.display_name.trim()))
     return 'generic_pass_name';
-  const elevation = place.elevation_m ?? place.dem_elevation_m;
-  if (
-    elevation !== undefined &&
-    elevation >= PLACE_FILTER_POLICY.passMinElevationM
-  )
-    return null;
-  if (place.pass_amp_m === undefined) return null;
+  if (!passNeedsTerrain(place) || place.pass_amp_m === undefined) return null;
   return place.pass_amp_m >= PLACE_FILTER_POLICY.passMinAmpM
     ? null
     : 'low_relief_pass';

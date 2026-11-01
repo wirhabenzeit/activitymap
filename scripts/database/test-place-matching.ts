@@ -97,7 +97,9 @@ const catalogue = createSyntheticCatalogue({
   regionId: 'ch-at-it',
   transformRows: (rows) =>
     rows.map((row, index) =>
-      index === 1 ? { ...row, elevation_m: 680, pass_amp_m: 20 } : row,
+      index === 1
+        ? { ...row, pass_highways: ['tertiary'], pass_amp_m: 20 }
+        : row,
     ),
 });
 const peak = catalogue.rows[0]!;

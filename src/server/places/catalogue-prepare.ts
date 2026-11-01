@@ -27,7 +27,7 @@ import {
   sourceDisplayName,
 } from './normalize-source';
 import { type OsmSource, scanPbf } from './osm-pbf';
-import { applyPlaceFilter } from './place-filter';
+import { applyPlaceFilter, passNeedsTerrain } from './place-filter';
 import { type DemSource, measureTerrain } from './terrain';
 
 export async function fileSha256(path: string) {
@@ -46,6 +46,8 @@ function selected(tags: Record<string, string>) {
     tags.tourism === 'wilderness_hut'
   );
 }
+const isPass = (source: OsmSource) =>
+  source.tags.natural === 'saddle' || source.tags.mountain_pass === 'yes';
 const isHut = (source: OsmSource) =>
   source.tags.tourism === 'alpine_hut' ||
   source.tags.tourism === 'wilderness_hut';
@@ -79,7 +81,7 @@ export async function prepareCatalogue(input: {
   polyPath: string;
   sourceUrl: string;
   coverageUrl: string;
-  /** Terrain for pass and peak metrics: Copernicus GLO-30 in production. */
+  /** Terrain for the pass filter: Copernicus GLO-30 in production. */
   dem: DemSource;
   onProgress?: (message: string) => void;
 }) {
@@ -221,6 +223,30 @@ export async function prepareCatalogue(input: {
       if (!locations.has(id))
         throw new Error(`Missing hut node position: ${id}`);
   }
+  // The filter reads the roads a pass is on: the `highway` values of every
+  // way through a pass node, kept as a sorted set per node.
+  const passNodes = new Set(
+    ordered
+      .filter((source) => source.osm_type === 'node' && isPass(source))
+      .map((source) => source.osm_id),
+  );
+  const highways = new Map<string, Set<string>>();
+  input.onProgress?.(`Reading the roads through ${passNodes.size} pass nodes`);
+  const roads = await scanPbf(input.pbfPath, {
+    select: (tags) => tags.highway !== undefined,
+    onSource(source) {
+      const highway = source.tags.highway!.trim();
+      // Free-form tag: a blank or runaway value says nothing about the road.
+      if (source.osm_type !== 'way' || !highway || highway.length > 64) return;
+      for (const ref of source.node_refs ?? [])
+        if (passNodes.has(ref)) {
+          const values = highways.get(ref) ?? new Set();
+          highways.set(ref, values.add(highway));
+        }
+    },
+  });
+  if (roads.dataAsOf !== header.dataAsOf)
+    throw new Error('PBF changed between source and road passes');
   const points = new Map(
     huts.map((source) => {
       try {
@@ -308,11 +334,14 @@ export async function prepareCatalogue(input: {
       catalogueSnapshotId: snapshotId,
       normalizationVersion: NORMALIZATION_VERSION,
     });
-    return place ? [place] : [];
+    if (!place) return [];
+    if (!place.kinds.includes('pass')) return [place];
+    const roads = [...(highways.get(source.osm_id) ?? [])].sort();
+    return [{ ...place, pass_highways: roads }];
   });
-  input.onProgress?.('Measuring pass and peak terrain');
   const rows = applyPlaceFilter(
     await measureTerrain(normalized, input.dem, {
+      select: passNeedsTerrain,
       onProgress: input.onProgress,
     }),
   );

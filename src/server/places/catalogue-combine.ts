@@ -14,7 +14,7 @@ import {
   validateCatalogue,
 } from './catalogue-artifact';
 import { type CoverageGeometry, parseCoverageGeometry } from './coverage';
-import { applyPlaceFilter } from './place-filter';
+import { applyPlaceFilter, passNeedsTerrain } from './place-filter';
 import type { NormalizedPlace } from './types';
 
 function polygon(coverage: CoverageGeometry): MultiPolygon {
@@ -49,12 +49,35 @@ export function catalogueCoverageContains(
   );
 }
 const key = (row: NormalizedPlace) => `${row.osm_type}/${row.osm_id}`;
-/** Hidden decisions can depend on same-name passes across a border, so they
- * are recomputed for the combined rows rather than compared. */
+/** Filter inputs and decisions are not compared. Each extract sees only the
+ * roads inside it, so a border pass lists different roads per country; they
+ * are merged. Decisions can depend on same-name passes across a border, so
+ * they are recomputed for the combined rows. */
 function sourceContent(row: NormalizedPlace) {
   const content = { ...row, catalogue_snapshot_id: 'comparison' };
   delete content.hidden_reason;
+  delete content.pass_highways;
+  delete content.pass_amp_m;
   return canonicalJson(content);
+}
+function mergeRoads(a: NormalizedPlace, b: NormalizedPlace): NormalizedPlace {
+  if (a.pass_highways === undefined && b.pass_highways === undefined) return a;
+  const amp = a.pass_amp_m ?? b.pass_amp_m;
+  return {
+    ...a,
+    pass_highways: [
+      ...new Set([...(a.pass_highways ?? []), ...(b.pass_highways ?? [])]),
+    ].sort(),
+    ...(amp === undefined ? {} : { pass_amp_m: amp }),
+  };
+}
+/** The amp is only kept where the merged roads still need it. An extract that
+ * needed it measured it, since tags and names agree across extracts. */
+function settleTerrain(row: NormalizedPlace): NormalizedPlace {
+  if (row.pass_amp_m === undefined || passNeedsTerrain(row)) return row;
+  const settled = { ...row };
+  delete settled.pass_amp_m;
+  return settled;
 }
 
 /** A single serving catalogue from aligned, independently validated country
@@ -110,6 +133,7 @@ export function combineCatalogues(
           throw new Error(
             `Conflicting border source ${key(row)} in ${[...existing.regions, catalogue.manifest.region_id!].join(', ')}`,
           );
+        existing.row = mergeRoads(existing.row, row);
         existing.regions.push(catalogue.manifest.region_id!);
       } else
         sources.set(key(row), {
@@ -222,7 +246,7 @@ export function combineCatalogues(
   };
   const snapshotId = catalogueSnapshotId(identity);
   const combined = entries.map(({ row }) => ({
-    ...row,
+    ...settleTerrain(row),
     catalogue_snapshot_id: snapshotId,
   }));
   const rows = first.manifest.terrain ? applyPlaceFilter(combined) : combined;

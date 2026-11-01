@@ -135,33 +135,33 @@ export const normalizedPlaceSchema = z
     osm_version: z.number().int().positive().max(2147483647),
     osm_updated_at: z.iso.datetime({ offset: true }),
     point_derivation: placePointDerivationSchema,
-    // Terrain metrics from the catalogue DEM (osm-places-v2 onwards).
-    dem_elevation_m: finite.optional(),
+    // Noise filter inputs (osm-places-v2 onwards): the sorted `highway`
+    // values of the OSM ways through a pass node, and its DEM saddle amp.
+    pass_highways: z.array(nonblank.max(64)).max(64).optional(),
     pass_amp_m: nonnegative.optional(),
-    peak_prominence_m: nonnegative.optional(),
-    peak_prominence_capped: z.boolean().optional(),
     hidden_reason: placeHiddenReasonSchema.optional(),
     normalization_version: nonblank,
     catalogue_snapshot_id: nonblank,
   })
   .superRefine((place, context) => {
     if (
-      (place.peak_prominence_m === undefined) !==
-      (place.peak_prominence_capped === undefined)
-    )
-      context.addIssue({
-        code: 'custom',
-        path: ['peak_prominence_capped'],
-        message: 'Peak prominence and its cap flag go together',
-      });
-    if (
-      (place.pass_amp_m !== undefined && !place.kinds.includes('pass')) ||
-      (place.peak_prominence_m !== undefined && !place.kinds.includes('peak'))
+      (place.pass_amp_m !== undefined || place.pass_highways !== undefined) &&
+      !place.kinds.includes('pass')
     )
       context.addIssue({
         code: 'custom',
         path: ['kinds'],
-        message: 'Terrain metrics must match the place kinds',
+        message: 'Pass filter inputs belong to passes',
+      });
+    if (
+      place.pass_highways?.some(
+        (value, index, values) => index > 0 && values[index - 1]! >= value,
+      )
+    )
+      context.addIssue({
+        code: 'custom',
+        path: ['pass_highways'],
+        message: 'Pass highways must be sorted and unique',
       });
     const expected = new Set(
       place.subtypes.map((subtype) => subtypeKind[subtype]),

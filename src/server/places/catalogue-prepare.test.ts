@@ -75,6 +75,40 @@ const sources: OsmSource[] = [
       { type: 'way', ref: '12', role: 'outer' },
     ],
   },
+  // A pass on a local road and a trail; highway nodes and blank values are
+  // not roads.
+  {
+    osm_type: 'node',
+    osm_id: '9007199254740995',
+    osm_version: 1,
+    osm_timestamp: '2026-10-20T00:00:00Z',
+    tags: { mountain_pass: 'yes', name: 'Road pass' },
+    point: { lon: 8.6, lat: 47 },
+    point_derivation: 'osm_node',
+  },
+  {
+    osm_type: 'node',
+    osm_id: '6',
+    osm_version: 1,
+    osm_timestamp: '2026-10-20T00:00:00Z',
+    tags: { highway: 'crossing' },
+    point: { lon: 8.6, lat: 47.001 },
+    point_derivation: 'osm_node',
+  },
+  ...(
+    [
+      ['13', 'tertiary'],
+      ['14', 'path'],
+      ['15', ' '],
+    ] as const
+  ).map(([id, highway]): OsmSource => ({
+    osm_type: 'way',
+    osm_id: id,
+    osm_version: 1,
+    osm_timestamp: '2026-10-20T00:00:00Z',
+    tags: { highway },
+    node_refs: ['6', '9007199254740995'],
+  })),
 ];
 void test('Node preparation streams fresh PBF snapshots, resolves selective dependencies and binds provenance', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'node-place-prepare-'));
@@ -99,16 +133,23 @@ void test('Node preparation streams fresh PBF snapshots, resolves selective depe
       ...input,
       onProgress: (message) => progress.push(message),
     });
-    assert.equal(result.rows.length, 3);
+    assert.equal(result.rows.length, 4);
     assert.equal(result.manifest.region_id, 'synthetic');
     assert.equal(result.manifest.source.data_as_of, '2026-10-23T00:00:00Z');
     assert.equal(result.rows[0]!.osm_id, '9007199254740993');
     assert.equal(result.manifest.counts.derived_hut_points, 2);
-    assert.deepEqual(result.rows[1]!.location, {
+    assert.deepEqual(result.rows[2]!.location, {
       longitude: 8.05,
       latitude: 47.05,
     });
-    assert.deepEqual(result.rows[2]!.location, result.rows[1]!.location);
+    assert.deepEqual(result.rows[3]!.location, result.rows[2]!.location);
+    // The pass is on a local road over flat synthetic terrain.
+    const pass = result.rows[1]!;
+    assert.deepEqual(pass.pass_highways, ['path', 'tertiary']);
+    assert.equal(pass.pass_amp_m, 0);
+    assert.equal(pass.hidden_reason, 'low_relief_pass');
+    assert.equal(result.rows[0]!.pass_highways, undefined);
+    assert(progress.some((message) => message.includes('1 pass nodes')));
     assert(progress.some((message) => message.includes('member ways')));
     assert(progress.some((message) => message.includes('node positions')));
     assert.deepEqual(await prepareCatalogue(input), result);
@@ -147,7 +188,7 @@ void test('Node preparation streams fresh PBF snapshots, resolves selective depe
       ]),
     );
     const withExclusions = await prepareCatalogue(input);
-    assert.equal(withExclusions.rows.length, 3);
+    assert.equal(withExclusions.rows.length, 4);
     assert.deepEqual(withExclusions.manifest.source.exclusions, [
       {
         osm_type: 'way',

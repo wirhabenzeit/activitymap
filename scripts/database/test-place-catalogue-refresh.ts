@@ -315,7 +315,7 @@ try {
       ...row,
       osm_version: 3,
       ...(index === 1
-        ? { elevation_m: 680, dem_elevation_m: 681.3, pass_amp_m: 20.7 }
+        ? { elevation_m: 680, pass_highways: ['tertiary'], pass_amp_m: 20.7 }
         : {}),
     }));
   const c = createSyntheticCatalogue({
@@ -336,11 +336,19 @@ try {
   assert.equal(returnedHut.retired_at, null);
   // Hidden places stay stored and counted but are never candidates.
   const [hiddenPass] = await reader<
-    { hidden_reason: string | null; pass_amp_m: number | null }[]
-  >`SELECT hidden_reason, pass_amp_m FROM places WHERE osm_id = 9007199254740994`;
+    {
+      hidden_reason: string | null;
+      pass_highways: string[] | null;
+      pass_amp_m: number | null;
+    }[]
+  >`SELECT hidden_reason, pass_highways, pass_amp_m FROM places WHERE osm_id = 9007199254740994`;
   assert.deepEqual(
     { ...hiddenPass },
-    { hidden_reason: 'low_relief_pass', pass_amp_m: 20.7 },
+    {
+      hidden_reason: 'low_relief_pass',
+      pass_highways: ['tertiary'],
+      pass_amp_m: 20.7,
+    },
   );
   assert.equal(c.manifest.counts.filter?.hidden, 1);
   await createPlacesRepository(reader).assertCatalogue(

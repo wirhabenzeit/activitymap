@@ -1,5 +1,5 @@
 {
-  "id": "efd1978b-ad21-4dc0-a83a-248e68a9518a",
+  "id": "fdc0b51a-8301-42f7-b105-4b11fdd9ec06",
   "prevId": "ba0d5969-39fc-40f6-a7db-c95f11b023f1",
   "version": "7",
   "dialect": "postgresql",
@@ -2355,27 +2355,15 @@
           "primaryKey": false,
           "notNull": true
         },
-        "dem_elevation_m": {
-          "name": "dem_elevation_m",
-          "type": "real",
+        "pass_highways": {
+          "name": "pass_highways",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": false
         },
         "pass_amp_m": {
           "name": "pass_amp_m",
           "type": "real",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "peak_prominence_m": {
-          "name": "peak_prominence_m",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "peak_prominence_capped": {
-          "name": "peak_prominence_capped",
-          "type": "boolean",
           "primaryKey": false,
           "notNull": false
         },
@@ -2520,9 +2508,9 @@
           "name": "places_osm_version_check",
           "value": "\"places\".\"osm_version\" > 0"
         },
-        "places_terrain_check": {
-          "name": "places_terrain_check",
-          "value": "(\"places\".\"peak_prominence_m\" IS NULL) = (\"places\".\"peak_prominence_capped\" IS NULL)\n        AND (\"places\".\"pass_amp_m\" IS NULL OR ('pass' = ANY(\"places\".\"kinds\") AND \"places\".\"pass_amp_m\" >= 0 AND \"places\".\"pass_amp_m\" < 'Infinity'::real))\n        AND (\"places\".\"peak_prominence_m\" IS NULL OR ('peak' = ANY(\"places\".\"kinds\") AND \"places\".\"peak_prominence_m\" >= 0 AND \"places\".\"peak_prominence_m\" < 'Infinity'::real))\n        AND (\"places\".\"dem_elevation_m\" IS NULL OR (\"places\".\"dem_elevation_m\" > '-Infinity'::real AND \"places\".\"dem_elevation_m\" < 'Infinity'::real))"
+        "places_pass_filter_check": {
+          "name": "places_pass_filter_check",
+          "value": "(\"places\".\"pass_highways\" IS NULL OR 'pass' = ANY(\"places\".\"kinds\"))\n        AND (\"places\".\"pass_amp_m\" IS NULL OR ('pass' = ANY(\"places\".\"kinds\") AND \"places\".\"pass_amp_m\" >= 0 AND \"places\".\"pass_amp_m\" < 'Infinity'::real))"
         },
         "places_hidden_reason_check": {
           "name": "places_hidden_reason_check",

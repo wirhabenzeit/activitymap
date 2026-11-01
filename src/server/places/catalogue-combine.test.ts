@@ -175,7 +175,7 @@ void test('combining recomputes filter decisions across country extracts', () =>
     names: { name: 'Ricken' },
     tags: { name: 'Ricken', mountain_pass: 'yes' },
     location: { longitude: lon, latitude: 47.25 },
-    elevation_m: 790,
+    pass_highways: ['tertiary'],
     pass_amp_m: amp,
   });
   const swiss = createSyntheticCatalogue({
@@ -207,4 +207,39 @@ void test('combining recomputes filter decisions across country extracts', () =>
       ]),
     /matching normalization\/terrain/,
   );
+});
+void test('combining merges the roads each extract sees at a border pass', () => {
+  // Bielerhöhe: Austria has its road, the Swiss extract only the node.
+  const withRoads =
+    (pass_highways: string[], amp?: number) => (rows: NormalizedPlace[]) => [
+      rows[0]!,
+      {
+        ...rows[1]!,
+        pass_highways,
+        ...(amp === undefined ? {} : { pass_amp_m: amp }),
+      },
+    ];
+  const swiss = createSyntheticCatalogue({
+    regionId: 'switzerland',
+    transformRows: withRoads(['primary']),
+  });
+  const austria = createSyntheticCatalogue({
+    regionId: 'austria',
+    transformRows: withRoads(['tertiary'], 20),
+  });
+  assert.equal(austria.rows[1]!.hidden_reason, 'low_relief_pass');
+  const combined = combineCatalogues('ch-at', [swiss, austria]);
+  assert.deepEqual(combined.rows[1]!.pass_highways, ['primary', 'tertiary']);
+  // A main road keeps the pass, and its amp is no longer an input.
+  assert.equal(combined.rows[1]!.pass_amp_m, undefined);
+  assert.equal(combined.rows[1]!.hidden_reason, undefined);
+
+  const trail = createSyntheticCatalogue({
+    regionId: 'switzerland',
+    transformRows: withRoads(['path']),
+  });
+  const merged = combineCatalogues('ch-at', [trail, austria]);
+  assert.deepEqual(merged.rows[1]!.pass_highways, ['path', 'tertiary']);
+  assert.equal(merged.rows[1]!.pass_amp_m, 20);
+  assert.equal(merged.rows[1]!.hidden_reason, 'low_relief_pass');
 });

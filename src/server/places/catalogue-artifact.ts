@@ -10,7 +10,11 @@ import {
   NORMALIZATION_VERSIONS,
   PLACE_SELECTORS,
 } from './normalize-source';
-import { PLACE_FILTER_POLICY, applyPlaceFilter } from './place-filter';
+import {
+  PLACE_FILTER_POLICY,
+  applyPlaceFilter,
+  passNeedsTerrain,
+} from './place-filter';
 import {
   COPERNICUS_ATTRIBUTION,
   COPERNICUS_GLO30_URL,
@@ -90,7 +94,7 @@ const filterCountsSchema = z.strictObject({
       PLACE_HIDDEN_REASONS.map((reason) => [reason, count]),
     ) as Record<PlaceHiddenReason, typeof count>,
   ),
-  /** Passes and peaks outside the DEM, which no terrain rule can hide. */
+  /** Passes that need terrain but lie outside the DEM, so are never hidden. */
   without_terrain: count,
 });
 const countsSchema = z.strictObject({
@@ -311,8 +315,9 @@ export function catalogueCounts(
         for (const kind of row.kinds) filter.hidden_by_kind[kind]++;
       }
       if (
-        (row.kinds.includes('pass') && row.pass_amp_m === undefined) ||
-        (row.kinds.includes('peak') && row.peak_prominence_m === undefined)
+        row.kinds.includes('pass') &&
+        passNeedsTerrain(row) &&
+        row.pass_amp_m === undefined
       )
         filter.without_terrain++;
     }
@@ -459,14 +464,20 @@ export function validateCatalogue(value: unknown): ValidatedCatalogue {
     rows.some(
       (row) =>
         row.hidden_reason !== undefined ||
-        row.dem_elevation_m !== undefined ||
-        row.pass_amp_m !== undefined ||
-        row.peak_prominence_m !== undefined,
+        row.pass_highways !== undefined ||
+        row.pass_amp_m !== undefined,
     )
   )
     throw new Error(
       'Legacy catalogue rows cannot carry terrain or filter data',
     );
+  if (
+    filtered &&
+    rows.some(
+      (row) => row.kinds.includes('pass') && row.pass_highways === undefined,
+    )
+  )
+    throw new Error('Catalogue passes must list the roads they are on');
   // Rows of the current policy must carry exactly its decisions.
   if (
     manifest.terrain?.filter_policy_version === PLACE_FILTER_POLICY.version &&

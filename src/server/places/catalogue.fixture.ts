@@ -120,7 +120,16 @@ export function createSyntheticCatalogue(
   const transformed = options.transformRows
     ? options.transformRows(initial)
     : initial;
-  const rows = options.legacy ? transformed : applyPlaceFilter(transformed);
+  // Current catalogues list the roads of every pass; the synthetic pass is on none.
+  const rows = options.legacy
+    ? transformed
+    : applyPlaceFilter(
+        transformed.map((row) =>
+          row.kinds.includes('pass')
+            ? { ...row, pass_highways: row.pass_highways ?? [] }
+            : row,
+        ),
+      );
   const serialized = serializeCatalogueRows(rows);
   return validateCatalogue({
     manifest: {

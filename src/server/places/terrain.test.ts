@@ -9,7 +9,6 @@ import {
   circularRunMaxima,
   measureTerrain,
   passTerrain,
-  peakTerrain,
 } from './terrain';
 import { gridAround, syntheticDem } from './terrain.fixture';
 import type { NormalizedPlace } from './types';
@@ -57,7 +56,6 @@ void test('circle test scores a saddle by its weaker side and a slope as zero', 
     lon,
     lat,
   )!;
-  near(saddle.elevationM, 1_000, 0.1);
   assert.equal(saddle.radiusM, 2_500);
   near(saddle.ampM, 0.00002 * 2_500 ** 2, 1);
 
@@ -108,61 +106,7 @@ void test('circle test skips radii that reach missing data', () => {
   );
 });
 
-const cone =
-  (east: number, north: number, top: number, slope: number) =>
-  (e: number, n: number) =>
-    top - slope * Math.hypot(e - east, n - north);
-
-void test('priority flood finds the key col to higher ground', () => {
-  const first = cone(0, 0, 1_000, 0.2),
-    second = cone(1_000, 0, 1_100, 0.2);
-  const result = peakTerrain(
-    gridAround(lon, lat, (e, n) => Math.max(first(e, n), second(e, n))),
-    lon,
-    lat,
-  )!;
-  near(result.summitM, 1_000, 0.1);
-  // Col at 250 m east, 950 m; the 30 m grid places it within one cell.
-  near(result.prominenceM, 50, 6);
-  assert.equal(result.capped, false);
-});
-
-void test('priority flood snaps to the highest cell within 250 m', () => {
-  const bump = cone(200, 0, 1_000, 0.5),
-    higher = cone(2_000, 0, 1_500, 0.4);
-  const result = peakTerrain(
-    gridAround(lon, lat, (e, n) => Math.max(bump(e, n), higher(e, n), 0)),
-    lon,
-    lat,
-  )!;
-  // The 30 m grid has no cell exactly on the bump's summit.
-  near(result.summitM, 1_000, 6);
-  assert.equal(result.capped, false);
-  // Cones meet where 1000 - 0.5d1 = 1500 - 0.4d2, 444 m east at 878 m.
-  near(result.prominenceM, 122, 10);
-});
-
-void test('priority flood caps a peak that dominates its window', () => {
-  const result = peakTerrain(
-    gridAround(lon, lat, cone(0, 0, 2_000, 0.1)),
-    lon,
-    lat,
-  )!;
-  assert.equal(result.capped, true);
-  // The highest edge cell is 3 km away on an axis.
-  near(result.prominenceM, 300, 5);
-
-  const island = peakTerrain(
-    gridAround(lon, lat, (e, n) =>
-      Math.hypot(e, n) > 500 ? Number.NaN : 1_000 - 0.1 * Math.hypot(e, n),
-    ),
-    lon,
-    lat,
-  )!;
-  assert.equal(island.capped, true);
-});
-
-void test('measureTerrain stores decimetre metrics for passes and peaks only', async () => {
+void test('measureTerrain stores a decimetre amp for the selected passes only', async () => {
   const base = {
     osm_type: 'node',
     names: { name: 'x' },
@@ -179,35 +123,39 @@ void test('measureTerrain stores decimetre metrics for passes and peaks only', a
       ...base,
       osm_id: '1',
       kinds: ['pass'],
-      subtypes: ['natural_saddle'],
-      display_name: 'Pass',
+      subtypes: ['road_trail_pass'],
+      display_name: 'Road pass',
+      pass_highways: ['tertiary'],
     },
     {
       ...base,
       osm_id: '2',
-      kinds: ['peak'],
-      subtypes: ['peak'],
-      display_name: 'Peak',
+      kinds: ['pass'],
+      subtypes: ['natural_saddle'],
+      display_name: 'Trail col',
+      pass_highways: ['path'],
       pass_amp_m: 3,
     },
     {
       ...base,
       osm_id: '3',
-      kinds: ['hut'],
-      subtypes: ['alpine_hut'],
-      display_name: 'Hut',
+      kinds: ['peak'],
+      subtypes: ['peak'],
+      display_name: 'Peak',
     },
   ];
   const measured = await measureTerrain(
     rows,
-    syntheticDem((e, n) => 1_000.04 + 0.00002 * (n * n - e * e)),
+    syntheticDem((e, n) => 1_000 + 0.00002 * (n * n - e * e)),
+    { select: (row) => !!row.pass_highways?.includes('tertiary') },
   );
-  assert.equal(measured[0]!.dem_elevation_m, 1_000);
   assert(measured[0]!.pass_amp_m! > 100);
-  assert.equal(measured[0]!.peak_prominence_m, undefined);
-  // A stale metric of another kind is removed.
+  assert.equal(
+    measured[0]!.pass_amp_m,
+    Math.round(measured[0]!.pass_amp_m! * 10) / 10,
+  );
+  // A stale amp on an unselected pass is removed.
   assert.equal(measured[1]!.pass_amp_m, undefined);
-  assert.equal(measured[1]!.peak_prominence_capped, false);
   assert.equal(measured[2], rows[2]);
 });
 

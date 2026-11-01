@@ -1,18 +1,16 @@
 import type { NormalizedPlace } from './types';
 
 /**
- * Local terrain tests on one global DEM. Passes get a circle saddle test,
- * peaks a windowed prominence. Neither needs tiles, national models or a
- * global prominence run; both were evaluated against the per-country research
- * for issue #462 (`scripts/places/saddle-test` on the research branch).
+ * Circle saddle test on one global DEM for passes on minor roads, the only
+ * places a terrain rule decides (see place-filter.ts). It needs no tiles,
+ * national models or prominence run; it was evaluated against the per-country
+ * research for issue #462 (`scripts/places/saddle-test` on the research branch).
  */
 export const TERRAIN_METHOD = Object.freeze({
-  version: 'glo30-circle-flood-v1',
+  version: 'glo30-road-pass-v1',
   dem: 'copernicus-glo-30',
   passCircleRadiiM: Object.freeze([200, 400, 800, 1_500, 2_500]),
   passCircleSamples: 72,
-  peakSnapM: 250,
-  peakWindowM: 3_000,
   metresPerDegreeLatitude: 110_540,
   metresPerDegreeLongitudeAtEquator: 111_320,
 });
@@ -22,11 +20,8 @@ export const COPERNICUS_ATTRIBUTION = Object.freeze({
   text: '© DLR e.V. and Airbus, Copernicus programme',
   url: 'https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model',
 });
-/** Largest distance from a place that any test reads. */
-export const TERRAIN_READ_RADIUS_M = Math.max(
-  TERRAIN_METHOD.peakWindowM,
-  TERRAIN_METHOD.passCircleRadiiM.at(-1)!,
-);
+/** Largest distance from a place that the test reads. */
+export const TERRAIN_READ_RADIUS_M = TERRAIN_METHOD.passCircleRadiiM.at(-1)!;
 
 /**
  * A north-up raster on a regular lon/lat grid. Cell (0, 0) is centred on
@@ -49,19 +44,7 @@ export interface DemSource {
   window(lon: number, lat: number, radiusM: number): Promise<DemGrid>;
 }
 
-export type PassTerrain = {
-  /** DEM height at the node. */
-  elevationM: number;
-  ampM: number;
-  radiusM: number;
-};
-export type PeakTerrain = {
-  /** Highest DEM cell within the snap radius. */
-  summitM: number;
-  prominenceM: number;
-  /** The flood reached the window edge first: prominence is a lower bound. */
-  capped: boolean;
-};
+export type PassTerrain = { ampM: number; radiusM: number };
 
 export function metresPerDegree(latitude: number) {
   return {
@@ -142,7 +125,7 @@ export function passTerrain(
   const centre = bilinear(grid, lon, lat);
   if (!Number.isFinite(centre)) return undefined;
   const scale = metresPerDegree(lat);
-  let best: PassTerrain = { elevationM: centre, ampM: 0, radiusM: 0 };
+  let best: PassTerrain = { ampM: 0, radiusM: 0 };
   const samples = TERRAIN_METHOD.passCircleSamples;
   for (const radius of TERRAIN_METHOD.passCircleRadiiM) {
     const differences: number[] = [];
@@ -170,153 +153,37 @@ export function passTerrain(
       ),
     );
     const amp = Math.min(rise, drop);
-    if (amp > best.ampM)
-      best = { elevationM: centre, ampM: amp, radiusM: radius };
+    if (amp > best.ampM) best = { ampM: amp, radiusM: radius };
   }
   return best;
-}
-
-/** Max-heap of cell indices by height; ties pop the lower index first. */
-class CellHeap {
-  private heights: number[] = [];
-  private cells: number[] = [];
-  get size() {
-    return this.cells.length;
-  }
-  private before(a: number, b: number) {
-    return (
-      this.heights[a]! > this.heights[b]! ||
-      (this.heights[a] === this.heights[b] && this.cells[a]! < this.cells[b]!)
-    );
-  }
-  private swap(a: number, b: number) {
-    [this.heights[a], this.heights[b]] = [this.heights[b]!, this.heights[a]!];
-    [this.cells[a], this.cells[b]] = [this.cells[b]!, this.cells[a]!];
-  }
-  push(height: number, cell: number) {
-    this.heights.push(height);
-    this.cells.push(cell);
-    for (let i = this.cells.length - 1; i > 0;) {
-      const parent = (i - 1) >> 1;
-      if (!this.before(i, parent)) break;
-      this.swap(i, parent);
-      i = parent;
-    }
-  }
-  pop(): [height: number, cell: number] {
-    const top: [number, number] = [this.heights[0]!, this.cells[0]!];
-    const lastHeight = this.heights.pop()!,
-      lastCell = this.cells.pop()!;
-    if (this.cells.length) {
-      this.heights[0] = lastHeight;
-      this.cells[0] = lastCell;
-      for (let i = 0; ;) {
-        const left = 2 * i + 1,
-          right = left + 1;
-        let next = i;
-        if (left < this.cells.length && this.before(left, next)) next = left;
-        if (right < this.cells.length && this.before(right, next)) next = right;
-        if (next === i) break;
-        this.swap(i, next);
-        i = next;
-      }
-    }
-    return top;
-  }
-}
-
-/**
- * Local prominence. Start at the highest cell within the snap radius and flood
- * downhill inside a square window, always taking the highest unvisited
- * neighbour (8-connected priority flood). The lowest height popped before a
- * cell higher than the start is the key col. If the flood reaches the window
- * edge first, the drop to that cell is a lower bound and marked capped.
- */
-export function peakTerrain(
-  grid: DemGrid,
-  lon: number,
-  lat: number,
-): PeakTerrain | undefined {
-  const scale = metresPerDegree(lat);
-  const halfX = TERRAIN_METHOD.peakWindowM / scale.x / grid.dx,
-    halfY = TERRAIN_METHOD.peakWindowM / scale.y / grid.dy;
-  const cx = (lon - grid.west) / grid.dx,
-    cy = (grid.north - lat) / grid.dy;
-  const x0 = Math.max(0, Math.floor(cx - halfX)),
-    x1 = Math.min(grid.width - 1, Math.ceil(cx + halfX)),
-    y0 = Math.max(0, Math.floor(cy - halfY)),
-    y1 = Math.min(grid.height - 1, Math.ceil(cy + halfY));
-  const width = x1 - x0 + 1,
-    height = y1 - y0 + 1;
-  if (width < 3 || height < 3) return undefined;
-  const value = (x: number, y: number) =>
-    grid.values[(y0 + y) * grid.width + x0 + x]!;
-
-  let start = -1,
-    summit = -Infinity;
-  for (let y = 0; y < height; y++)
-    for (let x = 0; x < width; x++) {
-      const dxM = (x0 + x - cx) * grid.dx * scale.x,
-        dyM = (y0 + y - cy) * grid.dy * scale.y;
-      const z = value(x, y);
-      if (Math.hypot(dxM, dyM) <= TERRAIN_METHOD.peakSnapM && z > summit) {
-        summit = z;
-        start = y * width + x;
-      }
-    }
-  if (start < 0) return undefined;
-
-  const seen = new Uint8Array(width * height);
-  seen[start] = 1;
-  const heap = new CellHeap();
-  heap.push(summit, start);
-  let col = summit,
-    capped = true;
-  while (heap.size) {
-    const [z, cell] = heap.pop();
-    if (z > summit) {
-      capped = false;
-      break;
-    }
-    col = Math.min(col, z);
-    const x = cell % width,
-      y = (cell - x) / width;
-    if (x === 0 || y === 0 || x === width - 1 || y === height - 1) break;
-    for (let ny = y - 1; ny <= y + 1; ny++)
-      for (let nx = x - 1; nx <= x + 1; nx++) {
-        const next = ny * width + nx;
-        if (seen[next]) continue;
-        seen[next] = 1;
-        const neighbour = value(nx, ny);
-        if (Number.isFinite(neighbour)) heap.push(neighbour, next);
-      }
-  }
-  // An exhausted heap (an island of data) also leaves the value a lower bound.
-  return { summitM: summit, prominenceM: summit - col, capped };
 }
 
 /** Decimetres, as stored: decisions read the same values a reader sees. */
 const decimetres = (value: number) => Math.round(value * 10) / 10;
 
 /**
- * Add DEM metrics to every pass and peak. Places are visited in spatial
- * order with a few windows in flight so a block cache sees each DEM block
- * while it is still warm. Places outside the DEM keep no metrics.
+ * Add `pass_amp_m` to the selected passes and clear it elsewhere. Passes are
+ * visited in spatial order with a few windows in flight so a block cache sees
+ * each DEM block while it is still warm. Passes outside the DEM get no amp.
  */
 export async function measureTerrain(
   rows: readonly NormalizedPlace[],
   dem: DemSource,
   options: {
+    select: (row: NormalizedPlace) => boolean;
     concurrency?: number;
     onProgress?: (message: string) => void;
-  } = {},
+  },
 ): Promise<NormalizedPlace[]> {
-  const result = [...rows];
-  const pending = rows
+  const result = rows.map((row) => {
+    if (row.pass_amp_m === undefined) return row;
+    const place = { ...row };
+    delete place.pass_amp_m;
+    return place;
+  });
+  const pending = result
     .map((row, index) => ({ row, index }))
-    .filter(
-      ({ row }) => row.kinds.includes('pass') || row.kinds.includes('peak'),
-    )
+    .filter(({ row }) => row.kinds.includes('pass') && options.select(row))
     .sort(
       (a, b) =>
         Math.floor(b.row.location.latitude) -
@@ -326,41 +193,22 @@ export async function measureTerrain(
         b.row.location.latitude - a.row.location.latitude ||
         a.row.location.longitude - b.row.location.longitude,
     );
+  options.onProgress?.(`Measuring terrain for ${pending.length} road passes`);
   let next = 0,
     done = 0;
   const worker = async () => {
     while (next < pending.length) {
       const { row, index } = pending[next++]!;
       const { longitude: lon, latitude: lat } = row.location;
-      const grid = await dem.window(lon, lat, TERRAIN_READ_RADIUS_M);
-      const place = { ...row };
-      delete place.dem_elevation_m;
-      delete place.pass_amp_m;
-      delete place.peak_prominence_m;
-      delete place.peak_prominence_capped;
-      const pass = row.kinds.includes('pass')
-        ? passTerrain(grid, lon, lat)
-        : undefined;
-      const peak = row.kinds.includes('peak')
-        ? peakTerrain(grid, lon, lat)
-        : undefined;
-      const elevation = pass?.elevationM ?? peak?.summitM;
-      result[index] = {
-        ...place,
-        ...(elevation === undefined
-          ? {}
-          : { dem_elevation_m: decimetres(elevation) }),
-        ...(pass ? { pass_amp_m: decimetres(pass.ampM) } : {}),
-        ...(peak
-          ? {
-              peak_prominence_m: decimetres(peak.prominenceM),
-              peak_prominence_capped: peak.capped,
-            }
-          : {}),
-      };
-      if (++done % 5_000 === 0)
+      const pass = passTerrain(
+        await dem.window(lon, lat, TERRAIN_READ_RADIUS_M),
+        lon,
+        lat,
+      );
+      if (pass) result[index] = { ...row, pass_amp_m: decimetres(pass.ampM) };
+      if (++done % 1_000 === 0)
         options.onProgress?.(
-          `Measured terrain for ${done}/${pending.length} places`,
+          `Measured terrain for ${done}/${pending.length} road passes`,
         );
     }
   };

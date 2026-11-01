@@ -187,15 +187,23 @@ void test('filesystem loader validates canonical contents and never accepts part
 
 void test('terrain catalogues bind the filter; legacy catalogues stay readable', () => {
   const lowPass = (rows: NormalizedPlace[]) => {
-    rows[1] = { ...rows[1]!, elevation_m: 680, pass_amp_m: 20 };
+    rows[1] = { ...rows[1]!, pass_highways: ['tertiary'], pass_amp_m: 20 };
     return rows;
   };
   const filtered = createSyntheticCatalogue({ transformRows: lowPass });
   assert.equal(filtered.rows[1]!.hidden_reason, 'low_relief_pass');
   assert.equal(filtered.manifest.counts.filter?.hidden, 1);
   assert.equal(filtered.manifest.counts.filter?.hidden_by_kind.pass, 1);
-  // The fixture peak has no DEM metrics.
-  assert.equal(filtered.manifest.counts.filter?.without_terrain, 1);
+  assert.equal(filtered.manifest.counts.filter?.without_terrain, 0);
+  // A road pass outside the DEM is counted and kept.
+  const outside = createSyntheticCatalogue({
+    transformRows: (rows) => {
+      rows[1] = { ...rows[1]!, pass_highways: ['tertiary'] };
+      return rows;
+    },
+  });
+  assert.equal(outside.rows[1]!.hidden_reason, undefined);
+  assert.equal(outside.manifest.counts.filter?.without_terrain, 1);
   assert.equal(listedPlaceCount(filtered.manifest), 2);
   assert.equal(
     filtered.manifest.terrain?.dem_attribution.text,
@@ -210,6 +218,28 @@ void test('terrain catalogues bind the filter; legacy catalogues stay readable',
     return kept;
   });
   const serialized = serializeCatalogueRows(tampered);
+  const withoutRoads = filtered.rows.map((row) => {
+    const copy = { ...row };
+    delete copy.pass_highways;
+    return copy;
+  });
+  const withoutRoadsText = serializeCatalogueRows(withoutRoads);
+  assert.throws(
+    () =>
+      validateCatalogue({
+        ...filtered,
+        rows: withoutRoads,
+        manifest: {
+          ...filtered.manifest,
+          artifact: {
+            ...filtered.manifest.artifact,
+            sha256: sha256(withoutRoadsText),
+            bytes: Buffer.byteLength(withoutRoadsText),
+          },
+        },
+      }),
+    /roads they are on/,
+  );
   assert.throws(
     () =>
       validateCatalogue({
