@@ -12,11 +12,13 @@ import {
 import { combineCatalogues } from '../../src/server/places/catalogue-combine';
 import { importCatalogue } from '../../src/server/places/catalogue-import';
 import { refreshCatalogue } from '../../src/server/places/catalogue-refresh';
+import { V1_PLACE_REGION } from '../../src/server/places/catalogue-regions';
 import { createSyntheticCatalogue } from '../../src/server/places/catalogue.fixture';
 import {
   loadPublishedCatalogue,
   loadServingCatalogue,
 } from '../../src/server/places/published-catalogue';
+import type { NormalizedPlace } from '../../src/server/places/types';
 import { createPlacesRepository } from '../../src/server/repositories/places';
 
 const target = resolveMigrationTarget(process.env);
@@ -307,11 +309,20 @@ try {
     /region/,
   );
   assert.deepEqual(await state(), afterB);
+  // The pass becomes a lowland crossing that the catalogue filter hides.
+  const versionThree = (rows: NormalizedPlace[]) =>
+    rows.map((row, index) => ({
+      ...row,
+      osm_version: 3,
+      ...(index === 1
+        ? { elevation_m: 680, pass_highways: ['tertiary'], pass_amp_m: 20.7 }
+        : {}),
+    }));
   const c = createSyntheticCatalogue({
     sourceSha256: '2'.repeat(64),
     dataAsOf: '2026-10-22T20:23:47Z',
     regionId,
-    transformRows: (rows) => rows.map((row) => ({ ...row, osm_version: 3 })),
+    transformRows: versionThree,
   });
   const restored = await refreshCatalogue(writer, c, {
     ...nextOptions,
@@ -323,6 +334,48 @@ try {
   const returnedHut = afterC.rows.find((row) => row.osm_type === 'way')!;
   assert.equal(returnedHut.id, originalHut.id);
   assert.equal(returnedHut.retired_at, null);
+  // Hidden places stay stored and counted but are never candidates.
+  const [hiddenPass] = await reader<
+    {
+      hidden_reason: string | null;
+      pass_highways: string[] | null;
+      pass_amp_m: number | null;
+    }[]
+  >`SELECT hidden_reason, pass_highways, pass_amp_m FROM places WHERE osm_id = 9007199254740994`;
+  assert.deepEqual(
+    { ...hiddenPass },
+    {
+      hidden_reason: 'low_relief_pass',
+      pass_highways: ['tertiary'],
+      pass_amp_m: 20.7,
+    },
+  );
+  assert.equal(c.manifest.counts.filter?.hidden, 1);
+  await createPlacesRepository(reader).assertCatalogue(
+    c.manifest.catalogue_snapshot_id,
+    3,
+  );
+  const hiddenDiscovery = await createPlacesRepository(reader).discover({
+    catalogueSnapshotId: c.manifest.catalogue_snapshot_id,
+    coverage: c.coverage,
+    geometry: {
+      type: 'GeometryCollection',
+      geometries: [{ type: 'Point', coordinates: [8.2, 46.9] }],
+    },
+    radiusM: 300,
+    limit: 10,
+  });
+  assert.equal(hiddenDiscovery.candidates.length, 0, 'hidden pass excluded');
+  assert.equal(
+    (
+      await refreshCatalogue(writer, c, {
+        ...nextOptions,
+        expectedCurrentSnapshot: c.manifest.catalogue_snapshot_id,
+      })
+    ).status,
+    'unchanged',
+    'terrain metrics round-trip through PostgreSQL real',
+  );
   // Fresh region publication and independent retirement scope.
   const other = createSyntheticCatalogue({
     sourceSha256: '3'.repeat(64),
@@ -370,7 +423,7 @@ try {
   const neighbor = createSyntheticCatalogue({
     regionId: 'neighbor',
     dataAsOf: c.manifest.source.data_as_of,
-    transformRows: (rows) => rows.map((row) => ({ ...row, osm_version: 3 })),
+    transformRows: versionThree,
   });
   const combined = combineCatalogues('ch-at-it', [c, neighbor]);
   const consolidatedOptions = {
@@ -443,8 +496,56 @@ try {
     consolidated.rows.filter((row) => row.catalogue_region === 'other'),
     beforeConsolidation.rows.filter((row) => row.catalogue_region === 'other'),
   );
+
+  // A larger catalogue replaces ch-at-it in turn and is served first.
+  const farther = createSyntheticCatalogue({
+    regionId: 'farther',
+    dataAsOf: c.manifest.source.data_as_of,
+    transformRows: (rows) =>
+      versionThree(rows).map((row) => ({
+        ...row,
+        osm_id: (BigInt(row.osm_id) + 5000n).toString(),
+      })),
+  });
+  const larger = combineCatalogues(V1_PLACE_REGION, [c, neighbor, farther]);
+  const largerOptions = {
+    regionId: V1_PLACE_REGION,
+    dryRun: false,
+    expectedCurrentSnapshot: null,
+    replaceRegion: {
+      regionId: 'ch-at-it',
+      expectedSnapshotId: combined.manifest.catalogue_snapshot_id,
+    },
+  };
+  await assert.rejects(
+    refreshCatalogue(
+      writer,
+      combineCatalogues(V1_PLACE_REGION, [neighbor, farther]),
+      largerOptions,
+    ),
+    /include the replaced region/,
+    'a replacement must keep every country of the replaced catalogue',
+  );
+  await refreshCatalogue(writer, larger, largerOptions);
+  const afterLarger = await state();
+  assert.deepEqual(
+    afterLarger.rows
+      .filter((row) => row.catalogue_region === V1_PLACE_REGION)
+      .filter((row) => !row.osm_id.startsWith('9007199254745'))
+      .map((row) => row.id)
+      .sort(),
+    consolidated.rows
+      .filter((row) => row.catalogue_region === 'ch-at-it')
+      .map((row) => row.id)
+      .sort(),
+  );
+  assert.equal(
+    (await loadServingCatalogue(reader)).manifest.catalogue_snapshot_id,
+    larger.manifest.catalogue_snapshot_id,
+    'v1-places is preferred over ch-at-it',
+  );
   console.log(
-    'Refresh proof passed: frozen adoption, dry run, A→A, A→B, stable IDs, retirement/reactivation, rollback, concurrent publishers, consistent readers, coverage/discovery, source ordering, region isolation and atomic region consolidation.',
+    'Refresh proof passed: frozen adoption, dry run, A→A, A→B, stable IDs, retirement/reactivation, hidden places, rollback, concurrent publishers, consistent readers, coverage/discovery, source ordering, region isolation and atomic region consolidation, including ch-at-it into v1-places.',
   );
 } finally {
   await Promise.all([writer.end(), second.end(), reader.end()]);

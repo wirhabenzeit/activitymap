@@ -31,6 +31,9 @@ export function sourceKey(row: Pick<NormalizedPlace, 'osm_type' | 'osm_id'>) {
   return `${row.osm_type}/${row.osm_id}`;
 }
 
+const float4 = (value: number | undefined) =>
+  value === undefined ? null : Math.fround(value);
+
 export function comparablePlace(row: NormalizedPlace): string {
   return JSON.stringify({
     osm_type: row.osm_type,
@@ -48,6 +51,9 @@ export function comparablePlace(row: NormalizedPlace): string {
     elevation_m:
       row.elevation_m === undefined ? null : Math.fround(row.elevation_m),
     tags: orderedRecord(row.tags),
+    pass_highways: row.pass_highways ?? null,
+    pass_amp_m: float4(row.pass_amp_m),
+    hidden_reason: row.hidden_reason ?? null,
     osm_version: row.osm_version,
     osm_updated_at: new Date(row.osm_updated_at).toISOString(),
     point_derivation: row.point_derivation,
@@ -67,6 +73,9 @@ export function fromStored(row: typeof places.$inferSelect): NormalizedPlace {
     location: row.location,
     ...(row.elevationM === null ? {} : { elevation_m: row.elevationM }),
     tags: row.tags,
+    ...(row.passHighways === null ? {} : { pass_highways: row.passHighways }),
+    ...(row.passAmpM === null ? {} : { pass_amp_m: row.passAmpM }),
+    ...(row.hiddenReason === null ? {} : { hidden_reason: row.hiddenReason }),
     osm_version: row.osmVersion,
     osm_updated_at: row.osmUpdatedAt.toISOString(),
     point_derivation: row.pointDerivation,
@@ -87,6 +96,9 @@ export function toInsert(row: NormalizedPlace): typeof places.$inferInsert {
     elevationM:
       row.elevation_m === undefined ? null : Math.fround(row.elevation_m),
     tags: row.tags,
+    passHighways: row.pass_highways ?? null,
+    passAmpM: float4(row.pass_amp_m),
+    hiddenReason: row.hidden_reason ?? null,
     osmVersion: row.osm_version,
     osmUpdatedAt: new Date(row.osm_updated_at),
     pointDerivation: row.point_derivation,

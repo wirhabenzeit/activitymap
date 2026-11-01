@@ -353,6 +353,15 @@ export function PlaceDebugLayer({
               >
                 © OpenStreetMap contributors
               </a>
+              ,{' '}
+              <a
+                className="underline"
+                href="https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model"
+                target="_blank"
+                rel="noreferrer"
+              >
+                © DLR e.V. and Airbus, Copernicus programme
+              </a>
             </p>
             {data?.candidates.length === 0 && data.status === 'complete' && (
               <p>No catalogue places found in the discovery corridor.</p>

@@ -11,7 +11,13 @@ import {
   placeTagsSchema,
 } from './types';
 
-export const NORMALIZATION_VERSION = 'osm-places-v1';
+/** v2 adds DEM metrics and the noise filter (`terrain` in the manifest). v1
+ * artifacts stay readable so published catalogues keep serving until refresh. */
+export const NORMALIZATION_VERSION = 'osm-places-v2';
+export const NORMALIZATION_VERSIONS = [
+  'osm-places-v1',
+  NORMALIZATION_VERSION,
+] as const;
 export const PLACE_SELECTORS = {
   peak: { natural: 'peak' },
   saddle: { natural: 'saddle' },

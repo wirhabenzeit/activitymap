@@ -17,7 +17,10 @@ import type { Actor } from '~/server/auth/actor';
 import { db } from '~/server/db';
 import type { ActivityLocationHint } from '~/server/places/activity-clusters';
 import { canonicalJson } from '~/server/places/catalogue-artifact';
-import { V1_PLACE_REGION } from '~/server/places/catalogue-regions';
+import {
+  isServingRegion,
+  servingRegionRank,
+} from '~/server/places/catalogue-regions';
 import {
   MATCHING_RECIPE,
   MATCHING_RECIPE_HASH,
@@ -32,7 +35,7 @@ import {
 } from './place-matching-input';
 
 const KEY = 'activity-place-matching';
-const preferredCatalogue = sql`(SELECT snapshot_id FROM place_catalogues WHERE active AND region_id IN (${V1_PLACE_REGION}, 'switzerland') ORDER BY CASE WHEN region_id=${V1_PLACE_REGION} THEN 0 ELSE 1 END LIMIT 1)`;
+const preferredCatalogue = sql`(SELECT snapshot_id FROM place_catalogues WHERE active AND ${isServingRegion(sql`region_id`)} ORDER BY ${servingRegionRank(sql`region_id`)} LIMIT 1)`;
 const connected = sql`EXISTS (SELECT 1 FROM account c WHERE c."userId"=u.id AND c."providerId"='strava' AND c."accountId"=u.athlete_id::text AND c.revoked_at IS NULL AND c.scheduled_erasure_at IS NULL AND (COALESCE(c."accessToken",c.access_token,'')<>'' OR COALESCE(c."refreshToken",c.refresh_token,'')<>''))`;
 export type MatchingCandidate = {
   activityId: string;

@@ -30,6 +30,7 @@ import { geographyPoint } from '~/server/db/geography-point';
 import type { CatalogueManifest } from '~/server/places/catalogue-artifact';
 import type { CoverageGeometry } from '~/server/places/coverage';
 import {
+  PLACE_HIDDEN_REASONS,
   PLACE_KINDS,
   PLACE_POINT_DERIVATIONS,
   PLACE_RELATIONS,
@@ -359,6 +360,11 @@ export const places = pgTable(
     pointDerivation: text('point_derivation', {
       enum: PLACE_POINT_DERIVATIONS,
     }).notNull(),
+    // Noise filter inputs and decision (docs/place-catalogue-refresh.md).
+    // Hidden places stay stored for reference integrity but are never read.
+    passHighways: text('pass_highways').array(),
+    passAmpM: real('pass_amp_m'),
+    hiddenReason: text('hidden_reason', { enum: PLACE_HIDDEN_REASONS }),
     normalizationVersion: text('normalization_version').notNull(),
     catalogueSnapshotId: text('catalogue_snapshot_id').notNull(),
     catalogueRegion: text('catalogue_region'),
@@ -413,6 +419,17 @@ export const places = pgTable(
       sql`${table.elevationM} > '-Infinity'::real AND ${table.elevationM} < 'Infinity'::real`,
     ),
     check('places_osm_version_check', sql`${table.osmVersion} > 0`),
+    check(
+      'places_pass_filter_check',
+      sql`(${table.passHighways} IS NULL OR 'pass' = ANY(${table.kinds}))
+        AND (${table.passAmpM} IS NULL OR ('pass' = ANY(${table.kinds}) AND ${table.passAmpM} >= 0 AND ${table.passAmpM} < 'Infinity'::real))`,
+    ),
+    check(
+      'places_hidden_reason_check',
+      sql`${table.hiddenReason} IS NULL OR ${table.hiddenReason} IN (${sql.raw(
+        PLACE_HIDDEN_REASONS.map((reason) => `'${reason}'`).join(', '),
+      )})`,
+    ),
     check(
       'places_point_derivation_check',
       sql`(${table.osmType} = 'node' AND ${table.pointDerivation} = 'osm_node')

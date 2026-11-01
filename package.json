@@ -133,6 +133,7 @@
     "embla-carousel-react": "^8.6.0",
     "eslint-plugin-next": "^0.0.0",
     "file-saver": "^2.0.5",
+    "geotiff": "3.0.5",
     "htl": "^1.0.0",
     "immer": "^11.2.9",
     "lucide-react": "^1.61.0",

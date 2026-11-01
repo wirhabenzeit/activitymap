@@ -100,9 +100,15 @@ export async function refreshCatalogue(
         );
       if (replaced?.snapshotId !== options.replaceRegion.expectedSnapshotId)
         throw new Error('Replaced region changed since dry run');
+      // A replaced combined catalogue (ch-at-it) must have all its countries.
+      const replacedRegions = replaced.manifest.components?.map(
+        (component) => component.region_id,
+      ) ?? [previousRegion];
       if (
-        !catalogue.manifest.components?.some(
-          (component) => component.region_id === previousRegion,
+        !replacedRegions.every((region) =>
+          catalogue.manifest.components?.some(
+            (component) => component.region_id === region,
+          ),
         ) ||
         !catalogueCoverageContains(catalogue.coverage, replaced.coverage)
       )
@@ -258,6 +264,14 @@ export async function refreshCatalogue(
           })
           .slice(0, 20)
           .map((row) => ({ source: sourceKey(row), name: row.display_name })),
+        hidden: catalogue.rows
+          .filter((row) => row.hidden_reason)
+          .slice(0, 20)
+          .map((row) => ({
+            source: sourceKey(row),
+            name: row.display_name,
+            reason: row.hidden_reason,
+          })),
         retired: retired.slice(0, 20).map((row) => ({
           source: sourceKey(fromStored(row)),
           name: row.displayName,
@@ -298,6 +312,9 @@ export async function refreshCatalogue(
             location: sql`excluded.location`,
             elevationM: sql`excluded.elevation_m`,
             tags: sql`excluded.tags`,
+            passHighways: sql`excluded.pass_highways`,
+            passAmpM: sql`excluded.pass_amp_m`,
+            hiddenReason: sql`excluded.hidden_reason`,
             osmVersion: sql`excluded.osm_version`,
             osmUpdatedAt: sql`excluded.osm_updated_at`,
             pointDerivation: sql`excluded.point_derivation`,

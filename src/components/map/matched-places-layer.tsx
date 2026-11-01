@@ -330,7 +330,8 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
         id="matched-places"
         type="geojson"
         data={data}
-        attribution='<a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>'
+        // Places come from OSM; Copernicus terrain decides which are listed.
+        attribution='<a href="https://www.openstreetmap.org/copyright" target="_blank">© OpenStreetMap contributors</a>, <a href="https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model" target="_blank">© DLR e.V. and Airbus, Copernicus programme</a>'
       >
         <Layer
           id="matched-places-points"
