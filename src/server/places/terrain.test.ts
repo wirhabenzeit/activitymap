@@ -229,6 +229,9 @@ void test('Copernicus tiles use point pixels and widen towards the poles', () =>
   assert.equal(tileCell(8.2, 47).row, 0);
   assert.equal(tileCell(-0.5, -0.5).name, tileName(-1, -1));
   assert.equal(tileCell(8.5, 50.5).width, 2400);
+  // Across the antimeridian a window continues in the westernmost tile.
+  assert.equal(tileCell(180.0001, -44).name, tileName(-45, -180));
+  assert.equal(tileCell(-180.001, -44).name, tileName(-45, 179));
   assert.equal(longitudeSpacing(49.9), 1 / 3600);
   near(longitudeSpacing(-55), 1.5 / 3600, 1e-15);
 });

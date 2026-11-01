@@ -49,6 +49,9 @@ void test('passes with elevation-only or generic names are hidden unless notable
     'q. 2699',
     'P2650',
     'Pt. 2345',
+    'Saddle',
+    'Skaret',
+    'перевал',
     '1557',
     '1557 m',
     'Forcella',
@@ -148,6 +151,9 @@ void test('huts named as Alm, inn or forestry hut are hidden without club or inf
     'Forsthütte',
     'Jagdhütte am Bach',
     'Bergrestaurant',
+    'Vollaseter',
+    'Bergerie de Lavu',
+    'Auberge du Col',
   ])
     assert.equal(hutReason(hut(name)), 'non_mountain_hut', name);
   assert.equal(
@@ -159,6 +165,16 @@ void test('huts named as Alm, inn or forestry hut are hidden without club or inf
     null,
   );
   assert.equal(hutReason(hut('Hochalm', { capacity: '20' })), null);
+  assert.equal(
+    hutReason(hut('Vollaseter', { operator: 'Den Norske Turistforening' })),
+    null,
+  );
+  assert.equal(hutReason(hut('Bergerie de Lavu', { operator: 'CAF' })), null);
+  assert.equal(hutReason(hut('Hut Alm', { operator: 'DOC' })), null);
+  assert.equal(
+    hutReason(hut('Hochalm', { operator: 'Docteur Alm' })),
+    'non_mountain_hut',
+  );
   assert.equal(
     hutReason(hut('Hochalm', { 'contact:website': 'https://example.invalid' })),
     null,

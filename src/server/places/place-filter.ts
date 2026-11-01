@@ -17,14 +17,16 @@ export const PLACE_FILTER_POLICY = Object.freeze({
   notableTags: Object.freeze(['wikipedia', 'wikidata']),
   /** Names that are only an elevation label or a generic word. */
   genericPassName:
-    '^(?:(?:q|quota|p|pt|pkt|punkt|cota|kote)\\.?\\s*)?\\d{3,4}(?:\\s*m)?$|^(?:sea|pass|passo|sattel|col|colle|forcella|bocchetta|joch)$',
+    '^(?:(?:q|quota|p|pt|pkt|punkt|cota|kote)\\.?\\s*)?\\d{3,4}(?:\\s*m)?$|^(?:sea|pass|passo|sattel|col|colle|forcella|bocchetta|joch|saddle|the saddle|skar|skaret|перевал|ашуу)$',
   /** OSM `ele`, else DEM height. */
   passMinElevationM: 1_200,
   passMinAmpM: 60,
   /** Same-name passes this close are one pass: duplicate nodes must agree. */
   passMergeDistanceM: 1_000,
+  /** Alpine clubs, plus DNT (Norway), DOC and NZAC (New Zealand) and
+   * CAF/FFCAM (France). Short new acronyms must be whole words. */
   hutClubOperator:
-    'SAC|CAS|DAV|ÖAV|OeAV|Alpenverein|CAI|Club Alpino|AVS|Naturfreunde|SAT|Alpenclub|Alpine Club|SEM|SAF',
+    'SAC|CAS|DAV|ÖAV|OeAV|Alpenverein|CAI|Club Alpino|AVS|Naturfreunde|SAT|Alpenclub|Alpine Club|SEM|SAF|Turistforening|Department of Conservation|Club Alpin|(?<![\\p{L}\\p{N}])(?:DNT|DOC|NZAC|CAF|FFCAM)(?![\\p{L}\\p{N}])',
   hutInfoTags: Object.freeze([
     'capacity',
     'beds',
@@ -38,9 +40,10 @@ export const PLACE_FILTER_POLICY = Object.freeze({
     'phone',
     'contact:phone',
   ]),
-  /** Alm, farm, restaurant, inn, forestry, hunting and private huts. */
+  /** Alm, summer farm (Norwegian seter/støl, French bergerie), restaurant,
+   * inn, forestry, hunting and private huts. */
   hutNonMountainName:
-    '(?<![\\p{L}\\p{N}_])alm(?![\\p{L}\\p{N}_])|alm$|(?<![\\p{L}\\p{N}_])alpe?(?![\\p{L}\\p{N}_])|^alp |malga|casera|baita|forst|forestal|forestière|jagd|caccia|ristoro|gasthaus|gasthof|albergo|restaurant|stadel|privat',
+    '(?<![\\p{L}\\p{N}_])alm(?![\\p{L}\\p{N}_])|alm$|(?<![\\p{L}\\p{N}_])alpe?(?![\\p{L}\\p{N}_])|^alp |malga|casera|baita|forst|forestal|forestière|jagd|caccia|ristoro|gasthaus|gasthof|albergo|restaurant|stadel|privat|seter|setra|sæter|støl|bergerie|buvette|auberge',
 });
 
 const genericPassName = new RegExp(PLACE_FILTER_POLICY.genericPassName, 'iu');

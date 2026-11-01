@@ -5,6 +5,7 @@ import type postgres from 'postgres';
 import { z } from 'zod';
 
 import { decodeGeographyPoint } from '~/server/db/geography-point';
+import { MAX_CATALOGUE_ROWS } from '~/server/places/catalogue-artifact';
 import {
   type CoverageGeometry,
   parseCoverageGeometry,
@@ -108,7 +109,7 @@ export function createPlaceDiscoveryRepository(database: {
       expectedCount: number,
     ): Promise<void> {
       z.string().trim().min(1).parse(catalogueSnapshotId);
-      z.number().int().positive().max(100_000).parse(expectedCount);
+      z.number().int().positive().max(MAX_CATALOGUE_ROWS).parse(expectedCount);
       const result = await database.execute<{
         total: number;
         matching: number;

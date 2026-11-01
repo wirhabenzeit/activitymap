@@ -51,7 +51,10 @@ export function tileCell(lon: number, lat: number): TileCell {
   // The band, and hence the spacing, belongs to the tile, not the coordinate.
   const spacing = longitudeSpacing(south < 0 ? north : south);
   const width = Math.round(1 / spacing);
-  const globalCol = Math.round((lon + 180) / spacing);
+  // Windows near the antimeridian continue on the other side.
+  const columns = 360 * width;
+  const globalCol =
+    ((Math.round((lon + 180) / spacing) % columns) + columns) % columns;
   const westIndex = Math.floor(globalCol / width);
   const west = -180 + westIndex;
   const col = globalCol - westIndex * width;
@@ -269,11 +272,12 @@ export class CopernicusDem implements DemSource {
     return { west, north, dx, dy, width, height, values };
   }
 
-  /** S3 occasionally stalls or drops parallel range reads. Retry for about a
-   * minute, then fail the preparation. */
+  /** S3 occasionally stalls or drops parallel range reads, and a laptop can
+   * lose its network briefly. Retry for about four minutes, then fail the
+   * preparation. */
   private async retry<T>(
     operation: () => Promise<T>,
-    attempts = 6,
+    attempts = 8,
   ): Promise<T> {
     for (let attempt = 1; ; attempt++) {
       try {

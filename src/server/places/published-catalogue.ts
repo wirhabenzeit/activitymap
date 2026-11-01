@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { type PostgresJsDatabase, drizzle } from 'drizzle-orm/postgres-js';
 import type postgres from 'postgres';
 
@@ -12,7 +12,7 @@ import {
   catalogueSnapshotId,
   sha256,
 } from './catalogue-artifact';
-import { V1_PLACE_REGION } from './catalogue-regions';
+import { isServingRegion, servingRegionRank } from './catalogue-regions';
 import { parseCoverageGeometry } from './coverage';
 
 export type PublishedCatalogue = Pick<
@@ -75,12 +75,10 @@ export async function loadServingCatalogue(
     .where(
       and(
         eq(placeCatalogues.active, true),
-        inArray(placeCatalogues.regionId, [V1_PLACE_REGION, 'switzerland']),
+        isServingRegion(placeCatalogues.regionId),
       ),
     )
-    .orderBy(
-      sql`CASE WHEN ${placeCatalogues.regionId} = ${V1_PLACE_REGION} THEN 0 ELSE 1 END`,
-    )
+    .orderBy(servingRegionRank(placeCatalogues.regionId))
     .limit(1);
   if (!preferred) throw new Error('No published v1 place catalogue');
   return loadPublishedCatalogue(client, preferred.regionId, database);

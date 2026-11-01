@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, inArray, sql } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 import {
   type ActivityPlacesResponse,
@@ -21,7 +21,10 @@ import {
   activityStreams,
   placeCatalogues,
 } from '~/server/db/schema';
-import { V1_PLACE_REGION } from '~/server/places/catalogue-regions';
+import {
+  isServingRegion,
+  servingRegionRank,
+} from '~/server/places/catalogue-regions';
 import { validatePublishedCatalogue } from '~/server/places/published-catalogue';
 
 import {
@@ -83,15 +86,10 @@ export function createOnDemandPlacesRepository(database: typeof db = db) {
             .where(
               and(
                 eq(placeCatalogues.active, true),
-                inArray(placeCatalogues.regionId, [
-                  V1_PLACE_REGION,
-                  'switzerland',
-                ]),
+                isServingRegion(placeCatalogues.regionId),
               ),
             )
-            .orderBy(
-              sql`CASE WHEN ${placeCatalogues.regionId} = ${V1_PLACE_REGION} THEN 0 ELSE 1 END`,
-            )
+            .orderBy(servingRegionRank(placeCatalogues.regionId))
             .limit(1);
           if (row) {
             catalogue = validatePublishedCatalogue(row);

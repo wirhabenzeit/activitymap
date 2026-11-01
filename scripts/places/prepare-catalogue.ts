@@ -16,6 +16,7 @@ import {
   serializeCatalogueRows,
 } from '../../src/server/places/catalogue-artifact';
 import { prepareCatalogue } from '../../src/server/places/catalogue-prepare';
+import { GEOFABRIK_PATHS } from '../../src/server/places/catalogue-regions';
 import { CopernicusDem } from '../../src/server/places/copernicus-dem';
 
 const { values } = parseArgs({
@@ -29,7 +30,7 @@ const { values } = parseArgs({
     help: { type: 'boolean' },
   },
 });
-async function download(url: string, path: string) {
+function geofabrikUrl(url: string) {
   const parsed = new URL(url);
   if (
     parsed.protocol !== 'https:' ||
@@ -37,10 +38,23 @@ async function download(url: string, path: string) {
     parsed.port
   )
     throw new Error('Downloads require an HTTPS download.geofabrik.de URL');
-  const response = await fetch(url, {
+  return parsed;
+}
+async function download(url: string, path: string) {
+  // `-latest` redirects to the dated extract; follow only Geofabrik redirects.
+  let response = await fetch(geofabrikUrl(url), {
     signal: AbortSignal.timeout(30 * 60 * 1000),
-    redirect: 'error',
+    redirect: 'manual',
   });
+  for (let hops = 0; response.status >= 300 && response.status < 400; hops++) {
+    const location = response.headers.get('location');
+    if (!location || hops >= 3)
+      throw new Error(`Download redirect failed (${response.status})`);
+    response = await fetch(geofabrikUrl(new URL(location, url).href), {
+      signal: AbortSignal.timeout(30 * 60 * 1000),
+      redirect: 'manual',
+    });
+  }
   if (!response.ok || !response.body)
     throw new Error(`Download failed (${response.status})`);
   const file = await open(path, 'wx');
@@ -57,7 +71,7 @@ async function download(url: string, path: string) {
 }
 if (values.help) {
   console.log(
-    'Prepare a complete regional catalogue without database credentials:\n  pnpm places:prepare --region switzerland --out output/places/switzerland-YYYY-MM-DD\nSwitzerland, Austria and Italy have predefined Geofabrik URLs. Other regions require --source-url and --coverage-url. Supply --pbf and --poly together to use local source files. Pass and peak terrain is read from Copernicus GLO-30 with HTTP range requests. Runs entirely in TypeScript/Node; no external tools are required.',
+    `Prepare a complete regional catalogue without database credentials:\n  pnpm places:prepare --region switzerland --out output/places/switzerland-YYYY-MM-DD\nThe V1 countries (${Object.keys(GEOFABRIK_PATHS).join(', ')}) have predefined Geofabrik URLs. Other regions require --source-url and --coverage-url. Supply --pbf and --poly together to use local source files. Pass and peak terrain is read from Copernicus GLO-30 with HTTP range requests. Runs entirely in TypeScript/Node; no external tools are required.`,
   );
 } else {
   const started = performance.now();
@@ -65,17 +79,15 @@ if (values.help) {
   if (!values.out) throw new Error('--out is required');
   if (!!values.pbf !== !!values.poly)
     throw new Error('Supply both --pbf and --poly, or neither');
-  const knownCountry = ['switzerland', 'austria', 'italy'].includes(region);
+  const path = Object.hasOwn(GEOFABRIK_PATHS, region)
+    ? GEOFABRIK_PATHS[region as keyof typeof GEOFABRIK_PATHS]
+    : undefined;
   const sourceUrl =
     values['source-url'] ??
-    (knownCountry
-      ? `https://download.geofabrik.de/europe/${region}-latest.osm.pbf`
-      : undefined);
+    (path ? `https://download.geofabrik.de/${path}-latest.osm.pbf` : undefined);
   const coverageUrl =
     values['coverage-url'] ??
-    (knownCountry
-      ? `https://download.geofabrik.de/europe/${region}.poly`
-      : undefined);
+    (path ? `https://download.geofabrik.de/${path}.poly` : undefined);
   if (!sourceUrl || !coverageUrl)
     throw new Error(
       'Other regions require explicit --source-url and --coverage-url',

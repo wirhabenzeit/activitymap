@@ -100,9 +100,15 @@ export async function refreshCatalogue(
         );
       if (replaced?.snapshotId !== options.replaceRegion.expectedSnapshotId)
         throw new Error('Replaced region changed since dry run');
+      // A replaced combined catalogue (ch-at-it) must have all its countries.
+      const replacedRegions = replaced.manifest.components?.map(
+        (component) => component.region_id,
+      ) ?? [previousRegion];
       if (
-        !catalogue.manifest.components?.some(
-          (component) => component.region_id === previousRegion,
+        !replacedRegions.every((region) =>
+          catalogue.manifest.components?.some(
+            (component) => component.region_id === region,
+          ),
         ) ||
         !catalogueCoverageContains(catalogue.coverage, replaced.coverage)
       )

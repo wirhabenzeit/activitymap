@@ -24,6 +24,9 @@ import {
 } from './types';
 
 export const CATALOGUE_FORMAT_VERSION = 1;
+/** The combined eight-country catalogue has about 200,000 rows (~120 MB). */
+export const MAX_CATALOGUE_ROWS = 400_000;
+const MAX_ARTIFACT_BYTES = 268_435_456;
 export const COVERAGE_NOTE =
   'Provider boundary downloaded with the snapshot, not a guaranteed historical boundary or strict national border. Complete crossing features can lie outside it; coverage completeness must be evaluated separately.';
 export const CATALOGUE_ATTRIBUTION = {
@@ -334,9 +337,12 @@ export function validateCatalogue(value: unknown): ValidatedCatalogue {
   const input = z
     .strictObject({
       manifest: catalogueManifestSchema,
-      rows: z.array(normalizedPlaceSchema).min(1).max(100_000),
+      rows: z.array(normalizedPlaceSchema).min(1).max(MAX_CATALOGUE_ROWS),
       coverage: z.unknown(),
-      duplicates: z.array(catalogueDuplicateSchema).max(100_000).optional(),
+      duplicates: z
+        .array(catalogueDuplicateSchema)
+        .max(MAX_CATALOGUE_ROWS)
+        .optional(),
     })
     .parse(value);
   const coverage = parseCoverageGeometry(input.coverage);
@@ -505,7 +511,7 @@ export async function loadCatalogueArtifact(
     JSON.parse(await readBounded(join(directory, 'manifest.json'), 1_048_576)),
   );
   const [contents, coverageText] = await Promise.all([
-    readBounded(join(directory, manifest.artifact.file), 67_108_864),
+    readBounded(join(directory, manifest.artifact.file), MAX_ARTIFACT_BYTES),
     readBounded(join(directory, manifest.coverage.file), 2_097_152),
   ]);
   if (
@@ -530,7 +536,7 @@ export async function loadCatalogueArtifact(
           duplicates: await (async () => {
             const text = await readBounded(
               join(directory, manifest.deduplication!.file),
-              67_108_864,
+              MAX_ARTIFACT_BYTES,
             );
             if (
               text &&

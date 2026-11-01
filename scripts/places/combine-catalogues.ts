@@ -20,7 +20,7 @@ const { values } = parseArgs({
 });
 if (values.help)
   console.log(
-    'Combine aligned country catalogues, deduplicating shared OSM objects and unioning coverage:\n  pnpm places:combine --region ch-at-it --input <switzerland-artifact> --input <austria-artifact> --input <italy-artifact> --out <new-directory>',
+    'Combine aligned country catalogues, deduplicating shared OSM objects and unioning coverage:\n  pnpm places:combine --region v1-places --input <country-artifact> --input <country-artifact> ... --out <new-directory>',
   );
 else {
   if (!values.region || !values.out || !values.input || values.input.length < 2)

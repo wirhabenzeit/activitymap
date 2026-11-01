@@ -63,9 +63,11 @@ malformed geometry within the supported building model fails preparation.
 Unnamed/unselected objects are excluded by the existing normalization policy.
 
 To prepare already downloaded files, supply both `--pbf /path/to/snapshot.osm.pbf`
-and `--poly /path/to/coverage.poly`. Switzerland, Austria and Italy have predefined
-URLs; other regions require `--source-url` and `--coverage-url`. Downloads are
-restricted to HTTPS `download.geofabrik.de` URLs. Terrain is always read from
+and `--poly /path/to/coverage.poly`. The V1 countries in
+`src/server/places/catalogue-regions.ts` have predefined URLs; other regions
+require `--source-url` and `--coverage-url`. Downloads are restricted to HTTPS
+`download.geofabrik.de` URLs, following only redirects that stay on that host
+(`-latest` redirects to the dated extract). Terrain is always read from
 the public Copernicus bucket, so preparation needs network access even with
 local source files.
 The region identifier is included in new artifact identities. Old frozen v1
@@ -169,7 +171,7 @@ cloud-optimized GeoTIFFs from `https://copernicus-dem-30m.s3.amazonaws.com/`
 with HTTP range requests, using the pinned `geotiff` package. Only the internal
 1024 × 1024 blocks around passes and peaks are fetched and decoded, with a
 bounded in-memory cache; nothing is written to disk. Missing 1° tiles (HTTP 404)
-are sea and give no metrics. Every other failure is retried for about a minute
+are sea and give no metrics. Every other failure is retried for about four minutes
 and then fails the preparation, so a network problem cannot silently become
 "no terrain". The DEM is a surface model (forest canopy included) on a 1
 arc-second grid with pixel-is-point registration.
@@ -276,7 +278,8 @@ has completed. In the existing Swiss development setup the original is
 `output/places/switzerland-2026-10-20`.
 
 `loadPublishedCatalogue` reads the active manifest and coverage for an explicit
-region. `loadServingCatalogue` prefers `ch-at-it` and falls back to `switzerland`;
+region. `loadServingCatalogue` prefers `v1-places`, then `ch-at-it`, then
+`switzerland` (`SERVING_PLACE_REGIONS`);
 an explicit region argument disables fallback. Both accept the caller's database
 transaction, so a concurrent refresh cannot mix catalogue versions with the
 associated place reads. Integration with selected-activity matching remains on
@@ -354,10 +357,11 @@ metadata/dependencies, corrupt input, concave buildings, courtyard holes and
 split/reversed multipolygon rings. Preparation verification does not publish to
 production or modify activity evidence.
 
-## Switzerland, Austria and Italy
+## Switzerland, Austria and Italy (`ch-at-it`)
 
-V1 uses a combined `ch-at-it` serving catalogue built from the three complete
-country extracts. Prepare each country separately; all three have predefined
+The first combined serving catalogue, `ch-at-it`, was built from the three
+complete country extracts. It is replaced by `v1-places` (below); the workflow
+is the same. Prepare each country separately; all three have predefined
 Geofabrik download URLs:
 
 ```sh

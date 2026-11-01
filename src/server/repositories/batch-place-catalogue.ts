@@ -5,7 +5,10 @@ import { sql } from 'drizzle-orm';
 import type { PlaceMatchingSnapshot } from '~/server/application/batch-activity-places';
 import { db } from '~/server/db';
 import { listedPlaceCount } from '~/server/places/catalogue-artifact';
-import { V1_PLACE_REGION } from '~/server/places/catalogue-regions';
+import {
+  isServingRegion,
+  servingRegionRank,
+} from '~/server/places/catalogue-regions';
 import { validatePublishedCatalogue } from '~/server/places/published-catalogue';
 import {
   type PlaceQueryWindow,
@@ -41,8 +44,8 @@ export async function loadBatchPlaceCatalogue(
       const row = (
         await tx.execute<CatalogueRow>(sql`
       SELECT snapshot_id, manifest, coverage FROM place_catalogues
-      WHERE active AND region_id IN (${V1_PLACE_REGION}, 'switzerland')
-      ORDER BY CASE WHEN region_id = ${V1_PLACE_REGION} THEN 0 ELSE 1 END LIMIT 1
+      WHERE active AND ${isServingRegion(sql`region_id`)}
+      ORDER BY ${servingRegionRank(sql`region_id`)} LIMIT 1
     `)
       ).rows[0];
       if (!row) throw new Error('No published place catalogue');

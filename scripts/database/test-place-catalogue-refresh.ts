@@ -12,6 +12,7 @@ import {
 import { combineCatalogues } from '../../src/server/places/catalogue-combine';
 import { importCatalogue } from '../../src/server/places/catalogue-import';
 import { refreshCatalogue } from '../../src/server/places/catalogue-refresh';
+import { V1_PLACE_REGION } from '../../src/server/places/catalogue-regions';
 import { createSyntheticCatalogue } from '../../src/server/places/catalogue.fixture';
 import {
   loadPublishedCatalogue,
@@ -487,8 +488,56 @@ try {
     consolidated.rows.filter((row) => row.catalogue_region === 'other'),
     beforeConsolidation.rows.filter((row) => row.catalogue_region === 'other'),
   );
+
+  // A larger catalogue replaces ch-at-it in turn and is served first.
+  const farther = createSyntheticCatalogue({
+    regionId: 'farther',
+    dataAsOf: c.manifest.source.data_as_of,
+    transformRows: (rows) =>
+      versionThree(rows).map((row) => ({
+        ...row,
+        osm_id: (BigInt(row.osm_id) + 5000n).toString(),
+      })),
+  });
+  const larger = combineCatalogues(V1_PLACE_REGION, [c, neighbor, farther]);
+  const largerOptions = {
+    regionId: V1_PLACE_REGION,
+    dryRun: false,
+    expectedCurrentSnapshot: null,
+    replaceRegion: {
+      regionId: 'ch-at-it',
+      expectedSnapshotId: combined.manifest.catalogue_snapshot_id,
+    },
+  };
+  await assert.rejects(
+    refreshCatalogue(
+      writer,
+      combineCatalogues(V1_PLACE_REGION, [neighbor, farther]),
+      largerOptions,
+    ),
+    /include the replaced region/,
+    'a replacement must keep every country of the replaced catalogue',
+  );
+  await refreshCatalogue(writer, larger, largerOptions);
+  const afterLarger = await state();
+  assert.deepEqual(
+    afterLarger.rows
+      .filter((row) => row.catalogue_region === V1_PLACE_REGION)
+      .filter((row) => !row.osm_id.startsWith('9007199254745'))
+      .map((row) => row.id)
+      .sort(),
+    consolidated.rows
+      .filter((row) => row.catalogue_region === 'ch-at-it')
+      .map((row) => row.id)
+      .sort(),
+  );
+  assert.equal(
+    (await loadServingCatalogue(reader)).manifest.catalogue_snapshot_id,
+    larger.manifest.catalogue_snapshot_id,
+    'v1-places is preferred over ch-at-it',
+  );
   console.log(
-    'Refresh proof passed: frozen adoption, dry run, A→A, A→B, stable IDs, retirement/reactivation, hidden places, rollback, concurrent publishers, consistent readers, coverage/discovery, source ordering, region isolation and atomic region consolidation.',
+    'Refresh proof passed: frozen adoption, dry run, A→A, A→B, stable IDs, retirement/reactivation, hidden places, rollback, concurrent publishers, consistent readers, coverage/discovery, source ordering, region isolation and atomic region consolidation, including ch-at-it into v1-places.',
   );
 } finally {
   await Promise.all([writer.end(), second.end(), reader.end()]);
