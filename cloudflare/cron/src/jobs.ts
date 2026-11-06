@@ -1,10 +1,7 @@
 /**
  * Which ActivityMap cron endpoints each Cloudflare cron trigger calls, and in
- * what order. GitHub Actions schedules were skipped most of the time (a
- * five-minute schedule ran about five times a day), so a Cloudflare Worker
- * now triggers the same `/api/cron/*` routes on time. The endpoints keep
- * their own leases, hourly caps and pause switches; calling one twice, or
- * from GitHub as well, is safe.
+ * what order. The endpoints enforce their own leases, hourly caps and pause
+ * switches.
  */
 export interface CronJob {
   name: string;
@@ -30,7 +27,6 @@ export const SCHEDULES: Record<string, CronJob[]> = {
       path: '/api/cron/erase-revoked-athletes',
     },
   ],
-  // Same order and bounds as `.github/workflows/reconcile-strava-summaries.yml`.
   '37 * * * *': [
     {
       name: 'reconcile-strava-summaries',
@@ -48,8 +44,7 @@ export const SCHEDULES: Record<string, CronJob[]> = {
       path: '/api/cron/backfill-activity-photos',
     },
   ],
-  // Fills in full activity details (and older history) for summary-only
-  // activities; same bounds as `.github/workflows/fetch.yml`.
+  // Fills in full activity details for summaries and imports older history.
   '47 * * * *': [
     {
       name: 'sync-activities',
@@ -73,7 +68,7 @@ const RESPONSE_PREVIEW_CHARS = 500;
 
 /**
  * Runs one trigger's jobs in order. A failed job doesn't stop the jobs after
- * it, except those that `require` it, matching the GitHub workflow.
+ * it, except those that `require` it.
  */
 export async function runSchedule(
   cron: string,

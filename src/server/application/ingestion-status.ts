@@ -9,8 +9,8 @@ import {
 import type { BackgroundJobRun, IngestionOutcomeRow } from '~/server/db/schema';
 import type { IngestionSnapshot } from '~/server/repositories/ingestion-status';
 import {
-  INGESTION_JOB_MAX_RUN_MS,
   INGESTION_JOBS,
+  INGESTION_JOB_MAX_RUN_MS,
   type IngestionJob,
 } from '~/server/strava/ingestion-policy';
 import {
@@ -18,16 +18,15 @@ import {
   SUMMARY_RECONCILIATION_INTERVAL_MS,
 } from '~/server/strava/summary-reconciliation';
 
-/** A missed run or two is normal (deploys, GitHub delays); more is a stall. */
+/** The grace period allows for delayed starts around deployments. */
 const STALL_GRACE_MS = 15 * 60_000;
 
 export type JobState = 'active' | 'disabled' | 'stalled' | 'unknown';
 
 /**
- * What a job's heartbeat says about its scheduler. Neither the GitHub
- * schedule nor its repository variables are observable from the server, so a
- * job that has never reported is `unknown` and one that stopped reporting is
- * `stalled`; neither is proof of the other gate's setting.
+ * What a job's heartbeat says about its scheduler. The server observes
+ * Cloudflare through job runs. A job that has never reported is `unknown`
+ * and one that stopped reporting is `stalled`.
  */
 export function jobState(
   job: IngestionJob,
