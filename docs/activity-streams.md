@@ -278,11 +278,9 @@ and raw stream arrays. CI runs the PostgreSQL proof and Swift decoding check.
 reconciliation, so each worker retains its own 45-second work budget within a
 60-second route. The new endpoint requires the existing `x-cron-secret`,
 `VERCEL_ENV=production` and `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`. Backfill
-is enabled by default in production; no additional Vercel or GitHub opt-in is
-required, and Preview and local environments remain disabled. Setting
-`ACTIVITYMAP_STREAM_BACKFILL=disabled` in Vercel pauses the endpoint; setting the
-GitHub repository variable of that name to `disabled` pauses the scheduled step.
-An absent switch leaves backfill enabled. The cron and Settings use the same
+is enabled by default in production. Set
+`ACTIVITYMAP_STREAM_BACKFILL=disabled` in the Vercel Production environment
+and redeploy to pause backfill. The cron and Settings use the same
 server configuration check, including the external-effects guard.
 A failed reconciliation step skips backfill for that hour.
 
@@ -365,17 +363,16 @@ GROUP BY terminal, last_error->>'code';
 
 1. Deploy #182/#183 lifecycle handling and migrations 0010–0013 first. Verify
    invalidation, deletion and deauthorization before scheduled stream ingestion.
-2. Apply additive migrations 0014–0015 and deploy this worker with both enable switches
-   unset. Existing raw data needs no transformation or backfill migration.
-3. Set the production server enable switch, then invoke a **one-activity** canary
-   with the existing cron secret. Check counters, stored raw samples, and the
-   owned API/change-feed metadata. A canary fixes that hour's smaller allowance.
-4. Set the GitHub repository variable to enable the hourly step at the next hour.
-   Observe actual fetched counts, backlog, terminal errors, quota stops, and
-   ordinary Strava traffic. At five/hour, 120/day is only a theoretical ceiling.
-5. Unset the GitHub variable to pause scheduling. Unset the server environment
-   switch and redeploy to disable manual invocations too. Already-running work
-   remains bounded by its deadline; do not delete progress rows to pause.
+2. Apply additive migrations 0014–0015 before deploying the endpoint. Existing
+   raw data needs no transformation or backfill migration.
+3. For a manual **one-activity** canary, use the existing cron secret. Check
+   counters, stored raw samples, and the owned API/change-feed metadata. If the
+   canary is first in its UTC hour, its smaller allowance applies for that hour.
+4. Check the next hourly Cloudflare run for fetched counts, backlog, terminal
+   errors, quota stops, and ordinary Strava traffic.
+5. To pause scheduled and manual backfill, set
+   `ACTIVITYMAP_STREAM_BACKFILL=disabled` in Vercel Production and redeploy.
+   Already-running work remains bounded by its deadline.
 
 ```sh
 curl --fail-with-body --silent --show-error --max-time 60 \

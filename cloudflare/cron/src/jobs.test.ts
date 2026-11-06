@@ -75,7 +75,7 @@ void test('jobs are POSTed in order with the cron secret and their bounds', asyn
   assert.ok(results.every(isSuccess));
 });
 
-void test('the hourly detail sync keeps the bounds of the GitHub workflow', async () => {
+void test('the hourly detail sync requests a bounded batch', async () => {
   const { fetch, calls } = fakeFetch({});
   await runSchedule('47 * * * *', { ...options, fetch });
   assert.deepEqual(

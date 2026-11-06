@@ -3,7 +3,7 @@
 ActivityMap's background work runs through authenticated `POST /api/cron/*`
 routes on the production deployment. Each route checks the `x-cron-secret`
 header against `CRON_SECRET` and enforces its own leases, hourly caps and pause
-switches, so calling a route twice, or from two schedulers, is safe.
+switches.
 
 ## Scheduler: Cloudflare Worker
 
@@ -73,12 +73,6 @@ no public URL (`workers_dev` and preview URLs are off). Pause a backfill with
 its server-side switch (`ACTIVITYMAP_STREAM_BACKFILL=disabled`,
 `ACTIVITYMAP_PHOTO_BACKFILL=disabled`); pause everything by disabling the
 Worker's triggers in the Cloudflare dashboard.
-
-## GitHub Actions
-
-The workflows in `.github/workflows` keep their schedules as a fallback for
-now, and `workflow_dispatch` for manual runs. `fetch.yml` triggers
-`sync-activities` twice a day as a fallback for the Worker's hourly run.
 
 ## Admin dashboard
 
