@@ -12,22 +12,14 @@ export interface CronJob {
 }
 
 export const SCHEDULES: Record<string, CronJob[]> = {
-  // New and changed activities arrive through Strava webhooks.
-  '*/5 * * * *': [
-    { name: 'drain-webhook-inbox', path: '/api/cron/drain-webhook-inbox' },
-  ],
-  // Offset from the webhook trigger so the quarter-hour drain finishes first.
-  '2,17,32,47 * * * *': [
-    { name: 'match-activity-places', path: '/api/cron/match-activity-places' },
-  ],
+  // Run the jobs together so Postgres can suspend between batches.
   '0 * * * *': [
+    { name: 'drain-webhook-inbox', path: '/api/cron/drain-webhook-inbox' },
     { name: 'cleanup-rate-limits', path: '/api/cron/cleanup-rate-limits' },
     {
       name: 'erase-revoked-athletes',
       path: '/api/cron/erase-revoked-athletes',
     },
-  ],
-  '37 * * * *': [
     {
       name: 'reconcile-strava-summaries',
       path: '/api/cron/reconcile-strava-summaries',
@@ -43,9 +35,6 @@ export const SCHEDULES: Record<string, CronJob[]> = {
       name: 'backfill-activity-photos',
       path: '/api/cron/backfill-activity-photos',
     },
-  ],
-  // Fills in full activity details for summaries and imports older history.
-  '47 * * * *': [
     {
       name: 'sync-activities',
       path: '/api/cron/sync-activities',
@@ -55,6 +44,8 @@ export const SCHEDULES: Record<string, CronJob[]> = {
         minActivitiesThreshold: 2,
       },
     },
+    // Match after ingestion so this run can use newly stored streams.
+    { name: 'match-activity-places', path: '/api/cron/match-activity-places' },
   ],
 };
 

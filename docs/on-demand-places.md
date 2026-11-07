@@ -273,9 +273,8 @@ update/delete of cached rows or geographic invalidation queue is required.
 New and removed places must be published with their updated manifest count;
 matching fails closed if the loaded catalogue disagrees with its manifest.
 
-`POST /api/cron/match-activity-places` runs every fifteen minutes at :02, :17,
-:32 and :47, independently of the five-minute webhook drain. The two-minute
-offset normally lets that drain finish first. It requires the existing
+`POST /api/cron/match-activity-places` runs at the end of the hourly batch,
+after the webhook drain and Strava ingestion jobs. It requires the existing
 production/external-effects guards and `CRON_SECRET`. A run takes an expiring
 120-second global lease, processes at most 500 stale activities by default (maximum
 2,000), and stops starting work at a 40-second deadline. It reads a bounded

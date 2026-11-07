@@ -12,17 +12,22 @@ GitHub Actions schedules proved unreliable. Between 26 September and
 five-minute webhook drain had a median gap of 4.3 hours between runs, and the
 hourly jobs gaps of up to 9.7 hours. Vercel's Hobby plan only allows daily
 cron jobs. The `activitymap-cron` Worker in `cloudflare/cron` therefore
-triggers the routes on time:
+starts one batch on the hour (`0 * * * *`, UTC), so Postgres can suspend
+between batches. The Worker calls these jobs in order:
 
-| Cron (UTC)           | Jobs, in order                                                                                                      |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| `*/5 * * * *`        | `drain-webhook-inbox`                                                                                               |
-| `2,17,32,47 * * * *` | `match-activity-places`                                                                                             |
-| `0 * * * *`          | `cleanup-rate-limits`, `erase-revoked-athletes`                                                                     |
-| `37 * * * *`         | `reconcile-strava-summaries`, `backfill-activity-streams` (only if reconcile succeeded), `backfill-activity-photos` |
-| `47 * * * *`         | `sync-activities` (up to 30 detail refreshes and 30 older activities)                                               |
+1. `drain-webhook-inbox`
+2. `cleanup-rate-limits`
+3. `erase-revoked-athletes`
+4. `reconcile-strava-summaries`
+5. `backfill-activity-streams` (only if reconciliation succeeded)
+6. `backfill-activity-photos`
+7. `sync-activities` (up to 30 detail refreshes and 30 older activities)
+8. `match-activity-places`
 
-Place matching runs every fifteen minutes (at :02, :17, :32 and :47) over up to 500 stale activities, with a
+Incoming Strava webhooks still get an immediate processing attempt. The hourly
+drain handles pending events and retries that are due.
+
+Place matching runs over up to 500 stale activities per hour, with a
 40-second work deadline and a recoverable two-minute lease. A bounded metadata
 pool of 2,000 candidates lets each group choose nearby activities while starting
 in freshness order. It uses only stored streams, loads nearby places once per
@@ -44,9 +49,6 @@ crashed or failed write leaves the work pending. The manual **Run encounter
 matching** GitHub workflow runs one bounded cycle from reviewed `main`; it adds
 no recurring schedule and keeps credentials in the existing Actions secret.
 See [matching versions and invalidation](on-demand-places.md#persistent-checks-versions-and-invalidation).
-
-Hourly housekeeping shares one trigger to keep the Worker within the account's
-five-trigger limit. Each job still runs if the other fails.
 
 Each hour, stream backfill handles up to 40 activities (60 Strava requests)
 and photo catch-up up to 20 activities (48 requests). With Strava's 3,000
