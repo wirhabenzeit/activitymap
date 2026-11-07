@@ -13,7 +13,8 @@ traffic is being limited repeatedly or failures affect many users.
 
 ## Webhook backlog
 
-Cloudflare runs `drain-webhook-inbox` every five minutes.
+Cloudflare runs `drain-webhook-inbox` once per hour. Incoming Strava webhooks
+still get an immediate processing attempt.
 
 1. Look for missing or failed runs in Cron Events for `activitymap-cron`.
 2. Production logs for `[Cron] drain-webhook-inbox complete` or `failed`.

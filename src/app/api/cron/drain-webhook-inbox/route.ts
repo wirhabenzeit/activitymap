@@ -52,7 +52,7 @@ const drainInbox = withJobLog(
  * header matching `CRON_SECRET`, and `externalEffectsEnabled()` fails
  * closed outside Production.
  *
- * The Cloudflare Worker calls this route every five minutes.
+ * The Cloudflare Worker calls this route once per hour.
  */
 export async function POST(request: NextRequest) {
   if (!externalEffectsEnabled()) {

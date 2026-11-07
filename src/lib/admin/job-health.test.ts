@@ -14,7 +14,7 @@ void test('a job that ran recently and succeeded is ok', () => {
   const rows = byJob([
     {
       job: 'drain-webhook-inbox',
-      startedAt: minutesAgo(4),
+      startedAt: minutesAgo(59),
       status: 'completed',
     },
   ]);
@@ -25,7 +25,7 @@ void test('a job is late after two and a half missed intervals', () => {
   const rows = byJob([
     {
       job: 'drain-webhook-inbox',
-      startedAt: minutesAgo(13),
+      startedAt: minutesAgo(151),
       status: 'completed',
     },
     {
@@ -44,14 +44,14 @@ void test('a job is late after two and a half missed intervals', () => {
   assert.equal(rows['cleanup-rate-limits']!.health, 'late');
 });
 
-void test('matching health allows its fifteen-minute schedule', () => {
+void test('matching health allows its hourly schedule', () => {
   const run = (minutes: number): JobRun => ({
     job: 'match-activity-places',
     startedAt: minutesAgo(minutes),
     status: 'completed',
   });
-  assert.equal(byJob([run(30)])['match-activity-places']!.health, 'ok');
-  assert.equal(byJob([run(38)])['match-activity-places']!.health, 'late');
+  assert.equal(byJob([run(150)])['match-activity-places']!.health, 'ok');
+  assert.equal(byJob([run(151)])['match-activity-places']!.health, 'late');
 });
 
 void test('the latest run decides failing and disabled, and failures are counted', () => {
