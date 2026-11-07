@@ -2032,6 +2032,11 @@
       "arguments": {},
       "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
     },
+    "stats.tile.visitedPlaces": {
+      "source": "Most visited places",
+      "arguments": {},
+      "context": "Stats tile title; identifies the same drilldown and accessible chart on web and iOS."
+    },
     "stats.tile.totals": {
       "source": "Totals",
       "arguments": {},
@@ -2069,6 +2074,11 @@
     },
     "stats.toggle.sportMix": {
       "source": "Range",
+      "arguments": {},
+      "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
+    },
+    "stats.toggle.visitedPlaces": {
+      "source": "Place type",
       "arguments": {},
       "context": "Stats tile option group label; options are semantic IDs and preserve selected state."
     },

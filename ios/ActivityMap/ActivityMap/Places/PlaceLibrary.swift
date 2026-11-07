@@ -20,6 +20,13 @@ nonisolated struct LibraryPlace: Identifiable, Equatable, Sendable {
     }
 }
 
+nonisolated struct PlaceEvidence: Sendable {
+    let activityID: Int
+    let start: Date
+    let status: String
+    let places: [ActivityMapAPI.MatchedPlace]
+}
+
 /// Local read model of current synchronized bundles. No catalogue download or
 /// per-activity reads. Override composition for #463 belongs at effectivePlaces.
 nonisolated struct PlaceLibrary: Sendable {
@@ -44,25 +51,36 @@ nonisolated struct PlaceLibrary: Sendable {
         activity.placeMatches?.status == .complete ? activity.placeMatches!.places : []
     }
 
+    /// One activity's validated result status and effective places. Stats
+    /// rankings carry this off the main actor into the same aggregation.
+    @MainActor static func evidence(_ activity: Activity, userID: String?) -> PlaceEvidence {
+        let result = activity.placeMatches
+        let valid = userID != nil && result?.userID == userID && result?.activityID == String(activity.id)
+        return PlaceEvidence(activityID: activity.id, start: activity.startDateLocal,
+                             status: valid ? result!.status.rawValue : "unknown",
+                             places: valid ? effectivePlaces(activity) : [])
+    }
+
     @MainActor init(activities: [Activity], userID: String?, libraryComplete: Bool = true) {
+        self.init(evidence: activities.map { Self.evidence($0, userID: userID) }, userID: userID, libraryComplete: libraryComplete)
+    }
+
+    init(evidence: [PlaceEvidence], userID: String?, libraryComplete: Bool = true) {
         self.userID = userID
         var byID: [String: LibraryPlace] = [:]
         var statuses: [String: Int] = [:]
-        for activity in activities {
-            let result = activity.placeMatches
-            let valid = userID != nil && result?.userID == userID && result?.activityID == String(activity.id)
-            statuses[valid ? result!.status.rawValue : "unknown", default: 0] += 1
-            guard valid else { continue }
-            for place in Self.effectivePlaces(activity) {
+        for activity in evidence {
+            statuses[activity.status, default: 0] += 1
+            for place in activity.places {
                 if var existing = byID[place.id] {
-                    existing.activityIDs.insert(activity.id)
+                    existing.activityIDs.insert(activity.activityID)
                     let kinds = Array(Set(existing.place.kinds + place.kinds)).sorted { $0.rawValue < $1.rawValue }
                     existing.place = ActivityMapAPI.MatchedPlace(id: existing.id, name: existing.place.name, kinds: kinds, longitude: existing.place.longitude, latitude: existing.place.latitude, elevationM: existing.place.elevationM, visits: existing.place.visits)
-                    existing.firstVisit = min(existing.firstVisit, activity.startDateLocal)
-                    existing.latestVisit = max(existing.latestVisit, activity.startDateLocal)
+                    existing.firstVisit = min(existing.firstVisit, activity.start)
+                    existing.latestVisit = max(existing.latestVisit, activity.start)
                     byID[place.id] = existing
                 } else {
-                    byID[place.id] = LibraryPlace(place: place, activityIDs: [activity.id], firstVisit: activity.startDateLocal, latestVisit: activity.startDateLocal)
+                    byID[place.id] = LibraryPlace(place: place, activityIDs: [activity.activityID], firstVisit: activity.start, latestVisit: activity.start)
                 }
             }
         }

@@ -1,7 +1,7 @@
 'use client';
 
 import { MapPin, Search, X } from 'lucide-react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   useDeferredValue,
   useEffect,
@@ -11,7 +11,7 @@ import {
   useState,
 } from 'react';
 
-import { PlaceDetail } from '~/components/place-detail';
+import { PlaceDetail, useShowPlace } from '~/components/place-detail';
 import { PlaceSymbol } from '~/components/place-symbol';
 import { Input } from '~/components/ui/input';
 import { useDisplayUnits } from '~/hooks/use-display-preferences';
@@ -21,7 +21,6 @@ import { type LibraryPlace, searchLibraryPlaces } from '~/lib/place-library';
 import { primaryPlaceKind } from '~/lib/place-symbols';
 import { measurementScale, measurementUnit } from '~/lib/units';
 import { store, useShallowStore } from '~/store';
-import { applyFilters } from '~/store/filter';
 
 export function PlaceSearch() {
   const { search, place, setSearch, setPlace } = useShallowStore((state) => ({
@@ -32,7 +31,7 @@ export function PlaceSearch() {
   }));
   const { library, activities } = usePlaceLibrary();
   const units = useDisplayUnits();
-  const router = useRouter();
+  const showPlace = useShowPlace(activities);
   const pathname = usePathname();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -80,21 +79,11 @@ export function PlaceSearch() {
     setActive(0);
   };
   const show = (destination: 'map' | 'list') => {
-    if (!detail) return;
-    choose(detail, false);
-    store.getState().setOnlySelected(false);
-    if (destination === 'map') {
-      store.setState({ showPlaces: true });
-      store
-        .getState()
-        .requestRouteFit(
-          (activities ?? [])
-            .filter((activity) => applyFilters(store.getState(), activity))
-            .map((activity) => activity.id),
-        );
-    }
+    if (!detail || !library.userId) return;
+    showPlace(detail, library.userId, destination);
+    setOpen(false);
+    setActive(0);
     setInspection(undefined);
-    router.push(destination === 'map' ? '/map' : '/list');
   };
   return (
     <div

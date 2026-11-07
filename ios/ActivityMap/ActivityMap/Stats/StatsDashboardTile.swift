@@ -11,7 +11,9 @@ extension StatsDashboardTile {
                   expanded: expanded, filtered: store.activeStatsFilterCount > 0,
                   toggleExpansion: toggleExpansion, openActivity: openActivity,
                   detailScreen: detailScreen,
-                  inspection: dashboard.inspection(tile.id))
+                  inspection: dashboard.inspection(tile.id),
+                  placeHistoryComplete: store.placeHistoryComplete,
+                  openPlace: { dashboard.inspectedPlaceID = $0 })
     }
 }
 
@@ -33,11 +35,14 @@ struct StatsDashboardTile: View {
     var openActivity: (Int) -> Void = { _ in }
     var detailScreen = false
     var inspection: StatsTileInspection? = nil
+    var placeHistoryComplete = true
+    var openPlace: (String) -> Void = { _ in }
 
     init(tile: StatsTileDefinition, option: Binding<StatsToggleOption?>, displayed: StatsDashboardFace?,
          today: Int, expanded: Bool, filtered: Bool, toggleExpansion: @escaping () -> Void,
          openActivity: @escaping (Int) -> Void = { _ in }, detailScreen: Bool = false,
-         inspection: StatsTileInspection? = nil, volumeRange: StatsHistoryRange = .weeks) {
+         inspection: StatsTileInspection? = nil, volumeRange: StatsHistoryRange = .weeks,
+         placeHistoryComplete: Bool = true, openPlace: @escaping (String) -> Void = { _ in }) {
         self.tile = tile
         self.option = option.wrappedValue
         selectOption = { option.wrappedValue = $0 }
@@ -49,6 +54,8 @@ struct StatsDashboardTile: View {
         self.openActivity = openActivity
         self.detailScreen = detailScreen
         self.inspection = inspection
+        self.placeHistoryComplete = placeHistoryComplete
+        self.openPlace = openPlace
         _volumeRange = State(initialValue: volumeRange)
     }
 
@@ -63,7 +70,7 @@ struct StatsDashboardTile: View {
         }
         return $volumeRange
     }
-    private var pilot: Bool { [StatsTileID.thisWeek, .weeklyVolume, .monthVsLastMonth, .yearToDate, .distanceVsElevation, .sportMix, .yearPace, .typicalWeek, .records, .activityCalendar].contains(tile.id) }
+    private var pilot: Bool { [StatsTileID.thisWeek, .weeklyVolume, .monthVsLastMonth, .yearToDate, .distanceVsElevation, .sportMix, .yearPace, .typicalWeek, .records, .visitedPlaces, .activityCalendar].contains(tile.id) }
     private var displayedOption: StatsToggleOption? { displayed?.option ?? option }
     private var metric: StatsMetric { displayedOption.flatMap { StatsMetric(rawValue: $0.rawValue) } ?? .distance }
     private var year: Int { StatsDates.parts(today).year! }
@@ -79,6 +86,7 @@ struct StatsDashboardTile: View {
         case .yearToDate: expanded ? "\(year.formatted(.number.grouping(.never).locale(locale))) vs \((year - 1).formatted(.number.grouping(.never).locale(locale)))" : "\(year.formatted(.number.grouping(.never).locale(locale))) so far · vs \((year - 1).formatted(.number.grouping(.never).locale(locale)))"
         case .yearPace: "\(year.formatted(.number.grouping(.never).locale(locale))) projection"
         case .records: expanded ? "Personal bests" : "This year"
+        case .visitedPlaces: expanded ? "By activities" : displayedOption == .hut ? "This year · routes passing nearby" : "This year · by activities"
         case .activityCalendar: ""
         case .sportMix: !expanded ? "Moving time" : displayedOption == .allTime ? "All time by moving time" : "\(year.formatted(.number.grouping(.never).locale(locale))) by moving time"
         case .typicalWeek: "Per week · last 11 full weeks"
@@ -228,6 +236,10 @@ struct StatsDashboardTile: View {
                 hillinessChart(climb)
                 StatsExpansionReveal(expanded: expanded) { hillinessActivities(activities) }
             }
+        case .places(let current, let allTime):
+            StatsPlacesDetail(current: current, allTime: allTime,
+                              kind: ActivityMapAPI.PlaceKind(rawValue: displayedOption?.rawValue ?? "") ?? .peak,
+                              year: year, expanded: expanded, historyComplete: placeHistoryComplete, openPlace: openPlace)
         case .typical(let week):
             headline(week.totals.time, unit: "h / week", decimals: 1)
             note("\(StatsDisplay.number(week.activeDays, decimals: 1, locale: locale)) active days / week")

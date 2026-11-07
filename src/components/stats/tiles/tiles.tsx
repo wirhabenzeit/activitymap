@@ -65,6 +65,7 @@ import {
 } from './format';
 import { CalendarHistory, VolumeHistory } from './history';
 import { MonthRhythm, YearRhythm } from './period-rhythm';
+import { type StatsPlaceSource, visitedPlacesView } from './places';
 
 export type TileContext = {
   units?: UnitSystem;
@@ -89,6 +90,8 @@ export type TileContext = {
     selectedDay: number | null;
     setSelectedDay: (day: number | null) => void;
   };
+  // Synced place bundles for Most visited places; absent without an account.
+  places?: StatsPlaceSource;
 };
 
 export type TileSummary = {
@@ -139,6 +142,9 @@ export const faceOptionLabels: Record<string, string> = {
   allTime: 'All time',
   last12Weeks: '12 weeks',
   last52Weeks: '52 weeks',
+  peak: 'Peaks',
+  pass: 'Passes',
+  hut: 'Huts',
 };
 
 export const optionLabels: Record<string, string> = {
@@ -148,6 +154,9 @@ export const optionLabels: Record<string, string> = {
   allTime: 'All time',
   last12Weeks: '12 weeks',
   last52Weeks: '52 weeks',
+  peak: 'Peaks',
+  pass: 'Passes',
+  hut: 'Huts',
 };
 
 const signed = (value: number, format: (value: number) => string) =>
@@ -1659,6 +1668,8 @@ export function tileView(id: StatsTileID): TileView | null {
       return yearPaceView;
     case 'records':
       return recordsView;
+    case 'visitedPlaces':
+      return visitedPlacesView;
     case 'best30Days':
       return null;
     case 'restDays':

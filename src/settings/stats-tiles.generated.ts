@@ -103,6 +103,18 @@ export const statsTiles = [
     span: { columns: 2, rows: 1 },
   },
   {
+    id: 'visitedPlaces',
+    title: message('stats.tile.visitedPlaces'),
+    window: 'currentYear',
+    group: 'thisYear',
+    span: { columns: 2, rows: 1 },
+    minHeight: 300,
+    toggle: {
+      label: message('stats.toggle.visitedPlaces'),
+      options: ['peak', 'pass', 'hut'],
+    },
+  },
+  {
     id: 'totals',
     title: message('stats.tile.totals'),
     window: 'currentYear',

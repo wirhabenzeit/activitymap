@@ -212,7 +212,7 @@ export const statsCapabilitiesSchema = z
             compact: z.string().min(1),
             expanded: z.string().min(1),
             nativeOwner: z.number().int(),
-            uiOwner: z.union([z.literal(265), z.literal(363)]),
+            uiOwner: z.union([z.literal(265), z.literal(363), z.literal(461)]),
           })
           .strict(),
       )
