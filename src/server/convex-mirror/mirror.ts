@@ -94,6 +94,9 @@ export type MirrorResult = {
 };
 
 const CHUNK = 256;
+// Full copies upload a recording for nearly every activity; smaller chunks
+// keep each checkpoint within one cron run's time budget.
+const FULL_CHUNK = 64;
 const BATCH_BYTES = 512 * 1024;
 const BATCH_ITEMS = 64;
 const RECORDING_BATCH = 16;
@@ -220,9 +223,11 @@ export async function mirrorOwner({
     log(`Selected catalogue for matching version ${version}`);
   };
 
-  /** Copy the current state of `ids`. False when the catalogue changed
-   * mid-run, so the caller stops before checkpointing this chunk. */
-  const copy = async (ids: string[]) => {
+  /** Copy the current state of `ids`. Anything but 'done' means the caller
+   * stops before checkpointing this chunk: the time budget ran out between
+   * steps, or the catalogue changed. Work already published stays, and the
+   * next run skips it (identical metadata, current recordings and matches). */
+  const copy = async (ids: string[]): Promise<'done' | 'stopped'> => {
     await ensureCatalogue(ids[0]!);
     result.activities += ids.length;
     const activities = await source.activities(ids);
@@ -260,6 +265,7 @@ export async function mirrorOwner({
       ? await source.payloads([...needsRecording])
       : [];
     for (let i = 0; i < recordings.length; i += RECORDING_BATCH) {
+      if (now() > deadline) return 'stopped';
       const slice = recordings.slice(i, i + RECORDING_BATCH);
       const urls = await write<string[]>({
         kind: 'uploadUrls',
@@ -286,10 +292,11 @@ export async function mirrorOwner({
     }
 
     if (needsMatch.size) {
+      if (now() > deadline) return 'stopped';
       const { version, results } = await source.matches([...needsMatch]);
       if (version !== matchingVersion) {
         log('The Postgres catalogue changed during the run; stopping early');
-        return false;
+        return 'stopped';
       }
       const finished = results.filter((item) => FINISHED.has(item.status));
       for (const items of batches(finished))
@@ -301,7 +308,7 @@ export async function mirrorOwner({
         });
     }
     log(JSON.stringify({ ...result, checkpoint: undefined }));
-    return true;
+    return 'done';
   };
 
   if (fullMode) {
@@ -314,12 +321,12 @@ export async function mirrorOwner({
         result.complete = false;
         break;
       }
-      const ids = await source.activityIds(after, CHUNK);
-      if (ids.length > 0 && !(await copy(ids))) {
+      const ids = await source.activityIds(after, FULL_CHUNK);
+      if (ids.length > 0 && (await copy(ids)) !== 'done') {
         result.complete = false;
         break;
       }
-      if (ids.length < CHUNK) {
+      if (ids.length < FULL_CHUNK) {
         await save({ sequence: through, full: null });
         break;
       }
@@ -345,7 +352,7 @@ export async function mirrorOwner({
       break;
     }
     const slice = changed.slice(i, i + CHUNK);
-    if (!(await copy(slice.map((item) => item.id)))) {
+    if ((await copy(slice.map((item) => item.id))) !== 'done') {
       result.complete = false;
       break;
     }
