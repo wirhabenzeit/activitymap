@@ -23,6 +23,8 @@ between batches. The Worker calls these jobs in order:
 6. `backfill-activity-photos`
 7. `sync-activities` (up to 30 detail refreshes and 30 older activities)
 8. `match-activity-places`
+9. `mirror-convex-shadow` (off unless `ACTIVITYMAP_CONVEX_SHADOW_OWNERS` is set;
+   see `backend/README.md`)
 
 Incoming Strava webhooks still get an immediate processing attempt. The hourly
 drain handles pending events and retries that are due.

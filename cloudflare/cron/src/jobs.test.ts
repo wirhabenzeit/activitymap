@@ -50,11 +50,12 @@ void test('failure in housekeeping does not stop later jobs', async () => {
       ['backfill-activity-photos', 200],
       ['sync-activities', 200],
       ['match-activity-places', 200],
+      ['mirror-convex-shadow', 200],
     ],
   );
 });
 
-void test('all eight jobs are POSTed once per hour in order with the cron secret and their bounds', async () => {
+void test('all nine jobs are POSTed once per hour in order with the cron secret and their bounds', async () => {
   const { fetch, calls } = fakeFetch({});
   const results = await runSchedule(hourly, { ...options, fetch });
 
@@ -69,6 +70,7 @@ void test('all eight jobs are POSTed once per hour in order with the cron secret
       '/api/cron/backfill-activity-photos',
       '/api/cron/sync-activities',
       '/api/cron/match-activity-places',
+      '/api/cron/mirror-convex-shadow',
     ],
   );
   for (const call of calls) {
@@ -112,6 +114,7 @@ void test('a failed reconcile skips stream backfill but still catches up photos'
       ['backfill-activity-photos', 200],
       ['sync-activities', 200],
       ['match-activity-places', 200],
+      ['mirror-convex-shadow', 200],
     ],
   );
   assert.ok(

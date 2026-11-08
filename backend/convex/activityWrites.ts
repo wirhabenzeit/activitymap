@@ -171,8 +171,32 @@ export async function applySourceRecord(
   };
   if (prior) await ctx.db.replace('activities', prior._id, next);
   else await ctx.db.insert('activities', next);
-  await publishChange(ctx, owner, args.id, 'upsert');
+  // Re-applying identical metadata (mirror replays, importer re-runs) only
+  // advances the revision fence; clients have nothing new to sync.
+  if (!(preserve && sameValue(prior!.dto, dto)))
+    await publishChange(ctx, owner, args.id, 'upsert');
   return true;
+}
+
+/** Structural equality that ignores object key order (Convex sorts fields). */
+function sameValue(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (Array.isArray(left) || Array.isArray(right))
+    return (
+      Array.isArray(left) &&
+      Array.isArray(right) &&
+      left.length === right.length &&
+      left.every((item, index) => sameValue(item, right[index]))
+    );
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object')
+    return false;
+  const entries = (value: object) =>
+    Object.entries(value).filter(([, item]) => item !== undefined);
+  const a = entries(left);
+  const b = new Map(entries(right));
+  return (
+    a.length === b.size && a.every(([key, item]) => sameValue(item, b.get(key)))
+  );
 }
 
 export const applySource = internalMutation({

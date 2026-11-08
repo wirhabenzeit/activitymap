@@ -24,7 +24,22 @@ export default defineSchema({
     sequence: v.number(),
     retentionFloor: v.number(),
     catalogueAfter: v.optional(v.string()),
+    /** Shadow-write position: the last mirrored Postgres change sequence and
+     * the source revision used for it (revisions only ever increase). */
+    mirror: v.optional(
+      v.object({
+        sequence: v.number(),
+        revision: v.number(),
+        /** An unfinished full copy: last copied activity ID and the change
+         * sequence it started from. */
+        full: v.optional(v.object({ after: v.string(), through: v.number() })),
+      }),
+    ),
   }).index('by_owner', ['owner']),
+  /** Single-use nonces for signed bridge writes, kept until they expire. */
+  bridgeNonces: defineTable({ nonce: v.string(), expiresAt: v.number() })
+    .index('by_nonce', ['nonce'])
+    .index('by_expiry', ['expiresAt']),
   ownerEpochs: defineTable({ owner: v.id('owners'), epoch: v.string() }).index(
     'by_owner_epoch',
     ['owner', 'epoch'],

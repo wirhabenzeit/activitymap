@@ -46,6 +46,9 @@ export const SCHEDULES: Record<string, CronJob[]> = {
     },
     // Match after ingestion so this run can use newly stored streams.
     { name: 'match-activity-places', path: '/api/cron/match-activity-places' },
+    // Shadow-write the hour's changes into Convex; answers 503 until
+    // ACTIVITYMAP_CONVEX_SHADOW_OWNERS is configured.
+    { name: 'mirror-convex-shadow', path: '/api/cron/mirror-convex-shadow' },
   ],
 };
 
