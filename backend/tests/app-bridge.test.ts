@@ -89,10 +89,12 @@ async function seed() {
     items: ids.map((id, index) =>
       previewFixtureActivity(id, scope.athleteId, `Ride ${index}`, Date.now()),
     ),
+    // Only the first activity has stored samples in the source.
+    recordings: [{ id: ids[0]!, generation: 'pg-generation', revision: '7' }],
   });
   assert.deepEqual(applied, {
     applied: 3,
-    needsRecording: ids,
+    needsRecording: [ids[0]],
     needsMatch: ids,
   });
   const { file, manifest } = encodeWhole(streams);
@@ -340,4 +342,84 @@ void test('a stale epoch in the preview configuration fails closed', async (t) =
   })(new Request('https://app.test/api/v1/sync/bootstrap'));
   assert.equal(response.status, 500);
   assert.match(String(errors[0]), /bridge unavailable \(400\)/);
+});
+
+void test('re-imports replace a refreshed recording with a newer revision only', async () => {
+  const convex = await seed();
+  const common = { scope, generation, sourceRevision: 20 };
+  const fixture = previewFixtureActivity(
+    ids[0]!,
+    scope.athleteId,
+    'Ride 0',
+    Date.now(),
+  );
+  const reimport = (revision: string) =>
+    convex.mutation(internal.importer.applySources, {
+      ...common,
+      sourceRevision: common.sourceRevision + Number(revision),
+      items: [fixture],
+      recordings: [{ id: ids[0]!, generation: `pg-${revision}`, revision }],
+    });
+  // Unchanged identity: nothing to upload or rematch.
+  assert.deepEqual(
+    await convex.mutation(internal.importer.applySources, {
+      ...common,
+      items: [fixture],
+      recordings: [{ id: ids[0]!, generation: 'pg-generation', revision: '7' }],
+    }),
+    { applied: 1, needsRecording: [], needsMatch: [] },
+  );
+  // The source refreshed its samples without a stream-source change.
+  assert.deepEqual(await reimport('8'), {
+    applied: 1,
+    needsRecording: [ids[0]],
+    needsMatch: [ids[0]],
+  });
+  const stage = async () => {
+    const { file, manifest } = encodeWhole(streams);
+    return {
+      manifest,
+      file: await convex.run((ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array(file)])),
+      ),
+    };
+  };
+  const prepare = async (revision: string) =>
+    convex.action(internal.importer.prepareRecordings, {
+      ...common,
+      sourceRevision: common.sourceRevision + 8,
+      items: [
+        {
+          id: ids[0]!,
+          ...(await stage()),
+          recordingGeneration: `pg-${revision}`,
+          recordingRevision: revision,
+        },
+      ],
+    });
+  const before = await convex.run(async (ctx) =>
+    ctx.db.query('recordings').collect(),
+  );
+  assert.equal(await prepare('8'), 1);
+  const after = await convex.run(async (ctx) =>
+    ctx.db.query('recordings').collect(),
+  );
+  assert.deepEqual(
+    after.map((recording) => recording.revision),
+    ['8'],
+  );
+  assert.equal(
+    await convex.run(async (ctx) => ctx.storage.get(before[0]!.file)),
+    null,
+    'the replaced file is deleted',
+  );
+  const row = await convex.query(internal.sync.read, {
+    ...scope,
+    operation: { kind: 'activityIds', ids: [ids[0]!] },
+  });
+  assert.equal(row[0]!.streams?.revision, '8');
+  assert.equal(row[0]!.placeMatches, undefined, 'the old match is cleared');
+  // Late or repeated fetches cannot replace the newer recording.
+  assert.equal(await prepare('7'), 0);
+  assert.equal(await prepare('8'), 0);
 });

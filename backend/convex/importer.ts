@@ -59,8 +59,19 @@ export const applySources = internalMutation({
     generation: v.string(),
     sourceRevision: v.number(),
     items: v.array(activityMetadataValidator),
+    /** The source's current stored recordings, by activity. */
+    recordings: v.array(
+      v.object({
+        id: v.string(),
+        generation: v.string(),
+        revision: v.string(),
+      }),
+    ),
   },
-  handler: async (ctx, { scope, generation, sourceRevision, items }) => {
+  handler: async (
+    ctx,
+    { scope, generation, sourceRevision, items, recordings },
+  ) => {
     bounded(items.length);
     let applied = 0;
     for (const dto of items) {
@@ -79,11 +90,21 @@ export const applySources = internalMutation({
     const owner = await requireOwner(ctx, scope);
     const needsRecording: string[] = [];
     const needsMatch: string[] = [];
+    const sourceRecordings = new Map(recordings.map((item) => [item.id, item]));
     for (const dto of items) {
       const row = await activityFor(ctx, owner._id, idKey(dto.id));
       if (!row || row.deleted) continue;
-      if (!row.recording) needsRecording.push(dto.id);
-      if (row.projection?.match?.catalogue !== owner.catalogue)
+      const source = sourceRecordings.get(dto.id);
+      const current =
+        row.recording && (await ctx.db.get('recordings', row.recording));
+      // A different identity means the source refreshed its samples; the
+      // newer revision replaces the copy (and its match) on publication.
+      const outdated =
+        source &&
+        (current?.generation !== source.generation ||
+          current.revision !== source.revision);
+      if (outdated) needsRecording.push(dto.id);
+      if (outdated || row.projection?.match?.catalogue !== owner.catalogue)
         needsMatch.push(dto.id);
     }
     return { applied, needsRecording, needsMatch };

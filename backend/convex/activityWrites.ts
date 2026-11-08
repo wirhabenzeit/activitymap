@@ -180,6 +180,16 @@ export const applySource = internalMutation({
   handler: applySourceRecord,
 });
 
+/** Stream revisions are decimal counters assigned by the stream store. */
+function newerRevision(candidate: string, current: string) {
+  const decimal = /^(0|[1-9][0-9]*)$/;
+  return (
+    decimal.test(candidate) &&
+    decimal.test(current) &&
+    BigInt(candidate) > BigInt(current)
+  );
+}
+
 async function publicationScope(
   ctx: QueryCtx,
   args: {
@@ -216,7 +226,6 @@ export const publishRecording = internalMutation({
     const scope = await publicationScope(ctx, args);
     if (
       !scope ||
-      scope.row.recording ||
       !Number.isSafeInteger(args.sourceRevision) ||
       args.sourceRevision < scope.row.streamSourceRevision ||
       args.sourceRevision > scope.row.sourceRevision
@@ -230,6 +239,11 @@ export const publishRecording = internalMutation({
       streams.fetch_status !== 'succeeded'
     )
       throw new Error('Invalid recording metadata');
+    // A refresh of the same stream source replaces the current recording only
+    // with a strictly newer revision, so late or repeated fetches cannot win.
+    const prior =
+      row.recording && (await ctx.db.get('recordings', row.recording));
+    if (prior && !newerRevision(streams.revision, prior.revision)) return false;
     const [file, existing] = await Promise.all([
       ctx.db.system.get('_storage', args.file),
       ctx.db
@@ -265,12 +279,17 @@ export const publishRecording = internalMutation({
     });
     await ctx.db.patch('activities', row._id, {
       recording,
+      // Matches belong to the samples they were computed from.
       projection: boundedProjection(dto, {
         ...projection,
         streams,
         match: undefined,
       }),
     });
+    if (prior) {
+      await ctx.storage.delete(prior.file);
+      await ctx.db.delete('recordings', prior._id);
+    }
     await publishChange(ctx, owner, args.id, 'upsert');
     return true;
   },

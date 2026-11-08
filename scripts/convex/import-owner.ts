@@ -125,6 +125,26 @@ while (totals.activities < limit) {
     const { streams, placeMatches, ...dto } = toActivityDTO(row);
     return dto;
   });
+  // Postgres serves a stored set while fetched_at is set and invalidated_at is
+  // null (the trigger stamps it when the stream source changes), whatever the
+  // latest refresh attempt did. Select recordings by that rule alone.
+  const currentStreams = (ids: bigint[]) =>
+    and(
+      inArray(activityStreams.activityId, ids),
+      isNotNull(activityStreams.fetchedAt),
+      isNull(activityStreams.invalidatedAt),
+      isNotNull(activityStreams.payload),
+    );
+  const identities = await db
+    .select({
+      id: sql<string>`${activityStreams.activityId}::text`,
+      generation: activityStreams.generation,
+      revision: sql<string>`${activityStreams.revision}::text`,
+    })
+    .from(activityStreams)
+    .where(currentStreams(rows.map((row) => BigInt(row.id))));
+  const identityById = new Map(identities.map((item) => [item.id, item]));
+
   const needsRecording = new Set<string>();
   const needsMatch = new Set<string>();
   for (const items of batchesOf(dtos, { maxBytes: 192 * 1024, maxItems: 64 })) {
@@ -132,14 +152,18 @@ while (totals.activities < limit) {
       applied: number;
       needsRecording: string[];
       needsMatch: string[];
-    }>('importer:applySources', { ...common, items });
+    }>('importer:applySources', {
+      ...common,
+      items,
+      recordings: items.flatMap((item) => identityById.get(item.id) ?? []),
+    });
     totals.applied += result.applied;
     result.needsRecording.forEach((id) => needsRecording.add(id));
     result.needsMatch.forEach((id) => needsMatch.add(id));
   }
 
-  // Only current samples: the Postgres trigger stamps invalidated_at when an
-  // activity's stream source changes.
+  // Generation and revision are re-read with the payload, so a refresh that
+  // lands in between is published under its own identity.
   const streams =
     needsRecording.size === 0
       ? []
@@ -152,17 +176,7 @@ while (totals.activities < limit) {
             payload: activityStreams.payload,
           })
           .from(activityStreams)
-          .where(
-            and(
-              inArray(
-                activityStreams.activityId,
-                [...needsRecording].map((id) => BigInt(id)),
-              ),
-              isNull(activityStreams.invalidatedAt),
-              isNotNull(activityStreams.payload),
-              eq(activityStreams.lastAttemptStatus, 'succeeded'),
-            ),
-          );
+          .where(currentStreams([...needsRecording].map((id) => BigInt(id))));
   for (let i = 0; i < streams.length; i += 32) {
     const chunk = streams.slice(i, i + 32);
     const urls = await convexRun<string[]>('importer:uploadUrls', {
@@ -198,10 +212,15 @@ while (totals.activities < limit) {
     });
   }
 
-  const results = needsMatch.size
-    ? (await places.sync(actor, [...needsMatch])).results.values()
-    : [];
-  const finished = [...results].filter((result) =>
+  const synced = needsMatch.size
+    ? await places.sync(actor, [...needsMatch])
+    : null;
+  // Results are only valid under the catalogue identity pinned for this run.
+  if (synced && synced.version !== matchingVersion)
+    throw new Error(
+      'The Postgres place catalogue changed during the import; re-run it to select the new catalogue',
+    );
+  const finished = [...(synced?.results.values() ?? [])].filter((result) =>
     ['complete', 'partial', 'uncovered'].includes(result.status),
   );
   for (const items of batchesOf(finished, {
