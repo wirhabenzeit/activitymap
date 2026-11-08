@@ -2,7 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { StravaApiError } from './client';
-import { fetchStravaActivities, withLockedExistingActivities } from './service';
+import {
+  fetchStravaActivities,
+  ForeignStravaActivityError,
+  withLockedExistingActivities,
+} from './service';
 import type { StravaActivity } from './types';
 
 function stravaActivity(
@@ -276,4 +280,63 @@ void test('conflicting zero and positive photo counts still fetch photos and kee
   );
   assert.deepEqual(result.photoRefreshFailedIds, [7]);
   assert.equal(result.activities[0]?.photosState, 'refresh_required');
+});
+
+void test('detail fetch never returns or persists an activity owned by a different athlete', async () => {
+  const result = await fetchStravaActivities(
+    {
+      accessToken: 'token',
+      athleteId: 42,
+      activityIds: [1, 2],
+      persist: false,
+    },
+    {
+      createClient: () => ({
+        async getActivity(id) {
+          return id === 2
+            ? stravaActivity(id, { athlete: { id: 7777 } as StravaActivity['athlete'] })
+            : stravaActivity(id);
+        },
+        async getActivities() {
+          throw new Error('list fetch must not run');
+        },
+        async getActivityPhotos() {
+          return [];
+        },
+      }),
+    },
+  );
+
+  assert.deepEqual(
+    result.activities.map((activity) => activity.id),
+    [1],
+  );
+  assert.deepEqual(result.failedIds, [2]);
+  assert.ok(result.failures?.[0]?.error instanceof ForeignStravaActivityError);
+});
+
+void test('list fetch drops summaries owned by a different athlete', async () => {
+  const result = await fetchStravaActivities(
+    { accessToken: 'token', athleteId: 42, persist: false },
+    {
+      createClient: () => ({
+        async getActivity() {
+          throw new Error('detail fetch must not run');
+        },
+        async getActivities() {
+          return [
+            stravaActivity(1),
+            stravaActivity(2, { athlete: { id: 7777 } as StravaActivity['athlete'] }),
+          ];
+        },
+        async getActivityPhotos() {
+          throw new Error('photo fetch must not run');
+        },
+      }),
+    },
+  );
+  assert.deepEqual(
+    result.activities.map((activity) => activity.id),
+    [1],
+  );
 });

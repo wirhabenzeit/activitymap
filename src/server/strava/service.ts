@@ -104,6 +104,19 @@ export type FetchStravaActivitiesDeps = {
   createClient?: (accessToken: string) => ActivityDetailClient;
 };
 
+/** Strava returned an activity whose owner is not the athlete it was fetched for. */
+export class ForeignStravaActivityError extends Error {
+  constructor(
+    readonly activityId: number,
+    readonly athleteId: number,
+  ) {
+    super(
+      `Strava activity ${activityId} is not owned by athlete ${athleteId}; refusing to store it`,
+    );
+    this.name = 'ForeignStravaActivityError';
+  }
+}
+
 export async function fetchRequestedStravaActivities(
   client: Pick<ActivityDetailClient, 'getActivity'>,
   activityIds: number[],
@@ -211,9 +224,22 @@ export async function fetchStravaActivities(
     stravaActivitiesResult = await client.getActivities(params);
   }
 
-  const fetchedActivities = stravaActivitiesResult;
+  // Every row below is stored with `athlete: athleteId`. Strava can return
+  // activities the token's athlete can see but does not own (e.g. a public
+  // activity requested by id, as an unauthenticated webhook payload could
+  // ask for), so anything whose Strava owner differs is never persisted or
+  // returned: storing it would re-attribute another athlete's activity and
+  // photos to this one.
+  const fetchedActivities = (stravaActivitiesResult ?? []).filter((act) => {
+    if (act.athlete?.id === athleteId) return true;
+    const error = new ForeignStravaActivityError(act.id, athleteId);
+    logger.warn(error.message);
+    failedIds.push(act.id);
+    failures.push({ activityId: act.id, error });
+    return false;
+  });
 
-  if (!fetchedActivities || fetchedActivities.length === 0) {
+  if (fetchedActivities.length === 0) {
     return {
       activities: [],
       photos: [],

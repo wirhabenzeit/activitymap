@@ -519,3 +519,30 @@ void test('GET /api/v1/sync/changes holds up for a large account: thousands of c
     'changes must be strictly ordered by sequence across page boundaries',
   );
 });
+
+void test('GET /api/v1/sync/changes never hydrates an activity or photo now owned by another athlete', async () => {
+  const changes = [
+    buildChange({ sequence: 1, entityType: 'activity', entityId: '7', operation: 'upsert' }),
+    buildChange({ sequence: 2, entityType: 'photo', entityId: 'p7', operation: 'upsert' }),
+  ];
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    // The change rows are in this athlete's feed, but the rows they name
+    // currently belong to athlete 2002.
+    activitiesRepo: fakeActivitiesRepo([buildActivity({ id: 7, athlete: 2002 })]),
+    photosRepo: fakePhotosRepo([buildPhoto({ unique_id: 'p7', athlete_id: 2002 })]),
+    changesRepo: fakeChangesRepo({ changes }),
+  });
+
+  const response = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0))}`,
+    ),
+  );
+  const body = (await response.json()) as { data: { items: unknown[]; nextCursor: string } };
+
+  assert.equal(response.status, 200);
+  assert.deepEqual(body.data.items, []);
+  assert.equal(body.data.nextCursor, encode(2));
+});

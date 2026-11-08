@@ -18,6 +18,12 @@ export const env = createEnv({
     OAUTH_PROXY_SECRET: z.string().optional(),
     OAUTH_PROXY_PRODUCTION_URL: z.string().url().optional(),
     STRAVA_WEBHOOK_VERIFY_TOKEN: z.string().optional(),
+    // Path segment of the Strava webhook callback URL; the only proof a
+    // delivery came from Strava. See src/server/strava/webhook-callback.ts.
+    STRAVA_WEBHOOK_CALLBACK_SECRET: z
+      .string()
+      .regex(/^[A-Za-z0-9_-]{32,128}$/)
+      .optional(),
     PUBLIC_URL: z.string().url().optional(),
     NODE_ENV: z
       .enum(['development', 'test', 'production'])
@@ -44,6 +50,7 @@ export const env = createEnv({
     ACTIVITYMAP_EXTERNAL_EFFECTS: process.env.ACTIVITYMAP_EXTERNAL_EFFECTS,
     CRON_SECRET: process.env.CRON_SECRET,
     STRAVA_WEBHOOK_VERIFY_TOKEN: process.env.STRAVA_WEBHOOK_VERIFY_TOKEN,
+    STRAVA_WEBHOOK_CALLBACK_SECRET: process.env.STRAVA_WEBHOOK_CALLBACK_SECRET,
     NEON_DATABASE_URL: process.env.NEON_DATABASE_URL,
     DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
@@ -74,6 +81,7 @@ export const env = createEnv({
           AUTH_STRAVA_ID: values.AUTH_STRAVA_ID,
           AUTH_STRAVA_SECRET: values.AUTH_STRAVA_SECRET,
           STRAVA_WEBHOOK_VERIFY_TOKEN: values.STRAVA_WEBHOOK_VERIFY_TOKEN,
+          STRAVA_WEBHOOK_CALLBACK_SECRET: values.STRAVA_WEBHOOK_CALLBACK_SECRET,
           CRON_SECRET: values.CRON_SECRET,
           PUBLIC_URL: values.PUBLIC_URL,
         };
