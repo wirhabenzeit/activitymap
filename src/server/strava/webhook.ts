@@ -1,5 +1,7 @@
+import { and, eq, sql } from 'drizzle-orm';
+
 import { db as defaultDb } from '~/server/db';
-import { lockActiveStravaAccount } from '~/server/repositories/account-lifecycle';
+import { getAccountInternal } from '~/server/db/internal';
 import {
   accounts,
   activities,
@@ -9,15 +11,17 @@ import {
   stravaWebhookEvents,
   stravaWebhooks,
 } from '~/server/db/schema';
-import { getAccountInternal } from '~/server/db/internal';
-import { fetchStravaActivities } from '~/server/strava/service';
-import { activityOwnershipFilter } from '~/server/strava/webhook-filters';
-import { eq, sql, and } from 'drizzle-orm';
 import { logger } from '~/server/logging/logger';
-import type { WebhookRequest } from '~/types/strava';
+import { lockActiveStravaAccount } from '~/server/repositories/account-lifecycle';
 import { createChangesRepository } from '~/server/repositories/changes';
 import { createWebhookEventsRepository } from '~/server/repositories/webhook-events';
+import {
+  ForeignStravaActivityError,
+  fetchStravaActivities,
+} from '~/server/strava/service';
+import { activityOwnershipFilter } from '~/server/strava/webhook-filters';
 import { PermanentWebhookError } from '~/server/strava/webhook-retry';
+import type { WebhookRequest } from '~/types/strava';
 
 /** Full erasure of a deauthorized athlete's data must complete within 30 days of revocation (docs/strava-data-policy.md §1/§3). */
 const ERASURE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -172,6 +176,16 @@ export async function processInboxEvent(
   }
 }
 
+/** Strava's only athlete event: `update` with `updates.authorized: "false"`. */
+export function isDeauthorizationEvent(data: StravaWebhookEvent): boolean {
+  const authorized = data.updates?.authorized;
+  return (
+    data.object_type === 'athlete' &&
+    data.aspect_type === 'update' &&
+    (authorized === 'false' || authorized === false)
+  );
+}
+
 /**
  * Handles a Strava athlete-deauthorization webhook (`object_type:
  * "athlete"`), per docs/strava-data-policy.md §3. Per policy, on receipt
@@ -292,6 +306,21 @@ export async function processWebhookEvent(
   const fetchActivities = deps.fetchActivities ?? fetchStravaActivities;
 
   if (object_type === 'athlete') {
+    if (!isDeauthorizationEvent(data)) {
+      // Strava documents exactly one athlete event: deauthorization, sent as
+      // `aspect_type: 'update'` with `updates.authorized: 'false'`. Anything
+      // else is not a revocation and must never clear tokens or schedule
+      // erasure.
+      logger.warn(
+        '[Webhook] Ignored athlete event that is not a deauthorization',
+        {
+          aspect_type: data.aspect_type,
+          owner_id,
+          updated_fields: data.updates ? Object.keys(data.updates) : [],
+        },
+      );
+      return;
+    }
     await handleAthleteDeauthorization(data, database);
     return; // Genuinely completed: deauthorization recorded (or a no-op replay).
   }
@@ -313,6 +342,7 @@ export async function processWebhookEvent(
     activities: fetchedActivities,
     photos: fetchedPhotos,
     notFoundIds,
+    failures = [],
     photoRefreshAuthoritativeIds = [],
     photoRefreshFailedIds = [],
   } = await fetchActivities({
@@ -341,7 +371,7 @@ export async function processWebhookEvent(
   // retry and skip the tombstone (and the change record) forever.
   if (notFoundIds.includes(object_id)) {
     await database.transaction(async (tx) => {
-      if (!await lockActiveStravaAccount(tx, account)) return;
+      if (!(await lockActiveStravaAccount(tx, account))) return;
       // `photos.activity_id` cascades on delete, so this also silently
       // deletes any photos for this activity. Read which ones before the
       // delete so each gets its own change record too - see the identical
@@ -391,6 +421,20 @@ export async function processWebhookEvent(
     return; // Genuinely completed: deletion recorded.
   }
 
+  // The delivery's owner_id/object_id pairing is not authenticated by Strava.
+  // If Strava says the activity belongs to someone else, this event can never
+  // succeed: dead-letter it instead of retrying.
+  if (
+    failures.some(
+      ({ activityId, error }) =>
+        activityId === object_id && error instanceof ForeignStravaActivityError,
+    )
+  ) {
+    throw new PermanentWebhookError(
+      `Activity ${object_id} is not owned by athlete ${owner_id}`,
+    );
+  }
+
   // Check if we actually got the activity we requested
   const activityToSave = fetchedActivities.find((act) => act.id === object_id);
   if (!activityToSave) {
@@ -404,9 +448,11 @@ export async function processWebhookEvent(
 
   // Database Operations within a transaction for atomicity
   await database.transaction(async (tx) => {
-    if (!await lockActiveStravaAccount(tx, account)) return;
-    // 1. Upsert the activity
-    await tx
+    if (!(await lockActiveStravaAccount(tx, account))) return;
+    // 1. Upsert the activity. The conflict update only applies to a row this
+    // athlete already owns: an existing activity owned by anyone else is
+    // never re-attributed, whatever the delivery claims.
+    const upserted = await tx
       .insert(activities)
       .values(activityToSave) // Already includes athlete ID from transform
       .onConflictDoUpdate({
@@ -417,7 +463,14 @@ export async function processWebhookEvent(
             ? {}
             : { photosState: 'refresh_required' as const }),
         },
-      });
+        setWhere: eq(activities.athlete, owner_id),
+      })
+      .returning({ id: activities.id });
+    if (upserted.length === 0) {
+      throw new PermanentWebhookError(
+        `Activity ${object_id} already belongs to another athlete; refusing to reassign it to ${owner_id}`,
+      );
+    }
 
     if (data.aspect_type === 'update') {
       await tx.execute(
@@ -434,8 +487,20 @@ export async function processWebhookEvent(
           activity_id: photos.activity_id,
         })
         .from(photos)
-        .where(eq(photos.activity_id, activityToSave.id));
-      await tx.delete(photos).where(eq(photos.activity_id, activityToSave.id));
+        .where(
+          and(
+            eq(photos.activity_id, activityToSave.id),
+            eq(photos.athlete_id, owner_id),
+          ),
+        );
+      await tx
+        .delete(photos)
+        .where(
+          and(
+            eq(photos.activity_id, activityToSave.id),
+            eq(photos.athlete_id, owner_id),
+          ),
+        );
 
       if (fetchedPhotos.length > 0) {
         await tx.insert(photos).values(fetchedPhotos);

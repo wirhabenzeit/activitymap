@@ -1,15 +1,19 @@
 'use server';
 
-import { stravaWebhooks } from '~/server/db/schema';
+import { ne } from 'drizzle-orm';
+import { headers } from 'next/headers';
 
+import * as activitiesService from '~/server/application/activities';
+import { requireActor } from '~/server/auth/actor';
+import { requireAdmin } from '~/server/auth/admin';
+import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
 import { db } from '~/server/db';
+import { stravaWebhooks } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
+
 import { StravaClient } from './client';
 import { type UpdateActivityInput } from './validators';
-import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
-import { headers } from 'next/headers';
-import { requireActor } from '~/server/auth/actor';
-import * as activitiesService from '~/server/application/activities';
+import { webhookCallbackSecret, webhookCallbackUrl } from './webhook-callback';
 
 /**
  * Thin compatibility adapter: resolves the caller's `Actor` from the current
@@ -47,18 +51,35 @@ export async function deleteActivities(input: number[]): Promise<{
   return activitiesService.deleteActivitiesForActor(actor, input);
 }
 
-export async function checkWebhookStatus() {
-  requireExternalEffectsEnabled();
-
+/**
+ * Resolves the secret-bearing callback URL this deployment registers with
+ * Strava. Operator-only: the URL embeds `STRAVA_WEBHOOK_CALLBACK_SECRET`,
+ * which is the only proof that a webhook delivery came from Strava.
+ */
+function expectedCallbackUrl(): string {
   if (!process.env.PUBLIC_URL) {
     throw new Error('PUBLIC_URL environment variable is not set');
   }
+  const secret = webhookCallbackSecret();
+  if (!secret) {
+    throw new Error(
+      'STRAVA_WEBHOOK_CALLBACK_SECRET is not set or malformed (32-128 characters of A-Z, a-z, 0-9, _ or -)',
+    );
+  }
+  return webhookCallbackUrl(process.env.PUBLIC_URL, secret);
+}
 
-  const expectedUrl = new URL(
-    '/api/strava/webhook',
-    process.env.PUBLIC_URL,
-  ).toString();
+/**
+ * Operator-only. Reads this Strava app's push subscription and mirrors the
+ * one registered for this deployment's secret callback URL into
+ * `strava_webhooks`. Calls `requireAdmin()` first: the subscription id and
+ * callback URL must never reach other callers.
+ */
+export async function checkWebhookStatus() {
+  await requireAdmin();
+  requireExternalEffectsEnabled();
 
+  const expectedUrl = expectedCallbackUrl();
   const client = StravaClient.withoutAuth();
 
   try {
@@ -73,44 +94,33 @@ export async function checkWebhookStatus() {
     if (matchingSubscription) {
       const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
       if (!verifyToken) {
-        throw new Error('STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set');
+        throw new Error(
+          'STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set',
+        );
       }
 
-      await db
-        .insert(stravaWebhooks)
-        .values({
-          subscriptionId: matchingSubscription.id,
-          verifyToken,
-          callbackUrl: matchingSubscription.callback_url,
-          resourceState: matchingSubscription.resource_state,
-          applicationId: matchingSubscription.application_id,
-          createdAt: new Date(matchingSubscription.created_at),
-          updatedAt: new Date(matchingSubscription.updated_at),
-          verified: true,
-          active: true,
-        })
-        .onConflictDoUpdate({
-          target: stravaWebhooks.callbackUrl,
-          set: {
-            subscriptionId: matchingSubscription.id,
-            verifyToken,
-            resourceState: matchingSubscription.resource_state,
-            applicationId: matchingSubscription.application_id,
-            updatedAt: new Date(matchingSubscription.updated_at),
-            verified: true,
-            active: true,
-          },
-        });
+      await upsertActiveSubscription({
+        subscriptionId: matchingSubscription.id,
+        verifyToken,
+        callbackUrl: matchingSubscription.callback_url,
+        resourceState: matchingSubscription.resource_state,
+        applicationId: matchingSubscription.application_id,
+        createdAt: new Date(matchingSubscription.created_at),
+        updatedAt: new Date(matchingSubscription.updated_at),
+        verified: true,
+      });
 
       databaseStatus = 'synchronized';
     }
 
     return {
-      expectedUrl,
-      subscriptions: stravaSubscriptions,
       hasMatchingSubscription: !!matchingSubscription,
       databaseStatus,
-      matchingSubscription,
+      matchingSubscription: matchingSubscription
+        ? { id: matchingSubscription.id }
+        : undefined,
+      otherSubscriptionCount:
+        stravaSubscriptions.length - (matchingSubscription ? 1 : 0),
     };
   } catch (error) {
     logger.error('Failed to manage webhook subscription:', error);
@@ -118,20 +128,20 @@ export async function checkWebhookStatus() {
   }
 }
 
+/**
+ * Operator-only. Ensures this Strava app's single push subscription points
+ * at this deployment's secret callback URL. A subscription registered for
+ * any other callback (e.g. the legacy unauthenticated `/api/strava/webhook`)
+ * is deleted first, because Strava allows one subscription per app; every
+ * row for another callback URL is then deactivated so deliveries naming its
+ * subscription id are rejected.
+ */
 export async function createWebhookSubscription() {
+  await requireAdmin();
   requireExternalEffectsEnabled();
 
-  if (!process.env.PUBLIC_URL) {
-    throw new Error('PUBLIC_URL environment variable is not set');
-  }
-
-  const callbackUrl = new URL(
-    '/api/strava/webhook',
-    process.env.PUBLIC_URL,
-  ).toString();
-
+  const callbackUrl = expectedCallbackUrl();
   const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
-
   if (!verifyToken) {
     throw new Error(
       'STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set',
@@ -142,73 +152,66 @@ export async function createWebhookSubscription() {
 
   try {
     const existingSubscriptions = await client.getSubscriptions();
-
-    const existingSubscription = existingSubscriptions.find(
+    let subscription = existingSubscriptions.find(
       (sub) => sub.callback_url === callbackUrl,
     );
 
-    if (existingSubscription) {
-      await db
-        .insert(stravaWebhooks)
-        .values({
-          subscriptionId: existingSubscription.id,
-          verifyToken,
-          callbackUrl,
-          active: true,
-        })
-        .onConflictDoUpdate({
-          target: [stravaWebhooks.callbackUrl],
-          set: {
-            subscriptionId: existingSubscription.id,
-            verifyToken,
-            active: true,
-            updatedAt: new Date(),
-          },
-        });
-
-      return {
-        success: true,
-        subscription: existingSubscription,
-        message: 'Using existing subscription',
-      };
+    for (const stale of existingSubscriptions) {
+      if (stale.callback_url === callbackUrl) continue;
+      await client.deleteSubscription(stale.id);
+      logger.info(
+        '[Webhook] Deleted Strava subscription for a stale callback URL',
+        {
+          subscription_id: stale.id,
+        },
+      );
     }
 
-    const subscription = await client.createSubscription(
-      callbackUrl,
-      verifyToken,
-    );
+    const message = subscription
+      ? 'Using existing subscription'
+      : 'Created new subscription';
+    subscription ??= await client.createSubscription(callbackUrl, verifyToken);
 
+    await upsertActiveSubscription({
+      subscriptionId: subscription.id,
+      verifyToken,
+      callbackUrl,
+    });
     await db
-      .insert(stravaWebhooks)
-      .values({
-        subscriptionId: subscription.id,
-        verifyToken,
-        callbackUrl,
-        active: true,
-      })
-      .onConflictDoUpdate({
-        target: [stravaWebhooks.callbackUrl],
-        set: {
-          subscriptionId: subscription.id,
-          verifyToken,
-          active: true,
-          updatedAt: new Date(),
-        },
-      });
+      .update(stravaWebhooks)
+      .set({ active: false, updatedAt: new Date() })
+      .where(ne(stravaWebhooks.callbackUrl, callbackUrl));
 
     return {
       success: true,
-      subscription,
-      message: 'Created new subscription',
+      subscription: { id: subscription.id },
+      message,
     };
   } catch (error) {
     logger.error('Failed to create webhook subscription:', error);
-
     return {
       success: false,
-      error: error instanceof Error ? error.message : String(error),
-      details:
-        'Make sure your callback URL is publicly accessible and your Strava API credentials are correct',
+      error: 'Webhook subscription failed; see server logs for details.',
     };
   }
+}
+
+async function upsertActiveSubscription(
+  values: Omit<typeof stravaWebhooks.$inferInsert, 'active'>,
+) {
+  await db
+    .insert(stravaWebhooks)
+    .values({ ...values, active: true })
+    .onConflictDoUpdate({
+      target: stravaWebhooks.callbackUrl,
+      set: {
+        subscriptionId: values.subscriptionId,
+        verifyToken: values.verifyToken,
+        resourceState: values.resourceState,
+        applicationId: values.applicationId,
+        verified: values.verified,
+        active: true,
+        updatedAt: values.updatedAt ?? new Date(),
+      },
+    });
 }

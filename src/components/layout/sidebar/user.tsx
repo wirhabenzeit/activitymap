@@ -47,15 +47,12 @@ export function UserSettings() {
         description: (
           <div className="space-y-1">
             <p>
-              <span className="font-semibold">Success:</span> ✅
+              <span className="font-semibold">Success:</span>{' '}
+              {result.success ? '✅' : '❌'}
             </p>
             <p>
               <span className="font-semibold">ID:</span>{' '}
-              {result.subscription?.id}
-            </p>
-            <p>
-              <span className="font-semibold">URL:</span>{' '}
-              {result.subscription?.callback_url}
+              {result.subscription?.id ?? result.error}
             </p>
           </div>
         ),
@@ -86,9 +83,6 @@ export function UserSettings() {
         title: 'Webhook Status',
         description: (
           <div className="space-y-1">
-            <p>
-              <span className="font-semibold">URL:</span> {result.expectedUrl}
-            </p>
             <p>
               <span className="font-semibold">Status:</span>{' '}
               {result.hasMatchingSubscription ? '✅ Active' : '❌ Not Found'}

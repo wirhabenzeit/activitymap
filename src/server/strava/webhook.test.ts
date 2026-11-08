@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import { accounts, activities, photos, syncChanges, users } from '~/server/db/schema';
-
 import {
+  accounts,
+  activities,
+  photos,
+  syncChanges,
+  users,
+} from '~/server/db/schema';
+
+import { ForeignStravaActivityError } from './service.ts';
+import { PermanentWebhookError } from './webhook-retry.ts';
+import {
+  type ProcessWebhookEventDeps,
   isRegisteredStravaAthlete,
   processWebhookEvent,
-  type ProcessWebhookEventDeps,
 } from './webhook.ts';
 import type { StravaWebhookEvent } from './webhook.ts';
 
@@ -26,6 +35,8 @@ type FakeCall = { method: string; via: 'outer' | 'tx' };
 function buildFakeDb(opts: {
   existingPhotos?: { photo_id: string; activity_id: number }[];
   failChangeInsert?: boolean;
+  /** Rows the activity upsert returns; `[]` simulates a conflict row owned by another athlete. */
+  upsertReturns?: { id: number }[];
 }) {
   const calls: FakeCall[] = [];
   const recordedChanges: Record<string, unknown>[] = [];
@@ -39,7 +50,11 @@ function buildFakeDb(opts: {
             return {
               where: () => {
                 if (table === users || table === accounts) {
-                  return { for: async () => [{ id: table === users ? 'user-42' : 'account-42' }] };
+                  return {
+                    for: async () => [
+                      { id: table === users ? 'user-42' : 'account-42' },
+                    ],
+                  };
                 }
                 calls.push({ method: 'select', via });
                 if (table === photos) {
@@ -87,7 +102,11 @@ function buildFakeDb(opts: {
         if (table === activities) {
           calls.push({ method: 'insertActivity', via });
           return {
-            values: () => ({ onConflictDoUpdate: async () => undefined }),
+            values: () => ({
+              onConflictDoUpdate: () => ({
+                returning: async () => opts.upsertReturns ?? [{ id: 100 }],
+              }),
+            }),
           };
         }
         if (table === photos) {
@@ -129,7 +148,8 @@ function deps(
   overrides: Partial<ProcessWebhookEventDeps> = {},
 ): ProcessWebhookEventDeps {
   return {
-    resolveAccount: async () => ({ id: 'account-42', userId: 'user-42', access_token: 'token' }) as never,
+    resolveAccount: async () =>
+      ({ id: 'account-42', userId: 'user-42', access_token: 'token' }) as never,
     ...overrides,
   };
 }
@@ -431,6 +451,7 @@ const deauthorizationEvent: StravaWebhookEvent = {
   owner_id: 42,
   subscription_id: 1,
   event_time: 1_700_000_000,
+  updates: { authorized: 'false' },
 };
 
 /** Fails the test if either Strava-calling dependency is ever invoked. */
@@ -568,4 +589,84 @@ void test('isRegisteredStravaAthlete finds an athlete with a Strava account', as
 void test('isRegisteredStravaAthlete rejects an athlete without an ActivityMap account', async () => {
   const { database } = accountLookupDb([]);
   assert.equal(await isRegisteredStravaAthlete(129318689, database), false);
+});
+
+void test('processWebhookEvent ignores athlete events that are not a deauthorization (never clears tokens or schedules erasure)', async () => {
+  const notDeauthorizations: StravaWebhookEvent[] = [
+    { ...deauthorizationEvent, aspect_type: 'create', updates: undefined },
+    { ...deauthorizationEvent, aspect_type: 'delete', updates: undefined },
+    { ...deauthorizationEvent, updates: undefined },
+    { ...deauthorizationEvent, updates: { authorized: 'true' } },
+    { ...deauthorizationEvent, updates: { title: 'x' } },
+  ];
+  for (const event of notDeauthorizations) {
+    const { db, updateCalls, getAccount } = buildFakeAccountsDb(freshAccount());
+    await processWebhookEvent(
+      event,
+      db as unknown as Parameters<typeof processWebhookEvent>[1],
+      neverCallStravaDeps(),
+    );
+    assert.equal(updateCalls.length, 0, JSON.stringify(event));
+    const account = getAccount();
+    assert.equal(account?.refreshToken, 'better-auth-refresh');
+    assert.equal(account?.revokedAt, null);
+    assert.equal(account?.scheduledErasureAt, null);
+  }
+});
+
+void test('processWebhookEvent dead-letters an activity event whose Strava owner is not the payload owner_id, without any write', async () => {
+  const { db, calls, recordedChanges } = buildFakeDb({});
+
+  await assert.rejects(
+    () =>
+      processWebhookEvent(
+        { ...baseEvent, owner_id: 42, object_id: 100 },
+        db as unknown as Parameters<typeof processWebhookEvent>[1],
+        deps({
+          fetchActivities: async () => ({
+            activities: [],
+            photos: [],
+            notFoundIds: [],
+            failedIds: [100],
+            failures: [
+              {
+                activityId: 100,
+                error: new ForeignStravaActivityError(100, 42),
+              },
+            ],
+          }),
+        }),
+      ),
+    (error: unknown) => error instanceof PermanentWebhookError,
+  );
+  assert.deepEqual(calls, []);
+  assert.deepEqual(recordedChanges, []);
+});
+
+void test('processWebhookEvent refuses to reassign an existing activity owned by another athlete', async () => {
+  // The conflict-update is guarded by `athlete = owner_id`; an existing row
+  // owned by someone else makes the upsert return no row.
+  const { db, calls, recordedChanges } = buildFakeDb({ upsertReturns: [] });
+
+  await assert.rejects(
+    () =>
+      processWebhookEvent(
+        baseEvent,
+        db as unknown as Parameters<typeof processWebhookEvent>[1],
+        deps({
+          fetchActivities: async () => ({
+            activities: [{ id: 100, athlete: 42 } as never],
+            photos: [{ unique_id: 'new-photo' } as never],
+            notFoundIds: [],
+            photoRefreshAuthoritativeIds: [100],
+          }),
+        }),
+      ),
+    (error: unknown) => error instanceof PermanentWebhookError,
+  );
+  assert.deepEqual(
+    calls.map((c) => c.method),
+    ['insertActivity'],
+  );
+  assert.deepEqual(recordedChanges, []);
 });

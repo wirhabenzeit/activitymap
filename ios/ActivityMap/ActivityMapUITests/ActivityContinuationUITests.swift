@@ -149,6 +149,115 @@ final class ActivityContinuationUITests: XCTestCase {
         try await previousJourney(list: true)
     }
 
+    func testMapResultTitleEditingKeepsKeyboardAndDraft() async throws {
+        try await titleEditingJourney(list: false)
+    }
+
+    func testListRowTitleEditingKeepsKeyboardAndDraft() async throws {
+        try await titleEditingJourney(list: true)
+    }
+
+    func testMapResultsRecoverAfterDetailRenameLeavesSearch() async throws {
+        let app = launch(expanded: false, filteredEdit: true)
+        defer { app.terminate() }
+        let initial = try await state(in: app) { $0.ready && $0.listedIDs == [3, 2] && $0.selection == [3] }
+        try await open(3, app: app)
+        _ = try await scrollToBottom(app, expectedID: 3, list: false)
+        try visibleButton("activity-edit-action", in: app).tap()
+        let name = app.textFields["activity-edit-name"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10), app.debugDescription)
+        let original = try XCTUnwrap(name.value as? String)
+        name.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5)).tap()
+        app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: original.utf16.count) + "Renamed ride")
+        XCTAssertEqual(name.value as? String, "Renamed ride")
+        try visibleButton("activity-edit-save", in: app).tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 10), app.debugDescription)
+        // The saved activity remains selected but is now hidden by the name
+        // search. The results surface must survive losing its pushed detail.
+        let clear = app.buttons["Clear filters"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 10), app.debugDescription)
+        clear.tap()
+        let restored = try await state(in: app) { $0.ready && $0.candidates == [3] && $0.detailID == -1 }
+        XCTAssertEqual(restored.controllerID, initial.controllerID)
+        XCTAssertTrue(app.buttons["map-result-open-3"].label.contains("Renamed ride"))
+
+        try visibleButton("browse-destination-list", in: app).tap()
+        _ = try await state(in: app) { $0.ready && $0.selectedTab == "list" }
+        let row = app.buttons["activity-list-row-2"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10))
+        row.press(forDuration: 1)
+        let showOnMap = app.buttons["Show on map"].firstMatch
+        XCTAssertTrue(showOnMap.waitForExistence(timeout: 5), app.debugDescription)
+        showOnMap.tap()
+        let next = try await state(in: app) { $0.ready && $0.selectedTab == "map" && $0.selection == [2] && $0.detailID == 2 }
+        XCTAssertFalse(next.controllerID.isEmpty, "A new selection must still present native Map results")
+        capture(app, name: "Map results recover after filtered detail rename and a new selection")
+    }
+
+    private func titleEditingJourney(list: Bool) async throws {
+        let app = launch(list: list, expanded: false)
+        defer { app.terminate() }
+        let initial = try await state(in: app) { $0.ready }
+        let id = try XCTUnwrap((list ? initial.listedIDs : initial.candidates).first)
+        let row = app.buttons[list ? "activity-list-row-\(id)" : "map-result-open-\(id)"]
+        XCTAssertTrue(row.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(row.isHittable, app.debugDescription)
+        if !list { XCTAssertEqual(initial.detent, 1, "Exercise editing above the normal Map results sheet") }
+        let originalRowLabel = row.label
+        row.press(forDuration: 1)
+        let edit = app.buttons["Edit"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 5), app.debugDescription)
+        edit.tap()
+
+        let name = app.descendants(matching: .any).matching(identifier: "activity-edit-name").firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 10), app.debugDescription)
+        let originalTitle = try XCTUnwrap(name.value as? String)
+        // Tap once as a user would, allowing UIKit to place the insertion
+        // point. Never refocus between bursts: that would conceal the
+        // disappearing-keyboard regression.
+        name.tap()
+        let keyboard = app.keyboards.firstMatch
+        XCTAssertTrue(keyboard.waitForExistence(timeout: 5), app.debugDescription)
+        var inserted = ""
+        var draft = originalTitle
+        for burst in [" 123456", " 789012", " 345678"] {
+            try await Task.sleep(for: .milliseconds(500))
+            XCTAssertTrue(keyboard.exists, "The keyboard must stay visible between title edits")
+            app.typeText(burst)
+            inserted += burst
+            draft = try XCTUnwrap(name.value as? String)
+            XCTAssertTrue(draft.contains(inserted), "Typing must retain every burst at the insertion point")
+            XCTAssertEqual(draft.replacingOccurrences(of: inserted, with: ""), originalTitle,
+                           "Typing must preserve the complete original title")
+        }
+        try await Task.sleep(for: .milliseconds(500))
+        XCTAssertTrue(keyboard.exists, "The keyboard must remain visible after the title grows")
+        XCTAssertEqual(name.value as? String, draft)
+        capture(app, name: "\(list ? "List" : "Medium Map") row title edit retains keyboard and draft")
+
+        try visibleButton("activity-edit-cancel", in: app).tap()
+        let discard = app.buttons["Discard changes"].firstMatch
+        XCTAssertTrue(discard.waitForExistence(timeout: 5), "Cancelling a changed title must offer to discard the draft")
+        discard.tap()
+        XCTAssertTrue(name.waitForNonExistence(timeout: 10), app.debugDescription)
+        let returned = try await state(in: app) { $0.ready && $0.currentID(list: list) == initial.currentID(list: list) }
+        XCTAssertEqual(returned.selectedTab, initial.selectedTab)
+        XCTAssertEqual(returned.selection, initial.selection)
+        XCTAssertEqual(returned.listedIDs, initial.listedIDs)
+        XCTAssertEqual(returned.candidates, initial.candidates)
+        XCTAssertTrue(row.isHittable, "Discarding the edit must return to the original activity row")
+        XCTAssertEqual(row.label, originalRowLabel, "Discarding must leave the saved activity title unchanged")
+        if !list {
+            XCTAssertEqual(returned.controllerID, initial.controllerID)
+            XCTAssertEqual(returned.scrollID, initial.scrollID)
+            XCTAssertTrue(returned.scrollAttached)
+            XCTAssertEqual(returned.navigationDepth, initial.navigationDepth)
+            XCTAssertEqual(returned.detent, initial.detent)
+            XCTAssertEqual(returned.offset[1], initial.offset[1], accuracy: 2)
+        }
+        capture(app, name: "\(list ? "List" : "Medium Map") results preserved after discarding title edit")
+    }
+
     func testListTopPullFromElevationChart() async throws {
         try await previousJourney(list: true, profile: true)
     }
@@ -394,7 +503,7 @@ final class ActivityContinuationUITests: XCTestCase {
         }
     }
 
-    private func launch(list: Bool = false, expanded: Bool = true, profile: Bool = false) -> XCUIApplication {
+    private func launch(list: Bool = false, expanded: Bool = true, profile: Bool = false, filteredEdit: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = .portrait
         let app = XCUIApplication()
@@ -403,6 +512,7 @@ final class ActivityContinuationUITests: XCTestCase {
             + (expanded ? ["--map-rotation-expanded"] : [])
             + (list ? ["--activity-continuation-list"] : [])
             + (profile ? ["--activity-continuation-profile"] : [])
+            + (filteredEdit ? ["--activity-edit-filter-ui-testing"] : [])
         app.launch()
         return app
     }

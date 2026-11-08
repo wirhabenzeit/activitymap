@@ -139,6 +139,7 @@ export function createSyncChangesHandler({
       );
 
       const items = await resolveChangeItems(changes, {
+        athleteId: actor.athleteId,
         activitiesRepo,
         photosRepo,
       });
@@ -227,6 +228,7 @@ export function createSyncChangesHandler({
 async function resolveChangeItems(
   changes: SyncChange[],
   deps: {
+    athleteId: number;
     activitiesRepo: Pick<ActivitiesRepository, 'findManyByIds'>;
     photosRepo: Pick<PhotosRepository, 'findManyByIds'>;
   },
@@ -270,9 +272,11 @@ async function resolveChangeItems(
       continue;
     }
 
+    // A change row only says this athlete's feed mentioned the entity; it is
+    // not proof the athlete still owns it. Never hydrate another athlete's row.
     if (change.entityType === 'activity') {
       const activity = activityById.get(Number(change.entityId));
-      if (!activity) continue;
+      if (activity?.athlete !== deps.athleteId) continue;
       items.push({
         sequence: toIdString(change.sequence),
         entityType: 'activity',
@@ -282,7 +286,7 @@ async function resolveChangeItems(
       });
     } else {
       const photo = photoById.get(change.entityId);
-      if (!photo) continue;
+      if (photo?.athlete_id !== deps.athleteId) continue;
       items.push({
         sequence: toIdString(change.sequence),
         entityType: 'photo',

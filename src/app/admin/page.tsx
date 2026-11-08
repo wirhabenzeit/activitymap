@@ -17,6 +17,7 @@ import {
 import { requireAdmin } from '~/server/auth/admin';
 
 import { DashboardNavigation, type StatusCard } from './dashboard-navigation';
+import { WebhookControls } from './webhook-controls';
 
 /**
  * Read-only operations dashboard (issue #328): scheduled job health and run
@@ -291,7 +292,17 @@ export default async function AdminPage({
           failures: <FailingActivities data={data} />,
           places: <PlaceMatching data={data} totals={matching} />,
           ingestion: <IngestionStatus data={data} />,
-          webhooks: <WebhookInbox data={data} />,
+          webhooks: (
+            <>
+              <Section
+                title="Strava webhook subscription"
+                description="Registering points Strava's single push subscription at this deployment's secret callback URL and removes any subscription for another URL."
+              >
+                <WebhookControls />
+              </Section>
+              <WebhookInbox data={data} />
+            </>
+          ),
           budget: <StravaBudget data={data} />,
         }}
       />

@@ -1,12 +1,36 @@
 import SwiftUI
 
-/// Keep presentation state on the row, rather than in the transient menu.
+extension EnvironmentValues {
+    @Entry var editActivityRow: ((Activity) -> Void)? = nil
+}
+
+/// An editor outlives lazy rows and native context-menu presentation updates.
+/// Each browsing screen owns its draft destination outside the scrolling rows.
+struct ActivityRowEditorPresenter: ViewModifier {
+    let store: ActivityStore
+    @State private var editingActivity: Activity?
+
+    func body(content: Content) -> some View {
+        content
+            .environment(\.editActivityRow, { activity in
+                guard store.activityEditing != nil else { return }
+                editingActivity = activity
+            })
+            .sheet(item: $editingActivity) { activity in
+                if let service = store.activityEditing {
+                    ActivityEditForm(activity: store.activity(id: activity.id) ?? activity, service: service)
+                }
+            }
+    }
+}
+
+/// Rows request editing from their screen and keep their own GPX workflow.
 struct ActivityRowContextMenu: ViewModifier {
     @Environment(\.locale) private var locale
+    @Environment(\.editActivityRow) private var editActivity
     let activity: Activity
     let store: ActivityStore
     var showsMapAction = false
-    @State private var showsEditor = false
     @State private var workflow = ActivityGPXExportController()
 
     private var source: ActivityGPXExportSource { .capture(activity: activity, store: store) }
@@ -20,11 +44,6 @@ struct ActivityRowContextMenu: ViewModifier {
         content
             .contextMenu { actions }
             .accessibilityActions { actions }
-            .sheet(isPresented: $showsEditor) {
-                if let service = store.activityEditing {
-                    ActivityEditForm(activity: store.activity(id: activity.id) ?? activity, service: service)
-                }
-            }
             .background(ActivityGPXSharePresenter(file: $workflow.file) { error in
                 workflow.report(title: String(localized: AppMessages.activityActionShareGPXFailed(locale: locale)), message: error.localizedDescription)
             })
@@ -36,8 +55,8 @@ struct ActivityRowContextMenu: ViewModifier {
 
     private var actions: some View {
         Group {
-            Button { showsEditor = true } label: { BrowseActionLabel(.edit) }
-                .disabled(store.activityEditing == nil)
+            Button { editActivity?(activity) } label: { BrowseActionLabel(.edit) }
+                .disabled(store.activityEditing == nil || editActivity == nil)
             Button { workflow.export(source: source, current: { source }) } label: {
                 Label { Text(workflow.isExporting ? AppMessages.actionPreparingGPX(locale: locale) : AppMessages.actionExportGPXNative(locale: locale)) }
                       icon: { BrowseActionIcon(.exportGPX) }

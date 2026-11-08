@@ -255,6 +255,9 @@ private struct NativeMapResultsPresenter<Content: View>: UIViewControllerReprese
             }
             guard presentedViewController == nil else { return }
             let panel = Panel(rootView: configuration.content)
+            // A sheet above results handles its own keyboard. Keep the
+            // backing results viewport (and its row presenters) unchanged.
+            panel.safeAreaRegions = .container
             panel.layoutChanged = { [weak self] in self?.scheduleGeometryReport() }
             panel.view.backgroundColor = .clear
             panel.modalPresentationStyle = .pageSheet

@@ -1,26 +1,42 @@
-import { checkWebhookStatus } from '../src/server/strava/actions';
+import { StravaClient } from '../src/server/strava/client';
+import {
+  webhookCallbackSecret,
+  webhookCallbackUrl,
+} from '../src/server/strava/webhook-callback';
 
+/**
+ * Operator script: reports whether this Strava app's push subscription points
+ * at the secret callback URL. It never prints the secret. To create or
+ * replace the subscription, use the admin-only `createWebhookSubscription`
+ * action.
+ */
 async function main() {
   try {
-    console.log('Checking webhook status and syncing to database...');
-    const result = await checkWebhookStatus();
-    
-    console.log('Webhook status check complete:');
-    console.log('- Expected URL:', result.expectedUrl);
-    console.log('- Has matching subscription:', result.hasMatchingSubscription);
-    console.log('- Database status:', result.databaseStatus);
-    
-    if (result.matchingSubscription) {
-      console.log('- Matching subscription found');
-      console.log('- Created at:', new Date(result.matchingSubscription.created_at).toISOString());
-      console.log('- Updated at:', new Date(result.matchingSubscription.updated_at).toISOString());
-    } else {
-      console.log('No matching subscription found. You may need to create a new webhook subscription.');
+    const publicUrl = process.env.PUBLIC_URL;
+    const secret = webhookCallbackSecret();
+    if (!publicUrl || !secret) {
+      throw new Error(
+        'PUBLIC_URL and a valid STRAVA_WEBHOOK_CALLBACK_SECRET must be set',
+      );
     }
-    
-    console.log('\nNumber of active Strava subscriptions:', result.subscriptions.length);
+    const expectedUrl = webhookCallbackUrl(publicUrl, secret);
+    const subscriptions = await StravaClient.withoutAuth().getSubscriptions();
+    const matching = subscriptions.find(
+      (sub) => sub.callback_url === expectedUrl,
+    );
+
+    console.log('Strava subscriptions for this app:', subscriptions.length);
+    console.log('- Points at the secret callback URL:', Boolean(matching));
+    if (matching) console.log('- Subscription id:', matching.id);
+    const stale = subscriptions.filter((sub) => sub !== matching);
+    if (stale.length > 0) {
+      console.log(
+        '- Subscriptions for another callback URL (replace via createWebhookSubscription):',
+        stale.map((sub) => sub.id),
+      );
+    }
   } catch (error) {
-    console.error('Error syncing webhook:', error);
+    console.error('Error checking webhook subscription:', error);
   } finally {
     process.exit(0);
   }
