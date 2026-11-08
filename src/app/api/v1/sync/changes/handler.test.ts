@@ -8,6 +8,7 @@ import { syncChangesPageDTOSchema } from '~/contracts/v1/sync.ts';
 import type { Actor } from '~/server/auth/actor.ts';
 import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
 import { encodeSyncCursor } from '~/server/sync/cursor.ts';
+import { SyncRebootstrapRequiredError } from '~/server/sync/errors';
 
 import { createSyncChangesHandler } from './handler.ts';
 
@@ -706,4 +707,28 @@ void test('byte-bounded pages resume before the first deferred upsert', async ()
     third.items.map((item) => item.sequence),
     ['10'],
   );
+});
+
+void test('compaction between retention preflight and changes read returns rebootstrap rather than 500', async () => {
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo([]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: {
+      retentionFloor: async () => 0,
+      latestSequence: async () => 2,
+      findAfter: async () => {
+        throw new SyncRebootstrapRequiredError();
+      },
+    },
+    onError: () => assert.fail('Cursor expiry is not an internal error'),
+  });
+  const response = await GET(
+    new Request(`https://example.test/api/v1/sync/changes?cursor=${encode(1)}`),
+  );
+  assert.equal(response.status, 409);
+  const body = errorEnvelopeSchema.parse(await response.json());
+  assert.equal(body.error.code, 'sync_rebootstrap_required');
+  assert.equal(body.error.retryable, false);
 });

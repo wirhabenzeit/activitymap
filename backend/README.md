@@ -22,86 +22,80 @@ lab contains a different schema and uses its own deployment configuration.
 `owners` is the durable owner assignment and permission fence. Owners keep
 their application user and provider athlete IDs. A handoff records a new epoch
 with a compare-and-set against the current epoch. Previously used epochs cannot
-be issued again. Source and publication mutations check the same assignment,
-account generation and current source revision. Convex document IDs stay inside
-the application backend.
+be issued again. Source and publication mutations check the same assignment and
+account generation. Convex document IDs stay inside the application backend.
 
-The existing authenticated app derives the bridge actor from the resolved
-session. The bridge accepts a short-lived HMAC over the complete request body
-and the signer ID. Configure `ACTIVITYMAP_CONVEX_SITE`,
+The authenticated app derives the bridge actor from the resolved session. The
+read-only bridge accepts an HMAC over the complete request body, timestamp and
+signer ID, valid for 30 seconds. Configure `ACTIVITYMAP_CONVEX_SITE`,
 `ACTIVITYMAP_CONVEX_KEY_ID` and `ACTIVITYMAP_CONVEX_SIGNING_KEY` in the app's
-server secret store. Configure `ACTIVITYMAP_BRIDGE_SIGNING_KEYS` on the
-application deployment as a map from key IDs to 32-byte lowercase hex secrets.
-For rotation, install the new key on Convex, switch the server's signer and
-retire the prior verification key after in-flight requests expire. Use
-different keys for each environment.
+server secret store. Configure `ACTIVITYMAP_BRIDGE_SIGNING_KEYS` on Convex as a
+map from key IDs to 32-byte secrets encoded as 64 lowercase hex characters.
+Both ends decode the hex before signing/verifying. Deploy signer and verifier
+together; the earlier text-byte signatures are incompatible. For rotation,
+install the new verification key, switch the signer, then retire the prior key
+after in-flight requests expire. Use different keys for each environment.
+Requests can be replayed within the time window; a single-use nonce is required
+before adding any write operation.
 
-The application bridge and owner assignments are foundations for the handoff.
-The app routes currently exercise the existing contracts through Postgres or the
-isolated fixture adapter. Routing real owner reads and writers together requires
-the provider authority and migration work in the implementation plan.
+The app routes currently use Postgres or the isolated lab preview contract from
+#495. The preview requires `ACTIVITYMAP_CONVEX_PREVIEW_SITE`, an HTTPS origin
+without a path or credentials, separate from the application bridge's site.
+Lab performance measurements do not validate this package. Connecting the
+missing photo/raw/status operations, coordinated provider cutover, Convex
+authentication and reactive web subscriptions remain implementation-plan work.
 
-## Storage and sync
+## Recordings and publication
 
-The activity row holds bounded DTO metadata and a versioned stream/matching
-projection. Bootstrap reads it directly. Immutable gzip recordings and chart
-summaries use the separate recording table and storage. Source revisions,
-recording IDs, catalogue identity and account generation fence late work.
-Upserts and tombstones are sequenced in the same transaction as the visible
-change. Revocation hides data immediately. Physical erasure and orphan recovery
-belong to the account lifecycle and durable worker workflows.
+Activity rows hold bounded DTO metadata and versioned stream/matching
+projections. Immutable gzip recordings and chart summaries use a separate
+recording table and storage. Validators derive from the shared Zod contracts;
+mutation boundaries also enforce their semantic refinements.
 
-A catalogue change updates the shared catalogue and matching version first.
-The bounded rebuild publishes invalidation changes for rows that still carry
-old results. Subsequent matching publications replace those results under the
-new catalogue fence. This package currently serves activity sync and summary
-reads. Photo persistence, provider command dispatch, account lifecycle and
-authoritative catalogue publication are later work packages.
+The coordinator supplies monotonically increasing `sourceRevision` values.
+`streamSourceRevision` records the first revision of the current stream source,
+using the same `STREAM_SOURCE_FIELDS` as Postgres. It stays stable across names
+and kudos, but advances on geometry, privacy or sensor changes and deletion.
+A recording fetched at revision N can publish when N lies between that stream
+revision and the current metadata revision. Reverting source values or deleting
+and recreating an activity does not revive an earlier worker. Accepted recordings
+are associated with the current metadata revision for summary reads.
 
-## Review fixes and remaining integration boundary
+Matches are fenced by the current recording ID and catalogue, in addition to
+owner assignment and generation. Metadata-only updates preserve recordings,
+summaries and matches and allow in-flight work to finish. Stream-source changes
+remove the recording and invalidate its derived results.
 
-PR #494 deliberately remains a REST compatibility foundation. The web preview
-still uses the lab contract from #495. It now requires
-`ACTIVITYMAP_CONVEX_PREVIEW_SITE` (an HTTPS origin, with no path or credentials);
-there is no built-in deployment URL. For the existing lab, configure its site
-origin explicitly. This setting is separate from `ACTIVITYMAP_CONVEX_SITE`,
-which selects the application backend's signed bridge. The lab performance
-numbers do **not** validate this package or its missing photo/raw/status APIs.
-Connecting those contracts, coordinated provider cutover, Convex authentication
-and web subscriptions remain implementation-plan work, not claims of this PR.
+Preparation schedules reference-aware file cleanup before decoding and cleans
+immediately on rejection/failure. Referenced files survive cleanup. Uploads
+abandoned before preparation and full account erasure still require the
+account/ingestion lifecycle work. Revocation hides data immediately.
 
-The concrete review fixes are:
+## Sync and background maintenance
 
-- Source invalidation uses the same `STREAM_SOURCE_FIELDS` as Postgres. Names
-  and kudos preserve recordings, summaries and place matches; geometry,
-  privacy and sensor-source changes invalidate them. Late work still checks
-  the current source revision.
-- Missing/outdated projections return activity metadata without derived state,
-  so a projection-version rollout does not take the owner offline. Obsolete
-  account generations are excluded from reads.
-- `ownerHeads` holds the feed sequence, retention floor and rebuild cursor.
-  Item and summary queries no longer read the mutable head. Feed writes still
-  serialize per owner to maintain the offline cursor's total order.
-- A daily Convex cron compacts changes older than 90 days in 256-row batches,
-  atomically recording each owner's removed-sequence floor. `retention` exposes
-  that floor, and `changes` rejects older cursors even after all rows expire.
-- Catalogue selection schedules bounded invalidation batches automatically.
-  Superseded/revoked work stops; a new Convex routing epoch resumes pending work.
-  This invalidates old results; it does not implement the future rematching worker.
-- Recording preparation schedules a reference-aware cleanup before decoding.
-  Rejected/failed publication also cleans immediately. Referenced files survive
-  cleanup. Uploads abandoned before preparation and full account erasure still
-  require the account/ingestion lifecycle work.
-- Activity, stream and match validators derive from the existing Zod contracts;
-  Zod parsing at mutation boundaries still enforces their semantic refinements.
-- HMAC signing and verification decode the configured hex into 32 bytes. Deploy
-  signer and verifier together; keys from the previous text-byte implementation
-  produce different signatures. This bridge accepts reads only. Signed requests
-  can be replayed within 30 seconds; a single-use nonce is required before adding
-  any write operation.
-- Test fixtures live under `backend/tests`, independently of the lab. The app
-  shell resolves preview selection once per render.
+`ownerHeads` holds each owner's feed sequence, retention floor and rebuild
+cursor. Feed writes serialize per owner so visible changes and sequence updates
+commit together. Item/summary queries avoid this mutable head. Older or missing
+projections return metadata without derived state; obsolete account generations
+are excluded from reads.
 
-The head-table/index changes target this undeployed foundation. Do not apply
-this schema over an existing backend dataset without migrating its owner heads
-and rebuilding the changed index. The lab schema and retained data are untouched.
+A daily cron compacts changes older than 90 days in 256-row batches. Deletion
+and each owner's removed-sequence floor commit together. Rows whose head has
+already been erased are removed without blocking other owners. `retention`
+returns the persisted floor without a cutoff argument. `changes` checks the
+floor in the same transaction as reading the page. If compaction overtakes a
+cursor after preflight, the bridge and changes handler propagate
+`409 sync_rebootstrap_required`, asking the client to bootstrap again.
+
+Catalogue selection hides old matches immediately and schedules bounded
+invalidation batches. Superseded/revoked jobs stop; a fresh Convex routing epoch
+resumes pending work. This publishes invalidations, not rematching jobs; the
+matching worker must publish results against the new catalogue fence.
+
+## Schema migration
+
+The head-table/index changes and required `activities.streamSourceRevision`
+target this undeployed foundation. Do not apply this schema over an existing
+backend dataset without migrating owner heads, initializing stream revisions
+conservatively to each row's current source revision, and rebuilding the changed
+index. The lab schema and retained data are separate and untouched.

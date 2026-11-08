@@ -107,6 +107,11 @@ export const applySource = internalMutation({
       owner: owner._id,
       key,
       sourceRevision: args.sourceRevision,
+      // Stable across metadata changes, advances on source changes/deletion.
+      // Unlike a value hash, this also fences changes that are later reverted.
+      streamSourceRevision: preserve
+        ? prior!.streamSourceRevision
+        : args.sourceRevision,
       generation: args.generation,
     };
     if (args.dto === null) {
@@ -182,9 +187,9 @@ async function publicationScope(
   if (
     !row?.dto ||
     row.deleted ||
-    row.sourceRevision !== args.sourceRevision ||
     row.generation !== owner.generation ||
-    row.projection?.version !== PROJECTION_VERSION
+    row.projection?.version !== PROJECTION_VERSION ||
+    row.projection.generation !== owner.generation
   )
     return null;
   return { owner, row, dto: row.dto, projection: row.projection };
@@ -201,7 +206,14 @@ export const publishRecording = internalMutation({
   },
   handler: async (ctx, args) => {
     const scope = await publicationScope(ctx, args);
-    if (!scope || scope.row.recording) return false;
+    if (
+      !scope ||
+      scope.row.recording ||
+      !Number.isSafeInteger(args.sourceRevision) ||
+      args.sourceRevision < scope.row.streamSourceRevision ||
+      args.sourceRevision > scope.row.sourceRevision
+    )
+      return false;
     const { owner, row, dto, projection } = scope;
     const streams = streamMetadataSchema.parse(args.metadata);
     if (
@@ -239,7 +251,7 @@ export const publishRecording = internalMutation({
       file: args.file,
       generation: streams.generation,
       revision: streams.revision,
-      sourceRevision: args.sourceRevision,
+      sourceRevision: row.sourceRevision,
       manifest: args.manifest,
       summary: args.summary,
     });

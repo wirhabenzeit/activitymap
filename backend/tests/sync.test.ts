@@ -5,6 +5,7 @@ import { convexTest } from 'convex-test';
 import test, { after, mock } from 'node:test';
 
 import { convexSyncBridge } from '../../src/server/sync/convex-bridge';
+import { SyncRebootstrapRequiredError } from '../../src/server/sync/errors';
 import { internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
 import { encodeWhole } from '../recording/codec';
@@ -256,6 +257,25 @@ void test('signed bridge derives scope from the actor and old routing epochs can
     });
   await assert.rejects(convexSyncBridge(actor, tamper)!.assignment);
 
+  // Compaction can advance the floor after the client's separate preflight.
+  assert.equal(await bridge.read({ kind: 'retention' }, scope.epoch), 0);
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    dto: fixture,
+  });
+  await convex.run(async (ctx) => {
+    const change = (await ctx.db.query('changes').first())!;
+    await ctx.db.patch('changes', change._id, {
+      changedAt: Date.now() - 91 * 86_400_000,
+    });
+  });
+  await convex.mutation(internal.maintenance.compactChanges, {});
+  const staleRead = { kind: 'changes', after: 0, limit: 10 };
+  await assert.rejects(
+    bridge.read(staleRead, scope.epoch),
+    SyncRebootstrapRequiredError,
+  );
+
   const next = {
     ...config,
     backend: 'postgres' as const,
@@ -358,7 +378,7 @@ void test('metadata changes preserve recordings, summaries and matches; source f
       result,
     }),
     false,
-    'late source revision remains fenced',
+    'an already published match remains idempotent',
   );
   await drainScheduled(convex);
   assert(
@@ -516,7 +536,7 @@ void test('retention drains bounded batches, preserves recent changes and reject
   await drainScheduled(convex);
   const floor = await convex.query(internal.sync.read, {
     ...scope,
-    operation: { kind: 'retention', cutoff: Date.now() },
+    operation: { kind: 'retention' },
   });
   assert.equal(floor, 260);
   await assert.rejects(
@@ -553,7 +573,7 @@ void test('retention drains bounded batches, preserves recent changes and reject
   assert.equal(
     await convex.query(internal.sync.read, {
       ...scope,
-      operation: { kind: 'retention', cutoff: Date.now() },
+      operation: { kind: 'retention' },
     }),
     261,
   );
@@ -655,6 +675,183 @@ void test('catalogue invalidation pauses at handoff and resumes under a fresh Co
         operation,
       })
     ).items.length,
+    1,
+  );
+});
+
+void test('metadata updates allow in-flight recording and first match publication, but source changes fence them', async () => {
+  const convex = convexTest(schema, modules);
+  await convex.mutation(internal.owners.provision, config);
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    dto: fixture,
+  });
+  const encoded = encodeWhole({});
+  const stage = () =>
+    convex.run((ctx) =>
+      ctx.storage.store(new Blob([new Uint8Array(encoded.file)])),
+    );
+  const work = {
+    ...source,
+    manifest: encoded.manifest,
+    recordingGeneration: 'in-flight-recording',
+    recordingRevision: '1',
+  };
+  const file = await stage();
+  const metadata = {
+    ...fixture,
+    name: 'Renamed during fetch',
+    kudos_count: 20,
+  };
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    sourceRevision: 2,
+    dto: metadata,
+  });
+  assert.equal(
+    await convex.action(internal.recordingWorker.prepare, { ...work, file }),
+    true,
+  );
+  const recording = await convex.run(
+    async (ctx) => (await ctx.db.query('recordings').first())!,
+  );
+  assert.equal(
+    recording.sourceRevision,
+    2,
+    'summary association uses the current metadata revision',
+  );
+  assert(
+    (
+      await convex.query(internal.sync.read, {
+        ...scope,
+        operation: { kind: 'summaries', ids: [source.id] },
+      })
+    )[0].summary,
+  );
+  const match = {
+    ...source,
+    recording: recording._id,
+    catalogue,
+    result: {
+      activityId: source.id,
+      userId: scope.userId,
+      status: 'complete' as const,
+      streamGeneration: work.recordingGeneration,
+      streamRevision: '1',
+      catalogueSnapshotId: catalogue,
+      matcherVersion: 'test',
+      places: [],
+    },
+  };
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    sourceRevision: 3,
+    dto: { ...metadata, kudos_count: 21 },
+  });
+  assert.equal(
+    await convex.mutation(internal.activityWrites.publishMatch, match),
+    true,
+    'first result survives metadata changes',
+  );
+  assert.equal(
+    (await convex.query(internal.sync.read, { ...scope, operation })).items[0]
+      .placeMatches.status,
+    'complete',
+  );
+
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    sourceRevision: 4,
+    dto: { ...metadata, private: !metadata.private },
+  });
+  assert.equal(
+    await convex.mutation(internal.activityWrites.publishMatch, match),
+    false,
+  );
+  assert.equal(
+    await convex.action(internal.recordingWorker.prepare, {
+      ...work,
+      file: await stage(),
+    }),
+    false,
+  );
+  // Reverting source values must not resurrect jobs from the earlier source.
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    sourceRevision: 5,
+    dto: metadata,
+  });
+  assert.equal(
+    await convex.action(internal.recordingWorker.prepare, {
+      ...work,
+      file: await stage(),
+    }),
+    false,
+  );
+  const freshFile = await stage();
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    sourceRevision: 6,
+    dto: null,
+  });
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    sourceRevision: 7,
+    dto: metadata,
+  });
+  assert.equal(
+    await convex.action(internal.recordingWorker.prepare, {
+      ...work,
+      sourceRevision: 5,
+      file: freshFile,
+    }),
+    false,
+    'delete/recreate invalidates in-flight work',
+  );
+  await drainScheduled(convex);
+});
+
+void test('orphaned change rows cannot block retention for other owners', async () => {
+  const convex = convexTest(schema, modules);
+  const orphan = await convex.mutation(internal.owners.provision, config);
+  const other = await convex.mutation(internal.owners.provision, {
+    ...config,
+    userId: 'other-owner',
+    athleteId: '43',
+  });
+  await convex.run(async (ctx) => {
+    const head = (await ctx.db
+      .query('ownerHeads')
+      .withIndex('by_owner', (q) => q.eq('owner', orphan))
+      .unique())!;
+    await ctx.db.delete('ownerHeads', head._id);
+    await ctx.db.delete('owners', orphan);
+    for (const owner of [orphan, other])
+      await ctx.db.insert('changes', {
+        owner,
+        sequence: 1,
+        entityType: 'activity',
+        entityId: '1',
+        operation: 'delete',
+        changedAt: Date.now() - 91 * 86_400_000,
+      });
+    const liveHead = (await ctx.db.query('ownerHeads').first())!;
+    await ctx.db.patch('ownerHeads', liveHead._id, { sequence: 1 });
+  });
+  assert.equal(
+    await convex.mutation(internal.maintenance.compactChanges, {}),
+    2,
+  );
+  assert.equal(
+    await convex.run(
+      async (ctx) => (await ctx.db.query('changes').collect()).length,
+    ),
+    0,
+  );
+  assert.equal(
+    await convex.run(
+      async (ctx) => (await ctx.db.query('ownerHeads').first())!.retentionFloor,
+    ),
     1,
   );
 });

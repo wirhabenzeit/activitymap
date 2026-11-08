@@ -6,6 +6,8 @@ import { z } from 'zod';
 
 import type { Actor } from '~/server/auth/actor';
 
+import { SyncRebootstrapRequiredError } from './errors';
+
 const assignmentSchema = z.discriminatedUnion('backend', [
   z.object({ backend: z.literal('postgres'), epoch: z.string().nullable() }),
   z.object({ backend: z.literal('convex'), epoch: z.string() }),
@@ -55,6 +57,15 @@ export function convexSyncBridge(
       },
       body,
     });
+    if (result.status === 409) {
+      const error: unknown = await result.json();
+      if (
+        z
+          .object({ code: z.literal('sync_rebootstrap_required') })
+          .safeParse(error).success
+      )
+        throw new SyncRebootstrapRequiredError();
+    }
     if (!result.ok) throw new Error('Convex sync bridge unavailable');
     const payload: unknown = await result.json();
     return payload;

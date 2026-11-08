@@ -2,7 +2,6 @@ import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
-import { requireHead } from './owners';
 
 const RETENTION_MS = 90 * 86_400_000;
 const PAGE_SIZE = 256;
@@ -26,7 +25,12 @@ export const compactChanges = internalMutation({
       await ctx.db.delete('changes', row._id);
     }
     for (const [owner, floor] of floors) {
-      const head = await requireHead(ctx, owner);
+      const head = await ctx.db
+        .query('ownerHeads')
+        .withIndex('by_owner', (q) => q.eq('owner', owner))
+        .unique();
+      // Erased/migrating owners must not stall maintenance for everyone else.
+      if (!head) continue;
       await ctx.db.patch('ownerHeads', head._id, {
         retentionFloor: Math.max(head.retentionFloor, floor),
       });

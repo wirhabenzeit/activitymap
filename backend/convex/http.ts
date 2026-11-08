@@ -1,4 +1,5 @@
 import { httpRouter } from 'convex/server';
+import { ConvexError } from 'convex/values';
 
 import { internal } from './_generated/api';
 import { httpAction } from './_generated/server';
@@ -85,7 +86,15 @@ router.route({
               operation,
             });
       return Response.json(result, { headers });
-    } catch {
+    } catch (error) {
+      if (
+        error instanceof ConvexError &&
+        error.data === 'sync_rebootstrap_required'
+      )
+        return Response.json(
+          { code: 'sync_rebootstrap_required' },
+          { status: 409, headers },
+        );
       return new Response(null, { status: 400, headers });
     }
   }),

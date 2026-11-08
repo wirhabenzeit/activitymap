@@ -1,4 +1,4 @@
-import { v } from 'convex/values';
+import { ConvexError, v } from 'convex/values';
 
 import type { Doc } from './_generated/dataModel';
 import { internalQuery } from './_generated/server';
@@ -16,7 +16,7 @@ const cursor = v.union(id, v.null());
 const resource = v.union(v.literal('activities'), v.literal('photos'));
 const operation = v.union(
   v.object({ kind: v.literal('head') }),
-  v.object({ kind: v.literal('retention'), cutoff: v.number() }),
+  v.object({ kind: v.literal('retention') }),
   v.object({
     kind: v.literal('bootstrap'),
     resource,
@@ -113,10 +113,11 @@ export const read = internalQuery({
         if (
           !Number.isSafeInteger(op.after) ||
           op.after < 0 ||
-          op.after > feed!.sequence ||
-          op.after < feed!.retentionFloor
+          op.after > feed!.sequence
         )
           throw new Error('Invalid sync sequence');
+        if (op.after < feed!.retentionFloor)
+          throw new ConvexError('sync_rebootstrap_required');
         const rows = await ctx.db
           .query('changes')
           .withIndex('by_owner_sequence', (q) =>

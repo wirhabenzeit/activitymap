@@ -20,6 +20,7 @@ import type { PhotosRepository } from '~/server/repositories/photos';
 import type { PlaceMatchingRepository } from '~/server/repositories/place-matching';
 import type { SummaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
 import { encodeSyncCursor, tryDecodeSyncCursor } from '~/server/sync/cursor';
+import { SyncRebootstrapRequiredError } from '~/server/sync/errors';
 
 export interface SyncChangesHandlerDependencies {
   createRequestId?: () => string;
@@ -235,6 +236,8 @@ export function createSyncChangesHandler({
       );
       return Response.json(body);
     } catch (error) {
+      if (error instanceof SyncRebootstrapRequiredError)
+        return rebootstrapRequired(requestId, error.message);
       onError(error, requestId);
       return Response.json(
         errorEnvelope('internal_error', 'The request could not be completed.', {

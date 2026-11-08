@@ -34,6 +34,7 @@ export default defineSchema({
     key: v.string(),
     generation: v.string(),
     sourceRevision: v.number(),
+    streamSourceRevision: v.number(),
     deleted: v.boolean(),
     dto: v.optional(activityMetadataValidator),
     projection: v.optional(activityProjectionValidator),
