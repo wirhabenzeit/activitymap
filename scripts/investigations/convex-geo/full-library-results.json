@@ -1,0 +1,161 @@
+{
+  "date": "2026-11-07",
+  "runId": "full-library-1794069645840",
+  "deployment": "spotted-fennec-603",
+  "activities": 4602,
+  "totalLocalActivities": 4602,
+  "catalogueCount": 80366,
+  "groups": 194,
+  "activitiesPerGroup": {
+    "min": 1,
+    "median": 22,
+    "p95": 52,
+    "max": 97,
+    "total": 4602
+  },
+  "baselineStatuses": {
+    "uncovered": 824,
+    "complete": 3719,
+    "partial": 59
+  },
+  "postgres": {
+    "workerWallMs": 56282.331833000004,
+    "workerCpuMs": 39149.513,
+    "catalogueLoadMs": {
+      "min": 24.151624999998603,
+      "median": 29.03172900000027,
+      "p95": 32.8324590000002,
+      "max": 60.54070899999988,
+      "total": 5701.004292999999
+    },
+    "candidateRows": 17266,
+    "matchingFieldsJsonBytes": 3266485,
+    "passes": 10,
+    "inputBatches": 192,
+    "inputReadMs": 28436,
+    "matchingMs": 21155
+  },
+  "convex": {
+    "uncached": {
+      "verified": 4602,
+      "replayWallMs": 99269.840125,
+      "catalogueRoundTripMs": {
+        "min": 124.80683400000271,
+        "median": 226.34979150000163,
+        "p95": 625.4446250000037,
+        "max": 843.2830830000021,
+        "total": 53394.789952999956
+      },
+      "catalogueServerMs": {
+        "min": 0,
+        "median": 97,
+        "p95": 421,
+        "max": 576,
+        "total": 24130
+      },
+      "localInputReadMs": 26258.453541999977,
+      "localMatchingMs": 19146.467170000105,
+      "candidateRows": 17262,
+      "logicalRowsExamined": 104395,
+      "queryCalls": 1493,
+      "queryCacheHits": 0,
+      "actionCalls": 194,
+      "databaseReadBytes": 57999117,
+      "databaseReadDocuments": 104395,
+      "maxQueryReadBytes": 145162,
+      "maxQueryReadDocuments": 256,
+      "maxQueryUserMs": 14.601474,
+      "estimatedMarginalUsdUS": 0.015744281774030058,
+      "estimatedMarginalUsdOtherRegion": 0.020467566306239075
+    },
+    "cache-enabled": {
+      "verified": 4602,
+      "replayWallMs": 86511.548459,
+      "catalogueRoundTripMs": {
+        "min": 118.24162499999511,
+        "median": 167.50514599999588,
+        "p95": 443.0358750000014,
+        "max": 608.4165419999918,
+        "total": 40873.68628899996
+      },
+      "catalogueServerMs": {
+        "min": 0,
+        "median": 16,
+        "p95": 236,
+        "max": 440,
+        "total": 11625
+      },
+      "localInputReadMs": 26186.859580000004,
+      "localMatchingMs": 18914.21974499985,
+      "candidateRows": 17262,
+      "logicalRowsExamined": 104395,
+      "queryCalls": 1493,
+      "queryCacheHits": 807,
+      "actionCalls": 194,
+      "databaseReadBytes": 17020015,
+      "databaseReadDocuments": 30527,
+      "maxQueryReadBytes": 145162,
+      "maxQueryReadDocuments": 256,
+      "maxQueryUserMs": 13.394692,
+      "estimatedMarginalUsdUS": 0.007276869457688027,
+      "estimatedMarginalUsdOtherRegion": 0.009459930294994435
+    }
+  },
+  "costAssumptions": {
+    "plan": "Starter marginal rates before allowances; not actual invoice",
+    "usIoPerGiB": 0.22,
+    "usPerMillionCalls": 2.2,
+    "usActionPerGiBHour": 0.33,
+    "otherRegionMultiplier": 1.3,
+    "excluded": [
+      "catalogue import and storage",
+      "stream storage and reads",
+      "match/check writes",
+      "authentication and sync",
+      "matcher hosting compute"
+    ],
+    "actionEstimate": "conservative elapsed-time × 64MiB estimate; CPU billing may be lower"
+  },
+  "postgresRectangleExtras": [
+    {
+      "group": 82,
+      "postgresCandidates": 31,
+      "convexCandidates": 30,
+      "missing": 1,
+      "extra": 0,
+      "metadataChanged": 0,
+      "missingInsideExactWindows": 0,
+      "matchParity": 40
+    },
+    {
+      "group": 94,
+      "postgresCandidates": 21,
+      "convexCandidates": 20,
+      "missing": 1,
+      "extra": 0,
+      "metadataChanged": 0,
+      "missingInsideExactWindows": 0,
+      "matchParity": 18
+    },
+    {
+      "group": 155,
+      "postgresCandidates": 54,
+      "convexCandidates": 53,
+      "missing": 1,
+      "extra": 0,
+      "metadataChanged": 0,
+      "missingInsideExactWindows": 0,
+      "matchParity": 20
+    },
+    {
+      "group": 180,
+      "postgresCandidates": 906,
+      "convexCandidates": 905,
+      "missing": 1,
+      "extra": 0,
+      "metadataChanged": 0,
+      "missingInsideExactWindows": 0,
+      "matchParity": 17
+    }
+  ]
+}

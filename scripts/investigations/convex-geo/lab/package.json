@@ -1,0 +1,16 @@
+{
+  "name": "activitymap-geo-lab",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "convex dev --once",
+    "probe": "convex run lab:probe --deployment spotted-fennec-603"
+  },
+  "dependencies": {
+    "@convex-dev/geospatial": "0.2.1",
+    "convex": "1.46.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
