@@ -508,6 +508,9 @@ export class StravaClient {
       throw error;
     }
 
+    // DELETE /push_subscriptions/:id answers 204 with no body.
+    if (response.status === 204) return undefined as T;
+
     try {
       return (await response.json()) as T;
     } catch (parseError) {

@@ -115,3 +115,24 @@ void test('token refresh retains status and Retry-After without invoking persist
     'failed refreshes retire the task slot so retry can persist successfully',
   );
 });
+
+void test('deleteSubscription accepts the empty 204 Strava returns', async (t) => {
+  const originalEnv = { ...process.env };
+  Object.assign(process.env, {
+    AUTH_STRAVA_ID: 'fixture',
+    AUTH_STRAVA_SECRET: 'fixture',
+    ACTIVITYMAP_EXTERNAL_EFFECTS: 'enabled',
+  });
+  t.after(() => {
+    process.env = originalEnv;
+  });
+  const calls: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (url: string, init: RequestInit) => {
+    calls.push(`${init.method} ${new URL(url).pathname}`);
+    return new Response(null, { status: 204 });
+  });
+
+  await StravaClient.withoutAuth().deleteSubscription(42);
+
+  assert.deepEqual(calls, ['DELETE /api/v3/push_subscriptions/42']);
+});
