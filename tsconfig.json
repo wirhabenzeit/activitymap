@@ -40,5 +40,5 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", ".quality", "output", "public/sw.js"]
+  "exclude": ["node_modules", ".quality", "output", "public/sw.js", "backend"]
 }

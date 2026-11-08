@@ -9,7 +9,7 @@ import {
   type MatcherPolicy,
   validatePolicy,
 } from '~/server/places/policy';
-import type { PublishedCatalogue } from '~/server/places/published-catalogue';
+import type { PublishedCatalogue } from '~/server/places/published-catalogue-core';
 import {
   type PreparedTrack,
   prepareTrack,
