@@ -59,21 +59,30 @@ table and the Convex `owners` table key on the Better Auth user ID).
 ### Verification (Convex)
 
 ```ts
-// backend/convex/auth.config.ts
+// backend/convex/auth.config.ts (abridged; implemented in #505)
+const issuer = process.env.ACTIVITYMAP_AUTH_JWT_ISSUER;
 export default {
-  providers: [
-    {
-      type: 'customJwt',
-      issuer: process.env.ACTIVITYMAP_AUTH_JWT_ISSUER!,
-      applicationID: 'convex',
-      algorithm: 'ES256',
-      // Static data URI of the app's public JWKS: no fetch per validation,
-      // and no dependency on the app being reachable from Convex.
-      jwks: process.env.ACTIVITYMAP_AUTH_JWKS!,
-    },
-  ],
+  providers:
+    issuer === 'disabled'
+      ? []
+      : [
+          {
+            type: 'customJwt',
+            issuer,
+            applicationID: 'convex',
+            algorithm: 'ES256',
+            // Static data URI of the app's public JWKS: no fetch per
+            // validation, and no dependency on the app being reachable.
+            jwks: process.env.ACTIVITYMAP_AUTH_JWKS,
+          },
+        ],
 };
 ```
+
+Convex refuses to deploy an auth config that reads an unset variable, so
+every deployment sets `ACTIVITYMAP_AUTH_JWT_ISSUER`, to `disabled` until it is
+wired to an app environment. The plugin's tokens carry no `typ` header;
+Convex accepts them (verified on the dev deployment in #505).
 
 - Each deployment (dev, production) gets the issuer and JWKS of the app
   environment that reads it. Rotation: publish the new public key alongside
