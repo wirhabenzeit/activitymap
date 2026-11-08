@@ -1,5 +1,6 @@
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { logger } from '~/server/logging/logger';
+import { convexPreviewFor } from '~/server/preview/convex';
 import { createPlaceMatchingRepository } from '~/server/repositories/place-matching';
 
 import { createActivityPlacesHandler } from './handler';
@@ -17,8 +18,13 @@ export async function GET(
       const { id } = await params;
       return createActivityPlacesHandler({
         resolveActor: context.actor,
-        read: (actor, activityId) =>
-          createPlaceMatchingRepository().read(actor, activityId),
+        read: (actor, activityId) => {
+          const preview = convexPreviewFor(actor);
+          return (preview?.placesRepo ?? createPlaceMatchingRepository()).read(
+            actor,
+            activityId,
+          );
+        },
         onError: () =>
           logger.error('Place results read failed', {
             requestId: context.requestId,

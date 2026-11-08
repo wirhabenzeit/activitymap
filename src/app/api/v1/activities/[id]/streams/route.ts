@@ -1,5 +1,6 @@
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { logger } from '~/server/logging/logger';
+import { convexPreviewFor } from '~/server/preview/convex';
 import { createActivityStreamsRepository } from '~/server/repositories/activity-streams';
 import { streamActivityIdSchema } from '~/server/strava/streams';
 
@@ -17,6 +18,7 @@ export async function GET(
       return createActivityStreamsHandler({
         resolveActor: context.actor,
         repository: createActivityStreamsRepository(),
+        storedOnly: convexPreviewFor(await context.actor())?.streams,
         onError: (error, requestId) =>
           logger.error('Activity streams request failed', { error, requestId }),
       })(request, streamActivityIdSchema.safeParse(id).success ? id : null);

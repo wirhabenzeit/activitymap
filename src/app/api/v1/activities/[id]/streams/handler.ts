@@ -26,6 +26,7 @@ import { StravaBudgetExceededError } from '~/server/strava/request-budget';
 export function createActivityStreamsHandler(deps: {
   resolveActor: (request: Request) => Promise<Actor | null>;
   repository: ActivityStreamsRepository;
+  storedOnly?: Pick<ActivityStreamsRepository, 'read' | 'readSummaries'>;
   fetch?: typeof fetchActivityStreams;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
@@ -69,7 +70,14 @@ export function createActivityStreamsHandler(deps: {
       }
       const now = deps.now ?? (() => new Date());
       let status = 200;
-      if (fetchMode !== 'none') {
+      if (deps.storedOnly && refresh === 'true') {
+        return fail(
+          503,
+          'streams_fetch_failed',
+          'Explicit refresh is unavailable in the fixture preview.',
+        );
+      }
+      if (!deps.storedOnly && fetchMode !== 'none') {
         const result = await (deps.fetch ?? fetchActivityStreams)(actor, id, {
           repository: deps.repository,
           force: refresh === 'true',
@@ -104,7 +112,10 @@ export function createActivityStreamsHandler(deps: {
         ...(status === 202 ? { 'Retry-After': '3' } : {}),
       };
       if (deps.view === 'summary' || deps.view === 'compact') {
-        const [read] = await deps.repository.readSummaries(actor, [id]);
+        const [read] = await (deps.storedOnly ?? deps.repository).readSummaries(
+          actor,
+          [id],
+        );
         if (!read) throw new ActivityStreamsUnavailableError();
         return Response.json(
           responseEnvelope(
@@ -122,7 +133,7 @@ export function createActivityStreamsHandler(deps: {
           { status, headers: responseHeaders },
         );
       }
-      const row = await deps.repository.read(actor, id);
+      const row = await (deps.storedOnly ?? deps.repository).read(actor, id);
       return Response.json(
         responseEnvelope(activityStreamsDTOSchema).parse(
           makeEnvelope(toActivityStreamsDTO(id, row), now()),

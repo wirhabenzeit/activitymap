@@ -10,6 +10,7 @@ import { requireExternalEffectsEnabled } from '~/server/config/external-effects'
 import { db } from '~/server/db';
 import { stravaWebhooks } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
+import { assertPostgresDataActor } from '~/server/preview/selection';
 
 import { StravaClient } from './client';
 import { type UpdateActivityInput } from './validators';
@@ -24,6 +25,7 @@ import { webhookCallbackSecret, webhookCallbackUrl } from './webhook-callback';
  */
 export async function updateActivity(input: UpdateActivityInput) {
   const actor = await requireActor(await headers());
+  assertPostgresDataActor(actor);
   return activitiesService.updateActivityForActor(actor, input);
 }
 
@@ -37,6 +39,7 @@ export async function updateActivity(input: UpdateActivityInput) {
  */
 export async function refreshActivity(activityId: number) {
   const actor = await requireActor(await headers());
+  assertPostgresDataActor(actor);
   return activitiesService.refreshActivityForActor(actor, activityId);
 }
 
@@ -48,6 +51,7 @@ export async function deleteActivities(input: number[]): Promise<{
   errors: string[];
 }> {
   const actor = await requireActor(await headers());
+  assertPostgresDataActor(actor);
   return activitiesService.deleteActivitiesForActor(actor, input);
 }
 

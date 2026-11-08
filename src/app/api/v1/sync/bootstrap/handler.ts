@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 
-import { toActivityDTO } from '~/contracts/v1/activity';
+import { type ActivityDTO, toActivityDTO } from '~/contracts/v1/activity';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
-import { toPhotoDTO } from '~/contracts/v1/photo';
+import { type PhotoDTO, toPhotoDTO } from '~/contracts/v1/photo';
 import {
   syncBootstrapPageDTOSchema,
   syncBootstrapQuerySchema,
@@ -17,10 +17,20 @@ import type { PhotosRepository } from '~/server/repositories/photos';
 import type { PlaceMatchingRepository } from '~/server/repositories/place-matching';
 import type { SummaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
 import {
-  encodeBootstrapCursor,
-  tryDecodeBootstrapCursor,
+  decodeScopedBootstrapCursor,
+  encodeScopedBootstrapCursor,
 } from '~/server/sync/bootstrap-cursor';
 import { encodeSyncCursor } from '~/server/sync/cursor';
+
+export type BootstrapSnapshot = {
+  sequence: number;
+  lastSummaryReconciledAt: Date | null;
+  matchingVersion: string;
+  more: boolean;
+  page:
+    | { resource: 'activities'; items: ActivityDTO[] }
+    | { resource: 'photos'; items: PhotoDTO[] };
+};
 
 export interface SyncBootstrapHandlerDependencies {
   createRequestId?: () => string;
@@ -30,6 +40,17 @@ export interface SyncBootstrapHandlerDependencies {
   resolveActor: (request: Request) => Promise<Actor | null>;
   activitiesRepo: Pick<ActivitiesRepository, 'findPageByAthlete'>;
   photosRepo: Pick<PhotosRepository, 'findPageByAthlete'>;
+  cursorBackend?: string;
+  /** Optional backend-native snapshot read; keeps its high-water and page atomic. */
+  bootstrapPage?: (
+    actor: Actor,
+    args: {
+      resource: 'activities' | 'photos';
+      afterKey?: string;
+      limit: number;
+    },
+  ) => Promise<BootstrapSnapshot>;
+  defaultPageSize?: number;
   changesRepo: Pick<ChangesRepository, 'latestSequence'>;
   placesRepo?: Pick<PlaceMatchingRepository, 'sync'>;
   freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
@@ -61,6 +82,9 @@ export function createSyncBootstrapHandler({
   activitiesRepo,
   photosRepo,
   changesRepo,
+  cursorBackend,
+  bootstrapPage,
+  defaultPageSize,
   freshnessRepo = { lastCompletedAt: async () => null },
   placesRepo,
   retentionDays = DEFAULT_RETENTION_DAYS,
@@ -83,7 +107,7 @@ export function createSyncBootstrapHandler({
       const parsedQuery = syncBootstrapQuerySchema.safeParse({
         resource: url.searchParams.get('resource') ?? undefined,
         cursor: url.searchParams.get('cursor') ?? undefined,
-        limit: url.searchParams.get('limit') ?? undefined,
+        limit: url.searchParams.get('limit') ?? defaultPageSize,
       });
       if (!parsedQuery.success) {
         return Response.json(
@@ -110,10 +134,24 @@ export function createSyncBootstrapHandler({
       // silently drop any change that landed on an activity in between.
       const isFirstPage = resource === 'activities' && cursor === undefined;
 
+      const cursorScope = cursorBackend && `${cursorBackend}.${resource}`;
       let afterKey: string | undefined;
       if (cursor !== undefined) {
-        const decoded = tryDecodeBootstrapCursor(cursor);
-        if (decoded === null) {
+        const { key, foreign } = decodeScopedBootstrapCursor(
+          cursor,
+          cursorScope,
+        );
+        if (foreign) {
+          return Response.json(
+            errorEnvelope(
+              'sync_rebootstrap_required',
+              'The requested cursor belongs to a different bootstrap scope.',
+              { requestId },
+            ),
+            { status: 409 },
+          );
+        }
+        if (key === null) {
           return Response.json(
             errorEnvelope(
               'validation_failed',
@@ -125,7 +163,7 @@ export function createSyncBootstrapHandler({
             { status: 400 },
           );
         }
-        afterKey = decoded;
+        afterKey = key;
       }
 
       if (
@@ -146,11 +184,19 @@ export function createSyncBootstrapHandler({
       }
 
       const nowValue = now();
+      const snapshot = bootstrapPage
+        ? await bootstrapPage(actor, { resource, afterKey, limit })
+        : null;
+      if (snapshot && snapshot.page.resource !== resource)
+        throw new Error('Bootstrap resource mismatch');
       const snapshotCursor = isFirstPage
         ? encodeSyncCursor({
-            sequence: await changesRepo.latestSequence(actor.athleteId),
+            sequence: snapshot
+              ? snapshot.sequence
+              : await changesRepo.latestSequence(actor.athleteId),
             athleteId: actor.athleteId,
             issuedAt: nowValue,
+            backend: cursorBackend,
           })
         : null;
       const retention = {
@@ -161,19 +207,38 @@ export function createSyncBootstrapHandler({
       };
       const freshness = {
         lastSummaryReconciledAt:
-          (
-            await freshnessRepo.lastCompletedAt(actor.athleteId)
+          (snapshot
+            ? snapshot.lastSummaryReconciledAt
+            : await freshnessRepo.lastCompletedAt(actor.athleteId)
           )?.toISOString() ?? null,
       };
 
-      const payload =
-        resource === 'activities'
+      const last = snapshot?.page.items.at(-1);
+      const lastKey = last && ('id' in last ? last.id : last.unique_id);
+      if (snapshot?.more && !lastKey)
+        throw new Error('Empty advancing bootstrap page');
+      const payload = snapshot
+        ? {
+            ...snapshot.page,
+            nextCursor:
+              snapshot.more && lastKey
+                ? encodeScopedBootstrapCursor(lastKey, cursorScope)
+                : null,
+            snapshotCursor,
+            retention,
+            freshness: {
+              ...freshness,
+              placeMatchingVersion: snapshot.matchingVersion,
+            },
+          }
+        : resource === 'activities'
           ? await buildActivitiesPage({
               activitiesRepo,
               athleteId: actor.athleteId,
               afterKey,
               limit,
               snapshotCursor,
+              cursorScope,
               retention,
               freshness,
             })
@@ -183,11 +248,12 @@ export function createSyncBootstrapHandler({
               afterKey,
               limit,
               snapshotCursor,
+              cursorScope,
               retention,
               freshness,
             });
 
-      if (placesRepo) {
+      if (placesRepo && !snapshot) {
         const matches = await placesRepo.sync(
           actor,
           payload.resource === 'activities'
@@ -229,6 +295,7 @@ async function buildActivitiesPage({
   afterKey,
   limit,
   snapshotCursor,
+  cursorScope,
   retention,
   freshness,
 }: {
@@ -237,6 +304,7 @@ async function buildActivitiesPage({
   afterKey: string | undefined;
   limit: number;
   snapshotCursor: string | null;
+  cursorScope?: string;
   retention: RetentionMeta;
   freshness: FreshnessMeta;
 }) {
@@ -252,7 +320,7 @@ async function buildActivitiesPage({
   const lastRow = rows.at(-1);
   const nextCursor =
     rows.length === limit && lastRow
-      ? encodeBootstrapCursor(String(lastRow.id))
+      ? encodeScopedBootstrapCursor(String(lastRow.id), cursorScope)
       : null;
 
   return {
@@ -271,6 +339,7 @@ async function buildPhotosPage({
   afterKey,
   limit,
   snapshotCursor,
+  cursorScope,
   retention,
   freshness,
 }: {
@@ -279,6 +348,7 @@ async function buildPhotosPage({
   afterKey: string | undefined;
   limit: number;
   snapshotCursor: string | null;
+  cursorScope?: string;
   retention: RetentionMeta;
   freshness: FreshnessMeta;
 }) {
@@ -289,7 +359,7 @@ async function buildPhotosPage({
   const lastRow = rows.at(-1);
   const nextCursor =
     rows.length === limit && lastRow
-      ? encodeBootstrapCursor(lastRow.unique_id)
+      ? encodeScopedBootstrapCursor(lastRow.unique_id, cursorScope)
       : null;
 
   return {

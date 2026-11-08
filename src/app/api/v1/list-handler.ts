@@ -2,17 +2,17 @@ import { randomUUID } from 'node:crypto';
 
 import type { z } from 'zod';
 
-import type { Actor } from '~/server/auth/actor';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
 import {
   paginatedSchema,
   paginationQuerySchema,
 } from '~/contracts/v1/pagination';
+import type { Actor } from '~/server/auth/actor';
 import { requestIdFor } from '~/server/http/request-id';
 import {
-  encodeBootstrapCursor,
-  tryDecodeBootstrapCursor,
+  decodeScopedBootstrapCursor,
+  encodeScopedBootstrapCursor,
 } from '~/server/sync/bootstrap-cursor';
 
 export interface ListHandlerDependencies<
@@ -30,6 +30,7 @@ export interface ListHandlerDependencies<
     options: { afterKey?: CursorKey; limit: number },
   ) => Promise<Row[]>;
   parseCursorKey: (key: string) => CursorKey | null;
+  cursorScope?: string;
   cursorKeyFor: (row: Row) => string;
   toItem: (row: Row) => z.input<ItemSchema>;
 }
@@ -53,6 +54,7 @@ export function createListHandler<
   findPage,
   parseCursorKey,
   cursorKeyFor,
+  cursorScope,
   toItem,
 }: ListHandlerDependencies<Row, ItemSchema, CursorKey>) {
   return async function GET(request: Request): Promise<Response> {
@@ -91,8 +93,21 @@ export function createListHandler<
       const { cursor, limit } = parsedQuery.data;
       let afterKey: CursorKey | undefined;
       if (cursor !== undefined) {
-        const decoded = tryDecodeBootstrapCursor(cursor);
-        const parsedKey = decoded === null ? null : parseCursorKey(decoded);
+        const { key, foreign } = decodeScopedBootstrapCursor(
+          cursor,
+          cursorScope,
+        );
+        if (foreign) {
+          return Response.json(
+            errorEnvelope(
+              'sync_rebootstrap_required',
+              'The requested cursor belongs to a different list scope.',
+              { requestId },
+            ),
+            { status: 409 },
+          );
+        }
+        const parsedKey = key === null ? null : parseCursorKey(key);
         if (parsedKey === null) {
           return Response.json(
             errorEnvelope(
@@ -118,7 +133,7 @@ export function createListHandler<
       const lastRow = pageRows.at(-1);
       const nextCursor =
         rows.length > limit && lastRow
-          ? encodeBootstrapCursor(cursorKeyFor(lastRow))
+          ? encodeScopedBootstrapCursor(cursorKeyFor(lastRow), cursorScope)
           : null;
 
       const body = responseEnvelope(paginatedSchema(itemSchema)).parse(

@@ -58,6 +58,7 @@ import {
   routeFitPadding,
   routeFramingPolicy,
 } from '~/lib/route-framing';
+import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { cn, groupBy } from '~/lib/utils';
 import { activityFields } from '~/settings/activity';
@@ -308,7 +309,9 @@ export default function InteractiveMap() {
     addNotification: state.addNotification,
     // Same conditions under which a route card shows its elevation profile.
     summaryUserId:
-      !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
+      !state.isGuest && hasStoredLibraryAccess(state.user)
+        ? state.user?.id
+        : undefined,
   }));
   const visibleSelected = useMemo(
     () => selected.filter((id) => filterIDSet.has(id) && activityDict.has(id)),
