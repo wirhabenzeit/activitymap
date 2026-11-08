@@ -1,16 +1,34 @@
 import 'server-only';
 
-import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 
-import { toActivityDTO } from '~/contracts/v1/activity';
+import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
+import { toActivityStreamSummaryDTO } from '~/contracts/v1/activity-streams';
 import type { Actor } from '~/server/auth/actor';
 import { db } from '~/server/db';
-import { activityStreams, syncChanges } from '~/server/db/schema';
+import {
+  activities as activitiesTable,
+  activityStreams,
+  syncChanges,
+  users,
+} from '~/server/db/schema';
 import { activitiesRepository } from '~/server/repositories/activities';
+import { createActivityStreamsRepository } from '~/server/repositories/activity-streams';
 import { changesRepository } from '~/server/repositories/changes';
 import { createPlaceMatchingRepository } from '~/server/repositories/place-matching';
 
 import type { MirrorSource } from './mirror';
+import type { ParityPostgres } from './parity';
+
+/** The server actor for a shadow owner (an application user ID). */
+export async function shadowActor(userId: string): Promise<Actor> {
+  const [user] = await db
+    .select({ athleteId: users.athlete_id })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (!user?.athleteId) throw new Error('Shadow owner has no athlete');
+  return { userId, athleteId: user.athleteId, authentication: 'cookie' };
+}
 
 /** Postgres serves a stored stream set while it was fetched and has not been
  * invalidated, whatever the latest refresh attempt did. */
@@ -112,6 +130,95 @@ export function postgresMirrorSource(actor: Actor): MirrorSource {
     async matches(ids) {
       const { version, results } = await places.sync(actor, ids);
       return { version, results: [...results.values()] };
+    },
+  };
+}
+
+/** What the v1 handlers serve for the owner from Postgres: bootstrap items
+ * (`toActivityDTO` plus place matches) and stream summaries. */
+export function postgresParitySource(actor: Actor): ParityPostgres {
+  const places = createPlaceMatchingRepository();
+  const streams = createActivityStreamsRepository();
+  const activityChanges = (...conditions: Parameters<typeof and>) =>
+    and(
+      eq(syncChanges.athleteId, actor.athleteId),
+      eq(syncChanges.entityType, 'activity'),
+      ...conditions,
+    );
+  return {
+    async activityIds() {
+      const rows = await db
+        .select({ id: sql<string>`${activitiesTable.id}::text` })
+        .from(activitiesTable)
+        .where(eq(activitiesTable.athlete, actor.athleteId))
+        .orderBy(asc(activitiesTable.id));
+      return rows.map((row) => row.id);
+    },
+
+    async changedSince(since, limit) {
+      const rows = await db
+        .select({ id: syncChanges.entityId })
+        .from(syncChanges)
+        .where(
+          activityChanges(
+            sql`${syncChanges.changedAt} > ${since.toISOString()}::timestamptz`,
+          ),
+        )
+        .groupBy(syncChanges.entityId)
+        .orderBy(sql`max(${syncChanges.sequence}) desc`)
+        .limit(limit);
+      return rows.map((row) => row.id);
+    },
+
+    async latestChanges(ids) {
+      if (ids.length === 0) return new Map();
+      const rows = await db
+        .select({
+          id: syncChanges.entityId,
+          sequence: sql<string>`max(${syncChanges.sequence})::text`,
+          changedAt: sql<string>`(extract(epoch from max(${syncChanges.changedAt})) * 1000)::text`,
+        })
+        .from(syncChanges)
+        .where(activityChanges(inArray(syncChanges.entityId, ids)))
+        .groupBy(syncChanges.entityId);
+      return new Map(
+        rows.map((row) => [
+          row.id,
+          {
+            sequence: Number(row.sequence),
+            changedAt: new Date(Number(row.changedAt)),
+          },
+        ]),
+      );
+    },
+
+    async activities(ids) {
+      const rows = await activitiesRepository.findManyByIds(
+        ids.map(Number).filter(Number.isSafeInteger),
+      );
+      const items = rows
+        .filter((row) => row.athlete === actor.athleteId)
+        .map(toActivityDTO);
+      const { results } = await places.sync(
+        actor,
+        items.map((item) => item.id),
+      );
+      return items.map((item) =>
+        activityDTOSchema.parse({
+          ...item,
+          placeMatches: results.get(item.id),
+        }),
+      );
+    },
+
+    async summaries(ids) {
+      const reads = [];
+      // The v1 summaries route accepts up to 100 IDs per request.
+      for (let i = 0; i < ids.length; i += 100)
+        reads.push(
+          ...(await streams.readSummaries(actor, ids.slice(i, i + 100))),
+        );
+      return reads.map(toActivityStreamSummaryDTO);
     },
   };
 }

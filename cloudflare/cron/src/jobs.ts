@@ -54,6 +54,13 @@ export const SCHEDULES: Record<string, CronJob[]> = {
   '*/10 * * * *': [
     { name: 'mirror-convex-shadow', path: '/api/cron/mirror-convex-shadow' },
   ],
+  // Compare a sample of each shadow owner's Postgres data with Convex and
+  // answer 500 on drift. On its own trigger, between shadow-write runs, so a
+  // drift report doesn't mark the hourly batch as failed. Answers 503 until
+  // ACTIVITYMAP_CONVEX_SHADOW_OWNERS is configured.
+  '5 * * * *': [
+    { name: 'convex-shadow-parity', path: '/api/cron/convex-shadow-parity' },
+  ],
 };
 
 export interface JobResult {

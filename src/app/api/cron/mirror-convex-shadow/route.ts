@@ -1,13 +1,10 @@
-import { eq } from 'drizzle-orm';
-
 import { externalEffectsEnabled } from '~/server/config/external-effects';
 import { mirrorOwner } from '~/server/convex-mirror/mirror';
 import {
   postgresMirrorSource,
+  shadowActor,
   uploadRecording,
 } from '~/server/convex-mirror/postgres-source';
-import { db } from '~/server/db';
-import { users } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
 import { convexWriteBridge } from '~/server/sync/convex-writer';
 
@@ -23,16 +20,7 @@ export const POST = createConvexShadowCronHandler({
       : null,
   secret: () => process.env.CRON_SECRET,
   run: async (userId, deadline) => {
-    const [user] = await db
-      .select({ athleteId: users.athlete_id })
-      .from(users)
-      .where(eq(users.id, userId));
-    if (!user?.athleteId) throw new Error('Shadow owner has no athlete');
-    const actor = {
-      userId,
-      athleteId: user.athleteId,
-      authentication: 'cookie' as const,
-    };
+    const actor = await shadowActor(userId);
     const writer = convexWriteBridge(actor);
     if (!writer) throw new Error('ACTIVITYMAP_CONVEX_SITE is not configured');
     const result = await mirrorOwner({

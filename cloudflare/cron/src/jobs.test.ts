@@ -24,7 +24,7 @@ function fakeFetch(statuses: Record<string, number | Error>) {
 const options = { baseUrl: 'https://activitymap.cc', cronSecret: 's3cret' };
 const hourly = '0 * * * *';
 
-void test('the Worker config and job schedule define the hourly batch and the shadow-write trigger', () => {
+void test('the Worker config and job schedule define the hourly batch and the Convex shadow triggers', () => {
   const config = readFileSync(
     new URL('../wrangler.jsonc', import.meta.url),
     'utf8',
@@ -33,7 +33,7 @@ void test('the Worker config and job schedule define the hourly batch and the sh
     .replace(/,(\s*[}\]])/g, '$1');
   const crons = (JSON.parse(config) as { triggers: { crons: string[] } })
     .triggers.crons;
-  assert.deepEqual(crons, [hourly, '*/10 * * * *']);
+  assert.deepEqual(crons, [hourly, '*/10 * * * *', '5 * * * *']);
   assert.deepEqual(Object.keys(SCHEDULES), crons);
 });
 
@@ -158,4 +158,14 @@ void test('the Convex shadow-write job runs on its own ten-minute trigger', asyn
     results.map(({ name, status }) => [name, status]),
     [['mirror-convex-shadow', 200]],
   );
+});
+
+void test('the Convex parity check runs hourly between shadow-write runs', async () => {
+  const { fetch, calls } = fakeFetch({ '/api/cron/convex-shadow-parity': 500 });
+  const results = await runSchedule('5 * * * *', { ...options, fetch });
+  assert.deepEqual(
+    calls.map((call) => new URL(call.url).pathname),
+    ['/api/cron/convex-shadow-parity'],
+  );
+  assert.equal(isSuccess(results[0]!), false);
 });

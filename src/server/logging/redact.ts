@@ -82,7 +82,7 @@ function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEYS.some((candidate) => normalized.includes(candidate));
 }
 
-function isPersonalDataKey(key: string): boolean {
+export function isPersonalDataKey(key: string): boolean {
   return PERSONAL_DATA_KEYS.has(key.toLowerCase());
 }
 

@@ -10,14 +10,22 @@ export function shadowOwners(value: string | undefined): string[] | null {
 }
 
 /**
- * Shadow-write the configured owners' recent Postgres changes into Convex.
- * Owners run one after another within one time budget; a failing owner does
- * not stop the others, and each continues from its own checkpoint next time.
+ * Run a job for each configured shadow owner: the shadow writes themselves,
+ * or the parity check. Owners run one after another within one time budget; a
+ * failing owner does not stop the others, and each continues from its own
+ * checkpoint next time. The response is 500 when any owner threw or its
+ * result counts as a failure, so the scheduler's history shows it.
  */
-export function createConvexShadowCronHandler(deps: {
+export function createConvexShadowCronHandler<T>(deps: {
   owners: () => string[] | null;
   secret: () => string | undefined;
-  run: (userId: string, deadline: number) => Promise<unknown>;
+  run: (userId: string, deadline: number) => Promise<T>;
+  /** Whether a completed run still fails the job (for example drift). */
+  failed?: (result: T) => boolean;
+  /** What the response says about an owner whose run threw. */
+  errorMessage?: string;
+  /** The per-owner entry in the response; defaults to the result. */
+  present?: (result: T) => unknown;
   now?: () => number;
   budgetMs?: number;
   onError?: (error: unknown, userId: string) => void;
@@ -48,11 +56,13 @@ export function createConvexShadowCronHandler(deps: {
         continue;
       }
       try {
-        results[userId] = await deps.run(userId, deadline);
+        const result = await deps.run(userId, deadline);
+        if (deps.failed?.(result)) failed = true;
+        results[userId] = deps.present ? deps.present(result) : result;
       } catch (error) {
         failed = true;
         deps.onError?.(error, userId);
-        results[userId] = { error: 'Shadow write failed' };
+        results[userId] = { error: deps.errorMessage ?? 'Shadow write failed' };
       }
     }
     return Response.json(

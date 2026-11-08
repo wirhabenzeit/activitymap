@@ -124,7 +124,47 @@ hooks in ingestion code:
 `ACTIVITYMAP_CONVEX_SHADOW_OWNERS` (a JSON array of application user IDs). It is
 off unless that list is set and `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`, and it
 requires `CRON_SECRET` plus the writer settings above in the app's
-environment. It is not yet registered with the scheduler in `cloudflare/cron`.
+environment. The Cloudflare cron worker calls it every ten minutes.
+
+### Production parity check
+
+`pnpm convex:verify-owner` compares a whole library but reads only the local
+database. In production, `POST /api/cron/convex-shadow-parity` checks the same
+shadow owners once an hour (Cloudflare cron `5 * * * *`), with the same switch
+as the shadow writes. For each owner it compares a bounded sample:
+
+- a window of the owner's activity IDs that rotates every hour, 200 at a time,
+  so a 4,600-activity library is covered in about a day, plus
+- up to 200 activities changed in the last 24 hours, including deletions.
+
+For the sample it builds what the v1 handlers serve from Postgres (bootstrap
+items with place matches, and stream summaries) and reads the same through
+the signed read bridge (`activityIds` and `summaries` in `convex/sync.ts`,
+mapped by the preview adapter). The comparison is shared with the local
+verifier (`src/server/convex-mirror/compare.ts`);
+`placeMatches.resultRevision` is an expected difference.
+
+The mirror's checkpoint (`importer:mirrorState`, the write bridge's `state`
+operation) decides what must already match. An activity is skipped as in
+flight when its latest `sync_change` is above `mirror.sequence` or less than
+15 minutes old (the mirror's replay window for late commits). The change log
+is read after both backends, so a change that reached either side is visible
+to the check. While a full copy is running (`mirror.full`), the report says
+`copy: "in-progress"`, the checkpoint is `full.through`, and only activities
+up to `full.after` are compared. Before the first copy nothing is compared.
+
+The result is logged per owner (`Convex shadow parity`, or
+`Convex shadow parity drift` at error level with counts and an example per
+differing field; route, coordinate and description values are replaced by
+their length). Drift or a failed check answers 500. The response carries the
+counts and field names only.
+
+Besides the writer settings, the check needs the read bridge's
+`ACTIVITYMAP_CONVEX_KEY_ID` and `ACTIVITYMAP_CONVEX_SIGNING_KEY` in the app's
+environment and the matching key in `ACTIVITYMAP_BRIDGE_SIGNING_KEYS` on the
+Convex deployment. Postgres stream summaries are read through the same
+repository as the v1 route, which may store a summary recomputed for a newer
+summary algorithm, exactly as a client request would.
 
 Coordinated provider cutover, Convex authentication and reactive web
 subscriptions remain implementation-plan work.

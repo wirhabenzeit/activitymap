@@ -25,8 +25,12 @@ between batches. The Worker calls these jobs in order:
 8. `match-activity-places`
 
 A second trigger (`*/10 * * * *`) calls `mirror-convex-shadow` every ten
-minutes. It is off unless `ACTIVITYMAP_CONVEX_SHADOW_OWNERS` is set; see
-`backend/README.md`.
+minutes. A third (`5 * * * *`) calls `convex-shadow-parity` once an hour,
+between shadow-write runs: it compares a sample of each shadow owner's Postgres
+data with Convex and answers 500 on drift, so drift shows as a failed
+invocation in Cloudflare's cron history and as a `Convex shadow parity drift`
+error in the app's logs. Both are off (503) unless
+`ACTIVITYMAP_CONVEX_SHADOW_OWNERS` is set; see `backend/README.md`.
 
 Incoming Strava webhooks still get an immediate processing attempt. The hourly
 drain handles pending events and retries that are due.
