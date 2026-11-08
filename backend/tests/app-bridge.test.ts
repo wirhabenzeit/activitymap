@@ -178,7 +178,11 @@ type Page = {
   items: {
     id: string;
     name: string;
-    streams?: { state: string; fetched_at: string | null };
+    streams?: {
+      state: string;
+      fetched_at: string | null;
+      available_types: string[];
+    };
     placeMatches?: { status: string; matchingVersion?: string };
   }[];
   nextCursor: string | null;
@@ -207,6 +211,8 @@ void test('v1 sync, summaries, streams, lists and status are served by backend/'
   const [recorded, plain] = first.items;
   assert.equal(recorded!.streams?.state, 'current');
   assert.equal(recorded!.streams?.fetched_at, '2026-01-02T03:04:05.000Z');
+  // Canonical order, not Convex's sorted object fields.
+  assert.deepEqual(recorded!.streams?.available_types, ['time', 'distance']);
   assert.equal(recorded!.placeMatches?.status, 'complete');
   assert.equal(recorded!.placeMatches?.matchingVersion, matchingVersion);
   assert.equal(plain!.streams, undefined);

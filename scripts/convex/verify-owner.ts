@@ -131,8 +131,17 @@ async function library(handler: (request: Request) => Promise<Response>) {
   return { items, ms: Math.round(performance.now() - started) };
 }
 
+// Opaque per-backend tokens: Postgres uses result UUIDs, Convex the change
+// sequence. Clients only compare them within one backend, and moving an owner
+// between backends forces a new bootstrap.
+const EXPECTED = new Set(['activity.placeMatches.resultRevision']);
 const differences = new Map<string, { count: number; example: string }>();
+const expected = new Map<string, number>();
 function note(field: string, id: string, left: unknown, right: unknown) {
+  if (EXPECTED.has(field)) {
+    expected.set(field, (expected.get(field) ?? 0) + 1);
+    return;
+  }
   const entry = differences.get(field) ?? {
     count: 0,
     example: `${id}: ${JSON.stringify(left)?.slice(0, 160)} != ${JSON.stringify(right)?.slice(0, 160)}`,
@@ -210,6 +219,7 @@ const report = {
     postgres: summaries.postgres.length,
     convex: summaries.convex.length,
   },
+  expectedDifferences: Object.fromEntries(expected),
   differences: Object.fromEntries(
     [...differences].sort((a, b) => b[1].count - a[1].count),
   ),
