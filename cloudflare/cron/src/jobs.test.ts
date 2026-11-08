@@ -24,7 +24,7 @@ function fakeFetch(statuses: Record<string, number | Error>) {
 const options = { baseUrl: 'https://activitymap.cc', cronSecret: 's3cret' };
 const hourly = '0 * * * *';
 
-void test('the Worker config and job schedule define a single hourly trigger', () => {
+void test('the Worker config and job schedule define the hourly batch and the shadow-write trigger', () => {
   const config = readFileSync(
     new URL('../wrangler.jsonc', import.meta.url),
     'utf8',
@@ -33,7 +33,7 @@ void test('the Worker config and job schedule define a single hourly trigger', (
     .replace(/,(\s*[}\]])/g, '$1');
   const crons = (JSON.parse(config) as { triggers: { crons: string[] } })
     .triggers.crons;
-  assert.deepEqual(crons, [hourly]);
+  assert.deepEqual(crons, [hourly, '*/10 * * * *']);
   assert.deepEqual(Object.keys(SCHEDULES), crons);
 });
 
@@ -50,12 +50,11 @@ void test('failure in housekeeping does not stop later jobs', async () => {
       ['backfill-activity-photos', 200],
       ['sync-activities', 200],
       ['match-activity-places', 200],
-      ['mirror-convex-shadow', 200],
     ],
   );
 });
 
-void test('all nine jobs are POSTed once per hour in order with the cron secret and their bounds', async () => {
+void test('all eight jobs are POSTed once per hour in order with the cron secret and their bounds', async () => {
   const { fetch, calls } = fakeFetch({});
   const results = await runSchedule(hourly, { ...options, fetch });
 
@@ -70,7 +69,6 @@ void test('all nine jobs are POSTed once per hour in order with the cron secret 
       '/api/cron/backfill-activity-photos',
       '/api/cron/sync-activities',
       '/api/cron/match-activity-places',
-      '/api/cron/mirror-convex-shadow',
     ],
   );
   for (const call of calls) {
@@ -114,7 +112,6 @@ void test('a failed reconcile skips stream backfill but still catches up photos'
       ['backfill-activity-photos', 200],
       ['sync-activities', 200],
       ['match-activity-places', 200],
-      ['mirror-convex-shadow', 200],
     ],
   );
   assert.ok(
@@ -148,4 +145,17 @@ void test('a network error is reported, not thrown', async () => {
 
 void test('an unknown trigger is an error rather than a silent no-op', async () => {
   await assert.rejects(runSchedule('1 2 3 4 5', options), /No jobs/);
+});
+
+void test('the Convex shadow-write job runs on its own ten-minute trigger', async () => {
+  const { fetch, calls } = fakeFetch({});
+  const results = await runSchedule('*/10 * * * *', { ...options, fetch });
+  assert.deepEqual(
+    calls.map((call) => new URL(call.url).pathname),
+    ['/api/cron/mirror-convex-shadow'],
+  );
+  assert.deepEqual(
+    results.map(({ name, status }) => [name, status]),
+    [['mirror-convex-shadow', 200]],
+  );
 });
