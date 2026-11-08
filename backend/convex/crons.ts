@@ -9,4 +9,10 @@ crons.interval(
   internal.maintenance.compactChanges,
   {},
 );
+crons.interval(
+  'expire bridge write nonces',
+  { hours: 1 },
+  internal.bridge.expireNonces,
+  {},
+);
 export default crons;

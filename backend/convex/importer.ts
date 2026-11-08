@@ -16,14 +16,14 @@ import {
   publishMatchRecord,
 } from './activityWrites';
 import { scopeFields } from './ownerScope';
-import { idKey, ownerFor, requireOwner } from './owners';
+import { idKey, ownerFor, requireHead, requireOwner } from './owners';
 import { manifestValidator } from './recordingValidators';
 
 /**
- * Trusted, operator-run import of an existing Postgres library. Every write
- * goes through the same fenced code paths as live ingestion (applySource,
- * recording preparation and match publication), so an import exercises the
- * production invariants rather than side-loading rows.
+ * Trusted batch writers for copying Postgres state into this package: the
+ * operator-run importer and the shadow-write mirror. Every write goes through
+ * the same fenced code paths as live ingestion (applySource, recording
+ * preparation and match publication), so stale or repeated batches are no-ops.
  */
 
 const scope = v.object(scopeFields);
@@ -50,6 +50,58 @@ export const owner = internalQuery({
         matchingVersion: owner.matchingVersion,
       }
     );
+  },
+});
+
+/** What a mirror run needs to continue: fences and its last position. */
+export const mirrorState = internalQuery({
+  args: { userId: v.string(), athleteId: v.string() },
+  handler: async (ctx, { userId, athleteId }) => {
+    const owner = await ownerFor(ctx, userId);
+    if (!owner || owner.athleteId !== athleteId) return null;
+    const head = await requireHead(ctx, owner._id);
+    return {
+      backend: owner.backend,
+      epoch: owner.epoch,
+      generation: owner.generation,
+      revoked: owner.revoked,
+      catalogue: owner.catalogue,
+      matchingVersion: owner.matchingVersion,
+      mirror: head.mirror ?? null,
+    };
+  },
+});
+
+/** Positions only move forward, so a delayed run cannot rewind a newer one. */
+export const checkpoint = internalMutation({
+  args: { scope, sequence: v.number(), revision: v.number() },
+  handler: async (ctx, { scope, sequence, revision }) => {
+    const owner = await requireOwner(ctx, scope);
+    const head = await requireHead(ctx, owner._id);
+    if (!Number.isSafeInteger(sequence) || !Number.isSafeInteger(revision))
+      throw new Error('Invalid mirror position');
+    await ctx.db.patch('ownerHeads', head._id, {
+      mirror: {
+        sequence: Math.max(head.mirror?.sequence ?? 0, sequence),
+        revision: Math.max(head.mirror?.revision ?? 0, revision),
+      },
+    });
+  },
+});
+
+export const deleteSources = internalMutation({
+  args: {
+    scope,
+    generation: v.string(),
+    sourceRevision: v.number(),
+    ids: v.array(v.string()),
+  },
+  handler: async (ctx, { ids, ...common }) => {
+    bounded(ids.length);
+    let deleted = 0;
+    for (const id of ids)
+      if (await applySourceRecord(ctx, { ...common, id, dto: null })) deleted++;
+    return deleted;
   },
 });
 
