@@ -153,7 +153,7 @@ private actor FilteredActivityEditUITestSource: SyncPageSource, ActivityEditSour
 
     func bootstrap(resource: ActivityMapAPI.SyncResource, cursor: String?) throws -> ActivityMapAPI.SyncBootstrapPage {
         let retention = ActivityMapAPI.SyncRetentionMeta(retentionDays: 30, cursorValidUntil: .now.addingTimeInterval(86400))
-        let freshness = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: .now)
+        let freshness = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: .now, placeMatchingVersion: nil)
         if resource == .activities {
             return .activities(.init(items: activities, nextCursor: nil, snapshotCursor: "filtered-edit", retention: retention, freshness: freshness))
         }
@@ -163,7 +163,7 @@ private actor FilteredActivityEditUITestSource: SyncPageSource, ActivityEditSour
     func changes(cursor: String) throws -> ActivityMapAPI.SyncChangesPage {
         .init(items: [], nextCursor: cursor,
             retention: .init(retentionDays: 30, cursorValidUntil: .now.addingTimeInterval(86400)),
-            freshness: .init(lastSummaryReconciledAt: .now))
+            freshness: .init(lastSummaryReconciledAt: .now, placeMatchingVersion: nil))
     }
 
     func update(activityID: String, fields: ActivityMapAPI.UpdateActivityRequest) throws -> ActivityMapAPI.Activity {
