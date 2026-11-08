@@ -15,12 +15,16 @@ export default defineSchema({
     epoch: v.string(),
     generation: v.string(),
     revoked: v.boolean(),
-    sequence: v.number(),
     catalogue: v.string(),
     matchingVersion: v.string(),
     projectionVersion: v.number(),
-    catalogueAfter: v.optional(v.string()),
   }).index('by_user', ['userId']),
+  ownerHeads: defineTable({
+    owner: v.id('owners'),
+    sequence: v.number(),
+    retentionFloor: v.number(),
+    catalogueAfter: v.optional(v.string()),
+  }).index('by_owner', ['owner']),
   ownerEpochs: defineTable({ owner: v.id('owners'), epoch: v.string() }).index(
     'by_owner_epoch',
     ['owner', 'epoch'],
@@ -36,7 +40,7 @@ export default defineSchema({
     recording: v.optional(v.id('recordings')),
   })
     .index('by_owner_key', ['owner', 'key'])
-    .index('by_owner_live_key', ['owner', 'deleted', 'key']),
+    .index('by_owner_live_key', ['owner', 'generation', 'deleted', 'key']),
   recordings: defineTable({
     activity: v.id('activities'),
     file: v.id('_storage'),
@@ -53,5 +57,7 @@ export default defineSchema({
     entityId: v.string(),
     operation: v.union(v.literal('upsert'), v.literal('delete')),
     changedAt: v.number(),
-  }).index('by_owner_sequence', ['owner', 'sequence']),
+  })
+    .index('by_owner_sequence', ['owner', 'sequence'])
+    .index('by_changed_at', ['changedAt']),
 });

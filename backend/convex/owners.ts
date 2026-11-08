@@ -1,5 +1,7 @@
 import { v } from 'convex/values';
 
+import { internal } from './_generated/api';
+import type { Doc } from './_generated/dataModel';
 import type { QueryCtx } from './_generated/server';
 import { internalMutation, internalQuery } from './_generated/server';
 import { PROJECTION_VERSION } from './activityProjection';
@@ -34,11 +36,19 @@ export async function requireOwner(
     owner.athleteId !== scope.athleteId ||
     owner.epoch !== scope.epoch ||
     owner.backend !== 'convex' ||
-    owner.revoked ||
-    owner.projectionVersion !== PROJECTION_VERSION
+    owner.revoked
   )
     throw new Error('Activity owner unavailable');
   return owner;
+}
+
+export async function requireHead(ctx: QueryCtx, owner: Doc<'owners'>['_id']) {
+  const head = await ctx.db
+    .query('ownerHeads')
+    .withIndex('by_owner', (q) => q.eq('owner', owner))
+    .unique();
+  if (!head) throw new Error('Activity sync head unavailable');
+  return head;
 }
 
 /** Internal handoff boundary. The migration coordinator owns the transition. */
@@ -51,7 +61,10 @@ export const provision = internalMutation({
     catalogue: v.string(),
     matchingVersion: v.string(),
   },
-  handler: async (ctx, { expectedEpoch, ...args }) => {
+  handler: async (
+    ctx,
+    { expectedEpoch, ...args },
+  ): Promise<Doc<'owners'>['_id']> => {
     idKey(args.athleteId);
     if (
       !args.userId ||
@@ -70,8 +83,12 @@ export const provision = internalMutation({
       const id = await ctx.db.insert('owners', {
         ...args,
         revoked: false,
-        sequence: 0,
         projectionVersion: PROJECTION_VERSION,
+      });
+      await ctx.db.insert('ownerHeads', {
+        owner: id,
+        sequence: 0,
+        retentionFloor: 0,
       });
       await ctx.db.insert('ownerEpochs', { owner: id, epoch: args.epoch });
       return id;
@@ -99,6 +116,16 @@ export const provision = internalMutation({
       backend: args.backend,
       epoch: args.epoch,
     });
+    const head = await requireHead(ctx, prior._id);
+    if (args.backend === 'convex' && head.catalogueAfter !== undefined)
+      await ctx.scheduler.runAfter(0, internal.catalogue.next, {
+        scope: {
+          userId: args.userId,
+          athleteId: args.athleteId,
+          epoch: args.epoch,
+        },
+        catalogue: args.catalogue,
+      });
     return prior._id;
   },
 });

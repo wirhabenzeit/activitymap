@@ -47,7 +47,7 @@ async function allowed(request: Request, body: string) {
     return false;
   const key = await crypto.subtle.importKey(
     'raw',
-    utf8.encode(secret),
+    Uint8Array.from(secret.match(/../g)!, (pair) => Number.parseInt(pair, 16)),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
     ['verify'],

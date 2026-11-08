@@ -50,14 +50,13 @@ export default async function AppShellLayout({
     const user = await getUserInternal(session.user.id);
     // Fixture owners browse stored Convex data without a live provider account.
     // Avoid credential refresh/reconnection while rendering their preview.
+    const preview = user ? previewSelection({ userId: user.id }) : null;
     const account =
-      user && !previewSelection({ userId: user.id })
-        ? await getAccountInternal({ userId: user.id })
-        : null;
+      user && !preview ? await getAccountInternal({ userId: user.id }) : null;
     initialAuth.currentUser = user
       ? {
           ...toCurrentUserDTO(user, account),
-          ...(previewSelection({ userId: user.id }) && {
+          ...(preview && {
             storedLibraryPreview: true,
           }),
         }

@@ -1,11 +1,11 @@
 import { v } from 'convex/values';
 
+import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
 import { publishChange } from './activityWrites';
-import { requireOwner, scopeFields } from './owners';
+import { ownerFor, requireHead, requireOwner, scopeFields } from './owners';
 
-/** The operations layer publishes a new immutable catalogue identity first.
- * Every page hides matches against the previous identity immediately. */
+/** Hide old matches immediately, then durably publish their invalidations. */
 export const select = internalMutation({
   args: {
     scope: v.object(scopeFields),
@@ -29,32 +29,46 @@ export const select = internalMutation({
       owner.matchingVersion === matchingVersion
     )
       throw new Error('Catalogue and matching version must advance together');
-    await ctx.db.patch('owners', owner._id, {
+    const head = await requireHead(ctx, owner._id);
+    await ctx.db.patch('owners', owner._id, { catalogue, matchingVersion });
+    await ctx.db.patch('ownerHeads', head._id, { catalogueAfter: '' });
+    await ctx.scheduler.runAfter(0, internal.catalogue.next, {
+      scope,
       catalogue,
-      matchingVersion,
-      catalogueAfter: '',
     });
     return true;
   },
 });
 
-/** Publish pending changes in bounded batches. The matching worker replaces
- * them when a result for the current catalogue and recording arrives. */
+/** Each transaction commits its cursor and schedules its continuation together. */
 export const next = internalMutation({
   args: { scope: v.object(scopeFields), catalogue: v.string() },
-  handler: async (ctx, { scope, catalogue }) => {
-    const owner = await requireOwner(ctx, scope);
-    const after = owner.catalogueAfter;
-    if (after === undefined || owner.catalogue !== catalogue)
+  handler: async (ctx, { scope, catalogue }): Promise<{ done: boolean }> => {
+    const owner = await ownerFor(ctx, scope.userId);
+    // Revocation, handoff and a superseding catalogue make queued work a no-op.
+    if (
+      !owner ||
+      owner.revoked ||
+      owner.backend !== 'convex' ||
+      owner.epoch !== scope.epoch ||
+      owner.athleteId !== scope.athleteId ||
+      owner.catalogue !== catalogue
+    )
       return { done: true };
+    const head = await requireHead(ctx, owner._id);
+    const after = head.catalogueAfter;
+    if (after === undefined) return { done: true };
     const limit = 16;
     const rows = await ctx.db
       .query('activities')
       .withIndex('by_owner_live_key', (q) =>
-        q.eq('owner', owner._id).eq('deleted', false).gt('key', after),
+        q
+          .eq('owner', owner._id)
+          .eq('generation', owner.generation)
+          .eq('deleted', false)
+          .gt('key', after),
       )
       .take(limit);
-    let sequence = owner.sequence;
     for (const row of rows) {
       if (
         !row.dto ||
@@ -65,13 +79,17 @@ export const next = internalMutation({
       await ctx.db.patch('activities', row._id, {
         projection: { ...row.projection, match: undefined },
       });
-      await publishChange(ctx, { ...owner, sequence }, row.dto.id, 'upsert');
-      sequence++;
+      await publishChange(ctx, owner, row.dto.id, 'upsert');
     }
     const done = rows.length < limit;
-    await ctx.db.patch('owners', owner._id, {
+    await ctx.db.patch('ownerHeads', head._id, {
       catalogueAfter: done ? undefined : rows.at(-1)!.key,
     });
+    if (!done)
+      await ctx.scheduler.runAfter(0, internal.catalogue.next, {
+        scope,
+        catalogue,
+      });
     return { done };
   },
 });

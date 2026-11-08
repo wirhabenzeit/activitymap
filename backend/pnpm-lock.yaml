@@ -11,6 +11,12 @@ importers:
       convex:
         specifier: 1.46.0
         version: 1.46.0
+      convex-helpers:
+        specifier: 0.1.134
+        version: 0.1.134(convex@1.46.0)(prettier@3.9.10)(typescript@5.9.3)(zod@4.6.7)
+      zod:
+        specifier: 4.6.7
+        version: 4.6.7
     devDependencies:
       convex-test:
         specifier: 0.0.59
@@ -177,6 +183,31 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  convex-helpers@0.1.134:
+    resolution: {integrity: sha512-GPVj5HmRMOyd2PF/OxUYQlNS/HdmOo3pZ4iTyPXyEOxuXwvNeQcx7OUlvNFTTYnHhcuonsMx8UuqjVo5gCqpZA==}
+    hasBin: true
+    peerDependencies:
+      '@standard-schema/spec': ^1.0.0
+      convex: ^1.46.0
+      hono: ^4.0.5
+      prettier: ^3.0.0
+      react: ^17.0.2 || ^18.0.0 || ^19.0.0
+      typescript: ^5.5 || ^6.0.0 || ^7.0.0
+      zod: ^3.25.0 || ^4.0.0
+    peerDependenciesMeta:
+      '@standard-schema/spec':
+        optional: true
+      hono:
+        optional: true
+      prettier:
+        optional: true
+      react:
+        optional: true
+      typescript:
+        optional: true
+      zod:
+        optional: true
+
   convex-test@0.0.59:
     resolution: {integrity: sha512-2bxjk245RmF3RxrsDR86vbPCzGRnEmpqHbjVbs6bSupt18JadtvOR7Lao2+GcdYJIzny499aloDysYnoFPWP4A==}
     peerDependencies:
@@ -227,6 +258,9 @@ packages:
         optional: true
       utf-8-validate:
         optional: true
+
+  zod@4.6.7:
+    resolution: {integrity: sha512-g8W2D2kU6a8untc053fX1uVBKzM7yqAxW/3zwk83+6RyF2+SKOuV+c0wBDhUwzV1PaGapmZH+rmcUzPf+3CGwg==}
 
 snapshots:
 
@@ -308,6 +342,14 @@ snapshots:
   '@esbuild/win32-x64@0.27.0':
     optional: true
 
+  convex-helpers@0.1.134(convex@1.46.0)(prettier@3.9.10)(typescript@5.9.3)(zod@4.6.7):
+    dependencies:
+      convex: 1.46.0
+    optionalDependencies:
+      prettier: 3.9.10
+      typescript: 5.9.3
+      zod: 4.6.7
+
   convex-test@0.0.59(convex@1.46.0):
     dependencies:
       convex: 1.46.0
@@ -355,3 +397,5 @@ snapshots:
   typescript@5.9.3: {}
 
   ws@8.21.0: {}
+
+  zod@4.6.7: {}

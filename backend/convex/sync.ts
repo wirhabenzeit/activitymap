@@ -9,13 +9,14 @@ import {
   projectedActivity,
 } from './activityProjection';
 import { activityFor } from './activityWrites';
-import { idKey, requireOwner, scopeFields } from './owners';
+import { idKey, requireHead, requireOwner, scopeFields } from './owners';
 
 const id = v.string();
 const cursor = v.union(id, v.null());
 const resource = v.union(v.literal('activities'), v.literal('photos'));
 const operation = v.union(
   v.object({ kind: v.literal('head') }),
+  v.object({ kind: v.literal('retention'), cutoff: v.number() }),
   v.object({
     kind: v.literal('bootstrap'),
     resource,
@@ -32,13 +33,16 @@ const operation = v.union(
 );
 
 function project(row: Doc<'activities'>, owner: Doc<'owners'>) {
+  if (!row.dto || row.deleted || row.generation !== owner.generation)
+    return null;
   if (
-    !row.dto ||
-    row.deleted ||
-    row.generation !== owner.generation ||
-    row.projection?.version !== PROJECTION_VERSION
-  )
-    throw new Error('Activity projection unavailable');
+    row.projection?.version !== PROJECTION_VERSION ||
+    row.projection.generation !== owner.generation
+  ) {
+    // Preserve the activity in the library while a projection is rebuilt.
+    // Omit derived state rather than presenting stale streams or matches.
+    return { ...row.dto };
+  }
   return projectedActivity(
     row.dto,
     row.projection,
@@ -51,8 +55,12 @@ export const read = internalQuery({
   args: { ...scopeFields, operation },
   handler: async (ctx, { operation: op, ...scope }) => {
     const owner = await requireOwner(ctx, scope);
+    // Item/summary queries depend on assignment, not the frequently updated head.
+    const feed = ['head', 'bootstrap', 'changes', 'retention'].includes(op.kind)
+      ? await requireHead(ctx, owner._id)
+      : null;
     const head = {
-      sequence: owner.sequence,
+      sequence: feed?.sequence ?? 0,
       matchingVersion: owner.matchingVersion,
       lastSummaryReconciledAt: null,
     };
@@ -62,6 +70,8 @@ export const read = internalQuery({
     )
       throw new Error('Invalid sync page limit');
     switch (op.kind) {
+      case 'retention':
+        return feed!.retentionFloor;
       case 'head':
         return head;
       case 'bootstrap': {
@@ -76,11 +86,19 @@ export const read = internalQuery({
           const rows = await ctx.db
             .query('activities')
             .withIndex('by_owner_live_key', (q) =>
-              q.eq('owner', owner._id).eq('deleted', false).gt('key', after),
+              q
+                .eq('owner', owner._id)
+                .eq('generation', owner.generation)
+                .eq('deleted', false)
+                .gt('key', after),
             )
             .take(count);
           for (const row of rows) {
             const item = project(row, owner);
+            if (!item) {
+              after = row.key;
+              continue;
+            }
             size += jsonBytes(item) + Number(items.length > 0);
             if (size > MAX_PAGE_BYTES)
               return { ...response, items, more: true };
@@ -95,7 +113,8 @@ export const read = internalQuery({
         if (
           !Number.isSafeInteger(op.after) ||
           op.after < 0 ||
-          op.after > owner.sequence
+          op.after > feed!.sequence ||
+          op.after < feed!.retentionFloor
         )
           throw new Error('Invalid sync sequence');
         const rows = await ctx.db
@@ -123,6 +142,7 @@ export const read = internalQuery({
           rows.map(async (row) => {
             if (!row || row.deleted) return null;
             const item = project(row, owner);
+            if (!item) return null;
             const recording =
               row.recording && (await ctx.db.get('recordings', row.recording));
             const summary =
@@ -150,9 +170,10 @@ export const read = internalQuery({
         const rows = await Promise.all(
           op.ids.map((key) => activityFor(ctx, owner._id, idKey(key))),
         );
-        return rows.flatMap((row) =>
-          row && !row.deleted ? [project(row, owner)] : [],
-        );
+        return rows.flatMap((row) => {
+          const item = row && project(row, owner);
+          return item ? [item] : [];
+        });
       }
     }
   },

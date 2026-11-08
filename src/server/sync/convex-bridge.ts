@@ -39,7 +39,7 @@ export function convexSyncBridge(
       epoch,
     });
     const timestamp = String(Date.now());
-    const signature = createHmac('sha256', secret)
+    const signature = createHmac('sha256', Buffer.from(secret, 'hex'))
       .update(`activitymap-sync-v1\n${version}\n${timestamp}\n${body}`)
       .digest('hex');
     const result = await fetcher(url, {

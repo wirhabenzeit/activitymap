@@ -31,7 +31,6 @@ import {
 import { previewSelection } from './selection';
 import { previewIngestionStatus, statusPageSchema } from './status';
 
-const bridge = 'https://spotted-fennec-603.convex.site/existing-client-preview';
 const maxBridgePage = 128;
 const headSchema = z.object({
   sequence: z.number().int().nonnegative(),
@@ -139,6 +138,19 @@ export function convexPreviewFor(
 ) {
   const config = previewSelection(actor);
   if (!actor || !config) return null;
+  const configuredSite = process.env.ACTIVITYMAP_CONVEX_PREVIEW_SITE;
+  if (!configuredSite) throw new Error('Convex preview site is required');
+  const site = new URL(configuredSite);
+  if (
+    site.protocol !== 'https:' ||
+    site.username ||
+    site.password ||
+    site.pathname !== '/' ||
+    site.search ||
+    site.hash
+  )
+    throw new Error('Invalid Convex preview site');
+  const bridge = new URL('/existing-client-preview', site).href;
   const { userId, athleteId } = actor;
   const { epoch, key } = config;
   const cursorBackend = createHash('sha256')

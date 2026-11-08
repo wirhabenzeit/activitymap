@@ -9,6 +9,7 @@ void test('bootstrap performs one scoped bridge call and validates returned owne
   const settings = {
     NODE_ENV: 'test',
     VERCEL_ENV: 'development',
+    ACTIVITYMAP_CONVEX_PREVIEW_SITE: 'https://lab.example.com',
     ACTIVITYMAP_CLIENT_BACKEND: 'convex-preview',
     ACTIVITYMAP_CONVEX_PREVIEW_OWNERS: JSON.stringify({
       owner: { epoch: 'test-epoch-123456789', key: 'a'.repeat(64) },
@@ -27,6 +28,7 @@ void test('bootstrap performs one scoped bridge call and validates returned owne
     const operations: unknown[] = [];
     let athlete = '42';
     const preview = convexPreviewFor(actor, async (_input, init) => {
+      assert.equal(_input, 'https://lab.example.com/existing-client-preview');
       assert.equal(typeof init?.body, 'string');
       const body = JSON.parse(init!.body as string) as {
         athleteId: number;
@@ -74,6 +76,16 @@ void test('bootstrap performs one scoped bridge call and validates returned owne
       /actor mismatch/,
     );
     assert.equal(operations.length, 1);
+    const firstScope = preview.cursorBackend;
+    process.env.ACTIVITYMAP_CONVEX_PREVIEW_SITE =
+      'https://another-lab.example.com';
+    assert.notEqual(convexPreviewFor(actor)!.cursorBackend, firstScope);
+    delete process.env.ACTIVITYMAP_CONVEX_PREVIEW_SITE;
+    assert.throws(() => convexPreviewFor(actor), /site is required/);
+    process.env.ACTIVITYMAP_CONVEX_PREVIEW_SITE = 'http://lab.example.com';
+    assert.throws(() => convexPreviewFor(actor), /Invalid Convex preview site/);
+    process.env.ACTIVITYMAP_CONVEX_PREVIEW_SITE =
+      settings.ACTIVITYMAP_CONVEX_PREVIEW_SITE;
     athlete = '999';
     await assert.rejects(
       preview.bootstrapPage(actor, { resource: 'activities', limit: 100 }),

@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { activityPlacesResponseSchema } from '../../src/contracts/activity-places';
 import { activityDTOSchema } from '../../src/contracts/v1/activity';
 import { streamMetadataSchema } from '../../src/contracts/v1/activity-streams';
+import { STREAM_SOURCE_FIELDS } from '../../src/server/strava/stream-policy';
 import { supersedes } from '../ingestion/source-order';
 import type { Doc } from './_generated/dataModel';
 import {
@@ -20,7 +21,7 @@ import {
   placeMatchValidator,
   streamMetadataValidator,
 } from './activityValidators';
-import { idKey, requireOwner, scopeFields } from './owners';
+import { idKey, requireHead, requireOwner, scopeFields } from './owners';
 import { manifestValidator, summaryValidator } from './recordingValidators';
 
 const fence = {
@@ -47,9 +48,10 @@ export async function publishChange(
   entityId: string,
   operation: 'upsert' | 'delete',
 ) {
-  const sequence = owner.sequence + 1;
+  const head = await requireHead(ctx, owner._id);
+  const sequence = head.sequence + 1;
   if (!Number.isSafeInteger(sequence)) throw new Error('Change feed exhausted');
-  await ctx.db.patch('owners', owner._id, { sequence });
+  await ctx.db.patch('ownerHeads', head._id, { sequence });
 
   await ctx.db.insert('changes', {
     owner: owner._id,
@@ -80,9 +82,24 @@ export const applySource = internalMutation({
       )
     )
       return false;
+    // Match the Postgres stream-source trigger: social/label changes cannot
+    // invalidate sensor samples, but privacy, geometry and sensor changes can.
+    const preserve = !!(
+      args.dto &&
+      prior?.dto &&
+      !prior.deleted &&
+      prior.generation === args.generation &&
+      prior.projection?.generation === args.generation &&
+      prior.projection.version === PROJECTION_VERSION &&
+      STREAM_SOURCE_FIELDS.every(
+        (field) =>
+          JSON.stringify(prior.dto![field]) ===
+          JSON.stringify(args.dto![field]),
+      )
+    );
     const oldRecording =
       prior?.recording && (await ctx.db.get('recordings', prior.recording));
-    if (oldRecording) {
+    if (oldRecording && !preserve) {
       await ctx.storage.delete(oldRecording.file);
       await ctx.db.delete('recordings', oldRecording._id);
     }
@@ -121,15 +138,28 @@ export const applySource = internalMutation({
       version: PROJECTION_VERSION,
       generation: owner.generation,
       sourceVersion: String(args.sourceRevision),
+      ...(preserve && { match: prior?.projection?.match }),
       ...(previousStreams && {
         streams: {
           ...previousStreams,
-          state: 'stale',
-          fetch_status: 'invalidated',
+          ...(!preserve && {
+            state: 'stale' as const,
+            fetch_status: 'invalidated' as const,
+          }),
         },
       }),
     });
-    const next = { ...common, dto, projection, deleted: false };
+    if (preserve && oldRecording)
+      await ctx.db.patch('recordings', oldRecording._id, {
+        sourceRevision: args.sourceRevision,
+      });
+    const next = {
+      ...common,
+      dto,
+      projection,
+      deleted: false,
+      ...(preserve && prior?.recording && { recording: prior.recording }),
+    };
     if (prior) await ctx.db.replace('activities', prior._id, next);
     else await ctx.db.insert('activities', next);
     await publishChange(ctx, owner, args.id, 'upsert');
@@ -252,12 +282,13 @@ export const publishMatch = internalMutation({
       throw new Error('Matching result source mismatch');
     const prior = projection.match;
     if (prior?.catalogue === args.catalogue) return false;
+    const head = await requireHead(ctx, owner._id);
     await ctx.db.patch('activities', row._id, {
       projection: boundedProjection(dto, {
         ...projection,
         match: {
           catalogue: args.catalogue,
-          value: { ...result, resultRevision: String(owner.sequence + 1) },
+          value: { ...result, resultRevision: String(head.sequence + 1) },
         },
       }),
     });
