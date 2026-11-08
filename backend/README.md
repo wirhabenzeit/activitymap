@@ -70,22 +70,61 @@ ACTIVITYMAP_CONVEX_KEY_ID=dev1
 ACTIVITYMAP_CONVEX_SIGNING_KEY=<hex>
 ```
 
-Copy an owner from the local development Postgres, then compare what the v1
-handlers serve from both backends:
+The importer and the shadow-write mirror write through a separate signed
+route, `/internal/write/v1`. It has its own key map and signature domain, so
+the read bridge's key can never authorize a write, and every request carries a
+single-use nonce (`bridgeNonces`, expired hourly). Add a writer key next to the
+reader key:
+
+```sh
+pnpm exec convex env set ACTIVITYMAP_BRIDGE_WRITER_KEYS '{"devw1":"<hex>"}'
+# backend/.env.local
+ACTIVITYMAP_CONVEX_WRITER_KEY_ID=devw1
+ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY=<hex>
+```
+
+Copy an owner from the local development Postgres, keep it current, and
+compare what the v1 handlers serve from both backends:
 
 ```sh
 pnpm convex:import-owner --user <userId>
+pnpm convex:mirror-owner --user <userId> [--watch <seconds>]
 pnpm convex:verify-owner --user <userId>
 ```
 
-The importer writes through `owners.provision`, `applySource`, recording
-preparation and `publishMatch` (batched in `convex/importer.ts`), so imports
-exercise the same fences as live ingestion. Each run uses a newer source
-revision; re-runs keep unchanged recordings and matches and only publish what is
-missing. Both scripts refuse to read anything but the local database. They call
-internal functions through the logged-in Convex CLI, so no deploy key is
-needed. The verifier runs the real bootstrap and stream-summary handlers against
-Postgres and against this package, and exits non-zero on any difference.
+Provisioning stays operator-only (`owners.provision` through the Convex CLI);
+it is not exposed on the write bridge. All three scripts refuse to read
+anything but the local database. The verifier runs the real bootstrap and
+stream-summary handlers against Postgres and against this package, and exits
+non-zero on any difference.
+
+## Shadow writes
+
+While Postgres remains the writer, `src/server/convex-mirror/mirror.ts` copies
+an owner's changes into this package. Postgres records every visible
+activity, stream and match change in `sync_change`, so the mirror needs no
+hooks in ingestion code:
+
+- A run reads the activities with changes after its checkpoint, re-reads their
+  current Postgres state and writes it through the fenced batch functions in
+  `convex/importer.ts`. Writes are labelled with a run revision that only ever
+  increases, so out-of-order or repeated runs cannot regress Convex.
+- The stream trigger inserts `sync_change` rows without the per-athlete lock,
+  so a lower sequence can commit after a higher one was read. Each run also
+  replays the last 15 minutes of changes. Re-applying identical state only
+  advances the revision fence and publishes no change.
+- Stream refreshes replace a recording only with a strictly newer revision;
+  match results are published under the catalogue selected from the Postgres
+  matching version, which the mirror switches before publishing.
+- The checkpoint (`ownerHeads.mirror`) only moves forward, per chunk, so a run
+  that stops early (time budget, catalogue change) continues next time. The
+  importer is the same code in full mode.
+
+`POST /api/cron/mirror-convex-shadow` runs the mirror for the users listed in
+`ACTIVITYMAP_CONVEX_SHADOW_OWNERS` (a JSON array of application user IDs). It is
+off unless that list is set and `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`, and it
+requires `CRON_SECRET` plus the writer settings above in the app's
+environment. It is not yet registered with the scheduler in `cloudflare/cron`.
 
 Coordinated provider cutover, Convex authentication and reactive web
 subscriptions remain implementation-plan work.

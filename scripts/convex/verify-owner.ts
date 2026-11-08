@@ -7,11 +7,12 @@
  *
  * Exits non-zero on any difference. Prints a per-field difference summary.
  */
-import { readFileSync } from 'node:fs';
-
-import { parse } from 'dotenv';
-
-import { convexRun, parseArgs, pinLocalDatabase } from './local-source';
+import {
+  convexRun,
+  loadBridgeEnv,
+  parseArgs,
+  pinLocalDatabase,
+} from './local-source';
 
 pinLocalDatabase();
 const options = parseArgs(process.argv.slice(2));
@@ -20,15 +21,11 @@ if (!userId) throw new Error('Pass --user <userId>');
 const summaryLimit = Number(options.get('summaries') ?? 500);
 
 // The local signer for the dev deployment lives in backend/.env.local.
-const local = parse(readFileSync('backend/.env.local'));
-for (const name of [
+loadBridgeEnv([
   'ACTIVITYMAP_CONVEX_SITE',
   'ACTIVITYMAP_CONVEX_KEY_ID',
   'ACTIVITYMAP_CONVEX_SIGNING_KEY',
-]) {
-  if (!local[name]) throw new Error(`backend/.env.local is missing ${name}`);
-  process.env[name] = local[name];
-}
+]);
 const owner = await convexRun<{ epoch: string; backend: string } | null>(
   'importer:owner',
   { userId },

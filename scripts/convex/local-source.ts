@@ -8,9 +8,10 @@
  */
 import { execFile } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { promisify } from 'node:util';
 
-import { config } from 'dotenv';
+import { config, parse } from 'dotenv';
 
 import { resolveDatabaseConnection } from '../../src/server/db/connection';
 
@@ -93,31 +94,22 @@ export async function convexRun<T>(fn: string, args: unknown): Promise<T> {
   return (text === '' ? null : JSON.parse(text)) as T;
 }
 
-/** Group items into batches below a serialized byte budget and count limit. */
-export function batchesOf<T>(
-  items: T[],
-  { maxBytes, maxItems }: { maxBytes: number; maxItems: number },
-) {
-  const batches: T[][] = [];
-  let current: T[] = [];
-  let bytes = 0;
-  for (const item of items) {
-    const size = Buffer.byteLength(JSON.stringify(item));
-    if (
-      current.length > 0 &&
-      (bytes + size > maxBytes || current.length >= maxItems)
-    ) {
-      batches.push(current);
-      current = [];
-      bytes = 0;
-    }
-    current.push(item);
-    bytes += size;
-  }
-  if (current.length > 0) batches.push(current);
-  return batches;
-}
-
 export function token() {
   return randomBytes(24).toString('base64url');
 }
+
+/** Load the dev deployment's bridge settings from backend/.env.local (not
+ * committed) into the environment. */
+export function loadBridgeEnv(names: string[]) {
+  const local = parse(readFileSync('backend/.env.local'));
+  for (const name of names) {
+    if (!local[name]) throw new Error(`backend/.env.local is missing ${name}`);
+    process.env[name] = local[name];
+  }
+}
+
+export const WRITER_ENV = [
+  'ACTIVITYMAP_CONVEX_SITE',
+  'ACTIVITYMAP_CONVEX_WRITER_KEY_ID',
+  'ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY',
+];
