@@ -1,0 +1,81 @@
+{
+  "activeFiles": 17,
+  "elapsedMs": 51001,
+  "leaseMs": 6000,
+  "quotaCap": 75,
+  "retryAfterMs": 4000,
+  "trials": [
+    {
+      "attempts": 2,
+      "fault": "before-detail",
+      "ms": 8970,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "after-detail",
+      "ms": 9664,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "before-streams",
+      "ms": 8544,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "after-streams",
+      "ms": 8765,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "before-upload",
+      "ms": 8948,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "after-upload",
+      "ms": 9330,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "during-commit",
+      "ms": 11027,
+      "recoveries": 1
+    },
+    {
+      "attempts": 1,
+      "fault": "after-commit",
+      "ms": 950,
+      "recoveries": 0
+    },
+    {
+      "attempts": 2,
+      "fault": "overlap",
+      "ms": 9769,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "before-refresh",
+      "ms": 9685,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "after-refresh",
+      "ms": 9119,
+      "recoveries": 1
+    },
+    {
+      "attempts": 2,
+      "fault": "overlap-refresh",
+      "ms": 9035,
+      "recoveries": 1
+    }
+  ]
+}

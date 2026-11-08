@@ -1,0 +1,1824 @@
+{
+  "local": {
+    "environment": {
+      "node": "v22.22.0",
+      "platform": "darwin",
+      "arch": "arm64"
+    },
+    "evidence": "local-filesystem",
+    "portableRuntimeInputCount": 107,
+    "rows": [
+      {
+        "source": "synthetic",
+        "fixture": "small",
+        "samples": 96,
+        "layout": "whole",
+        "trials": [
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 1412,
+            "maxFileBytes": 1412,
+            "manifestBytes": 240,
+            "summaryBytes": 1066,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 3.754458999999997,
+            "writeMs": 2.360167000000004,
+            "readDecodeMs": 0.9776250000000033,
+            "writePeakRssKiB": 106080,
+            "readPeakRssKiB": 106224
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 1412,
+            "maxFileBytes": 1412,
+            "manifestBytes": 240,
+            "summaryBytes": 1066,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 4.060916999999989,
+            "writeMs": 1.7875839999999954,
+            "readDecodeMs": 1.0627089999999981,
+            "writePeakRssKiB": 106128,
+            "readPeakRssKiB": 106192
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 1412,
+            "maxFileBytes": 1412,
+            "manifestBytes": 240,
+            "summaryBytes": 1066,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 4.531667000000013,
+            "writeMs": 1.9847500000000053,
+            "readDecodeMs": 1.0740830000000017,
+            "writePeakRssKiB": 108592,
+            "readPeakRssKiB": 108672
+          }
+        ]
+      },
+      {
+        "source": "synthetic",
+        "fixture": "small",
+        "samples": 96,
+        "layout": "chunks",
+        "trials": [
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 1434,
+            "maxFileBytes": 1249,
+            "manifestBytes": 81,
+            "summaryBytes": 1066,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 4.047125000000008,
+            "writeMs": 2.0358750000000043,
+            "readDecodeMs": 1.3457499999999953,
+            "writePeakRssKiB": 106400,
+            "readPeakRssKiB": 106544
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 1434,
+            "maxFileBytes": 1249,
+            "manifestBytes": 81,
+            "summaryBytes": 1066,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 3.8498750000000115,
+            "writeMs": 2.709333000000001,
+            "readDecodeMs": 1.2875839999999954,
+            "writePeakRssKiB": 106112,
+            "readPeakRssKiB": 106240
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 1434,
+            "maxFileBytes": 1249,
+            "manifestBytes": 81,
+            "summaryBytes": 1066,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 3.7637909999999977,
+            "writeMs": 2.412707999999995,
+            "readDecodeMs": 1.6644579999999962,
+            "writePeakRssKiB": 105344,
+            "readPeakRssKiB": 105440
+          }
+        ]
+      },
+      {
+        "source": "synthetic",
+        "fixture": "typical",
+        "samples": 4800,
+        "layout": "whole",
+        "trials": [
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 57512,
+            "maxFileBytes": 57512,
+            "manifestBytes": 255,
+            "summaryBytes": 3610,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 20.597667000000015,
+            "writeMs": 0.8653329999999926,
+            "readDecodeMs": 6.445082999999983,
+            "writePeakRssKiB": 118192,
+            "readPeakRssKiB": 118784
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 57512,
+            "maxFileBytes": 57512,
+            "manifestBytes": 255,
+            "summaryBytes": 3610,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 22.219125000000005,
+            "writeMs": 1.4753330000000062,
+            "readDecodeMs": 7.114083000000022,
+            "writePeakRssKiB": 115696,
+            "readPeakRssKiB": 116400
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 57512,
+            "maxFileBytes": 57512,
+            "manifestBytes": 255,
+            "summaryBytes": 3610,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 20.155333,
+            "writeMs": 0.8925420000000059,
+            "readDecodeMs": 7.0220410000000015,
+            "writePeakRssKiB": 116336,
+            "readPeakRssKiB": 116800
+          }
+        ]
+      },
+      {
+        "source": "synthetic",
+        "fixture": "typical",
+        "samples": 4800,
+        "layout": "chunks",
+        "trials": [
+          {
+            "layout": "chunks",
+            "fileCount": 3,
+            "fileBytes": 58202,
+            "maxFileBytes": 49079,
+            "manifestBytes": 109,
+            "summaryBytes": 3610,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 19.818916,
+            "writeMs": 1.9742919999999913,
+            "readDecodeMs": 6.4900420000000025,
+            "writePeakRssKiB": 115680,
+            "readPeakRssKiB": 115888
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 3,
+            "fileBytes": 58202,
+            "maxFileBytes": 49079,
+            "manifestBytes": 109,
+            "summaryBytes": 3610,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 19.56504199999999,
+            "writeMs": 2.1319579999999974,
+            "readDecodeMs": 6.3972920000000215,
+            "writePeakRssKiB": 116032,
+            "readPeakRssKiB": 116256
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 3,
+            "fileBytes": 58202,
+            "maxFileBytes": 49079,
+            "manifestBytes": 109,
+            "summaryBytes": 3610,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 20.701125000000005,
+            "writeMs": 2.59729200000001,
+            "readDecodeMs": 6.473792000000003,
+            "writePeakRssKiB": 115744,
+            "readPeakRssKiB": 115968
+          }
+        ]
+      },
+      {
+        "source": "synthetic",
+        "fixture": "oversized",
+        "samples": 20000,
+        "layout": "whole",
+        "trials": [
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 223265,
+            "maxFileBytes": 223265,
+            "manifestBytes": 262,
+            "summaryBytes": 4078,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 54.80220900000002,
+            "writeMs": 0.9090420000000279,
+            "readDecodeMs": 15.82887500000001,
+            "writePeakRssKiB": 126048,
+            "readPeakRssKiB": 147968
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 223265,
+            "maxFileBytes": 223265,
+            "manifestBytes": 262,
+            "summaryBytes": 4078,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 55.198250000000016,
+            "writeMs": 0.8437079999999924,
+            "readDecodeMs": 14.662499999999994,
+            "writePeakRssKiB": 127296,
+            "readPeakRssKiB": 148848
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 223265,
+            "maxFileBytes": 223265,
+            "manifestBytes": 262,
+            "summaryBytes": 4078,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 58.888166999999996,
+            "writeMs": 1.010417000000018,
+            "readDecodeMs": 14.926166999999992,
+            "writePeakRssKiB": 127360,
+            "readPeakRssKiB": 148592
+          }
+        ]
+      },
+      {
+        "source": "synthetic",
+        "fixture": "oversized",
+        "samples": 20000,
+        "layout": "chunks",
+        "trials": [
+          {
+            "layout": "chunks",
+            "fileCount": 6,
+            "fileBytes": 238058,
+            "maxFileBytes": 49209,
+            "manifestBytes": 193,
+            "summaryBytes": 4078,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 50.30324999999999,
+            "writeMs": 1.830457999999993,
+            "readDecodeMs": 20.110791000000006,
+            "writePeakRssKiB": 122720,
+            "readPeakRssKiB": 143776
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 6,
+            "fileBytes": 238058,
+            "maxFileBytes": 49209,
+            "manifestBytes": 193,
+            "summaryBytes": 4078,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 51.7855,
+            "writeMs": 1.405666999999994,
+            "readDecodeMs": 19.273500000000013,
+            "writePeakRssKiB": 125216,
+            "readPeakRssKiB": 145760
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 6,
+            "fileBytes": 238058,
+            "maxFileBytes": 49209,
+            "manifestBytes": 193,
+            "summaryBytes": 4078,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 50.91875,
+            "writeMs": 1.5958750000000066,
+            "readDecodeMs": 21.22091599999999,
+            "writePeakRssKiB": 125280,
+            "readPeakRssKiB": 147440
+          }
+        ]
+      },
+      {
+        "source": "synthetic",
+        "fixture": "largest",
+        "samples": 172071,
+        "layout": "whole",
+        "trials": [
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 1844066,
+            "maxFileBytes": 1844066,
+            "manifestBytes": 270,
+            "summaryBytes": 4891,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 377.66525,
+            "writeMs": 1.106999999999971,
+            "readDecodeMs": 99.67075,
+            "writePeakRssKiB": 271088,
+            "readPeakRssKiB": 359472
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 1844066,
+            "maxFileBytes": 1844066,
+            "manifestBytes": 270,
+            "summaryBytes": 4891,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 365.559041,
+            "writeMs": 2.25100000000009,
+            "readDecodeMs": 113.14741700000002,
+            "writePeakRssKiB": 272800,
+            "readPeakRssKiB": 332576
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 1844066,
+            "maxFileBytes": 1844066,
+            "manifestBytes": 270,
+            "summaryBytes": 4891,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 379.71591599999994,
+            "writeMs": 1.5240830000000187,
+            "readDecodeMs": 101.97820899999999,
+            "writePeakRssKiB": 270848,
+            "readPeakRssKiB": 359216
+          }
+        ]
+      },
+      {
+        "source": "synthetic",
+        "fixture": "largest",
+        "samples": 172071,
+        "layout": "chunks",
+        "trials": [
+          {
+            "layout": "chunks",
+            "fileCount": 44,
+            "fileBytes": 2046639,
+            "maxFileBytes": 49155,
+            "manifestBytes": 1273,
+            "summaryBytes": 4891,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 320.323625,
+            "writeMs": 5.883458000000019,
+            "readDecodeMs": 109.85116600000003,
+            "writePeakRssKiB": 210896,
+            "readPeakRssKiB": 295792
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 44,
+            "fileBytes": 2046639,
+            "maxFileBytes": 49155,
+            "manifestBytes": 1273,
+            "summaryBytes": 4891,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 325.18233299999997,
+            "writeMs": 5.62866600000001,
+            "readDecodeMs": 109.97224999999997,
+            "writePeakRssKiB": 214016,
+            "readPeakRssKiB": 298464
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 44,
+            "fileBytes": 2046639,
+            "maxFileBytes": 49155,
+            "manifestBytes": 1273,
+            "summaryBytes": 4891,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 318.92204200000003,
+            "writeMs": 5.724291999999991,
+            "readDecodeMs": 108.99999999999994,
+            "writePeakRssKiB": 208256,
+            "readPeakRssKiB": 297584
+          }
+        ]
+      },
+      {
+        "source": "local-recordings",
+        "fixture": "small",
+        "samples": 1,
+        "layout": "whole",
+        "trials": [
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 144,
+            "maxFileBytes": 144,
+            "manifestBytes": 208,
+            "summaryBytes": 68,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 2.70450000000001,
+            "writeMs": 0.7370829999999984,
+            "readDecodeMs": 0.568792000000002,
+            "writePeakRssKiB": 105136,
+            "readPeakRssKiB": 105200
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 144,
+            "maxFileBytes": 144,
+            "manifestBytes": 208,
+            "summaryBytes": 68,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 3.1206249999999898,
+            "writeMs": 0.750458000000009,
+            "readDecodeMs": 0.5873749999999944,
+            "writePeakRssKiB": 105360,
+            "readPeakRssKiB": 105408
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 144,
+            "maxFileBytes": 144,
+            "manifestBytes": 208,
+            "summaryBytes": 68,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 3.0246250000000003,
+            "writeMs": 0.6966249999999974,
+            "readDecodeMs": 0.5590419999999909,
+            "writePeakRssKiB": 105392,
+            "readPeakRssKiB": 105408
+          }
+        ]
+      },
+      {
+        "source": "local-recordings",
+        "fixture": "small",
+        "samples": 1,
+        "layout": "chunks",
+        "trials": [
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 195,
+            "maxFileBytes": 107,
+            "manifestBytes": 80,
+            "summaryBytes": 68,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 2.8674999999999926,
+            "writeMs": 1.0507920000000013,
+            "readDecodeMs": 0.7104590000000002,
+            "writePeakRssKiB": 104928,
+            "readPeakRssKiB": 104992
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 195,
+            "maxFileBytes": 107,
+            "manifestBytes": 80,
+            "summaryBytes": 68,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 3.094416999999993,
+            "writeMs": 0.9966250000000088,
+            "readDecodeMs": 0.6999579999999952,
+            "writePeakRssKiB": 107136,
+            "readPeakRssKiB": 107200
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 195,
+            "maxFileBytes": 107,
+            "manifestBytes": 80,
+            "summaryBytes": 68,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 2.9273330000000044,
+            "writeMs": 0.9569170000000042,
+            "readDecodeMs": 0.6468330000000009,
+            "writePeakRssKiB": 105840,
+            "readPeakRssKiB": 105904
+          }
+        ]
+      },
+      {
+        "source": "local-recordings",
+        "fixture": "median",
+        "samples": 3049,
+        "layout": "whole",
+        "trials": [
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 40449,
+            "maxFileBytes": 40449,
+            "manifestBytes": 225,
+            "summaryBytes": 2982,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 16.113625,
+            "writeMs": 0.7435840000000127,
+            "readDecodeMs": 3.4717079999999925,
+            "writePeakRssKiB": 111264,
+            "readPeakRssKiB": 111488
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 40449,
+            "maxFileBytes": 40449,
+            "manifestBytes": 225,
+            "summaryBytes": 2982,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 17.233125,
+            "writeMs": 0.8510419999999925,
+            "readDecodeMs": 3.7081660000000056,
+            "writePeakRssKiB": 111872,
+            "readPeakRssKiB": 112112
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 40449,
+            "maxFileBytes": 40449,
+            "manifestBytes": 225,
+            "summaryBytes": 2982,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 16.27770799999999,
+            "writeMs": 0.8983750000000015,
+            "readDecodeMs": 3.7535839999999894,
+            "writePeakRssKiB": 112208,
+            "readPeakRssKiB": 112464
+          }
+        ]
+      },
+      {
+        "source": "local-recordings",
+        "fixture": "median",
+        "samples": 3049,
+        "layout": "chunks",
+        "trials": [
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 40513,
+            "maxFileBytes": 40400,
+            "manifestBytes": 83,
+            "summaryBytes": 2982,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 15.464124999999996,
+            "writeMs": 0.9934169999999938,
+            "readDecodeMs": 3.7820420000000183,
+            "writePeakRssKiB": 111536,
+            "readPeakRssKiB": 111776
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 40513,
+            "maxFileBytes": 40400,
+            "manifestBytes": 83,
+            "summaryBytes": 2982,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 16.31458400000001,
+            "writeMs": 1.0395829999999933,
+            "readDecodeMs": 3.9940830000000034,
+            "writePeakRssKiB": 111008,
+            "readPeakRssKiB": 111216
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 2,
+            "fileBytes": 40513,
+            "maxFileBytes": 40400,
+            "manifestBytes": 83,
+            "summaryBytes": 2982,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 16.559792,
+            "writeMs": 1.0475840000000005,
+            "readDecodeMs": 3.8900000000000006,
+            "writePeakRssKiB": 113248,
+            "readPeakRssKiB": 113472
+          }
+        ]
+      },
+      {
+        "source": "local-recordings",
+        "fixture": "largest",
+        "samples": 45262,
+        "layout": "whole",
+        "trials": [
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 614184,
+            "maxFileBytes": 614184,
+            "manifestBytes": 245,
+            "summaryBytes": 4270,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 112.989,
+            "writeMs": 0.9350829999999917,
+            "readDecodeMs": 27.237375000000014,
+            "writePeakRssKiB": 161568,
+            "readPeakRssKiB": 178208
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 614184,
+            "maxFileBytes": 614184,
+            "manifestBytes": 245,
+            "summaryBytes": 4270,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 119.13566700000001,
+            "writeMs": 0.9641670000000033,
+            "readDecodeMs": 24.727332999999987,
+            "writePeakRssKiB": 157312,
+            "readPeakRssKiB": 174304
+          },
+          {
+            "layout": "whole",
+            "fileCount": 1,
+            "fileBytes": 614184,
+            "maxFileBytes": 614184,
+            "manifestBytes": 245,
+            "summaryBytes": 4270,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 113.296583,
+            "writeMs": 0.941375000000022,
+            "readDecodeMs": 25.86304100000001,
+            "writePeakRssKiB": 158400,
+            "readPeakRssKiB": 175824
+          }
+        ]
+      },
+      {
+        "source": "local-recordings",
+        "fixture": "largest",
+        "samples": 45262,
+        "layout": "chunks",
+        "trials": [
+          {
+            "layout": "chunks",
+            "fileCount": 13,
+            "fileBytes": 636551,
+            "maxFileBytes": 58948,
+            "manifestBytes": 388,
+            "summaryBytes": 4270,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 109.03349999999999,
+            "writeMs": 2.5155420000000106,
+            "readDecodeMs": 31.094666999999987,
+            "writePeakRssKiB": 151776,
+            "readPeakRssKiB": 164352
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 13,
+            "fileBytes": 636551,
+            "maxFileBytes": 58948,
+            "manifestBytes": 388,
+            "summaryBytes": 4270,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 109.483459,
+            "writeMs": 2.3839169999999967,
+            "readDecodeMs": 28.612707999999998,
+            "writePeakRssKiB": 149888,
+            "readPeakRssKiB": 164672
+          },
+          {
+            "layout": "chunks",
+            "fileCount": 13,
+            "fileBytes": 636551,
+            "maxFileBytes": 58948,
+            "manifestBytes": 388,
+            "summaryBytes": 4270,
+            "summaryFormat": "polyline-v1",
+            "encodeMs": 108.03862500000001,
+            "writeMs": 2.252207999999996,
+            "readDecodeMs": 29.58041700000001,
+            "writePeakRssKiB": 152928,
+            "readPeakRssKiB": 164736
+          }
+        ]
+      }
+    ]
+  },
+  "hosted": {
+    "evidence": "hosted-synthetic-whole-files",
+    "deployment": "spotted-fennec-603",
+    "rows": [
+      {
+        "fixture": "small",
+        "samples": 96,
+        "trials": [
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 1412,
+            "counts": {
+              "altitude": 96,
+              "distance": 96,
+              "heartrate": 96,
+              "latlng": 96,
+              "time": 96,
+              "watts": 96
+            },
+            "decodeMs": 2.3831219999992754,
+            "downloadMs": 41.58333500000299,
+            "encodeMs": 10.583490999997593,
+            "fixture": "small",
+            "guards": false,
+            "matcherMatches": 1,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 145144,
+            "publishMs": 38.189086999998835,
+            "queryMs": 22.7771900000007,
+            "summaryBytes": 1066,
+            "uncompressedBytes": 4414,
+            "uploadMs": 216.2028549999959,
+            "cliWallMs": 1372.675416,
+            "observedUsage": {
+              "actionMs": 559.312076,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 2211,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 2178,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 3127,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          },
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 1412,
+            "counts": {
+              "altitude": 96,
+              "distance": 96,
+              "heartrate": 96,
+              "latlng": 96,
+              "time": 96,
+              "watts": 96
+            },
+            "decodeMs": 3.439606000000026,
+            "downloadMs": 48.77797799999996,
+            "encodeMs": 5.048780000000079,
+            "fixture": "small",
+            "guards": false,
+            "matcherMatches": 1,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 129700,
+            "publishMs": 41.42581300000006,
+            "queryMs": 28.804068999999913,
+            "summaryBytes": 1066,
+            "uncompressedBytes": 4414,
+            "uploadMs": 203.06207099999995,
+            "cliWallMs": 2188.013792,
+            "observedUsage": {
+              "actionMs": 1415.142257,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 2211,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 2178,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 3127,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          },
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 1412,
+            "counts": {
+              "altitude": 96,
+              "distance": 96,
+              "heartrate": 96,
+              "latlng": 96,
+              "time": 96,
+              "watts": 96
+            },
+            "decodeMs": 2.3724230000007083,
+            "downloadMs": 46.54505100000097,
+            "encodeMs": 2.14931699999579,
+            "fixture": "small",
+            "guards": false,
+            "matcherMatches": 1,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 145144,
+            "publishMs": 49.31199200000265,
+            "queryMs": 24.50006900000153,
+            "summaryBytes": 1066,
+            "uncompressedBytes": 4414,
+            "uploadMs": 464.4168120000031,
+            "cliWallMs": 1622.0813339999995,
+            "observedUsage": {
+              "actionMs": 748.9855789999999,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 2211,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 2178,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 3127,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "fixture": "typical",
+        "samples": 4800,
+        "trials": [
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 57512,
+            "counts": {
+              "altitude": 4800,
+              "distance": 4800,
+              "heartrate": 4800,
+              "latlng": 4800,
+              "time": 4800,
+              "watts": 4800
+            },
+            "decodeMs": 21.608909999999923,
+            "downloadMs": 47.30210399999987,
+            "encodeMs": 26.140348999999787,
+            "fixture": "typical",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 140844,
+            "publishMs": 39.688558000000285,
+            "queryMs": 23.78871799999979,
+            "summaryBytes": 3610,
+            "uncompressedBytes": 209671,
+            "uploadMs": 227.03947499999958,
+            "cliWallMs": 1400.831792,
+            "observedUsage": {
+              "actionMs": 600.140641,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 4749,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 4716,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 5665,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          },
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 57512,
+            "counts": {
+              "altitude": 4800,
+              "distance": 4800,
+              "heartrate": 4800,
+              "latlng": 4800,
+              "time": 4800,
+              "watts": 4800
+            },
+            "decodeMs": 248.34362299999975,
+            "downloadMs": 80.68630899999971,
+            "encodeMs": 214.02989100000013,
+            "fixture": "typical",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 132356,
+            "publishMs": 43.28675199999998,
+            "queryMs": 137.1043770000001,
+            "summaryBytes": 3610,
+            "uncompressedBytes": 209671,
+            "uploadMs": 245.40939400000025,
+            "cliWallMs": 4152.123417,
+            "observedUsage": {
+              "actionMs": 3351.3319579999998,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 4749,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 4716,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 5665,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          },
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 57512,
+            "counts": {
+              "altitude": 4800,
+              "distance": 4800,
+              "heartrate": 4800,
+              "latlng": 4800,
+              "time": 4800,
+              "watts": 4800
+            },
+            "decodeMs": 42.49542600000041,
+            "downloadMs": 39.915068999999676,
+            "encodeMs": 116.25211000000036,
+            "fixture": "typical",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 134244,
+            "publishMs": 33.963355999999294,
+            "queryMs": 23.280337000000145,
+            "summaryBytes": 3610,
+            "uncompressedBytes": 209671,
+            "uploadMs": 200.32566100000076,
+            "cliWallMs": 1527.2215419999993,
+            "observedUsage": {
+              "actionMs": 703.2787780000001,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 4749,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 4716,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 5665,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "fixture": "oversized",
+        "samples": 20000,
+        "trials": [
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 223265,
+            "counts": {
+              "altitude": 20000,
+              "distance": 20000,
+              "heartrate": 20000,
+              "latlng": 20000,
+              "time": 20000,
+              "watts": 20000
+            },
+            "decodeMs": 257.2709990000003,
+            "downloadMs": 52.34238400000049,
+            "encodeMs": 504.6611360000006,
+            "fixture": "oversized",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 142904,
+            "publishMs": 34.905673999999635,
+            "queryMs": 22.869087000000036,
+            "summaryBytes": 4078,
+            "uncompressedBytes": 900121,
+            "uploadMs": 209.11698799999976,
+            "cliWallMs": 2544.4344169999986,
+            "observedUsage": {
+              "actionMs": 1729.975728,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 5222,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 5189,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 6138,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          },
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 223265,
+            "counts": {
+              "altitude": 20000,
+              "distance": 20000,
+              "heartrate": 20000,
+              "latlng": 20000,
+              "time": 20000,
+              "watts": 20000
+            },
+            "decodeMs": 320.69558099999995,
+            "downloadMs": 103.60944400000017,
+            "encodeMs": 499.0763850000001,
+            "fixture": "oversized",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 136768,
+            "publishMs": 56.65968900000007,
+            "queryMs": 118.82922300000018,
+            "summaryBytes": 4078,
+            "uncompressedBytes": 900121,
+            "uploadMs": 301.2001190000001,
+            "cliWallMs": 5061.451792,
+            "observedUsage": {
+              "actionMs": 4252.239503,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 5222,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 5189,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 6138,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          },
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 223265,
+            "counts": {
+              "altitude": 20000,
+              "distance": 20000,
+              "heartrate": 20000,
+              "latlng": 20000,
+              "time": 20000,
+              "watts": 20000
+            },
+            "decodeMs": 210.99137599999995,
+            "downloadMs": 54.62269500000002,
+            "encodeMs": 415.73210199999994,
+            "fixture": "oversized",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 146460,
+            "publishMs": 36.58061099999941,
+            "queryMs": 21.48162400000001,
+            "summaryBytes": 4078,
+            "uncompressedBytes": 900121,
+            "uploadMs": 203.40236299999924,
+            "cliWallMs": 2577.482749999999,
+            "observedUsage": {
+              "actionMs": 1800.755139,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 5222,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 5189,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 6138,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "fixture": "largest",
+        "samples": 172071,
+        "trials": [
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 1844066,
+            "counts": {
+              "altitude": 172071,
+              "distance": 172071,
+              "heartrate": 172071,
+              "latlng": 172071,
+              "time": 172071,
+              "watts": 172071
+            },
+            "decodeMs": 2359.7921769999994,
+            "downloadMs": 152.9359259999983,
+            "encodeMs": 3975.8663320000014,
+            "fixture": "largest",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 307744,
+            "publishMs": 36.580973000000085,
+            "queryMs": 20.718219000002136,
+            "summaryBytes": 4891,
+            "uncompressedBytes": 8074983,
+            "uploadMs": 285.2642539999979,
+            "cliWallMs": 11582.598292000002,
+            "observedUsage": {
+              "actionMs": 10802.642500999998,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 6033,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 6000,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 6949,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          },
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 1844066,
+            "counts": {
+              "altitude": 172071,
+              "distance": 172071,
+              "heartrate": 172071,
+              "latlng": 172071,
+              "time": 172071,
+              "watts": 172071
+            },
+            "decodeMs": 2362.3066219999964,
+            "downloadMs": 127.23829299999488,
+            "encodeMs": 3802.216864000002,
+            "fixture": "largest",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 326984,
+            "publishMs": 63.59902400000283,
+            "queryMs": 30.672566000001098,
+            "summaryBytes": 4891,
+            "uncompressedBytes": 8074983,
+            "uploadMs": 259.6529559999981,
+            "cliWallMs": 11010.755167000003,
+            "observedUsage": {
+              "actionMs": 10212.062544,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 6033,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 6000,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 6949,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          },
+          {
+            "codec": "gzip-json-v1",
+            "compressedBytes": 1844066,
+            "counts": {
+              "altitude": 172071,
+              "distance": 172071,
+              "heartrate": 172071,
+              "latlng": 172071,
+              "time": 172071,
+              "watts": 172071
+            },
+            "decodeMs": 2256.5305239999943,
+            "downloadMs": 155.05002700000477,
+            "encodeMs": 3779.262394999998,
+            "fixture": "largest",
+            "guards": false,
+            "node": "v22.23.4",
+            "processMaxRssKiB": 335708,
+            "publishMs": 38.220816999993986,
+            "queryMs": 25.146067000001494,
+            "summaryBytes": 4891,
+            "uncompressedBytes": 8074983,
+            "uploadMs": 263.02258900000015,
+            "cliWallMs": 11005.876541999998,
+            "observedUsage": {
+              "actionMs": 10221.444207999999,
+              "configuredActionMemoryMb": 512,
+              "loggedFileStorageReadBytes": 0,
+              "loggedFileStorageWriteBytes": 0,
+              "database": [
+                {
+                  "function": "recordingRows:provision",
+                  "error": false,
+                  "readBytes": 0,
+                  "writeBytes": 408,
+                  "readDocuments": 0,
+                  "writeDocuments": 1
+                },
+                {
+                  "function": "recordingRows:begin",
+                  "error": false,
+                  "readBytes": 644,
+                  "writeBytes": 910,
+                  "readDocuments": 2,
+                  "writeDocuments": 2
+                },
+                {
+                  "function": "recordingRows:publish",
+                  "error": false,
+                  "readBytes": 1542,
+                  "writeBytes": 6033,
+                  "readDocuments": 4,
+                  "writeDocuments": 4
+                },
+                {
+                  "function": "recordingRows:current",
+                  "error": false,
+                  "readBytes": 6000,
+                  "writeBytes": 0,
+                  "readDocuments": 3,
+                  "writeDocuments": 0
+                },
+                {
+                  "function": "recordingRows:erase",
+                  "error": false,
+                  "readBytes": 6949,
+                  "writeBytes": 0,
+                  "readDocuments": 5,
+                  "writeDocuments": 3
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ],
+    "guardTrial": {
+      "codec": "gzip-json-v1",
+      "compressedBytes": 1412,
+      "counts": {
+        "altitude": 96,
+        "distance": 96,
+        "heartrate": 96,
+        "latlng": 96,
+        "time": 96,
+        "watts": 96
+      },
+      "decodeMs": 0.6816409999955795,
+      "downloadMs": 47.80418500000087,
+      "encodeMs": 1.341736000002129,
+      "fixture": "small",
+      "guards": true,
+      "matcherMatches": 1,
+      "node": "v22.23.4",
+      "processMaxRssKiB": 335708,
+      "publishMs": 34.49392400000215,
+      "queryMs": 20.111277999996673,
+      "summaryBytes": 1066,
+      "uncompressedBytes": 4414,
+      "uploadMs": 199.52027899999666,
+      "cliWallMs": 2227.6637499999997,
+      "observedUsage": {
+        "actionMs": 1440.0698240000002,
+        "configuredActionMemoryMb": 512,
+        "loggedFileStorageReadBytes": 0,
+        "loggedFileStorageWriteBytes": 0,
+        "database": [
+          {
+            "function": "recordingRows:provision",
+            "error": false,
+            "readBytes": 0,
+            "writeBytes": 408,
+            "readDocuments": 0,
+            "writeDocuments": 1
+          },
+          {
+            "function": "recordingRows:begin",
+            "error": false,
+            "readBytes": 644,
+            "writeBytes": 910,
+            "readDocuments": 2,
+            "writeDocuments": 2
+          },
+          {
+            "function": "recordingRows:publish",
+            "error": false,
+            "readBytes": 1542,
+            "writeBytes": 2211,
+            "readDocuments": 4,
+            "writeDocuments": 4
+          },
+          {
+            "function": "recordingRows:current",
+            "error": false,
+            "readBytes": 2178,
+            "writeBytes": 0,
+            "readDocuments": 3,
+            "writeDocuments": 0
+          },
+          {
+            "function": "recordingRows:current",
+            "error": true,
+            "readBytes": 417,
+            "writeBytes": 0,
+            "readDocuments": 1,
+            "writeDocuments": 0
+          },
+          {
+            "function": "recordingRows:current",
+            "error": false,
+            "readBytes": 0,
+            "writeBytes": 0,
+            "readDocuments": 0,
+            "writeDocuments": 0
+          },
+          {
+            "function": "recordingRows:begin",
+            "error": false,
+            "readBytes": 728,
+            "writeBytes": 952,
+            "readDocuments": 2,
+            "writeDocuments": 2
+          },
+          {
+            "function": "recordingRows:begin",
+            "error": false,
+            "readBytes": 824,
+            "writeBytes": 952,
+            "readDocuments": 2,
+            "writeDocuments": 2
+          },
+          {
+            "function": "recordingRows:publish",
+            "error": true,
+            "readBytes": 813,
+            "writeBytes": 0,
+            "readDocuments": 2,
+            "writeDocuments": 0
+          },
+          {
+            "function": "recordingRows:publish",
+            "error": false,
+            "readBytes": 813,
+            "writeBytes": 0,
+            "readDocuments": 2,
+            "writeDocuments": 0
+          },
+          {
+            "function": "recordingRows:close",
+            "error": false,
+            "readBytes": 908,
+            "writeBytes": 454,
+            "readDocuments": 2,
+            "writeDocuments": 1
+          },
+          {
+            "function": "recordingRows:reap",
+            "error": false,
+            "readBytes": 1267,
+            "writeBytes": 0,
+            "readDocuments": 3,
+            "writeDocuments": 1
+          },
+          {
+            "function": "recordingRows:publish",
+            "error": false,
+            "readBytes": 4025,
+            "writeBytes": 2211,
+            "readDocuments": 7,
+            "writeDocuments": 6
+          },
+          {
+            "function": "recordingRows:begin",
+            "error": false,
+            "readBytes": 728,
+            "writeBytes": 952,
+            "readDocuments": 2,
+            "writeDocuments": 2
+          },
+          {
+            "function": "recordingRows:erase",
+            "error": false,
+            "readBytes": 3223,
+            "writeBytes": 0,
+            "readDocuments": 5,
+            "writeDocuments": 3
+          },
+          {
+            "function": "recordingRows:provision",
+            "error": false,
+            "readBytes": 0,
+            "writeBytes": 408,
+            "readDocuments": 0,
+            "writeDocuments": 1
+          },
+          {
+            "function": "recordingRows:publish",
+            "error": false,
+            "readBytes": 454,
+            "writeBytes": 0,
+            "readDocuments": 1,
+            "writeDocuments": 0
+          },
+          {
+            "function": "recordingRows:current",
+            "error": false,
+            "readBytes": 375,
+            "writeBytes": 0,
+            "readDocuments": 1,
+            "writeDocuments": 0
+          },
+          {
+            "function": "recordingRows:close",
+            "error": false,
+            "readBytes": 908,
+            "writeBytes": 454,
+            "readDocuments": 2,
+            "writeDocuments": 1
+          },
+          {
+            "function": "recordingRows:reap",
+            "error": false,
+            "readBytes": 908,
+            "writeBytes": 0,
+            "readDocuments": 2,
+            "writeDocuments": 1
+          },
+          {
+            "function": "recordingRows:erase",
+            "error": false,
+            "readBytes": 644,
+            "writeBytes": 0,
+            "readDocuments": 2,
+            "writeDocuments": 1
+          }
+        ]
+      }
+    }
+  }
+}

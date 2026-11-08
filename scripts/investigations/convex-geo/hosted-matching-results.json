@@ -1,0 +1,612 @@
+{
+  "deployment": "spotted-fennec-603",
+  "trialDate": "2026-11-07",
+  "library": {
+    "eligibleActivities": 4602,
+    "ownerScopes": 1,
+    "sourceUncompressedBytes": 811800673,
+    "fileCompressedBytes": 238729963,
+    "catalogueRows": 80366,
+    "catalogueSnapshotId": "osm-places-v1:1a9e03962c0a18e0bea01dfddb5feaa1f96b1b0c65636b22a8e881f77811ac9b",
+    "catalogueRevision": "0"
+  },
+  "baseline": {
+    "groups": 194,
+    "statuses": {
+      "uncovered": 824,
+      "complete": 3719,
+      "partial": 59
+    },
+    "wallMs": 56282.331833000004
+  },
+  "outcomes": {
+    "single": {
+      "state": "verified",
+      "mode": "single",
+      "groups": 1,
+      "verified": 1,
+      "exactWindowOracle": 1,
+      "maxFrozenWindowDriftDegrees": 0,
+      "counts": {
+        "uncovered": 1
+      },
+      "wallMs": 846.7970839999999,
+      "totals": {
+        "compressedBytes": 11257,
+        "decodeMs": 14.630845999985468,
+        "fileMs": 65.89171699999133,
+        "pages": 1,
+        "prepareMs": 11.61140700004762,
+        "samples": 915,
+        "scanned": 0,
+        "scoreMs": 53.09186500002397,
+        "sections": 1,
+        "tileMs": 15,
+        "tiles": 1
+      },
+      "max": {
+        "compressedBytes": 11257,
+        "decodeMs": 14.630845999985468,
+        "fileMs": 65.89171699999133,
+        "pages": 1,
+        "prepareMs": 11.61140700004762,
+        "rssMiB": 601.0078125,
+        "samples": 915,
+        "scanned": 0,
+        "scoreMs": 53.09186500002397,
+        "sections": 1,
+        "tileMs": 15,
+        "tiles": 1
+      },
+      "groupObservedMs": {
+        "p50": 699.311583,
+        "p95": 699.311583,
+        "max": 699.311583
+      },
+      "groupsAbove512MiBProcessHighWater": 1,
+      "rssInstrumentedGroups": 0,
+      "maxObservedRssMiB": null,
+      "groupsThatRaisedProcessPeakAbove512MiB": 0,
+      "maxGroupActivities": 1
+    },
+    "actual": {
+      "state": "verified",
+      "mode": "actual",
+      "changeRecords": 4602,
+      "groups": 192,
+      "verified": 4602,
+      "exactWindowOracle": 193,
+      "maxFrozenWindowDriftDegrees": 0,
+      "counts": {
+        "uncovered": 824,
+        "complete": 3719,
+        "partial": 59
+      },
+      "wallMs": 1043508.59525,
+      "totals": {
+        "compressedBytes": 238882944,
+        "decodeMs": 174064.2029440005,
+        "fileMs": 134934.87667999935,
+        "pages": 1492,
+        "prepareMs": 114343.48258000135,
+        "samples": 18743660,
+        "scanned": 104316,
+        "scoreMs": 305174.80701700004,
+        "sections": 14231,
+        "tileMs": 45328,
+        "tiles": 1383
+      },
+      "max": {
+        "compressedBytes": 1589001,
+        "decodeMs": 2128.46311599997,
+        "fileMs": 1796.847316999978,
+        "pages": 68,
+        "prepareMs": 1976.0995590000002,
+        "rssMiB": 662.08984375,
+        "samples": 120181,
+        "scanned": 3656,
+        "scoreMs": 4104.441978999996,
+        "sections": 2006,
+        "tileMs": 1243,
+        "tiles": 68,
+        "rssHighWaterAtStartMiB": 648.87109375,
+        "rssObservedMiB": 662.08984375
+      },
+      "groupObservedMs": {
+        "p50": 6277.778665999998,
+        "p95": 8495.992708000005,
+        "max": 12401.746458999929
+      },
+      "groupsAbove512MiBProcessHighWater": 48,
+      "rssInstrumentedGroups": 112,
+      "maxObservedRssMiB": 662.08984375,
+      "groupsThatRaisedProcessPeakAbove512MiB": 17,
+      "maxGroupActivities": 97,
+      "sameOrdinalMembershipAsFrozen": 88
+    },
+    "frozen": {
+      "state": "verified",
+      "mode": "frozen",
+      "changeRecords": 4602,
+      "groups": 194,
+      "verified": 4602,
+      "exactWindowOracle": 194,
+      "maxFrozenWindowDriftDegrees": 1.1368683772161603e-13,
+      "counts": {
+        "uncovered": 824,
+        "complete": 3719,
+        "partial": 59
+      },
+      "wallMs": 1035131.960583,
+      "totals": {
+        "compressedBytes": 238729963,
+        "decodeMs": 175280.8089939994,
+        "fileMs": 158993.35538300005,
+        "pages": 1493,
+        "prepareMs": 125668.65866699949,
+        "samples": 18743660,
+        "scanned": 104395,
+        "scoreMs": 322131.5532270002,
+        "sections": 14231,
+        "tileMs": 45266,
+        "tiles": 1384
+      },
+      "max": {
+        "compressedBytes": 1639978,
+        "decodeMs": 2130.151601999998,
+        "fileMs": 2016.4974240000022,
+        "pages": 53,
+        "prepareMs": 2457.6124849999987,
+        "rssMiB": 668.98828125,
+        "samples": 120181,
+        "scanned": 3656,
+        "scoreMs": 5484.081167000001,
+        "sections": 2006,
+        "tileMs": 1140,
+        "tiles": 53,
+        "rssHighWaterAtStartMiB": 668.98828125,
+        "rssObservedMiB": 668.98828125
+      },
+      "groupObservedMs": {
+        "p50": 6019.92412499999,
+        "p95": 8600.361167000025,
+        "max": 12442.76549999998
+      },
+      "groupsAbove512MiBProcessHighWater": 53,
+      "rssInstrumentedGroups": 110,
+      "maxObservedRssMiB": 668.98828125,
+      "groupsThatRaisedProcessPeakAbove512MiB": 8,
+      "maxGroupActivities": 97
+    },
+    "parallel": {
+      "state": "verified",
+      "mode": "parallel",
+      "groups": 12,
+      "verified": 206,
+      "exactWindowOracle": 12,
+      "pairedSequentialTileMs": 6438,
+      "maxFrozenWindowDriftDegrees": 1.1368683772161603e-13,
+      "counts": {
+        "uncovered": 182,
+        "complete": 15,
+        "partial": 9
+      },
+      "wallMs": 67052.06216700001,
+      "totals": {
+        "compressedBytes": 14705289,
+        "decodeMs": 13569.556895000045,
+        "fileMs": 7391.089749999985,
+        "pages": 440,
+        "prepareMs": 9678.589617999853,
+        "samples": 1150897,
+        "scanned": 5385,
+        "scoreMs": 19582.017962999875,
+        "sections": 1110,
+        "tileMs": 3847,
+        "tiles": 433
+      },
+      "max": {
+        "compressedBytes": 1639978,
+        "decodeMs": 1958.158094000013,
+        "fileMs": 980.2390780000715,
+        "pages": 53,
+        "prepareMs": 1404.8654830000596,
+        "rssHighWaterAtStartMiB": 239.6171875,
+        "rssMiB": 239.6171875,
+        "rssObservedMiB": 237.74609375,
+        "samples": 118715,
+        "scanned": 1864,
+        "scoreMs": 3599.8646749999607,
+        "sections": 331,
+        "tileMs": 507,
+        "tiles": 53
+      },
+      "groupObservedMs": {
+        "p50": 5370.0511659999975,
+        "p95": 8255.085458000001,
+        "max": 8255.085458000001
+      },
+      "groupsAbove512MiBProcessHighWater": 0,
+      "rssInstrumentedGroups": 12,
+      "maxObservedRssMiB": 237.74609375,
+      "groupsThatRaisedProcessPeakAbove512MiB": 0,
+      "maxGroupActivities": 25
+    },
+    "bounded": {
+      "state": "verified",
+      "mode": "bounded",
+      "groups": 23,
+      "verified": 60,
+      "exactWindowOracle": 23,
+      "boundedSourceGroups": {
+        "groups": 4,
+        "maxObservedRssMiB": 668.98828125,
+        "samplesPerSubgroup": 25000,
+        "rawBytesPerSubgroup": 4194304,
+        "activitiesPerSubgroup": 12
+      },
+      "maxFrozenWindowDriftDegrees": 0,
+      "counts": {
+        "complete": 34,
+        "uncovered": 26
+      },
+      "wallMs": 42189.145,
+      "totals": {
+        "compressedBytes": 5179076,
+        "decodeMs": 4528.156773000315,
+        "fileMs": 3020.552879999974,
+        "pages": 95,
+        "prepareMs": 3087.5583559998777,
+        "samples": 431862,
+        "scanned": 11669,
+        "scoreMs": 13206.225525999966,
+        "sections": 274,
+        "tileMs": 4220,
+        "tiles": 69
+      },
+      "max": {
+        "compressedBytes": 368362,
+        "decodeMs": 360.4338620000053,
+        "fileMs": 284.76617099996656,
+        "pages": 11,
+        "prepareMs": 426.9715530000394,
+        "rssHighWaterAtStartMiB": 239.6171875,
+        "rssMiB": 239.6171875,
+        "rssObservedMiB": 231.5546875,
+        "samples": 26836,
+        "scanned": 1822,
+        "scoreMs": 1005.3704770000186,
+        "sections": 35,
+        "tileMs": 448,
+        "tiles": 8
+      },
+      "groupObservedMs": {
+        "p50": 1894.1914580000011,
+        "p95": 2338.7402079999993,
+        "max": 2343.7019579999996
+      },
+      "groupsAbove512MiBProcessHighWater": 0,
+      "rssInstrumentedGroups": 23,
+      "maxObservedRssMiB": 231.5546875,
+      "groupsThatRaisedProcessPeakAbove512MiB": 0,
+      "maxGroupActivities": 9
+    },
+    "isolated": {
+      "state": "verified",
+      "mode": "isolated",
+      "groups": 4,
+      "verified": 60,
+      "exactWindowOracle": 4,
+      "boundedSourceGroups": {
+        "groups": 4,
+        "maxObservedRssMiB": 668.98828125,
+        "samplesPerSubgroup": 25000,
+        "rawBytesPerSubgroup": 4194304,
+        "activitiesPerSubgroup": 12
+      },
+      "maxFrozenWindowDriftDegrees": 0,
+      "counts": {
+        "complete": 34,
+        "uncovered": 26
+      },
+      "wallMs": 7310.353791,
+      "totals": {
+        "compressedBytes": 5179076,
+        "decodeMs": 842.5570410000007,
+        "fileMs": 1262.250329000001,
+        "pages": 31,
+        "prepareMs": 587.2941579999987,
+        "samples": 431862,
+        "scanned": 4819,
+        "scoreMs": 1121.6236380000007,
+        "sections": 274,
+        "tileMs": 440,
+        "tiles": 25
+      },
+      "max": {
+        "compressedBytes": 1474484,
+        "decodeMs": 236.49109899999985,
+        "fileMs": 634.6643730000014,
+        "pages": 14,
+        "prepareMs": 211.28593100000023,
+        "rssHighWaterAtStartMiB": 563.9375,
+        "rssMiB": 624.1640625,
+        "rssObservedMiB": 624.1640625,
+        "samples": 118179,
+        "scanned": 2517,
+        "scoreMs": 464.99895300000003,
+        "sections": 95,
+        "tileMs": 260,
+        "tiles": 11
+      },
+      "groupObservedMs": {
+        "p50": 1497.8299579999998,
+        "p95": 2534.0139580000005,
+        "max": 2534.0139580000005
+      },
+      "groupsAbove512MiBProcessHighWater": 2,
+      "rssInstrumentedGroups": 4,
+      "maxObservedRssMiB": 624.1640625,
+      "groupsThatRaisedProcessPeakAbove512MiB": 2,
+      "maxGroupActivities": 26
+    }
+  },
+  "synthetic": [
+    {
+      "fixture": "largest",
+      "samples": 172071,
+      "observedMs": 5234.74,
+      "attempt": 1,
+      "phase": "complete",
+      "status": "partial",
+      "metrics": {
+        "compressedBytes": 1844066,
+        "decodeMs": 2625.012412,
+        "fileMs": 339.97727299999997,
+        "pages": 0,
+        "prepareMs": 0.004203000000416068,
+        "rssMiB": 217.98828125,
+        "samples": 172071,
+        "scanned": 0,
+        "scoreMs": 357.04479099999935,
+        "sections": 0,
+        "tileMs": 0,
+        "tiles": 0
+      }
+    },
+    {
+      "fixture": "score-limit",
+      "samples": 100000,
+      "observedMs": 6995.948915999999,
+      "attempt": 1,
+      "phase": "complete",
+      "status": "complete",
+      "metrics": {
+        "compressedBytes": 1077704,
+        "decodeMs": 1725.5642719999996,
+        "fileMs": 89.67741599999863,
+        "pages": 15,
+        "prepareMs": 1213.2882609999979,
+        "rssMiB": 243.17578125,
+        "samples": 100000,
+        "scanned": 2677,
+        "scoreMs": 2826.2577600000004,
+        "sections": 1,
+        "tileMs": 677,
+        "tiles": 12
+      }
+    },
+    {
+      "fixture": "postgres-missing-gps",
+      "observedMs": 659.7930000000015,
+      "attempt": 1,
+      "phase": "complete",
+      "status": "partial",
+      "metrics": {
+        "compressedBytes": 22,
+        "decodeMs": 0.21855599999980768,
+        "fileMs": 65.93495300000177,
+        "pages": 0,
+        "prepareMs": 0.13670900000215624,
+        "rssMiB": 241.21484375,
+        "samples": 0,
+        "scanned": 0,
+        "scoreMs": 194.9169120000006,
+        "sections": 0,
+        "tileMs": 0,
+        "tiles": 0
+      }
+    },
+    {
+      "fixture": "wide",
+      "samples": 300,
+      "observedMs": 467.3545000000013,
+      "attempt": 1,
+      "phase": "failed",
+      "failure": "catalogue_incomplete"
+    },
+    {
+      "fixture": "typical",
+      "samples": 4800,
+      "observedMs": 7157.157791000001,
+      "attempt": 2,
+      "phase": "complete",
+      "status": "complete",
+      "metrics": {
+        "compressedBytes": 57512,
+        "decodeMs": 21.594461000000592,
+        "fileMs": 54.452274999999645,
+        "pages": 6,
+        "prepareMs": 99.21051100000113,
+        "rssMiB": 241.21484375,
+        "samples": 4800,
+        "scanned": 1172,
+        "scoreMs": 219.35356899999897,
+        "sections": 1,
+        "tileMs": 202,
+        "tiles": 4
+      }
+    }
+  ],
+  "fixtureIngestion": {
+    "initial": "complete",
+    "emptyUpdate": "missing_streams",
+    "changeSequences": [1, 2],
+    "sourceUpdateAndDeletionFenced": true
+  },
+  "erasure": {
+    "filesVerified": 4602,
+    "persistedResponsesVerified": 4602,
+    "remaining": 0,
+    "runErased": true
+  },
+  "cloudLogs": {
+    "scope": "Captured lab log window began partway through import and includes preliminary, corrected, synthetic, and cleanup runs. Function counters are telemetry separate from billing.",
+    "functions": {
+      "matchingReplay:publish": {
+        "executions": 135,
+        "cached": 0,
+        "errors": 0,
+        "retries": 3,
+        "executionMs": 36864.61388999998,
+        "usage": {
+          "databaseReadBytes": 8029044,
+          "databaseWriteBytes": 14810491,
+          "databaseIoReadBytes": 8029044,
+          "databaseIoWriteBytes": 14810491,
+          "databaseReadDocuments": 21137,
+          "databaseWriteDocuments": 14677,
+          "storageReadBytes": 0,
+          "storageWriteBytes": 0,
+          "networkEgressBytes": 0
+        }
+      },
+      "matchingReplay:reserve": {
+        "executions": 133,
+        "cached": 0,
+        "errors": 0,
+        "retries": 2,
+        "executionMs": 21956.83751,
+        "usage": {
+          "databaseReadBytes": 2673381,
+          "databaseWriteBytes": 4314838,
+          "databaseIoReadBytes": 2673381,
+          "databaseIoWriteBytes": 4314838,
+          "databaseReadDocuments": 8932,
+          "databaseWriteDocuments": 8666,
+          "storageReadBytes": 0,
+          "storageWriteBytes": 0,
+          "networkEgressBytes": 0
+        }
+      },
+      "matchingGroups:load": {
+        "executions": 512,
+        "cached": 0,
+        "errors": 0,
+        "retries": 0,
+        "executionMs": 56885.744695999965,
+        "usage": {
+          "databaseReadBytes": 153129924,
+          "databaseWriteBytes": 0,
+          "databaseIoReadBytes": 153129924,
+          "databaseIoWriteBytes": 0,
+          "databaseReadDocuments": 323433,
+          "databaseWriteDocuments": 0,
+          "storageReadBytes": 0,
+          "storageWriteBytes": 0,
+          "networkEgressBytes": 0
+        }
+      },
+      "matchingGroups:inputs": {
+        "executions": 511,
+        "cached": 0,
+        "errors": 0,
+        "retries": 0,
+        "executionMs": 22035.36362400001,
+        "usage": {
+          "databaseReadBytes": 32936099,
+          "databaseWriteBytes": 0,
+          "databaseIoReadBytes": 32936099,
+          "databaseIoWriteBytes": 0,
+          "databaseReadDocuments": 49407,
+          "databaseWriteDocuments": 0,
+          "storageReadBytes": 0,
+          "storageWriteBytes": 0,
+          "networkEgressBytes": 0
+        }
+      },
+      "matchingGroups:commit": {
+        "executions": 540,
+        "cached": 0,
+        "errors": 0,
+        "retries": 34,
+        "executionMs": 164183.1496539999,
+        "usage": {
+          "databaseReadBytes": 47431158,
+          "databaseWriteBytes": 15910622,
+          "databaseIoReadBytes": 47431158,
+          "databaseIoWriteBytes": 15910622,
+          "databaseReadDocuments": 79033,
+          "databaseWriteDocuments": 18345,
+          "storageReadBytes": 0,
+          "storageWriteBytes": 0,
+          "networkEgressBytes": 0
+        }
+      },
+      "matchingWorker:run": {
+        "executions": 512,
+        "cached": 0,
+        "errors": 0,
+        "retries": 0,
+        "executionMs": 2447539.3340669987,
+        "usage": {
+          "databaseReadBytes": 0,
+          "databaseWriteBytes": 0,
+          "databaseIoReadBytes": 0,
+          "databaseIoWriteBytes": 0,
+          "databaseReadDocuments": 0,
+          "databaseWriteDocuments": 0,
+          "storageReadBytes": 0,
+          "storageWriteBytes": 0,
+          "networkEgressBytes": 44566739
+        }
+      },
+      "matchingReplay:eraseBatch": {
+        "executions": 163,
+        "cached": 0,
+        "errors": 0,
+        "retries": 0,
+        "executionMs": 87983.65994599999,
+        "usage": {
+          "databaseReadBytes": 45180766,
+          "databaseWriteBytes": 0,
+          "databaseIoReadBytes": 45180766,
+          "databaseIoWriteBytes": 0,
+          "databaseReadDocuments": 51960,
+          "databaseWriteDocuments": 28143,
+          "storageReadBytes": 0,
+          "storageWriteBytes": 0,
+          "networkEgressBytes": 0
+        }
+      },
+      "lab:tilePage": {
+        "executions": 4048,
+        "cached": 2873,
+        "errors": 0,
+        "retries": 0,
+        "executionMs": 16639.31409100001,
+        "usage": {
+          "databaseReadBytes": 34439165,
+          "databaseWriteBytes": 0,
+          "databaseIoReadBytes": 34439165,
+          "databaseIoWriteBytes": 0,
+          "databaseReadDocuments": 61790,
+          "databaseWriteDocuments": 0,
+          "storageReadBytes": 0,
+          "storageWriteBytes": 0,
+          "networkEgressBytes": 0
+        }
+      }
+    }
+  }
+}
