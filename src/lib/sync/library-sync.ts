@@ -36,6 +36,13 @@ function stop(registration: Registration) {
   registration.controller.abort(aborted());
 }
 
+/** During first mount a reader can precede the provider's registration. */
+export class LibrarySyncNotReadyError extends Error {
+  constructor() {
+    super('The signed-in library is not ready to sync.');
+  }
+}
+
 /** The authenticated provider is the only network writer for this scope. */
 export function registerLibrarySync(
   client: QueryClient,
@@ -88,9 +95,7 @@ export function requestLibrarySync(
   const registry = registryFor(client);
   const registration = registry.scopes.get(scope);
   if (!registration?.active)
-    return Promise.reject(
-      new Error('The signed-in library is not ready to sync.'),
-    );
+    return Promise.reject(new LibrarySyncNotReadyError());
   const requested = ++registration.requested;
   if (commit) registration.commits.push({ version: requested, apply: commit });
   const current = () => {

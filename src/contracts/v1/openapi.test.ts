@@ -4,6 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { test } from 'node:test';
+import { format, resolveConfig } from 'prettier';
 
 import { buildOpenApiDocument } from './openapi.ts';
 
@@ -68,9 +69,15 @@ function documentedV1Operations(): string[] {
   return operations.sort();
 }
 
-void test('the checked-in openapi/v1.json matches the current contracts (run `tsx scripts/generate-openapi.ts` if this fails)', () => {
+void test('the checked-in openapi/v1.json matches the current contracts (run `tsx scripts/generate-openapi.ts` if this fails)', async () => {
   const checkedIn = readFileSync(checkedInPath, 'utf8');
-  const regenerated = JSON.stringify(buildOpenApiDocument(), null, 2) + '\n';
+  const regenerated = await format(
+    JSON.stringify(buildOpenApiDocument(), null, 2),
+    {
+      ...(await resolveConfig(checkedInPath)),
+      filepath: checkedInPath,
+    },
+  );
   assert.equal(regenerated, checkedIn);
 });
 

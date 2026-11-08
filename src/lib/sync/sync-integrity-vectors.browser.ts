@@ -1,7 +1,9 @@
 /** Browser verification through the production sync client and IndexedDB adapter. */
+import type { ActivityPlacesResponse } from '~/contracts/activity-places';
 import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import type { PhotoDTO } from '~/contracts/v1/photo';
+import { syncedActivityPlaces } from '~/lib/activity-places';
 import { encodeStreamSummary } from '~/lib/streams/compact-summary';
 
 import { compactStreamCorpus } from '../../../scripts/fixtures/compact-stream-corpus';
@@ -285,10 +287,127 @@ export async function extraStorageChecks() {
       'checkpoint scope isolation',
     );
   }
+  const placesScope = 'auth:places-atomic';
+  const version = 'a'.repeat(64);
+  const bundle: ActivityPlacesResponse = {
+    userId: 'places-atomic',
+    activityId: '1',
+    status: 'complete',
+    streamGeneration: metadata.generation,
+    streamRevision: metadata.revision,
+    catalogueSnapshotId: 'catalogue',
+    matcherVersion: 'v5',
+    matchingVersion: version,
+    resultRevision: 'first',
+    places: [
+      {
+        id: '00000000-0000-4000-8000-000000000001',
+        name: 'Summit',
+        kinds: ['peak'],
+        longitude: 8,
+        latitude: 46,
+        elevationM: 2000,
+        visits: [{ distanceM: 10 }],
+      },
+    ],
+  };
+  const activity = {
+    ...fixtures.activity,
+    streams: metadata,
+    placeMatches: bundle,
+  } as ActivityDTO;
+  const state = {
+    ...checkpoint(placesScope),
+    placesSyncReady: true,
+    placeMatchingVersion: version,
+  };
+  await store.applyV1SyncPage(placesScope, mutations([activity]), state);
+  const zero = {
+    ...activity,
+    placeMatches: { ...bundle, resultRevision: 'zero', places: [] },
+  };
+  // Fail after result writes are queued: the old bundle and cursor must survive.
+  IDBObjectStore.prototype.put = function (value, key) {
+    if (this.name === 'sync_state') {
+      this.transaction.abort();
+      throw new Error('injected place save failure');
+    }
+    return key === undefined
+      ? originalPut.call(this, value)
+      : originalPut.call(this, value, key);
+  };
+  let placeFailed = false;
+  try {
+    await store.applyV1SyncPage(placesScope, mutations([zero]), {
+      ...state,
+      changesCursor: 'uncommitted',
+    });
+  } catch {
+    placeFailed = true;
+  } finally {
+    IDBObjectStore.prototype.put = originalPut;
+  }
+  check(placeFailed, true, 'places rollback injected');
+  check(
+    (await store.getCachedActivityDTOs(placesScope))[0]?.placeMatches?.places
+      .length,
+    1,
+    'places rollback',
+  );
+  check(
+    (await store.getV1SyncState(placesScope))?.changesCursor,
+    'old',
+    'places cursor rollback',
+  );
+  await store.applyV1SyncPage(placesScope, mutations([zero]), {
+    ...state,
+    changesCursor: 'zero',
+  });
+  check(
+    (await store.getCachedActivityDTOs(placesScope))[0]?.placeMatches?.places,
+    [],
+    'zero replaces visits',
+  );
+  const newer = 'b'.repeat(64);
+  await store.applyV1SyncPage(placesScope, [], {
+    ...state,
+    placeMatchingVersion: newer,
+  });
+  check(
+    syncedActivityPlaces(
+      (await store.getCachedActivityDTOs(placesScope))[0],
+      'places-atomic',
+      newer,
+    ),
+    undefined,
+    'empty-page global invalidation',
+  );
+  let rejected = false;
+  try {
+    await store.applyV1SyncPage(
+      'auth:someone-else',
+      mutations([activity]),
+      checkpoint('auth:someone-else'),
+    );
+  } catch {
+    rejected = true;
+  }
+  check(rejected, true, 'cross-account bundle rejected');
+  await store.applyV1SyncPage(
+    placesScope,
+    [{ sequence: '2', entityType: 'activity', operation: 'delete', id: '1' }],
+    state,
+  );
+  check(
+    (await store.getCachedActivityDTOs(placesScope)).length,
+    0,
+    'activity deletion removes bundle',
+  );
   return [
     'cancellation-aborts-transaction',
     'account-and-deployment-isolation',
     'summary-rollback-and-metadata-invalidation',
+    'places-atomic-replacement-zeroes-invalidation-and-deletion',
   ];
 }
 

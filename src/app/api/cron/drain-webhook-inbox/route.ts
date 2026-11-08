@@ -1,9 +1,11 @@
-import { NextResponse, type NextRequest } from 'next/server';
-import { logger } from '~/server/logging/logger';
+import { type NextRequest, NextResponse } from 'next/server';
+
+import { withJobLog } from '~/server/application/job-log';
 import {
   EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   externalEffectsEnabled,
 } from '~/server/config/external-effects';
+import { logger } from '~/server/logging/logger';
 import {
   DEFAULT_DRAIN_BATCH_SIZE,
   DEFAULT_DRAIN_CONCURRENCY,
@@ -11,7 +13,6 @@ import {
   getWebhookInboxMetrics,
   reconcileStuckWebhookEvents,
 } from '~/server/strava/webhook-drain';
-import { withJobLog } from '~/server/application/job-log';
 
 const drainInbox = withJobLog(
   'drain-webhook-inbox',
@@ -51,11 +52,7 @@ const drainInbox = withJobLog(
  * header matching `CRON_SECRET`, and `externalEffectsEnabled()` fails
  * closed outside Production.
  *
- * This repository has no `vercel.json` - `sync-activities` is instead
- * scheduled via a GitHub Actions workflow
- * (`.github/workflows/fetch.yml`) that POSTs to it on a cron trigger, so
- * this route is registered the same way, in
- * `.github/workflows/drain-webhook-inbox.yml`.
+ * The Cloudflare Worker calls this route once per hour.
  */
 export async function POST(request: NextRequest) {
   if (!externalEffectsEnabled()) {

@@ -6,6 +6,7 @@ import Observation
 struct StatsFilterScope: Hashable {
     let sports: Set<SportType>
     let search: String
+    let place: PlaceFilter?
     let distance: NumericFilter?
     let elevation: NumericFilter?
     let elapsed: NumericFilter?
@@ -15,6 +16,7 @@ struct StatsFilterScope: Hashable {
     init(_ store: ActivityStore) {
         sports = store.activeSportTypes
         search = store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).precomposedStringWithCanonicalMapping.lowercased()
+        place = store.selectedPlace
         distance = store.distanceFilter; elevation = store.elevationFilter; elapsed = store.durationFilter
         commute = store.commuteOnly; isPrivate = store.privateFilter; flagged = store.flaggedFilter
     }

@@ -18,7 +18,7 @@ actor GatedReplacementSource: SyncPageSource {
     }
     func bootstrap(resource: ActivityMapAPI.SyncResource, cursor: String?) async throws -> ActivityMapAPI.SyncBootstrapPage {
         if resource == .activities {
-            return .activities(.init(items: [replacement], nextCursor: nil, snapshotCursor: "replacement", retention: .init(retentionDays: 30, cursorValidUntil: Date().addingTimeInterval(86400)), freshness: .init(lastSummaryReconciledAt: nil)))
+            return .activities(.init(items: [replacement], nextCursor: nil, snapshotCursor: "replacement", retention: .init(retentionDays: 30, cursorValidUntil: Date().addingTimeInterval(86400)), freshness: .init(lastSummaryReconciledAt: nil, placeMatchingVersion: nil)))
         }
         return try await withCheckedThrowingContinuation {
             response = $0
@@ -40,7 +40,7 @@ struct SnapshotReplacementTests {
         let photo = try Fixtures.photo(["activity_id": "1"])
         var checkpoint = Fixtures.checkpoint
         checkpoint.lastSyncAt = Date().addingTimeInterval(-30 * 86400)
-        checkpoint.freshness = .init(lastSummaryReconciledAt: nil)
+        checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: nil)
         try await storage.apply([.upsertActivity(old), .upsertPhoto(photo)], checkpoint: checkpoint, scope: Fixtures.scope)
         let source = GatedReplacementSource(replacement: try Fixtures.activity(["id": "2"]))
         let store = ActivityStore()

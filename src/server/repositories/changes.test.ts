@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import { syncChanges } from '~/server/db/schema';
 
-import { createChangesRepository, type ChangesRepository } from './changes.ts';
+import { type ChangesRepository, createChangesRepository } from './changes.ts';
 
 /**
  * A minimal stand-in for the drizzle `db` handle, in the same spirit as
@@ -22,11 +23,13 @@ import { createChangesRepository, type ChangesRepository } from './changes.ts';
  * independently re-verified here; there is no live Postgres in this
  * sandbox to run it against (see the PR description).
  */
-function buildFakeDb(opts: {
-  selectResult?: unknown[];
-  aggregateResult?: { max?: number | string | bigint | null };
-  deletedRows?: { sequence: number }[];
-} = {}) {
+function buildFakeDb(
+  opts: {
+    selectResult?: unknown[];
+    aggregateResult?: { max?: number | string | bigint | null };
+    deletedRows?: { sequence: number }[];
+  } = {},
+) {
   const rows: {
     sequence: number;
     athleteId: number;
@@ -38,6 +41,9 @@ function buildFakeDb(opts: {
   let nextSequence = 1;
 
   const fakeDb = {
+    execute: async () => undefined,
+    transaction: async <T>(callback: (tx: unknown) => Promise<T>): Promise<T> =>
+      callback(fakeDb),
     insert(table: unknown) {
       if (table !== syncChanges) throw new Error('unexpected insert target');
       return {
@@ -90,7 +96,9 @@ function buildFakeDb(opts: {
           orderBy: () => makeChainable(),
           limit: async () => resolved,
           then: (resolve, reject) => {
-            Promise.resolve(resolved).then(resolve, reject).catch(() => undefined);
+            Promise.resolve(resolved)
+              .then(resolve, reject)
+              .catch(() => undefined);
           },
         };
       }
@@ -171,23 +179,46 @@ void test('a "changes after cursor X" read never skips or duplicates two changes
   const sameInstant = new Date('2026-06-01T00:00:00.000Z');
 
   await repo.record([
-    { athleteId: 1, entityType: 'activity', entityId: 1, operation: 'upsert', changedAt: sameInstant },
-    { athleteId: 1, entityType: 'activity', entityId: 2, operation: 'upsert', changedAt: sameInstant },
-    { athleteId: 1, entityType: 'activity', entityId: 3, operation: 'upsert', changedAt: sameInstant },
+    {
+      athleteId: 1,
+      entityType: 'activity',
+      entityId: 1,
+      operation: 'upsert',
+      changedAt: sameInstant,
+    },
+    {
+      athleteId: 1,
+      entityType: 'activity',
+      entityId: 2,
+      operation: 'upsert',
+      changedAt: sameInstant,
+    },
+    {
+      athleteId: 1,
+      entityType: 'activity',
+      entityId: 3,
+      operation: 'upsert',
+      changedAt: sameInstant,
+    },
   ]);
 
   // A minimal stand-in for `findAfter`'s real WHERE/ORDER BY, applied to
   // the fake's actual backing rows rather than to canned data, so this
   // exercises real sequence values `record()` assigned above.
   const changesAfter = (afterSequence: number) =>
-    rows.filter((r) => r.sequence > afterSequence).sort((a, b) => a.sequence - b.sequence);
+    rows
+      .filter((r) => r.sequence > afterSequence)
+      .sort((a, b) => a.sequence - b.sequence);
 
   // Page at the boundary right after the first row: must return exactly
   // the second and third rows - not skip the second (same instant as the
   // first) and not re-serve the first.
   const firstSequence = rows[0]!.sequence;
   const page = changesAfter(firstSequence);
-  assert.deepEqual(page.map((r) => r.entityId), ['2', '3']);
+  assert.deepEqual(
+    page.map((r) => r.entityId),
+    ['2', '3'],
+  );
 
   // Paging again from the new high-water mark returns nothing left to
   // apply - and re-requesting the same cursor again (a client retry after
@@ -208,7 +239,12 @@ void test('a deletion change record carries no reference to the entity row it na
   const repo = repoWith(db);
 
   const [inserted] = await repo.record([
-    { athleteId: 7, entityType: 'activity', entityId: 999, operation: 'delete' },
+    {
+      athleteId: 7,
+      entityType: 'activity',
+      entityId: 999,
+      operation: 'delete',
+    },
   ]);
 
   assert.equal(rows.length, 1);
@@ -240,14 +276,20 @@ void test('latestSequence rejects bigint aggregates outside JavaScript safe-inte
 });
 
 void test('compactOlderThan reports how many rows the delete removed', async () => {
-  const { db } = buildFakeDb({ deletedRows: [{ sequence: 1 }, { sequence: 2 }] });
-  const deletedCount = await repoWith(db).compactOlderThan(new Date('2020-01-01'));
+  const { db } = buildFakeDb({
+    deletedRows: [{ sequence: 1 }, { sequence: 2 }],
+  });
+  const deletedCount = await repoWith(db).compactOlderThan(
+    new Date('2020-01-01'),
+  );
   assert.equal(deletedCount, 2);
 });
 
 void test('compactOlderThan reports 0 when nothing was old enough to remove', async () => {
   const { db } = buildFakeDb({ deletedRows: [] });
-  const deletedCount = await repoWith(db).compactOlderThan(new Date('2020-01-01'));
+  const deletedCount = await repoWith(db).compactOlderThan(
+    new Date('2020-01-01'),
+  );
   assert.equal(deletedCount, 0);
 });
 

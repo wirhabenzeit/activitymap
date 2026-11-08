@@ -310,7 +310,7 @@ struct SyncControllerTests {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         var checkpoint = Fixtures.checkpoint
         checkpoint.lastSyncAt = Date()
-        checkpoint.freshness = .init(lastSummaryReconciledAt: nil)
+        checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: nil)
         try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: checkpoint, scope: Fixtures.scope)
         let source = ScriptedSyncSource([])
         let controller = SyncController(activities: ActivityStore(), source: { _ in source }, invalidate: { _ in })
@@ -326,7 +326,7 @@ struct SyncControllerTests {
     @Test func onlineSyncDisplaysDataAndUsesChangesCursorWithoutBackendReconciliation() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity()
-        let pending = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: nil)
+        let pending = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: nil, placeMatchingVersion: nil)
         let source = ScriptedSyncSource([
             .bootstrap(.activities, nil, .success(SyncFixtures.activities([dto], freshness: pending))),
             .bootstrap(.photos, nil, .success(SyncFixtures.photos(freshness: pending))),
@@ -359,7 +359,7 @@ struct SyncControllerTests {
         let dto = try Fixtures.activity()
         var checkpoint = Fixtures.checkpoint
         checkpoint.lastSyncAt = Date()
-        checkpoint.freshness = .init(lastSummaryReconciledAt: nil)
+        checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: nil)
         try await storage.apply([.upsertActivity(dto)], checkpoint: checkpoint, scope: Fixtures.scope)
         let source = ScriptedSyncSource([
             .changes("cursor-1", .failure(.transport("offline")))

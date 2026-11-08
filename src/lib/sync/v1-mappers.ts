@@ -2,6 +2,7 @@ import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import type { PhotoDTO } from '~/contracts/v1/photo';
 import type { Activity } from '~/lib/activity';
+import { syncedActivityPlaces } from '~/lib/activity-places';
 import type { Photo } from '~/server/db/schema';
 
 // Compatibility alias for callers adopting the explicit frontend projection.
@@ -70,6 +71,18 @@ export function dtoToActivity(dto: ActivityDTO): ActivityWithStreams {
     kilojoules: dto.kilojoules,
     geometryState: dto.geometry_state,
     photosState: dto.photos_state,
+  };
+}
+
+/** Only current synchronized memberships enter ordinary browsing predicates. */
+export function dtoToActivityWithPlaces(
+  dto: ActivityDTO,
+  userId: string,
+  matchingVersion: string | undefined,
+): Activity {
+  return {
+    ...dtoToActivity(dto),
+    placeMatches: syncedActivityPlaces(dto, userId, matchingVersion),
   };
 }
 

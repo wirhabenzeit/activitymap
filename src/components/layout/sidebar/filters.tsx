@@ -15,6 +15,7 @@ import { useEffect } from 'react';
 import * as React from 'react';
 import { useState } from 'react';
 
+import { PlaceSearch } from '~/components/place-search';
 import {
   PreferenceMenuCheckboxItem,
   PreferenceMenuContent,
@@ -462,7 +463,7 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
     >
       <SelectTrigger
         id={id}
-        className="ml-auto h-8 w-24"
+        className="h-8 w-24 shrink-0"
         aria-label={`${binaryFilters[name].label} filter`}
       >
         <SelectValue />
@@ -488,9 +489,17 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
   }
 
   return (
-    <SidebarMenuItem className="mx-2 flex h-9 items-center gap-3">
-      {binaryFilters[name].icon}
-      <label htmlFor={id} className="min-w-16 text-sm leading-none font-medium">
+    <SidebarMenuItem className="mx-2 flex min-h-9 items-center gap-2">
+      <span
+        aria-hidden="true"
+        className="flex size-4 shrink-0 items-center justify-center [&>svg]:size-4"
+      >
+        {binaryFilters[name].icon}
+      </span>
+      <label
+        htmlFor={id}
+        className="min-w-0 flex-1 text-sm leading-5 font-medium"
+      >
         {binaryFilters[name].label}
       </label>
       {control}
@@ -499,41 +508,26 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
 }
 
 export function SearchFilter() {
-  const [search, setSearch] = useShallowStore((state) => [
-    state.search,
-    state.setSearch,
-  ]);
+  const active = useShallowStore((state) =>
+    Boolean(state.search || state.place),
+  );
 
   const { state } = useSidebar();
-  const input = (
-    <Input
-      aria-label="Search activity names"
-      className={cn('h-8', state === 'expanded' && 'pl-8')}
-      placeholder="Search activities"
-      type="search"
-      value={search}
-      onChange={(event) => setSearch(event.target.value)}
-    />
-  );
+  const input = <PlaceSearch />;
 
   if (state === 'collapsed') {
     return (
       <CollapsedFilter
-        label="Search activities"
+        label="Search activities or places"
         icon={<Search />}
-        active={Boolean(search)}
+        active={active}
       >
         {input}
       </CollapsedFilter>
     );
   }
 
-  return (
-    <SidebarMenuItem className="relative mx-2">
-      <Search className="pointer-events-none absolute top-2 left-2 size-4 text-muted-foreground" />
-      {input}
-    </SidebarMenuItem>
-  );
+  return <SidebarMenuItem className="relative mx-2">{input}</SidebarMenuItem>;
 }
 
 export function SelectedActivitiesFilter() {

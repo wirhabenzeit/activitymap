@@ -272,7 +272,9 @@ try {
             .waitFor();
         }
         if (s.id === 'filters') {
-          const search = page.getByPlaceholder('Search activities');
+          const search = page.getByRole('combobox', {
+            name: 'Search activity names or choose a place',
+          });
           if (!(await search.isVisible()))
             await page
               .getByRole('button', { name: 'Filters', exact: true })

@@ -371,10 +371,13 @@ private final class DetailHarness<Content: View> {
         host.view.frame = window.bounds
         host.view.layoutIfNeeded()
     }
-    func snapshot() -> UIImage {
-        host.view.layoutIfNeeded()
-        return UIGraphicsImageRenderer(bounds: host.view.bounds).image { _ in
-            host.view.drawHierarchy(in: host.view.bounds, afterScreenUpdates: true)
+    func snapshot(presented: Bool = false) -> UIImage {
+        // Native sheet material and navigation chrome are composited by the
+        // window, outside the presented controller's transparent content view.
+        let view: UIView = presented ? window : host.view!
+        view.layoutIfNeeded()
+        return UIGraphicsImageRenderer(bounds: view.bounds).image { _ in
+            view.drawHierarchy(in: view.bounds, afterScreenUpdates: true)
         }
     }
     func snapshotRegion(_ rect: CGRect) -> Data? {
@@ -769,6 +772,13 @@ extension RenderedRoutePickingTests {
 
 extension RenderedRoutePickingTests {
     @Test func landscapePanelShowsLoadedProfileWithPinnedHeading() async throws {
+        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
+        for _ in 0..<100 where !scene.effectiveGeometry.interfaceOrientation.isLandscape {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        try #require(scene.effectiveGeometry.interfaceOrientation.isLandscape)
+        defer { scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) }
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity(["id": "1", "name": "Landscape ride"])
         try await storage.apply([.upsertActivity(dto)], scope: Fixtures.scope)
@@ -787,9 +797,15 @@ extension RenderedRoutePickingTests {
         let host = try DetailHarness(root: MapResultsContainer(picker: picker, store: store,
             size: CGSize(width: size.width, height: size.height - 21), topInset: 44,
             bottomInset: 21, largeText: false).ignoresSafeArea(), size: size)
-        defer { host.close() }
+        defer { host.host.dismiss(animated: false); host.close() }
+        for _ in 0..<100 where host.host.presentedViewController == nil {
+            try await Task.sleep(for: .milliseconds(20))
+        }
+        // iOS 27 results live in a native sheet, outside the presenting view's
+        // hierarchy. Capture that real sheet after its presentation completes.
+        try #require(host.host.presentedViewController != nil)
         try await Task.sleep(for: .milliseconds(500))
-        let image = host.snapshot()
+        let image = host.snapshot(presented: true)
         try host.save(image, name: "combined-landscape-elevation")
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate

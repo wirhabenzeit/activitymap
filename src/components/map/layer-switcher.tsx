@@ -1,4 +1,4 @@
-import { Camera, Map } from 'lucide-react';
+import { Camera, Map, Mountain } from 'lucide-react';
 import { useState } from 'react';
 
 import { MapControlIconButton } from '~/components/map/map-control-icon-button';
@@ -47,6 +47,8 @@ export function LayerSwitcher() {
     setBaseMap,
     showPhotos,
     togglePhotos,
+    showPlaces,
+    togglePlaces,
   } = useShallowStore((state) => ({
     overlayMaps: state.overlayMaps,
     baseMap: state.baseMap,
@@ -54,6 +56,8 @@ export function LayerSwitcher() {
     setBaseMap: state.setBaseMap,
     showPhotos: state.showPhotos,
     togglePhotos: state.togglePhotos,
+    showPlaces: state.showPlaces,
+    togglePlaces: state.togglePlaces,
   }));
 
   return (
@@ -64,14 +68,22 @@ export function LayerSwitcher() {
         </MapControlIconButton>
       </DropdownMenuTrigger>
       <PreferenceMenuContent className="w-56">
-        <DropdownMenuLabel>Activity photos</DropdownMenuLabel>
+        <DropdownMenuLabel>Activities</DropdownMenuLabel>
         <PreferenceMenuCheckboxItem
           checked={showPhotos}
           onCheckedChange={togglePhotos}
           className="gap-2"
         >
           <Camera className="h-4 w-4" aria-hidden="true" />
-          Show photos on map
+          Photos
+        </PreferenceMenuCheckboxItem>
+        <PreferenceMenuCheckboxItem
+          checked={showPlaces}
+          onCheckedChange={togglePlaces}
+          className="gap-2"
+        >
+          <Mountain className="h-4 w-4" aria-hidden="true" />
+          Places
         </PreferenceMenuCheckboxItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Base Map</DropdownMenuLabel>

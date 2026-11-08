@@ -47,6 +47,7 @@ import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
 import { usePhotos } from '~/hooks/use-photos';
 import type { Activity } from '~/lib/activity';
+import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
 import { sortActivities } from '~/lib/activity-presentation';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { observeMapResize } from '~/lib/map-resize';
@@ -70,7 +71,9 @@ import {
 import { store } from '~/store';
 import { useShallowStore } from '~/store';
 
+import { ActivityPlacesLayers } from './activity-places-layers';
 import { ElevationRouteMarker } from './elevation-route-marker';
+import { PlaceFilterPin } from './place-filter-pin';
 
 const skyLayer: SkyLayer = {
   id: 'sky',
@@ -267,6 +270,7 @@ export default function InteractiveMap() {
     threeDim,
     toggleThreeDim,
     showPhotos,
+    showPlaces,
     compactList,
     uploadedGeoJson,
     isGuest,
@@ -275,6 +279,8 @@ export default function InteractiveMap() {
     routeFitRequest,
     requestRouteFit,
     completeRouteFit,
+    placeFlyRequest,
+    completePlaceFly,
     addNotification,
   } = useShallowStore((state) => ({
     selected: state.selected,
@@ -288,6 +294,7 @@ export default function InteractiveMap() {
     hydrateMapState: state.hydrateMapState,
     threeDim: state.threeDim,
     showPhotos: state.showPhotos,
+    showPlaces: state.showPlaces,
     toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
     uploadedGeoJson: state.uploadedGeoJson,
@@ -296,6 +303,8 @@ export default function InteractiveMap() {
     routeFitRequest: state.routeFitRequest,
     requestRouteFit: state.requestRouteFit,
     completeRouteFit: state.completeRouteFit,
+    placeFlyRequest: state.placeFlyRequest,
+    completePlaceFly: state.completePlaceFly,
     addNotification: state.addNotification,
     // Same conditions under which a route card shows its elevation profile.
     summaryUserId:
@@ -364,6 +373,26 @@ export default function InteractiveMap() {
     !!routeFitRequest ||
     sharedMapState.hasPositionRequest ||
     !isDefaultViewState(mapPosition);
+
+  useEffect(() => {
+    if (!placeFlyRequest || !mapLoaded) return;
+    const map = mapRefLoc.current?.getMap();
+    if (!map) return;
+    // Centre the chosen place beside any results panel, close enough to see
+    // the routes around it. Reduced motion jumps instead of flying.
+    const panel = panelRef.current?.getBoundingClientRect();
+    const padding = routeFitPadding(
+      map.getContainer().getBoundingClientRect(),
+      panel?.width && panel.height ? panel : null,
+    );
+    hasAutoCenteredOnLatest.current = true;
+    map.flyTo({
+      center: [placeFlyRequest.longitude, placeFlyRequest.latitude],
+      zoom: Math.min(Math.max(map.getZoom(), 13), 15),
+      ...(padding && { padding }),
+    });
+    completePlaceFly(placeFlyRequest.id);
+  }, [placeFlyRequest, mapLoaded, completePlaceFly]);
 
   useEffect(() => {
     if (!routeFitRequest || !mapLoaded || activitiesPending) return;
@@ -557,6 +586,8 @@ export default function InteractiveMap() {
   // Collect all interactive layer IDs from active overlays
   const activeInteractiveLayerIds = useMemo(() => {
     const ids: string[] = ['routeLayerBG', 'routeLayerBGsel']; // Default interactive layers
+    if (summaryUserId && visibleSelected.length)
+      ids.push(MATCHED_PLACES_HIT_LAYER);
 
     overlays.forEach((mapName) => {
       const mapSetting = getOverlayMapSetting(mapName);
@@ -570,7 +601,7 @@ export default function InteractiveMap() {
     });
 
     return ids;
-  }, [overlays]);
+  }, [overlays, summaryUserId, visibleSelected.length]);
 
   const overlayMapComponents = useMemo(
     () => (
@@ -760,6 +791,15 @@ export default function InteractiveMap() {
     </div>
   );
 
+  const handleMapPick = useCallback((ids: number[]) => {
+    const state = store.getState();
+    const hits = state.pickActivities(ids);
+    if (state.combineSelections && !hits.length) return;
+    setDetailId(!state.combineSelections && hits.length === 1 ? hits[0]! : 0);
+    setPanelExpanded(false);
+    setPickCount((count) => count + 1);
+  }, []);
+
   // Part of #132: a visitor who arrived via a legacy `/map?user=`/
   // `/map?activities=` share link gets an explicit "no longer works"
   // message instead of a silently empty map - see
@@ -832,18 +872,7 @@ export default function InteractiveMap() {
         <Overlay position="top-right">
           <UploadControl />
         </Overlay>
-        <Selection
-          onSelection={(ids) => {
-            const state = store.getState();
-            const hits = state.pickActivities(ids);
-            if (state.combineSelections && !hits.length) return;
-            setDetailId(
-              !state.combineSelections && hits.length === 1 ? hits[0]! : 0,
-            );
-            setPanelExpanded(false);
-            setPickCount((count) => count + 1);
-          }}
-        />
+        <Selection onSelection={handleMapPick} />
         <Overlay position="top-left">
           <LayerSwitcher />
         </Overlay>
@@ -883,7 +912,17 @@ export default function InteractiveMap() {
           activities={activityDict}
           visibleIDs={visibleIDSet}
         />
+        <ActivityPlacesLayers
+          activities={activityDict}
+          selectedIds={visibleSelected}
+          visibleIds={visibleIDs}
+          showAllPlaces={showPlaces}
+          inspectedActivityId={detailId || undefined}
+          onPickActivities={handleMapPick}
+          highlighted={highlighted}
+        />
         {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}
+        <PlaceFilterPin />
       </ReactMapGL>
       {selected.length > 0 && (
         <div

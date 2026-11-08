@@ -81,6 +81,12 @@ jobs:
         run: pnpm test:browser:install --with-deps
       - name: Run fixture-only composed browser regressions
         run: pnpm test:browser
+      - name: Verify selected-route place markers and elevation annotations
+        run: pnpm test:activity-places-ui
+      - name: Verify local place autocomplete, filters and details
+        run: pnpm test:place-search-ui
+      - name: Verify account-scoped place matching experiments
+        run: pnpm test:place-debug-ui
       - name: Upload browser logs, traces, screenshots and result counts
         if: always()
         uses: actions/upload-artifact@v7
@@ -123,7 +129,7 @@ jobs:
       - name: Generate and compile the Swift client
         run: bash scripts/verify-swift-client.sh
 
-  # Builds the real app and runs unit/app-hosted suites plus five UI smoke
+  # Builds the real app and runs unit/app-hosted suites plus focused UI smoke
   # journeys on an owned simulator. The manual ios-full workflow runs the full
   # UI matrix. The api-dtos:check step in `quality` only compares generated text, and
   # `swift-client` above compiles a separate OpenAPI-generated package, so
@@ -136,6 +142,9 @@ jobs:
     needs: changes
     if: needs.changes.outputs.native == 'true'
     runs-on: xcode-27
+    concurrency:
+      group: ios-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+      cancel-in-progress: ${{ github.event_name == 'pull_request' }}
     timeout-minutes: 35
     env:
       IOS_TEST_PROFILE: pr
@@ -145,9 +154,28 @@ jobs:
         with:
           node-version: 22
       - name: Record the toolchain
+        id: toolchain
         run: |
           xcodebuild -version
           xcodebuild -showsdks | grep -i iphonesimulator
+          fingerprint=$( { xcodebuild -version; xcodebuild -showsdks; sw_vers -buildVersion; } | shasum -a 256 | cut -d ' ' -f 1)
+          echo "fingerprint=$fingerprint" >> "$GITHUB_OUTPUT"
+      - name: Restore Swift packages and compiled simulator dependencies
+        id: native-cache
+        uses: actions/cache/restore@v6
+        timeout-minutes: 2
+        continue-on-error: true
+        with:
+          path: |
+            .quality/ios-derived/SourcePackages
+            .quality/ios-derived/Build
+            .quality/ios-derived/ModuleCache.noindex
+            .quality/ios-derived/SDKStatCaches.noindex
+            .quality/ios-derived/SDKExplicitPrecompiledModules
+            .quality/ios-derived/CompilationCache.noindex
+          key: ios-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('ios/**/Package.resolved', 'ios/**/*.pbxproj', 'ios/**/*.xcscheme', 'ios/**/Config/*.xcconfig', 'scripts/quality/native-harness.mjs') }}-${{ github.sha }}
+          restore-keys: |
+            ios-build-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.fingerprint }}-${{ hashFiles('ios/**/Package.resolved', 'ios/**/*.pbxproj', 'ios/**/*.xcscheme', 'ios/**/Config/*.xcconfig', 'scripts/quality/native-harness.mjs') }}-
       - name: Verify old and new Swift clients decode stream metadata
         run: |
           git fetch origin +refs/heads/main:refs/remotes/origin/main --depth=1
@@ -155,7 +183,22 @@ jobs:
       - name: Verify compact summary codecs and encoded cache round trips
         run: bash scripts/verify-compact-stream-codec.sh
       - name: Run iOS unit and UI smoke regressions on an owned simulator
+        id: native
         run: node scripts/quality/native-harness.mjs
+      - name: Save successful build even when runtime tests fail
+        if: ${{ !cancelled() && steps.native.outputs.build_succeeded == 'true' && steps.native-cache.outputs.cache-hit != 'true' && steps.native-cache.outputs.cache-primary-key != '' }}
+        uses: actions/cache/save@v6
+        timeout-minutes: 2
+        continue-on-error: true
+        with:
+          path: |
+            .quality/ios-derived/SourcePackages
+            .quality/ios-derived/Build
+            .quality/ios-derived/ModuleCache.noindex
+            .quality/ios-derived/SDKStatCaches.noindex
+            .quality/ios-derived/SDKExplicitPrecompiledModules
+            .quality/ios-derived/CompilationCache.noindex
+          key: ${{ steps.native-cache.outputs.cache-primary-key }}
       - name: Upload native result bundle and test summary
         if: always()
         uses: actions/upload-artifact@v7
@@ -169,7 +212,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       postgres:
-        image: postgres:17
+        image: postgres:17-trixie
         env:
           POSTGRES_DB: activitymap_test
           POSTGRES_PASSWORD: postgres
@@ -188,6 +231,10 @@ jobs:
       MIGRATION_REQUIRE_TARGET_GUARDS: 'true'
     steps:
       - uses: actions/checkout@v7
+      - name: Install PostGIS binaries without populating the application schema
+        env:
+          POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+        run: docker exec --user root -i "$POSTGRES_CONTAINER" sh < docker/postgres-places/install-postgis.sh
       - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
@@ -216,6 +263,16 @@ jobs:
         run: pnpm db:test-activity-streams
       - name: Prove stream API, invalidation and shared request budgeting
         run: pnpm db:test-stream-lifecycle
+      - name: Prove activity-place spatial indexes, constraints and erasure
+        run: pnpm db:test-activity-places
+      - name: Prove frozen catalogue imports are atomic and repeatable
+        run: pnpm db:test-place-catalogue
+      - name: Prove catalogue refresh, retirement and concurrent reader consistency
+        run: pnpm db:test-place-refresh
+      - name: Prove read-only on-demand matching and private response fences
+        run: pnpm db:test-on-demand-places
+      - name: Prove persisted place matching versions, invalidation and stale-write guards
+        run: pnpm db:test-place-matching
       - name: Prove photo catch-up preserves existing data
         run: pnpm db:test-photo-backfill
       - name: Prove conservative hourly stream backfill

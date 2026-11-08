@@ -1,6 +1,8 @@
 services:
   postgres:
-    image: postgres:17
+    image: activitymap-postgres:17-postgis
+    build:
+      context: ./docker/postgres-places
     command: '-d 1'
     volumes:
       - db_data:/var/lib/postgresql/data

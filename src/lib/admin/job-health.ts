@@ -4,7 +4,8 @@
  * has no schedule and only runs when triggered by hand.
  */
 export const SCHEDULED_JOB_INTERVALS = {
-  'drain-webhook-inbox': 5 * 60_000,
+  'drain-webhook-inbox': 60 * 60_000,
+  'match-activity-places': 60 * 60_000,
   'cleanup-rate-limits': 60 * 60_000,
   'erase-revoked-athletes': 60 * 60_000,
   'reconcile-strava-summaries': 60 * 60_000,

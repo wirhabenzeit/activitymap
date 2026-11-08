@@ -32,6 +32,27 @@ function participant(id: StatsTileID) {
     : document.querySelector<HTMLElement>(`[data-tile-id="${id}"]`);
 }
 
+const group = '::view-transition-group(stats-focused-tile)';
+const duration = 250;
+const easing = 'cubic-bezier(0.22, 0.75, 0.25, 1)';
+
+// Zoom the snapshot group from the old surface's box to the new one with
+// transform alone. The default group animation interpolates width and height,
+// which runs on the main thread and stutters behind any rendering work.
+function zoom(from: DOMRect, to: DOMRect) {
+  if (!from.width || !from.height || !to.width || !to.height) return;
+  const scale = `${from.width / to.width}, ${from.height / to.height}`;
+  document.documentElement.animate(
+    {
+      transform: [
+        `translate(${from.left}px, ${from.top}px) scale(${scale})`,
+        `translate(${to.left}px, ${to.top}px) scale(1, 1)`,
+      ],
+    },
+    { duration, easing, pseudoElement: group },
+  );
+}
+
 // Snapshot the old and new surfaces, rather than resizing live charts or
 // moving dashboard neighbors. No animation is needed on unsupported browsers.
 function changeView(id: StatsTileID | null, update: () => void) {
@@ -50,17 +71,23 @@ function changeView(id: StatsTileID | null, update: () => void) {
     if (!element) return;
     element.style.viewTransitionName = 'stats-focused-tile';
     element.dataset.statsTransitionTile = '';
+    return element.getBoundingClientRect();
   };
-  name();
+  const from = name();
+  let to: DOMRect | undefined;
   document.documentElement.dataset.statsTransition = '';
   const current = document.startViewTransition(() => {
     flushSync(update);
     // The dashboard is visibility-hidden to preserve its layout/scroll, so
     // clear its old name before naming the destination (one participant only).
     clearParticipants();
-    name();
+    to = name();
   });
   transition = current;
+  void current.ready.then(
+    () => from && to && zoom(from, to),
+    () => undefined,
+  );
   const cleanup = () => {
     if (transition !== current) return;
     transition = undefined;

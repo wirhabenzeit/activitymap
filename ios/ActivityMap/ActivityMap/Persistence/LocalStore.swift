@@ -18,6 +18,7 @@ nonisolated struct StoreSnapshot: Sendable {
 /// Each operation uses a fresh context with autosave disabled: all mutations and
 /// the checkpoint reach disk in one save, or are rolled back together.
 actor LocalStore {
+    enum PlacesSyncError: Error { case invalidScope }
     private let container: ModelContainer
     let save: @Sendable (ModelContext) throws -> Void
 
@@ -35,7 +36,7 @@ actor LocalStore {
     nonisolated static func makeContainer(
         inMemory: Bool = false, url: URL? = nil
     ) throws -> ModelContainer {
-        let schema = Schema([StoredActivity.self, StoredPhoto.self, SyncState.self, StoredStreamSummary.self])
+        let schema = Schema([StoredActivity.self, StoredPhoto.self, SyncState.self, StoredStreamSummary.self, StoredActivityPlaces.self, StoredPlacesContext.self])
         let configuration: ModelConfiguration
         if let url {
             configuration = ModelConfiguration(schema: schema, url: url, cloudKitDatabase: .none)
@@ -72,11 +73,16 @@ actor LocalStore {
         let context = makeContext()
         let scopeKey = scope.key
         var invalidatedIDs = Set<String>()
+        var changedPlacesIDs = Set<String>()
+        var placesVersionChanged = false
         do {
             // Preserve feed order, including multiple operations on one entity.
             for mutation in mutations {
                 switch mutation {
                 case .upsertActivity(let dto):
+                    if let matches = dto.placeMatches, matches.userID != scope.userID || matches.activityID != dto.id {
+                        throw PlacesSyncError.invalidScope
+                    }
                     let key = StoreScope.key([scopeKey, dto.id])
                     if let row = try context.fetch(FetchDescriptor<StoredActivity>(
                         predicate: #Predicate { $0.key == key })).first {
@@ -85,10 +91,16 @@ actor LocalStore {
                         if try reconcileSummaryUpsert(dto, previous: previous, scopeKey: scopeKey, context: context) {
                             invalidatedIDs.insert(dto.id)
                         }
+                        if try reconcilePlacesUpsert(dto, previous: previous, scopeKey: scopeKey, context: context) {
+                            changedPlacesIDs.insert(dto.id)
+                        }
                         row.payload = try StoreCodec.encode(dto)
                     } else {
                         if try reconcileSummaryUpsert(dto, previous: nil, scopeKey: scopeKey, context: context) {
                             invalidatedIDs.insert(dto.id)
+                        }
+                        if try reconcilePlacesUpsert(dto, previous: nil, scopeKey: scopeKey, context: context) {
+                            changedPlacesIDs.insert(dto.id)
                         }
                         context.insert(try StoredActivity(scope: scopeKey, dto: dto))
                     }
@@ -103,6 +115,8 @@ actor LocalStore {
                     }
                 case .deleteActivity(let id):
                     invalidatedIDs.insert(id)
+                    for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>(
+                        predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) { context.delete(row) }
                     for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
                         predicate: #Predicate { $0.scope == scopeKey && $0.activityID == id })) {
                         context.delete(row)
@@ -124,6 +138,7 @@ actor LocalStore {
                 }
             }
             if let checkpoint {
+                placesVersionChanged = try reconcilePlacesVersion(checkpoint.freshness?.placeMatchingVersion, scopeKey: scopeKey, context: context)
                 if let state = try context.fetch(FetchDescriptor<SyncState>(
                     predicate: #Predicate { $0.scope == scopeKey })).first {
                     state.payload = try StoreCodec.encode(checkpoint)
@@ -135,6 +150,12 @@ actor LocalStore {
             try save(context)
             for id in invalidatedIDs { streamFences.invalidate(StoreScope.key([scopeKey, id])) }
             if !invalidatedIDs.isEmpty { notifySummaryChange(scope: scopeKey, activityIDs: invalidatedIDs) }
+            if placesVersionChanged {
+                placesChangesCommitted(scopeKey: scopeKey)
+            } else {
+                let placesOnlyIDs = changedPlacesIDs.subtracting(invalidatedIDs)
+                if !placesOnlyIDs.isEmpty { placesChangesCommitted(scopeKey: scopeKey, activityIDs: placesOnlyIDs) }
+            }
         } catch {
             context.rollback()
             throw error
@@ -154,6 +175,8 @@ actor LocalStore {
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<StoredStreamSummary>(
                 predicate: #Predicate { $0.scope == key })) { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.scope == key })) { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredPlacesContext>(predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             try save(context)
             streamFences.invalidate(key)
             notifySummaryChange(scope: key)
@@ -173,6 +196,8 @@ actor LocalStore {
             for row in try context.fetch(FetchDescriptor<StoredPhoto>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<SyncState>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<StoredStreamSummary>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>()) where row.scope != keep { context.delete(row) }
+            for row in try context.fetch(FetchDescriptor<StoredPlacesContext>()) where row.scope != keep { context.delete(row) }
             try save(context)
             streamFences.invalidateAll()
             notifySummaryChange(scope: nil)

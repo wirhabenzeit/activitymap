@@ -13,6 +13,7 @@ nonisolated struct ElevationProfile: Equatable, Sendable {
     }
     let points: [Point]
     let samplingBasis: ActivityMapAPI.StreamSeriesType
+    let providerDistanceStart: Double
     let span: Double
     let minimum: Double
     let maximum: Double
@@ -50,7 +51,7 @@ nonisolated struct ElevationProfile: Equatable, Sendable {
         return Self(points: distance.indices.map { index in
             Point(id: index, distance: distance[index] - start, altitude: altitude[index],
                   latitude: locations?[index][0], longitude: locations?[index][1])
-        }, samplingBasis: basis, span: end - start, minimum: minimum, maximum: maximum)
+        }, samplingBasis: basis, providerDistanceStart: start, span: end - start, minimum: minimum, maximum: maximum)
     }
 
     func nearest(to distance: Double) -> Point {

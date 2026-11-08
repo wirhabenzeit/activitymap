@@ -1,0 +1,1 @@
+CREATE INDEX "places_geometry_location_idx" ON "places" USING gist (("location"::geometry)) WHERE "places"."retired_at" IS NULL;

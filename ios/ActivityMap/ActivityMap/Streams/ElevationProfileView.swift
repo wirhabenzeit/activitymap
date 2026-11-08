@@ -19,11 +19,20 @@ struct ElevationProfileView: View {
         let cached: CachedStreamSummary
         let profile: ElevationProfile?
     }
+    private struct PlaceDemand: Equatable {
+        let activityID: Int
+        let relevant: Bool
+        let session: Int?
+    }
     private struct Demand: Equatable {
         let activityID: Int
         let relevant: Bool
         let sessionRevision: Int?
         let retry: Int
+    }
+    private var places: [ProfilePlace] {
+        guard let profile, let cached else { return [] }
+        return ProfilePlace.project(store.activityPlaces?.result(String(activityID)), onto: profile, metadata: cached.metadata)
     }
     private var loader: StreamSummaryLoader? { store.streamSummaries }
     private var cached: CachedStreamSummary? { loader?.currentSummary(for: String(activityID)) }
@@ -54,7 +63,7 @@ struct ElevationProfileView: View {
         VStack(alignment: .leading, spacing: 8) {
             Group {
                 if let profile {
-                    ElevationPlot(profile: profile, compact: compact, selectedX: $selectedDistance) { point in
+                    ElevationPlot(profile: profile, compact: compact, selectedX: $selectedDistance, places: places, placesLoader: store.activityPlaces, activityID: String(activityID), onMap: store.selectedTab == .map) { point in
                         guard let point else { clearCursor(); return }
                         guard isRelevant, let cached else { return }
                         let next = ElevationCursor(owner: owner, activityID: activityID, cached: cached, point: point)
@@ -82,6 +91,10 @@ struct ElevationProfileView: View {
             }
         }
         .accessibilityIdentifier("elevation-profile")
+        .task(id: PlaceDemand(activityID: activityID, relevant: isRelevant, session: store.activityPlaces?.sessionRevision)) {
+            store.activityPlaces?.demand(isRelevant ? [String(activityID)] : [], owner: owner, priority: String(activityID))
+        }
+        .onDisappear { store.activityPlaces?.release(owner) }
         .task(id: Demand(activityID: activityID, relevant: isRelevant,
                          sessionRevision: loader?.sessionRevision, retry: retry)) {
             guard isRelevant, let loader else { clearCursor(); return }
@@ -211,10 +224,17 @@ struct ElevationPlot: View {
     let profile: ElevationProfile
     var compact = false
     @Binding var selectedX: Double?
+    var places: [ProfilePlace] = []
+    var placesLoader: ActivityPlacesLoader?
+    var activityID = ""
+    var onMap = false
+    @State private var presentedPlace: ProfilePlace?
+
     var onSelection: (ElevationProfile.Point?) -> Void = { _ in }
     var onDrag: (Bool) -> Void = { _ in }
     @State private var accessibleSampleID: Int?
     @State private var marker = ElevationMarker()
+    @ScaledMetric(relativeTo: .caption) private var placeHeadroom = 12.0
     @ScaledMetric(relativeTo: .caption) private var chartHeight = 160.0
     @ScaledMetric(relativeTo: .caption) private var reservedHeight = 200.0
     private var selected: ElevationProfile.Point? {
@@ -222,6 +242,12 @@ struct ElevationPlot: View {
         if let accessibleSampleID, let point = profile.points.first(where: { $0.id == accessibleSampleID }),
            point.distance / profile.distanceDivisor(units: units) == selectedX { return point }
         return profile.nearest(to: selectedX * profile.distanceDivisor(units: units))
+    }
+
+    private var activePlace: ProfilePlace? {
+        if let presentedPlace, !onMap || placesLoader?.focus?.placeID == presentedPlace.place.id { return presentedPlace }
+        guard placesLoader?.focus?.activityID == activityID else { return nil }
+        return places.first { $0.place.id == placesLoader?.focus?.placeID }
     }
 
     private var gestureSelection: Binding<Double?> {
@@ -239,23 +265,37 @@ struct ElevationPlot: View {
         #endif
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Text("Elevation (\(units.elevationUnit))").foregroundStyle(AppTheme.secondaryText)
-                Spacer(minLength: 0)
-                Text(selected.map { profile.selectionLabel($0, units: units, locale: locale) } ?? " ")
-                    .fontWeight(.medium).monospacedDigit()
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 6).padding(.vertical, 3)
-                    .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 5))
-                    .opacity(selected == nil ? 0 : 1)
-                    .accessibilityHidden(true)
-                    .accessibilityIdentifier("elevation-selection-readout")
+                if let entry = activePlace, selected == nil {
+                    HStack(spacing: 5) {
+                        PlaceGlyph(kind: entry.place.kind).frame(width: 16, height: 16)
+                        Text(entry.place.name).fontWeight(.medium).lineLimit(1)
+                        Text("\(profile.distanceLabel(entry.distance, units: units)) · \((entry.altitude / units.elevationScale).formatted(.number.precision(.fractionLength(0)))) \(units.elevationUnit)")
+                            .fixedSize()
+                    }
+                    .foregroundStyle(AppTheme.accent)
+                    .accessibilityIdentifier("elevation-place-readout")
+                } else {
+                    Text("Elevation (\(units.elevationUnit))").foregroundStyle(AppTheme.secondaryText)
+                }
+                if activePlace == nil || selected != nil {
+                    Spacer(minLength: 0)
+                    Text(selected.map { profile.selectionLabel($0, units: units, locale: locale) } ?? " ")
+                        .fontWeight(.medium).monospacedDigit()
+                        .foregroundStyle(.primary)
+                        .padding(.horizontal, 6).padding(.vertical, 3)
+                        .background(Color(uiColor: .secondarySystemBackground), in: RoundedRectangle(cornerRadius: 5))
+                        .opacity(selected == nil ? 0 : 1)
+                        .accessibilityHidden(true)
+                        .accessibilityIdentifier("elevation-selection-readout")
+                }
             }
             .font(.caption)
             .fixedSize(horizontal: false, vertical: true)
             .frame(minHeight: 24)
-            ElevationChart(profile: profile, units: units, marker: marker) { gestureSelection.wrappedValue = $0 }
+            ElevationChart(profile: profile, units: units, marker: marker, places: places, focusedPlaceKey: activePlace?.id, choosePlace: choose, dismissPlace: dismissPlace) { gestureSelection.wrappedValue = $0 }
                 .equatable()
             .frame(height: compact ? reservedHeight * 0.75 - 32 : chartHeight)
+            .padding(.top, places.isEmpty ? 0 : placeHeadroom)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel("Elevation profile, \(profile.accessibilityDescription(units: units, locale: locale))")
             .accessibilityValue(selected.map { profile.valueLabel($0, units: units, locale: locale) } ?? "No sample selected")
@@ -269,6 +309,12 @@ struct ElevationPlot: View {
                 }
             }
             .accessibilityAction(named: "Clear selected sample") { select(nil) }
+            .accessibilityActions {
+                if activePlace != nil { Button("Close selected place", action: dismissPlace) }
+                ForEach(places) { entry in
+                    Button("\(entry.place.name), \(profile.distanceLabel(entry.distance, units: units))") { choose(entry) }
+                }
+            }
         }
         .frame(minHeight: compact ? reservedHeight * 0.75 : reservedHeight, alignment: .top)
         .onChange(of: units) { _, _ in select(nil) }
@@ -278,7 +324,18 @@ struct ElevationPlot: View {
             if marker.point != point { marker.point = point }
         }
         .onChange(of: hasGestureSelection) { _, selecting in onDrag(selecting) }
-        .onDisappear { select(nil); onSelection(nil); onDrag(false) }
+        .onChange(of: places) { _, _ in presentedPlace = nil }
+        .onDisappear { presentedPlace = nil; select(nil); onSelection(nil); onDrag(false) }
+    }
+    private func dismissPlace() {
+        presentedPlace = nil
+        if placesLoader?.focus?.activityID == activityID { placesLoader?.focus = nil }
+        select(nil)
+    }
+    private func choose(_ entry: ProfilePlace) {
+        select(nil)
+        presentedPlace = entry
+        if onMap { placesLoader?.focus = PlaceFocus(activityID: activityID, placeID: entry.place.id, revealOnMap: true) }
     }
     private func select(_ point: ElevationProfile.Point?) {
         accessibleSampleID = point?.id
@@ -298,11 +355,15 @@ private struct ElevationChart: View, Equatable {
     let profile: ElevationProfile
     let units: UnitSystem
     let marker: ElevationMarker
+    var places: [ProfilePlace] = []
+    var focusedPlaceKey: String?
+    var choosePlace: (ProfilePlace) -> Void = { _ in }
+    var dismissPlace: () -> Void = {}
     /// Chart x value under the finger, or nil once it lifts.
     let select: (Double?) -> Void
 
     nonisolated static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.profile == rhs.profile && lhs.units == rhs.units && lhs.marker === rhs.marker
+        lhs.profile == rhs.profile && lhs.units == rhs.units && lhs.marker === rhs.marker && lhs.places == rhs.places && lhs.focusedPlaceKey == rhs.focusedPlaceKey
     }
 
     var body: some View {
@@ -318,7 +379,9 @@ private struct ElevationChart: View, Equatable {
             }
         }
         .chartXScale(domain: 0...(profile.span / profile.distanceDivisor(units: units)))
+        .chartXScale(range: .plotDimension(startPadding: places.isEmpty ? 0 : 12, endPadding: places.isEmpty ? 0 : 12))
         .chartYScale(domain: (profile.altitudeDomain.lowerBound / units.elevationScale)...(profile.altitudeDomain.upperBound / units.elevationScale))
+        .chartYScale(range: .plotDimension(startPadding: 0, endPadding: places.isEmpty ? 0 : 20))
         .chartXAxis { AxisMarks(values: .automatic(desiredCount: 4)) }
         .chartYAxis { AxisMarks(position: .leading, values: .automatic(desiredCount: 3)) }
         .chartXAxisLabel("Distance (\(profile.distanceUnit(units: units)))", alignment: .center)
@@ -332,6 +395,23 @@ private struct ElevationChart: View, Equatable {
                         let x = min(max(0, location.x - plot.minX), plot.width)
                         select(proxy.value(atX: x, as: Double.self))
                     })
+                    .simultaneousGesture(TapGesture().onEnded { dismissPlace() })
+                ForEach(places) { entry in
+                    if let x = proxy.position(forX: entry.distance / profile.distanceDivisor(units: units)),
+                       let y = proxy.position(forY: entry.altitude / units.elevationScale) {
+                        Path { path in
+                            path.move(to: CGPoint(x: plot.minX + x, y: plot.minY + y - 4))
+                            path.addLine(to: CGPoint(x: plot.minX + x, y: plot.maxY))
+                        }
+                        .stroke(.primary.opacity(0.16), style: StrokeStyle(lineWidth: 1, dash: [2, 4]))
+                        .allowsHitTesting(false)
+                        Button { choosePlace(entry) } label: {
+                            MatchedPlaceSymbol(place: entry.place, active: focusedPlaceKey == entry.id).frame(width: 44, height: 44).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .position(x: plot.minX + x, y: plot.minY + y - PlaceGlyph.chartSymbol(for: entry.place.kind).offset)
+                    }
+                }
             }
         }
     }

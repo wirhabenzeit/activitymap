@@ -2,6 +2,13 @@
 
 The SwiftUI client supports mobile sign-in and local-first activity synchronization. Sign in to bootstrap activities and photo metadata into SwiftData; the map and list then read that cache. Sample activities are used only by Xcode previews.
 
+Matched places and visits arrive with activity sync and are saved in the same
+SwiftData transaction as their activity and sync cursor. Complete results are
+available offline. Empty replacements remove prior visits, and a changed matching
+version hides outdated results until refreshed. Existing caches stage one fresh
+bootstrap when the server first advertises this support; a failed refresh keeps
+the prior completed library. See [matching synchronization](../../docs/on-demand-places.md#synchronizing-matched-places-to-web-and-ios).
+
 ## Run it
 
 1. Use Xcode 27 or newer. The app runs on iOS 26 or newer; Xcode 27 is needed to compile optional iOS 27 APIs.
@@ -172,7 +179,9 @@ Worktrees have no ignored `Local.xcconfig`, so the script takes `MAPBOX_ACCESS_T
 
 Running the plain `ActivityMap` scheme on a device from Xcode builds `page.dominik.activitymap`, which replaces the TestFlight app. Use the script instead.
 
-Stats opens chart detail as a focus page using the full available content width beside filters (#353), growing the tapped card into the page in place: one chart widens, gains its detail controls and takes on sport colours on a single clock, and Back shrinks it into its dashboard slot. Reduce Motion cross-fades. On iPhone, Back and the chart title take over the single blue native header, with Filters available and account access kept on the dashboard; Back restores the Map/List/Stats controls and dashboard scroll position. Regular iPad windows retain the global shell header, with Back and the chart title above the focused content. The filter panel and header stay stationary during expansion and Back; only the chart content column participates in the zoom. The dashboard stays mounted, and Back restores its scroll position, metric choices and cached calculations. Regular windows retain the 52pt filter rail across Map, List, Stats and Stats focus; the filter button expands it into a 320pt panel. The panel sits beside one-column content and floats over List plus detail when needed. Opening List detail collapses an expanded column to the rail; closing detail leaves it collapsed (#354). Windows below 760pt and accessibility text sizes use the filter sheet, including while focused. A focused Stats page stays open through resizing until Back or a destination switch. Explicit inline preview hosts retain the original expansion layout.
+Stats opens chart detail as a focus page using the full available content width beside filters (#353), growing the tapped card into the page in place: one chart widens, gains its detail controls and takes on sport colours on a single clock, and Back shrinks it into its dashboard slot. Reduce Motion cross-fades. On iPhone, Back and the chart title take over the single blue native header, with Filters available and account access kept on the dashboard; Back restores the Map/List/Stats controls and dashboard scroll position. Regular iPad windows retain the global shell header, with Back and the chart title above the focused content. The filter panel and header stay stationary during expansion and Back; only the chart content column participates in the zoom. The dashboard stays mounted, and Back restores its scroll position, metric choices and cached calculations. Regular windows retain the 52pt filter rail across Map, List, Stats and Stats focus; the filter button expands it into a 320pt panel. The panel sits beside one-column content and floats over List plus detail when needed. Opening List detail collapses an expanded column to the rail; closing detail leaves it collapsed (#354). Narrow portrait windows and accessibility text sizes use the filter sheet, including while focused. Phone landscape uses the same standard sheet at full height. A focused Stats page stays open through resizing until Back or a destination switch. Explicit inline preview hosts retain the original expansion layout.
+
+The phone filter sheet has one height, 40% of the screen, and is never full height. It keeps the system's Liquid Glass but not glass's press stretch, which made the whole sheet bounce under every tap: the sheet removes that interaction from its own view before it appears. Changing the sheet's background effect instead cost either the look or the slide-in: presented with a material, which installs no stretch, and swapped for glass once on screen, it slid in in another colour; swapped before it appeared, it jumped to its height without sliding. Reduce Motion and some accessibility settings turn the stretch off, so check presses with them off. The result count is its subtitle, Reset and Close are in its toolbar, and search is the form's first row, so it scrolls with the other filters. A keyboard lifts a sheet to its largest detent: a resizable sheet jumped to its tallest height, and moving it to a shorter one as the keyboard came showed as a jump of its own. With one height, the keyboard raises the whole sheet in the system's own animation and lowers it again afterwards, and the map, list or Stats stay visible above it, filtering by activity name as you type. The map, list and Stats also stay usable behind the sheet: you can scroll, pan and switch tabs with filters open. Opening an activity or picking routes on the map closes the sheet so the detail or results take the screen. Over the map's route results, which present the sheet themselves, the map stays usable too; a map tap that changes or clears the results closes the sheet with them, and the shell records that so Filters opens again. The field edits the filter directly: the keyboard's Search key hides the keyboard and keeps the text, and the clear button or Reset remove it. While the field has focus and text, place matches appear as a row of chips under it; choosing one clears the name text, puts the place in the field as a pill and hides the keyboard. On the Map tab the camera then flies to the place, centred in the map above the sheet, and an accent pin marks it for as long as the place filter is on; it replaces that place's own marker and lets taps through to the routes. The pill's name opens the place's details and its cross removes it, and the pin with it. iOS offers no way to put an app's own suggestions in the keyboard's predictions bar, so the chips stay in the form. Phone landscape and accessibility text sizes use the full-height sheet. The iPad sidebar and rail keep a search row that opens the same search row in its own sheet, focused, with the selected place as the same pill beside it; Search or Done closes it.
 
 Pushed List details replace the browsing header with a single native blue Back/title/Previous/Next bar. Back restores the browsing header. Side-by-side List details on iPad retain the browsing header. Wherever the filter rail or panel is shown, List keeps the full-width browsing header above it like Map and Stats; a pushed detail's Back/title bar then sits in the List column below it.
 
@@ -320,7 +329,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-Required iOS CI builds the app and runs the selected unit/app-hosted suites plus five real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
+Required iOS CI builds the app and runs the selected unit/app-hosted suites plus seven real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
 
@@ -486,8 +495,8 @@ IOS_TEST_PROFILE=pr pnpm test:ios
 IOS_TEST_PROFILE=full pnpm test:ios
 ```
 
-The local default is `full`. On iOS 27, `pr` builds the real app and runs all 30
-selected unit/app-hosted suites plus five real UI smoke methods: native GPX
+The local default is `full`. On iOS 27, `pr` builds the real app and runs all 32
+selected unit/app-hosted suites plus seven real UI smoke methods: offline matched places, the places overview, native GPX
 sharing/cancellation, List previous pull, Map next pull, Stats content/edge
 Back and standard Sport mix compact/expanded content. Pull-request CI and pushes
 to main select this profile only for native,
@@ -496,7 +505,7 @@ it conservatively. Web-only changes skip the native app job. It has an
 18-minute cold-build limit, eight-minute test limit and 35-minute job limit.
 This is not the full UI matrix.
 
-The full profile runs 36 selected suites, including all 39 UI methods, with the
+The full profile runs 39 selected suites, including all 57 UI methods, with the
 same 18-minute build limit, a 45-minute test limit and a 75-minute manual CI job.
 The seven action-matrix configurations run as independent methods so each has
 its own result and execution allowance.
@@ -560,3 +569,58 @@ The focused pipeline/gallery/map-policy suites passed 21 test methods on that
 simulator. All three broader `RenderedMapPhotoTests` timed out discovering map
 pins or the layers menu before photo demand; the unchanged pre-#414 photo cache
 reproduced those same failures. This rendering limitation needs separate review.
+
+## Matched places
+
+Selected, filter-visible routes show server-matched peaks, passes and huts on the
+map, including overlapping-route chooser results. **Layers → Activities →
+Show places on map** adds cached matches from every displayed activity, following
+filters and Only selected. Shared places appear once. The overview uses the same
+48-point grouping, 80-marker limit and zoom-12 labels as web. Counted clusters
+zoom in; clusters remaining at zoom 18 open a place chooser. An inspected place
+stays separate from clusters. The toggle starts off and resets on account change.
+
+Tapping a place on the activity open in Map detail preserves that detail and
+selection. Other overview places use the normal route picker: one matching
+activity opens detail, several open the activity chooser. Cards contain only
+place information and the activity count. A new map pick or Clear selection
+dismisses the previous place focus; an empty Combine pick keeps both. The
+elevation curve includes separate marks for repeated encounters.
+Place icons use a neutral palette and an angular pass glyph. Opening a map card
+preserves both its marker anchor and camera position.
+Profile icons open their place directly, without a context menu or lift
+animation. Named VoiceOver actions reach every encounter without an additional
+Places button beside the profile, while retaining sample scrubbing.
+In Map detail, choosing an encounter focuses its map card; other
+activity details show a compact local card.
+Pending, empty results and unavailable coverage show no place status messages or
+retry controls. Available results appear normally and stay cached offline.
+
+Backend jobs match stored GPS, and library sync delivers each result as part of
+its activity. The app never requests places directly: the loader reads
+synchronized bundles from SwiftData, including completed zero-match checks, and
+works offline. A route without a current result simply waits for a later sync.
+Stream changes, a newly observed catalogue/matcher version, deletion and account
+cleanup invalidate the corresponding data. No reference catalogue or matcher is
+downloaded.
+
+The overview reads committed SwiftData matches in one scoped batch.
+Sync replacements, stream invalidations and matching-version changes refresh the
+overview; incomplete/zero replacements remove old visits. Web and iOS share
+`shared/parity/map-places.v1.json` for grouping parity.
+See [the implementation plan](../../docs/activity-places-ios-plan.md).
+
+`ActivityPlacesTests` covers durable/offline reuse, disk-schema upgrade, account
+isolation, source/context/deletion fences, bounded request priority and profile
+projection. `ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection` uses
+production map/profile components with synthetic offline data and an inline map
+style; it covers marker interaction, repeated visits, style changes and selection
+preservation, plus active-route/Combine display scope. Unit checks include a
+100-result chooser and cancellation when demand shrinks. The journey is
+included in the PR and full native profiles.
+
+`MapPlaceTests` covers shared layout policy, 10,000-point grouping, contextual
+selection, filters and scope reset. The two overview journeys in
+`ActivityPlacesUITests` cover layer controls, cluster zoom, coincident-place
+choice, visited/unvisited activity behavior, clearing, filters, rotation and
+style replacement using offline synthetic data.

@@ -101,6 +101,17 @@ enum MapNavigation {
             // Show the nearby streets without pulling an already closer view back out.
             return CameraOptions(center: coordinate, padding: current.padding, zoom: max(current.zoom, 15),
                                  bearing: current.bearing, pitch: current.pitch)
+        case let .place(latitude, longitude, sheetFraction):
+            context.consume(request)
+            let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
+            guard CLLocationCoordinate2DIsValid(coordinate) else { return nil }
+            let fitted = RouteCameraFitter.padding(safeArea: safeArea, sheetHeight: max(sheetHeight, size.height * sheetFraction),
+                                                   topOcclusion: topOcclusion)
+            // Centred between the side insets, close enough to see the routes around it.
+            let padding = UIEdgeInsets(top: fitted.top, left: max(safeArea.left, leadingOcclusion), bottom: fitted.bottom,
+                                       right: max(safeArea.right, trailingOcclusion))
+            return CameraOptions(center: coordinate, padding: padding, zoom: min(max(current.zoom, 13), 15),
+                                 bearing: current.bearing, pitch: current.pitch)
         case .resetView:
             context.consume(request)
             let initial = MapCamera.initial

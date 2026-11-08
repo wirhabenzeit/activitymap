@@ -2,8 +2,10 @@ import { type StateCreator } from 'zustand';
 
 import type { CurrentUserDTO } from '~/server/db/dto';
 
+import { resetActivityPlaceFocus } from './activity-place-focus';
 import { resetBrowsingContext } from './browsing';
 import { type RootState } from './index';
+import { usePlaceDebug } from './place-debug';
 
 export type InitialAuth = {
   currentUser: CurrentUserDTO | null;
@@ -54,6 +56,13 @@ export const createAuthSlice: StateCreator<
   initializeAuth: (auth) => {
     set((state) => {
       const nextUser = auth.currentUser ?? undefined;
+      if (
+        state.place &&
+        (state.place.userId !== nextUser?.id ||
+          !nextUser?.stravaConnected ||
+          auth.guestMode)
+      )
+        state.place = undefined;
       const accountChanged =
         state.user?.id !== nextUser?.id ||
         state.isGuest !== Boolean(auth.guestMode) ||
@@ -64,6 +73,8 @@ export const createAuthSlice: StateCreator<
         accountChanged ||
         state.user?.stravaConnected !== nextUser?.stravaConnected
       ) {
+        resetActivityPlaceFocus();
+        usePlaceDebug.setState({ userId: null });
         state.authSession += 1;
       }
       if (accountChanged) {

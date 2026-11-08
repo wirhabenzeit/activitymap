@@ -57,7 +57,7 @@ actor GatedChangesSource: SyncPageSource {
 @MainActor
 enum SyncFixtures {
     static let retention = ActivityMapAPI.SyncRetentionMeta(retentionDays: 30, cursorValidUntil: Date().addingTimeInterval(86400))
-    static let freshness = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: Date())
+    static let freshness = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: Date(), placeMatchingVersion: nil)
     static let rebootstrap = APIClient.RequestError.server(code: "sync_rebootstrap_required", message: "Expired", status: 409, requestID: "request", retryable: false)
 
     static func activities(_ items: [ActivityMapAPI.Activity] = [], next: String? = nil, snapshot: String? = "snapshot", freshness: ActivityMapAPI.SyncFreshnessMeta = SyncFixtures.freshness) -> ActivityMapAPI.SyncBootstrapPage {

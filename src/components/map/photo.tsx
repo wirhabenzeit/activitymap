@@ -15,6 +15,7 @@ import type { Photo } from '~/server/db/schema';
 import { useShallowStore } from '~/store';
 
 import { PhotoImage, PhotoLightbox } from '../list/photo';
+import { MapMarkerPin } from './map-marker-pin';
 
 export default function PhotoLayer({
   photos,
@@ -146,8 +147,9 @@ export function MapPhotos({
                 });
               }}
             >
-              <span
-                className={`relative flex items-center justify-center border-[1.5px] border-white bg-slate-800 shadow-md ${layout.thumbnails ? 'h-9 w-9 rounded-md' : 'h-7 w-7 rounded-full'}`}
+              <MapMarkerPin
+                count={count}
+                thumbnails={layout.thumbnails}
                 data-photo-appearance={layout.thumbnails ? 'thumbnail' : 'pin'}
               >
                 {layout.thumbnails ? (
@@ -160,12 +162,7 @@ export function MapPhotos({
                 ) : (
                   <Camera size={14} aria-hidden="true" />
                 )}
-                {count > 1 && (
-                  <span className="absolute -top-1 -right-1 min-w-4 rounded-full border border-white bg-slate-800 px-1 text-center text-[9px] leading-4 font-semibold">
-                    {count}
-                  </span>
-                )}
-              </span>
+              </MapMarkerPin>
             </button>
           </Marker>
         );

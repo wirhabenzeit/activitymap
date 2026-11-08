@@ -162,6 +162,55 @@
       "when": 1792249637711,
       "tag": "0022_manual-strava-import",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1792691887351,
+      "tag": "0023_activity-places",
+      "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1792705202759,
+      "tag": "0024_places-proximity-visits",
+      "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1792735761368,
+      "tag": "0025_place-catalogue-refresh",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1792838783503,
+      "tag": "0026_activity-place-checks",
+      "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1792843321184,
+      "tag": "0027_regional-place-queries",
+      "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1792876095515,
+      "tag": "0028_pending-place-matching",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793522276573,
+      "tag": "0029_place-noise-filter",
+      "breakpoints": true
     }
   ]
 }

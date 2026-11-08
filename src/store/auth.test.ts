@@ -8,6 +8,7 @@ import type { CurrentUserDTO } from '~/server/db/dto';
 
 import { createAuthSlice } from './auth';
 import type { RootState } from './index';
+import { usePlaceDebug } from './place-debug';
 
 void test('account epochs are stable for profile refreshes and change on departure, return and disconnect', () => {
   const state = createStore<RootState>()(
@@ -27,4 +28,57 @@ void test('account epochs are stable for profile refreshes and change on departu
   assert.equal(state.getState().authSession, first + 3);
   login({ currentUser: { ...alice, stravaConnected: false } });
   assert.equal(state.getState().authSession, first + 3);
+});
+
+void test('place interaction state is cleared on account changes, logout and disconnection', async () => {
+  const { useActivityPlaceFocus } = await import('./activity-place-focus');
+  const state = createStore<RootState>()(
+    immer((...args) => ({ ...createAuthSlice(...args) }) as RootState),
+  );
+  const alice = { id: 'alice', stravaConnected: true } as CurrentUserDTO;
+  const login = state.getState().initializeAuth;
+  const focus = () =>
+    useActivityPlaceFocus.getState().setFocus({
+      userId: 'alice',
+      activityId: '123',
+      placeId: 'place',
+      visitIndex: 0,
+      source: 'profile',
+    });
+  login({ currentUser: alice });
+  focus();
+  login({ currentUser: { ...alice, name: 'Updated profile' } });
+  assert.equal(useActivityPlaceFocus.getState().focus?.activityId, '123');
+  login({ currentUser: { ...alice, id: 'bob' } });
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+  login({ currentUser: alice });
+  focus();
+  login({ currentUser: null });
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+  login({ currentUser: alice });
+  focus();
+  login({ currentUser: { ...alice, stravaConnected: false } });
+  assert.equal(useActivityPlaceFocus.getState().focus, null);
+});
+
+void test('debug toggle survives profile refreshes but resets on account departure and disconnect', () => {
+  const state = createStore<RootState>()(
+    immer((...args) => ({ ...createAuthSlice(...args) }) as RootState),
+  );
+  const alice = { id: 'alice', stravaConnected: true } as CurrentUserDTO;
+  const login = state.getState().initializeAuth;
+  login({ currentUser: alice });
+  usePlaceDebug.getState().setEnabled('alice', true);
+  login({ currentUser: { ...alice, name: 'Updated' } });
+  assert.equal(usePlaceDebug.getState().userId, 'alice');
+  login({ currentUser: { ...alice, id: 'bob' } });
+  assert.equal(usePlaceDebug.getState().userId, null);
+  login({ currentUser: alice });
+  usePlaceDebug.getState().setEnabled('alice', true);
+  login({ currentUser: null });
+  assert.equal(usePlaceDebug.getState().userId, null);
+  login({ currentUser: alice });
+  usePlaceDebug.getState().setEnabled('alice', true);
+  login({ currentUser: { ...alice, stravaConnected: false } });
+  assert.equal(usePlaceDebug.getState().userId, null);
 });

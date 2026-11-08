@@ -1,26 +1,26 @@
 import { randomUUID } from 'node:crypto';
 
-import { requestIdFor } from '~/server/http/request-id';
-
-import type { Actor } from '~/server/auth/actor';
 import { toActivityDTO } from '~/contracts/v1/activity';
-import { toPhotoDTO } from '~/contracts/v1/photo';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelope } from '~/contracts/v1/error';
+import { toPhotoDTO } from '~/contracts/v1/photo';
 import {
   syncBootstrapPageDTOSchema,
   syncBootstrapQuerySchema,
 } from '~/contracts/v1/sync';
-import { encodeSyncCursor } from '~/server/sync/cursor';
+import type { Actor } from '~/server/auth/actor';
+import { requestIdFor } from '~/server/http/request-id';
+import type { ActivitiesRepository } from '~/server/repositories/activities';
+import type { ChangesRepository } from '~/server/repositories/changes';
+import { DEFAULT_RETENTION_DAYS } from '~/server/repositories/changes';
+import type { PhotosRepository } from '~/server/repositories/photos';
+import type { PlaceMatchingRepository } from '~/server/repositories/place-matching';
+import type { SummaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
 import {
   encodeBootstrapCursor,
   tryDecodeBootstrapCursor,
 } from '~/server/sync/bootstrap-cursor';
-import type { ActivitiesRepository } from '~/server/repositories/activities';
-import type { PhotosRepository } from '~/server/repositories/photos';
-import type { ChangesRepository } from '~/server/repositories/changes';
-import { DEFAULT_RETENTION_DAYS } from '~/server/repositories/changes';
-import type { SummaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
+import { encodeSyncCursor } from '~/server/sync/cursor';
 
 export interface SyncBootstrapHandlerDependencies {
   createRequestId?: () => string;
@@ -31,6 +31,7 @@ export interface SyncBootstrapHandlerDependencies {
   activitiesRepo: Pick<ActivitiesRepository, 'findPageByAthlete'>;
   photosRepo: Pick<PhotosRepository, 'findPageByAthlete'>;
   changesRepo: Pick<ChangesRepository, 'latestSequence'>;
+  placesRepo?: Pick<PlaceMatchingRepository, 'sync'>;
   freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
   retentionDays?: number;
@@ -61,6 +62,7 @@ export function createSyncBootstrapHandler({
   photosRepo,
   changesRepo,
   freshnessRepo = { lastCompletedAt: async () => null },
+  placesRepo,
   retentionDays = DEFAULT_RETENTION_DAYS,
 }: SyncBootstrapHandlerDependencies) {
   return async function GET(request: Request): Promise<Response> {
@@ -85,10 +87,14 @@ export function createSyncBootstrapHandler({
       });
       if (!parsedQuery.success) {
         return Response.json(
-          errorEnvelope('validation_failed', 'The query parameters are invalid.', {
-            requestId,
-            details: parsedQuery.error.flatten(),
-          }),
+          errorEnvelope(
+            'validation_failed',
+            'The query parameters are invalid.',
+            {
+              requestId,
+              details: parsedQuery.error.flatten(),
+            },
+          ),
           { status: 400 },
         );
       }
@@ -109,9 +115,13 @@ export function createSyncBootstrapHandler({
         const decoded = tryDecodeBootstrapCursor(cursor);
         if (decoded === null) {
           return Response.json(
-            errorEnvelope('validation_failed', 'The `cursor` parameter is invalid.', {
-              requestId,
-            }),
+            errorEnvelope(
+              'validation_failed',
+              'The `cursor` parameter is invalid.',
+              {
+                requestId,
+              },
+            ),
             { status: 400 },
           );
         }
@@ -124,9 +134,13 @@ export function createSyncBootstrapHandler({
         !Number.isInteger(Number(afterKey))
       ) {
         return Response.json(
-          errorEnvelope('validation_failed', 'The `cursor` parameter is invalid.', {
-            requestId,
-          }),
+          errorEnvelope(
+            'validation_failed',
+            'The `cursor` parameter is invalid.',
+            {
+              requestId,
+            },
+          ),
           { status: 400 },
         );
       }
@@ -146,9 +160,10 @@ export function createSyncBootstrapHandler({
         ).toISOString(),
       };
       const freshness = {
-        lastSummaryReconciledAt: (
-          await freshnessRepo.lastCompletedAt(actor.athleteId)
-        )?.toISOString() ?? null,
+        lastSummaryReconciledAt:
+          (
+            await freshnessRepo.lastCompletedAt(actor.athleteId)
+          )?.toISOString() ?? null,
       };
 
       const payload =
@@ -171,6 +186,22 @@ export function createSyncBootstrapHandler({
               retention,
               freshness,
             });
+
+      if (placesRepo) {
+        const matches = await placesRepo.sync(
+          actor,
+          payload.resource === 'activities'
+            ? payload.items.map((item) => item.id)
+            : [],
+        );
+        Object.assign(payload.freshness, {
+          placeMatchingVersion: matches.version,
+        });
+        if (payload.resource === 'activities') {
+          for (const item of payload.items)
+            item.placeMatches = matches.results.get(item.id);
+        }
+      }
 
       const body = responseEnvelope(syncBootstrapPageDTOSchema).parse(
         makeEnvelope(payload, nowValue),

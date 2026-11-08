@@ -16,17 +16,22 @@
 :root[data-stats-transition]::view-transition-new(root) {
   animation: none;
 }
+/* use-stats-focus animates the group's transform from the old box to the new
+   one; the UA width/height animation would run on the main thread. Both
+   snapshots fill the group so they match their source boxes at either end. */
 ::view-transition-group(stats-focused-tile) {
-  animation-duration: 220ms;
-  animation-timing-function: ease-out;
+  animation: none;
+  transform-origin: 0 0;
+}
+::view-transition-old(stats-focused-tile),
+::view-transition-new(stats-focused-tile) {
+  width: 100%;
+  height: 100%;
+  animation-duration: 250ms;
+  animation-timing-function: cubic-bezier(0.22, 0.75, 0.25, 1);
 }
 :root[data-stats-transition]::view-transition {
   pointer-events: none;
-}
-@media (prefers-reduced-motion: reduce) {
-  ::view-transition-group(stats-focused-tile) {
-    animation: none;
-  }
 }
 
 @theme {
@@ -255,4 +260,30 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Keep place cards in the product theme, including Mapbox's arrow. */
+.matched-place-popup .mapboxgl-popup-content {
+  padding: 0;
+  border: 1px solid hsl(var(--border));
+  border-radius: 12px;
+  background: hsl(var(--popover));
+  color: hsl(var(--popover-foreground));
+  box-shadow: 0 4px 20px #0002;
+}
+.matched-place-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
+.matched-place-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
+.matched-place-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
+  border-top-color: hsl(var(--popover));
+}
+.matched-place-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
+.matched-place-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
+.matched-place-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
+  border-bottom-color: hsl(var(--popover));
+}
+.matched-place-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+  border-right-color: hsl(var(--popover));
+}
+.matched-place-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+  border-left-color: hsl(var(--popover));
 }

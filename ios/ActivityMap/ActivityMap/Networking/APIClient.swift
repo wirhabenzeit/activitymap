@@ -99,6 +99,19 @@ nonisolated enum APIClient {
         return try await performResponse(request, session: session, as: payloadType)
     }
 
+    /// Existing web read endpoints return their shared DTO without a v1 envelope.
+    /// Error mapping, bearer authentication and cancellation remain shared.
+    static func getUnwrapped<Payload: Decodable & Sendable>(
+        _ path: String, bearerToken: String, baseURL: URL, session: URLSession = .shared,
+        as payloadType: Payload.Type
+    ) async throws -> Payload {
+        var request = URLRequest(url: baseURL.appending(path: path),
+            cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        request.httpMethod = "GET"
+        applyCommonHeaders(&request, bearerToken: bearerToken)
+        return try await performResponse(request, session: session, as: payloadType, unwrapped: true).payload
+    }
+
     static func post<Body: Encodable, Payload: Decodable & Sendable>(
         _ path: String,
         body: Body,
@@ -167,7 +180,7 @@ nonisolated enum APIClient {
     private static func performResponse<Payload: Decodable & Sendable>(
         _ request: URLRequest,
         session: URLSession,
-        as payloadType: Payload.Type
+        as payloadType: Payload.Type, unwrapped: Bool = false
     ) async throws -> Response<Payload> {
         let data: Data
         let response: URLResponse
@@ -184,7 +197,7 @@ nonisolated enum APIClient {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw RequestError.unexpectedStatus(-1)
         }
-        return try decodeResponse(data: data, httpResponse: httpResponse, as: payloadType)
+        return try decodeResponse(data: data, httpResponse: httpResponse, as: payloadType, unwrapped: unwrapped)
     }
 
     /// The decode/error-mapping half of `perform`, split out and left
@@ -204,7 +217,7 @@ nonisolated enum APIClient {
     static func decodeResponse<Payload: Decodable & Sendable>(
         data: Data,
         httpResponse: HTTPURLResponse,
-        as payloadType: Payload.Type
+        as payloadType: Payload.Type, unwrapped: Bool = false
     ) throws -> Response<Payload> {
         let decoder = ActivityMapAPI.makeDecoder()
         let retryAfter = parseRetryAfter(httpResponse)
@@ -231,6 +244,14 @@ nonisolated enum APIClient {
                 throw RequestError.serviceUnavailable(retryAfter: retryAfter, requestID: requestID)
             }
             throw RequestError.unexpectedStatus(httpResponse.statusCode)
+        }
+
+        if unwrapped {
+            do {
+                let payload = try decoder.decode(Payload.self, from: data)
+                return Response(payload: payload, statusCode: httpResponse.statusCode,
+                    retryAfter: retryAfter, requestID: requestID, body: data)
+            } catch { throw RequestError.decoding(String(describing: error)) }
         }
 
         let envelope: ActivityMapAPI.Envelope<Payload>

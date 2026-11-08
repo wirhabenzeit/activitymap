@@ -113,6 +113,15 @@ final class RoutePicker {
         isPresented = !store.selectedActivityIDs.isEmpty
     }
 
+    /// Looking up a place on the open activity keeps its detail and selection.
+    /// Elsewhere, use exactly the same chooser transition as overlapping routes.
+    func pickPlace(_ entry: DisplayMatchedPlace, store: ActivityStore) {
+        let request = invalidateQuery()
+        if let detailID, isPresented, entry.activityIDs.contains(String(detailID)),
+           store.visibleSelectedActivityIDs.contains(detailID) { return }
+        apply(ids: entry.activityIDs.compactMap(Int.init), adding: store.isCombining, request: request, store: store)
+    }
+
     /// Back changes presentation only: retain selection, active route and camera.
     func showResults() {
         navigationMotion = .backward

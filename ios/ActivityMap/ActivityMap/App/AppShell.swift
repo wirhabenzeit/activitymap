@@ -158,6 +158,16 @@ struct AppShell: View {
             if old == nil, id != nil, store.selectedTab == .list, panelTight, sheets.showsFilters {
                 setFiltersExpanded(false)
             }
+            // The phone filter sheet leaves the list usable behind it; an
+            // opened activity takes the screen.
+            if id != nil, sheets.showsFilters, !filterSidebarAvailable { sheets.showsFilters = false }
+        }
+        // Likewise for routes picked on the map behind the sheet, whose
+        // results need the sheet's place. Filters never change the selection.
+        .onChange(of: store.selectedActivityIDs) { _, selected in
+            if store.selectedTab == .map, !selected.isEmpty, sheets.showsFilters, !filterSidebarAvailable {
+                sheets.showsFilters = false
+            }
         }
         // Destinations never change filter visibility (#354).
         .onChange(of: store.selectedTab) { _, tab in
@@ -210,7 +220,13 @@ struct AppShell: View {
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
                             .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented)
-                            .environment(\.mapResultsPresentationChanged, { sheets.mapResultsPresented = $0 })
+                            .environment(\.mapResultsPresentationChanged, { presented in
+                                // Filters stacked over the results close with them, as
+                                // when the map behind clears the selection, unannounced.
+                                if !presented, sheets.mapResultsPresented, store.selectedTab == .map,
+                                   sheets.showsFilters, !sidebarAvailable { sheets.showsFilters = false }
+                                sheets.mapResultsPresented = presented
+                            })
                             .environment(\.stackedShellSheet, StackedShellSheet(
                                 request: Binding(get: { shellRequest(sidebarAvailable: sidebarAvailable) },
                                                  set: { if $0 == nil { clearShellRequest() } }),
@@ -336,19 +352,7 @@ struct AppShell: View {
     @ViewBuilder private func shellSheet(_ destination: ShellSheet) -> some View {
         switch destination {
         case .filters:
-            NavigationStack {
-                FilterPanel(store: store, scope: filterScope)
-                    .navigationTitle(Text(AppMessages.navigationFilters(locale: locale)))
-                    .navigationBarTitleDisplayMode(.inline)
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            Button { sheets.showsFilters = false } label: { Text(AppMessages.actionDone(locale: locale)) }
-                                .accessibilityIdentifier("filters-done")
-                        }
-                    }
-            }
-            .presentationDetents(verticalSizeClass == .compact || typeSize.isAccessibilitySize ? [.large] : [.medium, .large])
-            .presentationDragIndicator(.visible)
+            FilterSheet(store: store, scope: filterScope) { sheets.showsFilters = false }
         case .account(let account):
             AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
         }

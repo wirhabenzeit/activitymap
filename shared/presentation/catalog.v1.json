@@ -1040,6 +1040,16 @@
       "arguments": {},
       "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
     },
+    "filters.group.totals": {
+      "source": "Totals",
+      "arguments": {},
+      "context": "Section heading for the distance, elevation gain and elapsed time filters."
+    },
+    "filters.group.flags": {
+      "source": "Flags",
+      "arguments": {},
+      "context": "Section heading for the commute, private and flagged activity filters."
+    },
     "navigation.settings": {
       "source": "Settings",
       "arguments": {},

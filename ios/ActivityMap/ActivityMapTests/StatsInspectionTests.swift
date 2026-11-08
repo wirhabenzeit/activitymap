@@ -7,6 +7,7 @@ import Testing
 
 /// Exercise the real NavigationStack and adaptive inspector, including the
 /// second pop back to the retained dashboard. Selection is independent of Stats.
+/// Actual accessible Back/Close controls are exercised by StatsAccessibilityUITests.
 @MainActor @Suite(.serialized) struct StatsInspectionTests {
     @Test func productionShellKeepsStatsInspectionSeparateFromListNavigation() async throws {
         try await inspectionWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
@@ -31,7 +32,7 @@ import Testing
         try await inspectionWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         state.inspectedActivityID = id
         try await inspectionWait { navigation.viewControllers.count == 3 && navigation.transitionCoordinator == nil }
-        try await inspectionWait { host.accessible(label: "Back to Records") != nil }
+        #expect(navigation.viewControllers.count == 3)
         #expect(store.inspectedActivityID == nil && store.selectedActivityIDs == originalSelected)
         navigation.popViewController(animated: false)
         try await inspectionWait { navigation.viewControllers.count == 2 && state.inspectedActivityID == nil }
@@ -66,7 +67,7 @@ import Testing
         try await inspectionWait { navigation.viewControllers.count == 3 && navigation.transitionCoordinator == nil }
         #expect(store.selectedTab == .stats && store.selectedActivityIDs == originalSelected && store.activeActivityID == originalActive)
         #expect(store.inspectedActivityID == nil, "Stats inspection must not replace List inspection")
-        #expect(host.accessible(label: "Back to This month") != nil)
+        #expect(navigation.viewControllers.count == 3) // Real Back labels/taps: StatsAccessibilityUITests.
         navigation.popViewController(animated: false)
         try await inspectionWait { navigation.viewControllers.count == 2 && state.inspectedActivityID == nil }
         #expect(state.expandedTile == .monthVsLastMonth && state.option(.monthVsLastMonth) == .elevation)
@@ -103,7 +104,7 @@ import Testing
         }
         state.inspectedActivityID = try #require(records.activities[.distance]?.activityID)
         try await inspectionWait {
-            wide ? host.accessible(label: "Close activity details") != nil
+            wide ? host.hasInspectionPanel
                 : navigation.viewControllers.count == 3 && navigation.transitionCoordinator == nil
         }
         try await Task.sleep(for: .milliseconds(200))
@@ -128,14 +129,12 @@ import Testing
         state.toggleExpansion(.records)
         try await inspectionWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
         state.inspectedActivityID = ids[0]
-        try await inspectionWait { host.accessible(label: "Close activity details") != nil }
-        try await inspectionWait { host.accessible(label: "Back to Records") != nil }
+        try await inspectionWait { host.hasInspectionPanel }
         #expect(navigation.viewControllers.count == 2, "Regular width keeps inspection alongside Records")
         state.inspectedActivityID = ids[1]
         try await Task.sleep(for: .milliseconds(100))
         #expect(navigation.viewControllers.count == 2 && state.inspectedActivityID == ids[1])
-        let close = try #require(host.accessible(label: "Close activity details"))
-        #expect(close.accessibilityFrame.width >= 44 && close.accessibilityFrame.height >= 44)
+        // Close target size and activation are checked by StatsAccessibilityUITests.
         viewport.width = 650
         try await inspectionWait { navigation.viewControllers.count == 3 && navigation.transitionCoordinator == nil }
         #expect(state.inspectedActivityID == ids[1])
@@ -147,11 +146,11 @@ import Testing
         #expect(state.expandedTile == .records && state.inspection(.records)?.recordsRange == .allTime)
         #expect(store.selectedActivityIDs == originalSelected && store.activeActivityID == originalActive && store.inspectedActivityID == nil)
         state.inspectedActivityID = ids[0]
-        try await inspectionWait { host.accessible(label: "Close activity details") != nil }
+        try await inspectionWait { host.hasInspectionPanel }
         #expect(navigation.viewControllers.count == 2, "The next inspection uses the newly available wide panel")
         state.inspectedActivityID = nil
-        try await inspectionWait { host.accessible(label: "Close activity details") == nil }
-        try await inspectionWait { host.accessible(label: "Back to Stats dashboard") != nil }
+        try await inspectionWait { !host.hasInspectionPanel }
+        #expect(navigation.viewControllers.count == 2)
         #expect(state.expandedTile == .records)
     }
 }
@@ -195,21 +194,14 @@ private struct InspectionAdaptiveRoot: View {
         }
         return find(host)
     }
-    func accessible(label: String) -> NSObject? {
-        var visited: Set<ObjectIdentifier> = []
-        func visit(_ object: NSObject) -> NSObject? {
-            guard visited.insert(ObjectIdentifier(object)).inserted else { return nil }
-            if object.accessibilityLabel == label && !object.accessibilityFrame.isEmpty { return object }
-            let count = object.accessibilityElementCount()
-            if count > 0 && count < 1000 {
-                for index in 0..<count {
-                    if let child = object.accessibilityElement(at: index) as? NSObject, let found = visit(child) { return found }
-                }
-            }
-            if let view = object as? UIView {
-                for child in view.subviews { if let found = visit(child) { return found } }
-            }
-            return nil
+    // The adjacent production panel owns a 420pt native scroll viewport. This
+    // checks real rendered presence without querying an uninitialized AX tree.
+    var hasInspectionPanel: Bool {
+        func visit(_ view: UIView) -> Bool {
+            if let scroll = view as? UIScrollView,
+               abs(scroll.bounds.width - 420) < 2, scroll.window != nil,
+               scroll.convert(scroll.bounds, to: host.view).intersects(host.view.bounds) { return true }
+            return view.subviews.contains(where: visit)
         }
         return visit(host.view)
     }

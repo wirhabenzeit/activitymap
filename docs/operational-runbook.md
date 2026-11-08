@@ -13,9 +13,10 @@ traffic is being limited repeatedly or failures affect many users.
 
 ## Webhook backlog
 
-The **Drain Strava Webhook Inbox** workflow runs every five minutes. Check:
+Cloudflare runs `drain-webhook-inbox` once per hour. Incoming Strava webhooks
+still get an immediate processing attempt.
 
-1. GitHub Actions for missing or failed runs.
+1. Look for missing or failed runs in Cron Events for `activitymap-cron`.
 2. Production logs for `[Cron] drain-webhook-inbox complete` or `failed`.
 3. `metrics.countsByStatus` and `metrics.oldestPendingAgeMs`. Growing
    `pending`/`failed` counts mean the drain is falling behind. Deletion events
@@ -23,22 +24,23 @@ The **Drain Strava Webhook Inbox** workflow runs every five minutes. Check:
 4. Repeated non-zero `reconciled` counts, which indicate workers are becoming
    stuck or timing out.
 
-After fixing the cause, run the workflow manually. It uses the bounded defaults
-of 25 events and concurrency 5; repeat completed runs if necessary. Do not send
-larger ad-hoc overrides while Strava or the database is unhealthy.
+After fixing the cause, confirm the next scheduled drain succeeds. For an
+immediate retry, send an authenticated `POST /api/cron/drain-webhook-inbox`
+with the cron secret. Use the defaults of 25 events and concurrency 5 while
+Strava or the database is recovering.
 
 ## Summary reconciliation freshness
 
-The **Reconcile Strava summaries** workflow runs hourly and is what keeps
-cached Strava data within the seven-day limit. Each run reports `overdue`: the
-number of connected athletes whose last complete scan (or sign-up, before the
-first scan) is more than seven days old. A non-zero value is also logged as
+Cloudflare runs `reconcile-strava-summaries` hourly to keep cached Strava
+data within the seven-day limit. The `overdue` count includes connected
+athletes whose last complete scan is more than seven days old. For athletes
+awaiting their first scan, it counts from sign-up. A non-zero value is logged as
 `[Summary reconciliation] Athletes past the freshness limit`.
 
-`overdue` should stay at zero. If it rises, check the workflow's recent runs
-for failures, `stoppedForRateLimit`, or `stoppedForTimeBudget`. One athlete is
-handled per run with three pages of 200 summaries, so a steadily growing count
-means the job no longer keeps up and needs a larger `batchSize`.
+`overdue` should stay at zero. If it rises, check Workers Logs for recent
+failures, `stoppedForRateLimit`, or `stoppedForTimeBudget`. Each run handles
+one athlete with up to three pages of 200 summaries, so a steadily growing
+count means the job no longer keeps up and needs a larger `batchSize`.
 
 ## Dead letters
 
@@ -77,15 +79,15 @@ Confirm the next drain succeeds. Never bulk-requeue dead letters.
 
 The athlete-deauthorization webhook clears stored Strava tokens immediately,
 sets `account.revoked_at`, and schedules erasure in
-`account.scheduled_erasure_at`. The hourly **Erase Revoked Athletes** workflow
+`account.scheduled_erasure_at`. The hourly `erase-revoked-athletes` job
 deletes due data after 30 days. See [Strava data policy](strava-data-policy.md)
 for the policy.
 
-If revocation appears stuck:
+If revocation appears stuck, check the records in this order.
 
 1. Check the athlete webhook row and its status/error.
 2. Confirm both revocation timestamps and that token columns are empty.
-3. Check the erasure workflow after the scheduled time.
+3. Check the erasure job in Workers Logs after the scheduled time.
 
 Never clear revocation fields manually. A genuine reconnect through Strava
 OAuth clears them safely.

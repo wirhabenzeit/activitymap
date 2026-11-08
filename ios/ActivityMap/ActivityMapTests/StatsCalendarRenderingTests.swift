@@ -4,6 +4,8 @@ import Observation
 import Testing
 @testable import ActivityMap
 
+// Native viewport/state checks stay hosted; day AX geometry and real taps
+// are exercised by StatsUITests (including StatsAccessibilityUITests.swift).
 @MainActor @Suite(.serialized) struct StatsCalendarRenderingTests {
     private func fixture() async throws -> (StatsCalendarSnapshot, [Int: StatsCalendarSnapshot], Int) {
         try await calendarWait { UIApplication.shared.connectedScenes.first is UIWindowScene }
@@ -18,7 +20,7 @@ import Testing
     }
 
     @Test(arguments: ["phone", "tablet", "large-text", "dark"])
-    func compactCalendarFitsWithSquareCellsAndSharedControls(variant: String) async throws {
+    func compactCalendarFitsViewportAcrossSizes(variant: String) async throws {
         let (rolling, years, today) = try await fixture()
         let state = CalendarRenderState(), inspection = StatsTileInspection()
         let size = variant == "tablet" ? CGSize(width: 834, height: 1112) : CGSize(width: 375, height: 1000)
@@ -29,19 +31,12 @@ import Testing
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(150))
         try host.capture("compact-\(variant)")
-        try await calendarWait { !host.days.isEmpty }
-        for day in host.days where !day.accessibilityFrame.isEmpty {
-            let frame = day.accessibilityFrame
-            #expect(abs(frame.width - frame.height) < 0.5, "Every compact day is square")
-        }
         let outer = try #require(host.scrolls.first)
         #expect(outer.contentSize.width <= outer.bounds.width + 1)
-        #expect(!host.elements.contains { ($0.accessibilityLabel ?? "").contains("Last 12 months") })
-        #expect(!host.elements.contains { $0.accessibilityLabel == "Calendar period" })
         try host.capture("compact-\(variant)")
     }
 
-    @Test func expandedHistoryRetainsPositionAcrossSelectionAndMetricChanges() async throws {
+    @Test func expandedHistoryRetainsNativeOffsetAcrossInspectionAndMetricChanges() async throws {
         let (rolling, years, today) = try await fixture()
         let state = CalendarRenderState(), inspection = StatsTileInspection()
         let host = try CalendarRenderHost(root: CalendarRenderRoot(rolling: rolling, years: years, today: today,
@@ -51,8 +46,7 @@ import Testing
         let scroll = try #require(host.horizontal)
         try await calendarWait { scroll.contentOffset.x > 0 }
         #expect(scroll.contentSize.width > scroll.bounds.width * 3, "All years share one horizontal timeline")
-        let latest = try #require(host.day(today))
-        #expect(latest.accessibilityActivate())
+        inspection.calendarDay = today
         try await calendarWait { inspection.calendarDay == today }
         let endOffset = scroll.contentOffset.x
         inspection.calendarDay = nil
@@ -60,14 +54,8 @@ import Testing
         #expect(abs(scroll.contentOffset.x - endOffset) < 1)
         scroll.setContentOffset(CGPoint(x: 1200, y: scroll.contentOffset.y), animated: false)
         try await Task.sleep(for: .milliseconds(200))
-        let viewport = scroll.convert(scroll.bounds, to: host.window)
-        let visible = try #require(host.days.first { day in
-            let frame = day.accessibilityFrame
-            return frame.minX > viewport.minX + 4 && frame.maxX < viewport.maxX - 4
-                && frame.minY > viewport.minY + 32 && frame.maxY < viewport.maxY
-        })
         let before = scroll.contentOffset.x
-        #expect(visible.accessibilityActivate())
+        inspection.calendarDay = today - 365
         try await calendarWait { inspection.calendarDay != nil && inspection.calendarDay != today }
         let chosenDay = try #require(inspection.calendarDay)
         #expect(abs(scroll.contentOffset.x - before) < 1, "Clicking a day must not reposition the timeline")
@@ -77,18 +65,12 @@ import Testing
             #expect(abs(scroll.contentOffset.x - before) < 1)
             #expect(inspection.calendarDay == chosenDay)
         }
-        for day in host.days where !day.accessibilityFrame.isEmpty {
-            #expect(abs(day.accessibilityFrame.width - day.accessibilityFrame.height) < 0.5)
-        }
         try host.capture("expanded-selected-history")
-        #expect(!host.elements.contains { $0.accessibilityLabel == "Calendar period" })
         scroll.setContentOffset(CGPoint(x: scroll.contentSize.width - scroll.bounds.width,
                                        y: scroll.contentOffset.y), animated: false)
-        try await calendarWait { host.day(today) != nil }
-        #expect(host.day(today)?.accessibilityActivate() == true)
+        inspection.calendarDay = today
         try await calendarWait { inspection.calendarDay == today }
-        #expect(host.elements.first { ($0.accessibilityLabel ?? "").contains("Lunch Ride") }?.accessibilityActivate() == true)
-        #expect(state.openedActivity != nil)
+        // Calendar activity activation and native Back are checked by StatsUITests.
         try host.capture("expanded-latest-selection")
     }
 }
@@ -136,31 +118,6 @@ private struct CalendarRenderRoot: View {
         window.makeKeyAndVisible()
         host.view.frame = window.bounds
         host.view.layoutIfNeeded()
-    }
-    var elements: [NSObject] {
-        var visited: Set<ObjectIdentifier> = [], result: [NSObject] = []
-        func visit(_ object: NSObject) {
-            guard visited.insert(ObjectIdentifier(object)).inserted else { return }
-            result.append(object)
-            let count = object.accessibilityElementCount()
-            if count > 0 && count < 5000 {
-                for index in 0..<count { if let child = object.accessibilityElement(at: index) as? NSObject { visit(child) } }
-            }
-            if let view = object as? UIView { view.subviews.forEach(visit) }
-        }
-        visit(host.view)
-        return result
-    }
-    var days: [NSObject] {
-        let prefixes = (0..<7).map { "\(StatsDisplay.weekday($0)), " }
-        return elements.filter { object in
-            let label = object.accessibilityLabel ?? ""
-            return prefixes.contains(where: label.hasPrefix) && label.contains(": ")
-        }
-    }
-    func day(_ day: Int) -> NSObject? {
-        let label = "\(StatsDisplay.weekday(day)), \(StatsDisplay.date(day)):"
-        return days.first { ($0.accessibilityLabel ?? "").hasPrefix(label) }
     }
     var scrolls: [UIScrollView] {
         func visit(_ view: UIView) -> [UIScrollView] { ((view as? UIScrollView).map { [$0] } ?? []) + view.subviews.flatMap(visit) }

@@ -51,6 +51,50 @@ final class MapRotationUITests: XCTestCase {
                        "Round-trip rotation must retain the scrolled position within one row")
     }
 
+    func testLandscapeFiltersReturnToTheMapSelection() async throws {
+        let app = launch()
+        defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
+        let initial = try await state(in: app) { $0.ready }
+        let landscape = try await rotate(.landscapeLeft, app: app, previous: initial)
+        let filters = try XCTUnwrap(app.buttons.matching(identifier: "browse-filters").allElementsBoundByIndex.first(where: \.isHittable))
+        filters.tap()
+        let close = app.buttons["filters-done"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10), app.debugDescription)
+        capture(app, name: "Landscape filter sheet over Map")
+        app.searchActivities("Rotation")
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        app.buttons["filter-reset"].tap()
+        close.tap()
+        let returned = try await state(in: app) { $0.ready && $0.presentationDepth == 1 }
+        XCTAssertEqual(returned.selection, landscape.selection)
+        XCTAssertEqual(returned.candidates, landscape.candidates)
+        XCTAssertEqual(returned.detent, landscape.detent)
+        XCTAssertTrue(resultsScroll(in: app).isHittable, "Map results return after the sheet closes")
+    }
+
+    func testFiltersOverResultsLeaveTheMapUsable() async throws {
+        let app = launch()
+        defer { app.terminate() }
+        _ = try await state(in: app) { $0.ready }
+        let filters = try XCTUnwrap(app.buttons.matching(identifier: "browse-filters").allElementsBoundByIndex.first(where: \.isHittable))
+        filters.tap()
+        let close = app.buttons["filters-done"]
+        XCTAssertTrue(close.waitForExistence(timeout: 10), app.debugDescription)
+        let map = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2))
+        map.press(forDuration: 0.05, thenDragTo: map.withOffset(CGVector(dx: 60, dy: 30)))
+        XCTAssertTrue(close.exists, "Panning the map keeps the filters over the results")
+        capture(app, name: "Filters over results after panning")
+        // A tap on the map changes or clears the results, which take the
+        // stacked filters along; Filters must still open again afterwards.
+        map.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 10), app.debugDescription)
+        let reopened = try XCTUnwrap(app.buttons.matching(identifier: "browse-filters").allElementsBoundByIndex.first(where: \.isHittable))
+        reopened.tap()
+        XCTAssertTrue(close.waitForExistence(timeout: 10), "Filters reopen after the results closed from behind")
+        close.tap()
+        XCTAssertTrue(close.waitForNonExistence(timeout: 10))
+    }
+
     func testActivityDetailAndUnderlyingResultsSurviveRotation() async throws {
         let app = launch()
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }

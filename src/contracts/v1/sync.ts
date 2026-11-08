@@ -34,6 +34,11 @@ export type SyncRetentionMeta = z.infer<typeof syncRetentionMetaSchema>;
 /** Dataset-level freshness from the last fully completed Strava summary scan. */
 export const syncFreshnessMetaSchema = z.object({
   lastSummaryReconciledAt: isoDateTime.nullable(),
+  // Global invalidation identity; stale results stay on disk but are not shown.
+  placeMatchingVersion: z
+    .string()
+    .regex(/^[0-9a-f]{64}$/)
+    .optional(),
 });
 export type SyncFreshnessMeta = z.infer<typeof syncFreshnessMetaSchema>;
 

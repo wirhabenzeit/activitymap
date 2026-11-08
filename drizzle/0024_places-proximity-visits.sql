@@ -1,0 +1,5 @@
+ALTER TABLE "activity_places" DROP CONSTRAINT "activity_places_supported_relations_check";--> statement-breakpoint
+ALTER TABLE "activity_places" ADD CONSTRAINT "activity_places_supported_relations_check" CHECK ("activity_places"."supported_relations" <@ ARRAY['reached_peak', 'reached_saddle', 'crossed_pass', 'visited_pass', 'arrived_at_hut']::text[]
+    AND cardinality("activity_places"."supported_relations") = (CASE WHEN 'reached_peak' = ANY("activity_places"."supported_relations") THEN 1 ELSE 0 END + CASE WHEN 'reached_saddle' = ANY("activity_places"."supported_relations") THEN 1 ELSE 0 END + CASE WHEN 'crossed_pass' = ANY("activity_places"."supported_relations") THEN 1 ELSE 0 END + CASE WHEN 'visited_pass' = ANY("activity_places"."supported_relations") THEN 1 ELSE 0 END + CASE WHEN 'arrived_at_hut' = ANY("activity_places"."supported_relations") THEN 1 ELSE 0 END)
+    AND (cardinality("activity_places"."supported_relations") = 0 OR (array_ndims("activity_places"."supported_relations") = 1 AND array_lower("activity_places"."supported_relations", 1) = 1))
+    );

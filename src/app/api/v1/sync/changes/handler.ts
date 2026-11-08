@@ -17,6 +17,7 @@ import type { ActivitiesRepository } from '~/server/repositories/activities';
 import type { ChangesRepository } from '~/server/repositories/changes';
 import { DEFAULT_RETENTION_DAYS } from '~/server/repositories/changes';
 import type { PhotosRepository } from '~/server/repositories/photos';
+import type { PlaceMatchingRepository } from '~/server/repositories/place-matching';
 import type { SummaryReconciliationRepository } from '~/server/repositories/summary-reconciliation';
 import { encodeSyncCursor, tryDecodeSyncCursor } from '~/server/sync/cursor';
 
@@ -29,6 +30,7 @@ export interface SyncChangesHandlerDependencies {
   activitiesRepo: Pick<ActivitiesRepository, 'findManyByIds'>;
   photosRepo: Pick<PhotosRepository, 'findManyByIds'>;
   changesRepo: Pick<ChangesRepository, 'findAfter' | 'latestSequence'>;
+  placesRepo?: Pick<PlaceMatchingRepository, 'sync'>;
   freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
   retentionDays?: number;
@@ -59,6 +61,7 @@ export function createSyncChangesHandler({
   photosRepo,
   changesRepo,
   freshnessRepo = { lastCompletedAt: async () => null },
+  placesRepo,
   retentionDays = DEFAULT_RETENTION_DAYS,
 }: SyncChangesHandlerDependencies) {
   return async function GET(request: Request): Promise<Response> {
@@ -168,6 +171,20 @@ export function createSyncChangesHandler({
             )?.toISOString() ?? null,
         },
       };
+
+      if (placesRepo) {
+        const matches = await placesRepo.sync(
+          actor,
+          items.flatMap((item) => (item.activity ? [item.id] : [])),
+        );
+        Object.assign(payload.freshness, {
+          placeMatchingVersion: matches.version,
+        });
+        for (const item of items) {
+          if (item.activity)
+            item.activity.placeMatches = matches.results.get(item.id);
+        }
+      }
 
       const body = responseEnvelope(syncChangesPageDTOSchema).parse(
         makeEnvelope(payload, nowValue),

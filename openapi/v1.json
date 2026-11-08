@@ -31,17 +31,11 @@
                 "type": "boolean"
               }
             },
-            "required": [
-              "showRouteEnds"
-            ],
+            "required": ["showRouteEnds"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "activityIds",
-          "expiresInMs",
-          "fields"
-        ],
+        "required": ["activityIds", "expiresInMs", "fields"],
         "additionalProperties": false
       },
       "CreatedShareLinkResponse": {
@@ -74,19 +68,11 @@
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
               }
             },
-            "required": [
-              "id",
-              "token",
-              "expiresAt"
-            ],
+            "required": ["id", "token", "expiresAt"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "ShareLinkListResponse": {
@@ -144,9 +130,7 @@
                           "type": "boolean"
                         }
                       },
-                      "required": [
-                        "showRouteEnds"
-                      ],
+                      "required": ["showRouteEnds"],
                       "additionalProperties": false
                     },
                     "activityCount": {
@@ -156,11 +140,7 @@
                     },
                     "status": {
                       "type": "string",
-                      "enum": [
-                        "active",
-                        "expired",
-                        "revoked"
-                      ]
+                      "enum": ["active", "expired", "revoked"]
                     }
                   },
                   "required": [
@@ -176,17 +156,11 @@
                 }
               }
             },
-            "required": [
-              "links"
-            ],
+            "required": ["links"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "RevokeShareLinkRequest": {
@@ -198,9 +172,7 @@
             "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
           }
         },
-        "required": [
-          "id"
-        ],
+        "required": ["id"],
         "additionalProperties": false
       },
       "RevokeShareLinkResponse": {
@@ -223,17 +195,11 @@
                 "const": "revoked"
               }
             },
-            "required": [
-              "status"
-            ],
+            "required": ["status"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "Authentication": {
@@ -241,10 +207,7 @@
         "properties": {
           "method": {
             "type": "string",
-            "enum": [
-              "cookie",
-              "bearer"
-            ]
+            "enum": ["cookie", "bearer"]
           },
           "sessionExpiresAt": {
             "type": "string",
@@ -252,10 +215,7 @@
             "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
           }
         },
-        "required": [
-          "method",
-          "sessionExpiresAt"
-        ],
+        "required": ["method", "sessionExpiresAt"],
         "additionalProperties": false
       },
       "CurrentUser": {
@@ -265,22 +225,13 @@
             "type": "string"
           },
           "name": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "email": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "image": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "athleteId": {
             "anyOf": [
@@ -303,20 +254,13 @@
                 "properties": {
                   "activities": {
                     "type": "string",
-                    "enum": [
-                      "all",
-                      "public",
-                      "none"
-                    ]
+                    "enum": ["all", "public", "none"]
                   },
                   "edit": {
                     "type": "boolean"
                   }
                 },
-                "required": [
-                  "activities",
-                  "edit"
-                ],
+                "required": ["activities", "edit"],
                 "additionalProperties": false
               },
               {
@@ -347,10 +291,7 @@
             "type": "object",
             "properties": {
               "generation": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "revision": {
                 "type": "string",
@@ -358,11 +299,7 @@
               },
               "state": {
                 "type": "string",
-                "enum": [
-                  "not_fetched",
-                  "current",
-                  "stale"
-                ]
+                "enum": ["not_fetched", "current", "stale"]
               },
               "fetch_status": {
                 "type": "string",
@@ -424,6 +361,138 @@
             ],
             "additionalProperties": false
           },
+          "placeMatches": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "activityId": {
+                    "type": "string",
+                    "pattern": "^[1-9][0-9]*$"
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "complete",
+                      "missing_streams",
+                      "uncovered",
+                      "partial",
+                      "unavailable",
+                      "pending"
+                    ]
+                  },
+                  "streamGeneration": {
+                    "type": ["string", "null"]
+                  },
+                  "streamRevision": {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  "catalogueSnapshotId": {
+                    "type": ["string", "null"]
+                  },
+                  "matcherVersion": {
+                    "type": "string"
+                  },
+                  "matchingVersion": {
+                    "type": "string"
+                  },
+                  "resultRevision": {
+                    "type": ["string", "null"]
+                  },
+                  "places": {
+                    "maxItems": 250,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                        },
+                        "name": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kinds": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": ["peak", "pass", "hut"]
+                          }
+                        },
+                        "longitude": {
+                          "type": "number",
+                          "minimum": -180,
+                          "maximum": 180
+                        },
+                        "latitude": {
+                          "type": "number",
+                          "minimum": -90,
+                          "maximum": 90
+                        },
+                        "elevationM": {
+                          "type": ["number", "null"]
+                        },
+                        "visits": {
+                          "minItems": 1,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "distanceM": {
+                                "anyOf": [
+                                  {
+                                    "type": "number",
+                                    "minimum": 0
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": ["distanceM"],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "kinds",
+                        "longitude",
+                        "latitude",
+                        "elevationM",
+                        "visits"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "userId",
+                  "activityId",
+                  "status",
+                  "streamGeneration",
+                  "streamRevision",
+                  "catalogueSnapshotId",
+                  "matcherVersion",
+                  "places"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "id": {
             "type": "string",
             "pattern": "^\\d+$"
@@ -436,16 +505,10 @@
             "type": "string"
           },
           "description": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "distance": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "moving_time": {
             "anyOf": [
@@ -472,10 +535,7 @@
             ]
           },
           "total_elevation_gain": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "sport_type": {
             "type": "string",
@@ -644,22 +704,13 @@
             ]
           },
           "map_id": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "map_polyline": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "map_summary_polyline": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "map_bbox": {
             "anyOf": [
@@ -675,34 +726,19 @@
             ]
           },
           "trainer": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "commute": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "manual": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "private": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "flagged": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "workout_type": {
             "anyOf": [
@@ -728,64 +764,34 @@
             ]
           },
           "average_speed": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "max_speed": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "calories": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "has_heartrate": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "average_heartrate": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "max_heartrate": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "heartrate_opt_out": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "display_hide_heartrate_option": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "elev_high": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "elev_low": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "pr_count": {
             "anyOf": [
@@ -800,34 +806,19 @@
             ]
           },
           "has_kudoed": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "hide_from_home": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "gear_id": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "device_watts": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "average_watts": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "max_watts": {
             "anyOf": [
@@ -854,10 +845,7 @@
             ]
           },
           "kilojoules": {
-            "type": [
-              "number",
-              "null"
-            ]
+            "type": ["number", "null"]
           },
           "last_updated": {
             "anyOf": [
@@ -873,20 +861,13 @@
           },
           "geometry_state": {
             "type": "string",
-            "enum": [
-              "summary",
-              "detailed",
-              "refresh_required"
-            ]
+            "enum": ["summary", "detailed", "refresh_required"]
           },
           "photos_state": {
             "anyOf": [
               {
                 "type": "string",
-                "enum": [
-                  "current",
-                  "refresh_required"
-                ]
+                "enum": ["current", "refresh_required"]
               },
               {
                 "type": "null"
@@ -1063,11 +1044,7 @@
             "$ref": "#/components/schemas/Activity"
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "RefreshActivityResponse": {
@@ -1096,10 +1073,7 @@
               },
               "photos_status": {
                 "type": "string",
-                "enum": [
-                  "complete",
-                  "partial"
-                ]
+                "enum": ["complete", "partial"]
               },
               "photos_error": {
                 "anyOf": [
@@ -1125,11 +1099,7 @@
                         ]
                       }
                     },
-                    "required": [
-                      "code",
-                      "retryable",
-                      "retry_after_seconds"
-                    ],
+                    "required": ["code", "retryable", "retry_after_seconds"],
                     "additionalProperties": false
                   },
                   {
@@ -1138,20 +1108,11 @@
                 ]
               }
             },
-            "required": [
-              "activity",
-              "photos",
-              "photos_status",
-              "photos_error"
-            ],
+            "required": ["activity", "photos", "photos_status", "photos_error"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "ActivitySummaryFetchResponse": {
@@ -1172,11 +1133,7 @@
             "maximum": 200
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "ActivityStreamsResponse": {
@@ -1202,10 +1159,7 @@
                 "type": "object",
                 "properties": {
                   "generation": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   },
                   "revision": {
                     "type": "string",
@@ -1213,11 +1167,7 @@
                   },
                   "state": {
                     "type": "string",
-                    "enum": [
-                      "not_fetched",
-                      "current",
-                      "stale"
-                    ]
+                    "enum": ["not_fetched", "current", "stale"]
                   },
                   "fetch_status": {
                     "type": "string",
@@ -1320,18 +1270,11 @@
                           },
                           "resolution": {
                             "type": "string",
-                            "enum": [
-                              "low",
-                              "medium",
-                              "high"
-                            ]
+                            "enum": ["low", "medium", "high"]
                           },
                           "series_type": {
                             "type": "string",
-                            "enum": [
-                              "time",
-                              "distance"
-                            ]
+                            "enum": ["time", "distance"]
                           }
                         },
                         "required": [
@@ -1363,18 +1306,11 @@
                           },
                           "resolution": {
                             "type": "string",
-                            "enum": [
-                              "low",
-                              "medium",
-                              "high"
-                            ]
+                            "enum": ["low", "medium", "high"]
                           },
                           "series_type": {
                             "type": "string",
-                            "enum": [
-                              "time",
-                              "distance"
-                            ]
+                            "enum": ["time", "distance"]
                           }
                         },
                         "required": [
@@ -1420,18 +1356,11 @@
                           },
                           "resolution": {
                             "type": "string",
-                            "enum": [
-                              "low",
-                              "medium",
-                              "high"
-                            ]
+                            "enum": ["low", "medium", "high"]
                           },
                           "series_type": {
                             "type": "string",
-                            "enum": [
-                              "time",
-                              "distance"
-                            ]
+                            "enum": ["time", "distance"]
                           }
                         },
                         "required": [
@@ -1462,18 +1391,11 @@
                           },
                           "resolution": {
                             "type": "string",
-                            "enum": [
-                              "low",
-                              "medium",
-                              "high"
-                            ]
+                            "enum": ["low", "medium", "high"]
                           },
                           "series_type": {
                             "type": "string",
-                            "enum": [
-                              "time",
-                              "distance"
-                            ]
+                            "enum": ["time", "distance"]
                           }
                         },
                         "required": [
@@ -1506,18 +1428,11 @@
                           },
                           "resolution": {
                             "type": "string",
-                            "enum": [
-                              "low",
-                              "medium",
-                              "high"
-                            ]
+                            "enum": ["low", "medium", "high"]
                           },
                           "series_type": {
                             "type": "string",
-                            "enum": [
-                              "time",
-                              "distance"
-                            ]
+                            "enum": ["time", "distance"]
                           }
                         },
                         "required": [
@@ -1550,18 +1465,11 @@
                           },
                           "resolution": {
                             "type": "string",
-                            "enum": [
-                              "low",
-                              "medium",
-                              "high"
-                            ]
+                            "enum": ["low", "medium", "high"]
                           },
                           "series_type": {
                             "type": "string",
-                            "enum": [
-                              "time",
-                              "distance"
-                            ]
+                            "enum": ["time", "distance"]
                           }
                         },
                         "required": [
@@ -1599,10 +1507,7 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "code",
-                      "retryable"
-                    ],
+                    "required": ["code", "retryable"],
                     "additionalProperties": false
                   },
                   {
@@ -1634,11 +1539,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "ActivityStreamSummaryResponse": {
@@ -1664,10 +1565,7 @@
                 "type": "object",
                 "properties": {
                   "generation": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   },
                   "revision": {
                     "type": "string",
@@ -1675,11 +1573,7 @@
                   },
                   "state": {
                     "type": "string",
-                    "enum": [
-                      "not_fetched",
-                      "current",
-                      "stale"
-                    ]
+                    "enum": ["not_fetched", "current", "stale"]
                   },
                   "fetch_status": {
                     "type": "string",
@@ -1755,10 +1649,7 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "enum": [
-                              "distance",
-                              "time"
-                            ]
+                            "enum": ["distance", "time"]
                           },
                           {
                             "type": "null"
@@ -1813,10 +1704,7 @@
                         }
                       }
                     },
-                    "required": [
-                      "version",
-                      "basis"
-                    ],
+                    "required": ["version", "basis"],
                     "additionalProperties": false
                   },
                   {
@@ -1843,10 +1731,7 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "code",
-                      "retryable"
-                    ],
+                    "required": ["code", "retryable"],
                     "additionalProperties": false
                   },
                   {
@@ -1877,11 +1762,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "ActivityStreamSummariesResponse": {
@@ -1912,10 +1793,7 @@
                       "type": "object",
                       "properties": {
                         "generation": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "type": ["string", "null"]
                         },
                         "revision": {
                           "type": "string",
@@ -1923,11 +1801,7 @@
                         },
                         "state": {
                           "type": "string",
-                          "enum": [
-                            "not_fetched",
-                            "current",
-                            "stale"
-                          ]
+                          "enum": ["not_fetched", "current", "stale"]
                         },
                         "fetch_status": {
                           "type": "string",
@@ -2003,10 +1877,7 @@
                               "anyOf": [
                                 {
                                   "type": "string",
-                                  "enum": [
-                                    "distance",
-                                    "time"
-                                  ]
+                                  "enum": ["distance", "time"]
                                 },
                                 {
                                   "type": "null"
@@ -2061,10 +1932,7 @@
                               }
                             }
                           },
-                          "required": [
-                            "version",
-                            "basis"
-                          ],
+                          "required": ["version", "basis"],
                           "additionalProperties": false
                         },
                         {
@@ -2091,10 +1959,7 @@
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "code",
-                            "retryable"
-                          ],
+                          "required": ["code", "retryable"],
                           "additionalProperties": false
                         },
                         {
@@ -2126,17 +1991,11 @@
                 }
               }
             },
-            "required": [
-              "summaries"
-            ],
+            "required": ["summaries"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "ActivityCompactStreamSummaryResponse": {
@@ -2162,10 +2021,7 @@
                 "type": "object",
                 "properties": {
                   "generation": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   },
                   "revision": {
                     "type": "string",
@@ -2173,11 +2029,7 @@
                   },
                   "state": {
                     "type": "string",
-                    "enum": [
-                      "not_fetched",
-                      "current",
-                      "stale"
-                    ]
+                    "enum": ["not_fetched", "current", "stale"]
                   },
                   "fetch_status": {
                     "type": "string",
@@ -2257,10 +2109,7 @@
                         "anyOf": [
                           {
                             "type": "string",
-                            "enum": [
-                              "distance",
-                              "time"
-                            ]
+                            "enum": ["distance", "time"]
                           },
                           {
                             "type": "null"
@@ -2329,10 +2178,7 @@
                         "type": "boolean"
                       }
                     },
-                    "required": [
-                      "code",
-                      "retryable"
-                    ],
+                    "required": ["code", "retryable"],
                     "additionalProperties": false
                   },
                   {
@@ -2363,11 +2209,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "ActivityCompactStreamSummariesResponse": {
@@ -2398,10 +2240,7 @@
                       "type": "object",
                       "properties": {
                         "generation": {
-                          "type": [
-                            "string",
-                            "null"
-                          ]
+                          "type": ["string", "null"]
                         },
                         "revision": {
                           "type": "string",
@@ -2409,11 +2248,7 @@
                         },
                         "state": {
                           "type": "string",
-                          "enum": [
-                            "not_fetched",
-                            "current",
-                            "stale"
-                          ]
+                          "enum": ["not_fetched", "current", "stale"]
                         },
                         "fetch_status": {
                           "type": "string",
@@ -2493,10 +2328,7 @@
                               "anyOf": [
                                 {
                                   "type": "string",
-                                  "enum": [
-                                    "distance",
-                                    "time"
-                                  ]
+                                  "enum": ["distance", "time"]
                                 },
                                 {
                                   "type": "null"
@@ -2565,10 +2397,7 @@
                               "type": "boolean"
                             }
                           },
-                          "required": [
-                            "code",
-                            "retryable"
-                          ],
+                          "required": ["code", "retryable"],
                           "additionalProperties": false
                         },
                         {
@@ -2600,17 +2429,11 @@
                 }
               }
             },
-            "required": [
-              "summaries"
-            ],
+            "required": ["summaries"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "Photo": {
@@ -2628,16 +2451,10 @@
             "pattern": "^\\d+$"
           },
           "activity_name": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "caption": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "type": {
             "type": "integer",
@@ -2700,10 +2517,7 @@
             ]
           },
           "default_photo": {
-            "type": [
-              "boolean",
-              "null"
-            ]
+            "type": ["boolean", "null"]
           },
           "location": {
             "anyOf": [
@@ -2755,10 +2569,7 @@
             ]
           },
           "status": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": ["string", "null"]
           },
           "resource_state": {
             "anyOf": [
@@ -2821,16 +2632,10 @@
                     }
                   },
                   "nextCursor": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   },
                   "snapshotCursor": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   },
                   "retention": {
                     "type": "object",
@@ -2846,10 +2651,7 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                       }
                     },
-                    "required": [
-                      "retentionDays",
-                      "cursorValidUntil"
-                    ],
+                    "required": ["retentionDays", "cursorValidUntil"],
                     "additionalProperties": false
                   },
                   "freshness": {
@@ -2866,11 +2668,13 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "placeMatchingVersion": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
                       }
                     },
-                    "required": [
-                      "lastSummaryReconciledAt"
-                    ],
+                    "required": ["lastSummaryReconciledAt"],
                     "additionalProperties": false
                   }
                 },
@@ -2898,16 +2702,10 @@
                     }
                   },
                   "nextCursor": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   },
                   "snapshotCursor": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
+                    "type": ["string", "null"]
                   },
                   "retention": {
                     "type": "object",
@@ -2923,10 +2721,7 @@
                         "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                       }
                     },
-                    "required": [
-                      "retentionDays",
-                      "cursorValidUntil"
-                    ],
+                    "required": ["retentionDays", "cursorValidUntil"],
                     "additionalProperties": false
                   },
                   "freshness": {
@@ -2943,11 +2738,13 @@
                             "type": "null"
                           }
                         ]
+                      },
+                      "placeMatchingVersion": {
+                        "type": "string",
+                        "pattern": "^[0-9a-f]{64}$"
                       }
                     },
-                    "required": [
-                      "lastSummaryReconciledAt"
-                    ],
+                    "required": ["lastSummaryReconciledAt"],
                     "additionalProperties": false
                   }
                 },
@@ -2964,11 +2761,7 @@
             ]
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "SyncChangesPageResponse": {
@@ -2997,17 +2790,11 @@
                     },
                     "entityType": {
                       "type": "string",
-                      "enum": [
-                        "activity",
-                        "photo"
-                      ]
+                      "enum": ["activity", "photo"]
                     },
                     "operation": {
                       "type": "string",
-                      "enum": [
-                        "upsert",
-                        "delete"
-                      ]
+                      "enum": ["upsert", "delete"]
                     },
                     "id": {
                       "type": "string"
@@ -3019,12 +2806,7 @@
                       "$ref": "#/components/schemas/Photo"
                     }
                   },
-                  "required": [
-                    "sequence",
-                    "entityType",
-                    "operation",
-                    "id"
-                  ],
+                  "required": ["sequence", "entityType", "operation", "id"],
                   "additionalProperties": false
                 }
               },
@@ -3045,10 +2827,7 @@
                     "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                   }
                 },
-                "required": [
-                  "retentionDays",
-                  "cursorValidUntil"
-                ],
+                "required": ["retentionDays", "cursorValidUntil"],
                 "additionalProperties": false
               },
               "freshness": {
@@ -3065,28 +2844,21 @@
                         "type": "null"
                       }
                     ]
+                  },
+                  "placeMatchingVersion": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
                   }
                 },
-                "required": [
-                  "lastSummaryReconciledAt"
-                ],
+                "required": ["lastSummaryReconciledAt"],
                 "additionalProperties": false
               }
             },
-            "required": [
-              "items",
-              "nextCursor",
-              "retention",
-              "freshness"
-            ],
+            "required": ["items", "nextCursor", "retention", "freshness"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "IngestionStatusResponse": {
@@ -3299,11 +3071,7 @@
                     "properties": {
                       "phase": {
                         "type": "string",
-                        "enum": [
-                          "idle",
-                          "scanning",
-                          "confirming"
-                        ]
+                        "enum": ["idle", "scanning", "confirming"]
                       },
                       "pagesScanned": {
                         "anyOf": [
@@ -3355,12 +3123,7 @@
                       },
                       "freshness": {
                         "type": "string",
-                        "enum": [
-                          "never_completed",
-                          "current",
-                          "due",
-                          "overdue"
-                        ]
+                        "enum": ["never_completed", "current", "due", "overdue"]
                       }
                     },
                     "required": [
@@ -3802,11 +3565,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "FailureResponse": {
@@ -3830,18 +3589,11 @@
               },
               "details": {}
             },
-            "required": [
-              "code",
-              "message",
-              "retryable",
-              "requestId"
-            ],
+            "required": ["code", "message", "retryable", "requestId"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "error"
-        ],
+        "required": ["error"],
         "additionalProperties": false
       },
       "StravaImportResponse": {
@@ -3863,10 +3615,7 @@
                 "type": "boolean"
               },
               "runId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               },
               "status": {
                 "type": "string",
@@ -3968,11 +3717,7 @@
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "CurrentUserResponse": {
@@ -3991,11 +3736,7 @@
             "$ref": "#/components/schemas/CurrentUser"
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "ActivityPageResponse": {
@@ -4020,24 +3761,14 @@
                 }
               },
               "nextCursor": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               }
             },
-            "required": [
-              "items",
-              "nextCursor"
-            ],
+            "required": ["items", "nextCursor"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "PhotoPageResponse": {
@@ -4062,24 +3793,14 @@
                 }
               },
               "nextCursor": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+                "type": ["string", "null"]
               }
             },
-            "required": [
-              "items",
-              "nextCursor"
-            ],
+            "required": ["items", "nextCursor"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "MobileExchangeRequest": {
@@ -4098,11 +3819,7 @@
             "minLength": 1
           }
         },
-        "required": [
-          "code",
-          "pkceVerifier",
-          "state"
-        ],
+        "required": ["code", "pkceVerifier", "state"],
         "additionalProperties": false
       },
       "MobileExchangeResponse": {
@@ -4134,19 +3851,11 @@
                 "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
               }
             },
-            "required": [
-              "sessionToken",
-              "tokenType",
-              "sessionExpiresAt"
-            ],
+            "required": ["sessionToken", "tokenType", "sessionExpiresAt"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "MobileSessionListResponse": {
@@ -4184,16 +3893,10 @@
                       "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
                     },
                     "ipAddress": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
+                      "type": ["string", "null"]
                     },
                     "userAgent": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
+                      "type": ["string", "null"]
                     },
                     "isCurrent": {
                       "type": "boolean"
@@ -4211,17 +3914,11 @@
                 }
               }
             },
-            "required": [
-              "sessions"
-            ],
+            "required": ["sessions"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       },
       "RevokeSessionRequest": {
@@ -4232,9 +3929,7 @@
             "minLength": 1
           }
         },
-        "required": [
-          "token"
-        ],
+        "required": ["token"],
         "additionalProperties": false
       },
       "DeleteAccountRequest": {
@@ -4245,9 +3940,7 @@
             "const": "DELETE"
           }
         },
-        "required": [
-          "confirmation"
-        ],
+        "required": ["confirmation"],
         "additionalProperties": false
       },
       "DeleteAccountResponse": {
@@ -4270,17 +3963,11 @@
                 "const": "deleted"
               }
             },
-            "required": [
-              "status"
-            ],
+            "required": ["status"],
             "additionalProperties": false
           }
         },
-        "required": [
-          "schemaVersion",
-          "serverTime",
-          "data"
-        ],
+        "required": ["schemaVersion", "serverTime", "data"],
         "additionalProperties": false
       }
     },
@@ -4897,10 +4584,7 @@
             "required": false,
             "schema": {
               "type": "string",
-              "enum": [
-                "activities",
-                "photos"
-              ]
+              "enum": ["activities", "photos"]
             },
             "description": "Which entity type to page through (default `activities`)"
           },
@@ -5087,10 +4771,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": [
-                "auto",
-                "none"
-              ],
+              "enum": ["auto", "none"],
               "default": "auto"
             }
           },
@@ -5099,10 +4780,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": [
-                "true",
-                "false"
-              ],
+              "enum": ["true", "false"],
               "default": "false"
             },
             "description": "Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none."
@@ -5221,10 +4899,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": [
-                "auto",
-                "none"
-              ],
+              "enum": ["auto", "none"],
               "default": "auto"
             }
           },
@@ -5233,10 +4908,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": [
-                "true",
-                "false"
-              ],
+              "enum": ["true", "false"],
               "default": "false"
             },
             "description": "Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none."
@@ -5444,10 +5116,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": [
-                "auto",
-                "none"
-              ],
+              "enum": ["auto", "none"],
               "default": "auto"
             }
           },
@@ -5456,10 +5125,7 @@
             "in": "query",
             "schema": {
               "type": "string",
-              "enum": [
-                "true",
-                "false"
-              ],
+              "enum": ["true", "false"],
               "default": "false"
             },
             "description": "Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none."

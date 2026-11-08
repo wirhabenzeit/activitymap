@@ -79,14 +79,16 @@ export function StatsActivityInspector({
   const mapActionVariant = useShallowStore((state) =>
     detail && !applyFilters(state, detail) ? 'clear-filters-and-show' : 'show',
   );
-  const open = (id: number) => {
+  // Stable across URL changes, so opening a Stats focus does not invalidate
+  // every tile's context and re-render the dashboard behind it.
+  const open = useCallback((id: number) => {
     originId.current = id;
     origin.current =
       document.activeElement instanceof HTMLElement
         ? document.activeElement
         : null;
     openActivityInspection('stats', id);
-  };
+  }, []);
   return (
     <Measure retainSize className="h-full min-h-0 w-full">
       {({ width }) => (

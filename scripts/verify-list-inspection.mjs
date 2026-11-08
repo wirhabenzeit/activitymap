@@ -659,7 +659,10 @@ try {
     .getByRole('button', { name: /^(Select|Deselect) Activity 205$/ })
     .click();
   const selectedBefore = await row(205).getAttribute('data-state');
-  await page.getByPlaceholder('Search activities').fill('Activity 00');
+  const search = page.getByRole('combobox', {
+    name: 'Search activity names or choose a place',
+  });
+  await search.fill('Activity 00');
   await row(9).waitFor();
   await row(9).click();
   await waitID('9');
@@ -667,10 +670,10 @@ try {
     .getByRole('button', { name: 'Next activity', exact: true })
     .click();
   await waitID('8');
-  await page.getByPlaceholder('Search activities').focus();
+  await search.focus();
   await page.keyboard.press('ArrowDown');
   assert.equal(id(), '8', 'Editing filters must not step the inspector');
-  await page.getByPlaceholder('Search activities').fill('Activity 205');
+  await search.fill('Activity 205');
   await waitID(null);
   assert.equal(await row(205).getAttribute('data-state'), selectedBefore);
   console.log(

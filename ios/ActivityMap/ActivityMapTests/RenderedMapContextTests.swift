@@ -260,7 +260,14 @@ extension RenderedRoutePickingTests {
         let statsScroll = try #require(descendants(host.view, of: UIScrollView.self).first {
             !($0 is UICollectionView) && $0.contentSize.height > 1500
         })
+        // Publishing the last tile precedes the native safe-area/layout commit.
+        // As in the Stats navigation tests, establish a settled viewport before
+        // simulating a user scroll; otherwise UIKit can still add the 44pt bar.
+        try await Task.sleep(for: .milliseconds(300))
+        host.view.layoutIfNeeded()
         statsScroll.setContentOffset(CGPoint(x: 0, y: 800), animated: false)
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(abs(statsScroll.contentOffset.y - 800) < 1)
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
         #expect(abs(list.contentOffset.y - offset) < 1)
@@ -279,7 +286,7 @@ extension RenderedRoutePickingTests {
         store.selectedTab = .stats
         try await Task.sleep(for: .milliseconds(100))
         #expect(descendants(host.view, of: UIScrollView.self).contains { $0 === statsScroll })
-        #expect(abs(statsScroll.contentOffset.y - 800) < 1, "Stats retains its mounted scroll context")
+        #expect(abs(statsScroll.contentOffset.y - 800) < 1, "Stats retains its mounted scroll context: offset=\(statsScroll.contentOffset), inset=\(statsScroll.adjustedContentInset), size=\(statsScroll.contentSize)")
         // Exercise the actual SwiftUI intent/viewport adapter from the hidden map.
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
@@ -305,7 +312,14 @@ extension RenderedRoutePickingTests {
         store.selectedTab = .list
         try await Task.sleep(for: .milliseconds(100))
         #expect(abs(list.contentOffset.y - offset) < 1)
-        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
+        // Restore the owning scene's original window before resetting geometry.
+        // A retained landscape host can otherwise reject the teardown request.
+        window.isHidden = true
+        oldWindow?.makeKeyAndVisible()
+        oldWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { error in
+            print("Round-trip portrait restoration: \(error)")
+        }
         try await cameraWait { scene.effectiveGeometry.interfaceOrientation == .portrait }
     }
 

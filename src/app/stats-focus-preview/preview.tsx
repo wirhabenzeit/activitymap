@@ -1,23 +1,25 @@
 'use client';
 
-import { useMemo, useState } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { StatsTileGrid } from '~/components/stats/tiles';
-import { FilterScope } from '~/components/stats/tiles/scope';
-import { StatsActivityInspector } from '~/components/stats/tiles/activity-inspector';
-import { AppSidebar } from '~/components/layout/app-sidebar';
-import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
-import { Separator } from '~/components/ui/separator';
 import Image from 'next/image';
+import { useMemo, useState } from 'react';
+
+import { AppSidebar } from '~/components/layout/app-sidebar';
+import { StatsTileGrid } from '~/components/stats/tiles';
+import { StatsActivityInspector } from '~/components/stats/tiles/activity-inspector';
+import { FilterScope } from '~/components/stats/tiles/scope';
+import { Separator } from '~/components/ui/separator';
+import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
 import { activityDTOSchema } from '~/contracts/v1/activity';
-import { dtoToActivity } from '~/lib/sync/v1-mappers';
-import { toStatsActivity } from '~/lib/stats/tile-series';
-import { dayFromISODate } from '~/lib/stats/tile-data';
 import {
   filterStatsActivities,
   statsFilterScope,
 } from '~/lib/stats/filter-scope';
+import { dayFromISODate } from '~/lib/stats/tile-data';
+import { toStatsActivity } from '~/lib/stats/tile-series';
+import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import { useShallowStore } from '~/store';
+
 import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
 
 const defaults = Object.fromEntries(
@@ -41,6 +43,7 @@ function PreviewStats() {
     values: state.values,
     binary: state.binary,
     search: state.search,
+    place: state.place,
   }));
   const reset = useShallowStore((state) => state.resetActivityFilters);
   const stats = useMemo(
@@ -85,7 +88,7 @@ export default function StatsFocusPreview() {
             <a
               href="/stats-focus-preview"
               aria-label="ActivityMap stats preview"
-              className="ml-2 mr-4 flex items-center gap-2 lg:mr-6"
+              className="mr-4 ml-2 flex items-center gap-2 lg:mr-6"
             >
               <Image
                 src="/app-mark.svg"

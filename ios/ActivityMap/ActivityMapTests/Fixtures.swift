@@ -7,7 +7,7 @@ enum Fixtures {
         bootstrapCursor: "snapshot", bootstrapComplete: true, changesCursor: "cursor-1",
         lastSyncAt: Date(timeIntervalSince1970: 1_700_000_000),
         retention: .init(retentionDays: 30, cursorValidUntil: Date(timeIntervalSince1970: 1_800_000_000)),
-        freshness: .init(lastSummaryReconciledAt: Date(timeIntervalSince1970: 1_700_000_000)))
+        freshness: .init(lastSummaryReconciledAt: Date(timeIntervalSince1970: 1_700_000_000), placeMatchingVersion: nil))
 
     static func activity(_ overrides: [String: Any] = [:]) throws -> ActivityMapAPI.Activity {
         var fields: [String: Any] = [

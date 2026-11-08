@@ -69,7 +69,7 @@ struct BrowsingStateTests {
             let reference = Date()
             var checkpoint = Fixtures.checkpoint
             checkpoint.lastSyncAt = reference.addingTimeInterval(-Double(fields["last_sync_age_days"] as? Int ?? 0) * 86400)
-            checkpoint.freshness = .init(lastSummaryReconciledAt: nil)
+            checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: nil)
             try await storage.apply([.upsertActivity(dto), .upsertPhoto(photo)], checkpoint: checkpoint, scope: Fixtures.scope)
             let steps: [ScriptedSyncSource.Step]
             if outcome == "show_cached_with_retry" {

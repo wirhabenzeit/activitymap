@@ -1,0 +1,129 @@
+{
+  "policy": {
+    "labelZoom": 12,
+    "pinSpacing": 48,
+    "viewportMargin": 44,
+    "maxMarkers": 80
+  },
+  "cases": [
+    {
+      "name": "shared and nearby places",
+      "width": 400,
+      "height": 400,
+      "points": [
+        {
+          "id": "peak",
+          "x": 100,
+          "y": 100
+        },
+        {
+          "id": "hut",
+          "x": 110,
+          "y": 110
+        },
+        {
+          "id": "peak",
+          "x": 100,
+          "y": 100
+        },
+        {
+          "id": "pass",
+          "x": 300,
+          "y": 300
+        }
+      ],
+      "expected": [["hut", "peak"], ["pass"]]
+    },
+    {
+      "name": "inspected place remains separate",
+      "width": 400,
+      "height": 400,
+      "focusedId": "peak",
+      "points": [
+        {
+          "id": "peak",
+          "x": 100,
+          "y": 100
+        },
+        {
+          "id": "hut",
+          "x": 110,
+          "y": 110
+        }
+      ],
+      "expected": [["hut"], ["peak"]]
+    },
+    {
+      "name": "coincident places remain reachable",
+      "width": 400,
+      "height": 400,
+      "points": [
+        {
+          "id": "b",
+          "x": 100,
+          "y": 100
+        },
+        {
+          "id": "a",
+          "x": 100,
+          "y": 100
+        }
+      ],
+      "expected": [["a", "b"]]
+    },
+    {
+      "name": "edge margin and offscreen focus",
+      "width": 400,
+      "height": 400,
+      "focusedId": "outside",
+      "points": [
+        {
+          "id": "edge",
+          "x": -44,
+          "y": 10
+        },
+        {
+          "id": "outside",
+          "x": -45,
+          "y": 10
+        }
+      ],
+      "expected": [["edge"]]
+    },
+    {
+      "name": "empty viewport",
+      "width": 0,
+      "height": 400,
+      "points": [
+        {
+          "id": "a",
+          "x": 0,
+          "y": 0
+        }
+      ],
+      "expected": []
+    }
+  ],
+  "symbols": [
+    {
+      "kinds": [["peak"], ["peak"]],
+      "expected": "peak"
+    },
+    {
+      "kinds": [["pass"], ["pass"]],
+      "expected": "pass"
+    },
+    {
+      "kinds": [["hut"], ["hut"]],
+      "expected": "hut"
+    },
+    {
+      "kinds": [["peak"], ["hut"]],
+      "expected": "mixed"
+    },
+    {
+      "kinds": [["peak", "pass"]],
+      "expected": "mixed"
+    }
+  ]
+}

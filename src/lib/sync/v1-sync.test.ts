@@ -4,10 +4,13 @@ import test from 'node:test';
 
 import { createSyncBootstrapHandler } from '~/app/api/v1/sync/bootstrap/handler.ts';
 import { createSyncChangesHandler } from '~/app/api/v1/sync/changes/handler.ts';
+import type { ActivityPlacesResponse } from '~/contracts/activity-places';
 import type { ActivityDTO } from '~/contracts/v1/activity.ts';
 import type { PhotoDTO } from '~/contracts/v1/photo.ts';
+import { syncedActivityPlaces } from '~/lib/activity-places';
 import type { Actor } from '~/server/auth/actor.ts';
 import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
+import type { PlaceMatchingRepository } from '~/server/repositories/place-matching';
 import { encodeSyncCursor } from '~/server/sync/cursor.ts';
 
 import type { FetchLike } from './v1-client.ts';
@@ -173,13 +176,17 @@ class FakeServer {
   }
 }
 
-function buildFetchImpl(server: FakeServer): FetchLike {
+function buildFetchImpl(
+  server: FakeServer,
+  placesRepo?: Pick<PlaceMatchingRepository, 'sync'>,
+): FetchLike {
   const deps = {
     now: () => NOW,
     resolveActor: async () => ACTOR,
     activitiesRepo: server.activitiesRepo(),
     photosRepo: server.photosRepo(),
     changesRepo: server.changesRepo(),
+    placesRepo,
   };
   const bootstrapGET = createSyncBootstrapHandler(deps);
   const changesGET = createSyncChangesHandler(deps);
@@ -556,4 +563,115 @@ void test('real delete then recreate feed leaves the recreated activity present'
     fetchImpl: buildFetchImpl(server),
   });
   assert.equal(activities.get(SCOPE)?.get('1')?.name, 'Recreated');
+});
+
+void test('place bundles bootstrap, replace visits with zeroes, invalidate on empty pages and disappear with their activity', async () => {
+  const server = new FakeServer();
+  const activity = buildActivity({ id: 1 });
+  server.upsertActivity(activity);
+  const { deps, activities, states } = createFakeStore();
+  let version = 'a'.repeat(64);
+  let bundle: ActivityPlacesResponse = {
+    userId: ACTOR.userId,
+    activityId: '1',
+    status: 'complete',
+    streamGeneration: 'g',
+    streamRevision: '1',
+    catalogueSnapshotId: 'catalogue',
+    matcherVersion: 'v5',
+    matchingVersion: version,
+    resultRevision: 'first',
+    places: [
+      {
+        id: '00000000-0000-4000-8000-000000000001',
+        name: 'Summit',
+        kinds: ['peak'],
+        longitude: 8,
+        latitude: 46,
+        elevationM: 2000,
+        visits: [{ distanceM: 300 }],
+      },
+    ],
+  };
+  const requests: string[][] = [];
+  const fetchImpl = buildFetchImpl(server, {
+    sync: async (actor, ids) => {
+      assert.deepEqual(actor, ACTOR);
+      requests.push(ids);
+      return { version, results: new Map(ids.map((id) => [id, bundle])) };
+    },
+  });
+  const sync = () => runV1Sync({ scope: SCOPE, store: deps, fetchImpl });
+  const saved = () => activities.get(SCOPE)!.get('1')!;
+  await sync();
+  assert.equal(saved().placeMatches?.places.length, 1);
+  assert.equal(states.get(SCOPE)?.placeMatchingVersion, version);
+  assert.equal(states.get(SCOPE)?.placesSyncReady, true);
+  assert.deepEqual(
+    requests[0],
+    ['1'],
+    'results are fetched for the whole page',
+  );
+
+  bundle = { ...bundle, resultRevision: 'zero', places: [] };
+  server.upsertActivity(activity); // Same activity metadata, new matching event.
+  await sync();
+  assert.deepEqual(saved().placeMatches?.places, []);
+  assert.equal(saved().placeMatches?.resultRevision, 'zero');
+
+  version = 'b'.repeat(64); // Catalogue/algorithm changed; no completed result yet.
+  await sync();
+  assert.equal(states.get(SCOPE)?.placeMatchingVersion, version);
+  assert.equal(syncedActivityPlaces(saved(), ACTOR.userId, version), undefined);
+  bundle = {
+    ...bundle,
+    matchingVersion: version,
+    resultRevision: 'new-version',
+  };
+  server.upsertActivity(activity);
+  await sync();
+  assert.equal(
+    syncedActivityPlaces(saved(), ACTOR.userId, version)?.resultRevision,
+    'new-version',
+  );
+  server.deleteActivity(1);
+  await sync();
+  assert.equal(activities.get(SCOPE)?.size, 0);
+});
+
+void test('a legacy cache upgrades once when the server supports place sync, preserving it if staged bootstrap fails', async () => {
+  const server = new FakeServer();
+  server.upsertActivity(buildActivity({ id: 1 }));
+  const { deps, activities, states } = createFakeStore();
+  await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: buildFetchImpl(server),
+  });
+  assert.equal(states.get(SCOPE)?.placesSyncReady, false);
+  const version = 'c'.repeat(64);
+  const network = buildFetchImpl(server, {
+    sync: async () => ({ version, results: new Map() }),
+  });
+  const failing: FetchLike = async (input, init) => {
+    if (input.includes('/bootstrap')) throw new Error('offline');
+    return network(input, init);
+  };
+  await assert.rejects(
+    runV1Sync({ scope: SCOPE, store: deps, fetchImpl: failing }),
+    /offline/,
+  );
+  assert.equal(activities.get(SCOPE)?.size, 1);
+  assert.equal(states.get(SCOPE)?.placesSyncReady, false);
+  const result = await runV1Sync({
+    scope: SCOPE,
+    store: deps,
+    fetchImpl: network,
+  });
+  assert.equal(result.mode, 'bootstrap');
+  assert.equal(states.get(SCOPE)?.placesSyncReady, true);
+  assert.equal(
+    (await runV1Sync({ scope: SCOPE, store: deps, fetchImpl: network })).mode,
+    'changes',
+  );
 });

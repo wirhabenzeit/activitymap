@@ -7,7 +7,12 @@ import SwiftUI
 struct StatsUITestFixture: View {
     @State private var store: ActivityStore
     @State private var preferences = DisplayPreferences(defaults: nil)
+    @State private var accessibilityDashboard = StatsDashboardState()
     private let largeText = ProcessInfo.processInfo.arguments.contains("--stats-ui-scenario=large-text")
+    private var scenario: String {
+        ProcessInfo.processInfo.arguments.first { $0.hasPrefix("--stats-ui-scenario=") }?
+            .replacingOccurrences(of: "--stats-ui-scenario=", with: "") ?? "standard"
+    }
 
     init() {
         MapboxOptions.accessToken = "pk.offline-test"
@@ -30,8 +35,21 @@ struct StatsUITestFixture: View {
     }
 
     var body: some View {
-        AppShell(store: store)
+        Group {
+            if ["metric-picker", "month-rhythm", "month-rhythm-large-text", "year-rhythm"].contains(scenario) {
+                StatsAccessibilityUITestFixture(scenario: scenario)
+            } else if scenario == "empty-history" {
+                VStack {
+                    Button("Remove fixture history") { store.activities = [] }
+                    StatsScreen(store: store, dashboard: accessibilityDashboard)
+                }
+                .task { accessibilityDashboard.expandedTile = .weeklyVolume }
+            } else {
+                AppShell(store: store)
+            }
+        }
             .environment(preferences)
+            .environment(\.colorScheme, scenario == "dark" ? .dark : .light)
             .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large)
             .environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##))
     }

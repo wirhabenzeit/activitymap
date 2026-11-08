@@ -23,6 +23,7 @@ struct MapCamera {
 final class MapContext {
     @ObservationIgnored private(set) var camera = MapCamera.initial
     var showPhotos = false
+    var showPlaces = false
     var baseStyle = BaseStyle.standard
     var activeOverlays = Set(SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault))
     private(set) var isPitched = false
@@ -39,6 +40,9 @@ final class MapContext {
     enum Action: Equatable {
         case activity(Int), fitActivity(Int), fitSelection, fitFiltered, resetBearing, resetView, pitch(CGFloat)
         case locate(latitude: Double, longitude: Double)
+        /// A place chosen in search, centred above the sheet covering this
+        /// fraction of the map's height.
+        case place(latitude: Double, longitude: Double, sheetFraction: CGFloat)
     }
 
     func record(_ state: CameraState) {
@@ -69,6 +73,7 @@ final class MapContext {
 
     func clearScope() {
         showPhotos = false
+        showPlaces = false
         camera = .initial
         locatedPosition = nil
         isPitched = false

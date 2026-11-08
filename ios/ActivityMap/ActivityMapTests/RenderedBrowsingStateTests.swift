@@ -65,7 +65,7 @@ extension RenderedRoutePickingTests {
         let dto = try Fixtures.activity(["id": "1", "name": "Saved activity near midnight"])
         var checkpoint = Fixtures.checkpoint
         checkpoint.lastSyncAt = Date().addingTimeInterval(-30 * 86400)
-        checkpoint.freshness = .init(lastSummaryReconciledAt: nil)
+        checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: nil)
         try await storage.apply([.upsertActivity(dto)], checkpoint: checkpoint, scope: Fixtures.scope)
         let source = ScriptedSyncSource([
             .changes("cursor-1", .failure(.serviceUnavailable(retryAfter: 120, requestID: nil))),

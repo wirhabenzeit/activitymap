@@ -46,6 +46,8 @@ import {
 import { runV1Sync } from '~/lib/sync/v1-sync';
 import { useShallowStore } from '~/store';
 
+const LIBRARY_SYNC_INTERVAL_MS = 2 * 60_000;
+
 /** Owns authenticated network writes. Views observe committed library snapshots. */
 export function OfflineSyncProvider() {
   const previousUserIdRef = useRef<string | undefined>(undefined);
@@ -312,7 +314,14 @@ export function OfflineSyncProvider() {
     };
     const offline = () =>
       updateBrowserSyncStatus(activeUserId, { phase: 'offline' });
+    // Backend jobs publish encounters and other server-side changes through
+    // the changes feed; poll it gently while the page is visible.
+    const syncVisible = () => {
+      if (document.visibilityState === 'visible') sync();
+    };
+    const interval = window.setInterval(syncVisible, LIBRARY_SYNC_INTERVAL_MS);
     sync();
+    document.addEventListener('visibilitychange', syncVisible);
     window.addEventListener('online', sync);
     window.addEventListener('offline', offline);
     window.addEventListener('activitymap:retry-browser-sync', sync);
@@ -320,6 +329,8 @@ export function OfflineSyncProvider() {
       mounted = false;
       unregister();
       releaseOwner();
+      window.clearInterval(interval);
+      document.removeEventListener('visibilitychange', syncVisible);
       window.removeEventListener('online', sync);
       window.removeEventListener('offline', offline);
       window.removeEventListener('activitymap:retry-browser-sync', sync);

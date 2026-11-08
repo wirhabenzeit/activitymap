@@ -233,16 +233,17 @@ extension PhotoGalleryTests {
         defer { host.close() }
         var image = host.snapshot()
         var text = ""
-        let deadline = Date().addingTimeInterval(5)
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(5))
+        // Cold Vision initialization can take longer than the rendering budget.
+        // Let SwiftUI load/draw the photo before OCR, and never block MainActor
+        // with recognition while its image-loading task is trying to publish.
         repeat {
             try await Task.sleep(for: .milliseconds(100))
             image = host.snapshot()
-            let request = VNRecognizeTextRequest()
-            request.minimumTextHeight = 0.003 // The fitted portrait image's label is small in landscape.
-            try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
-            text = (request.results?.compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ") ?? "")
-                .replacingOccurrences(of: "0f", with: "of") // Vision can read the counter's monospaced "o" as zero.
-        } while !(scenario == "missing" ? text.contains("Photo unavailable") : containsFixturePhoto(image)) && Date() < deadline
+            if scenario == "missing" { text = try await recognizePhotoText(image) }
+        } while !(scenario == "missing" ? text.contains("Photo unavailable") : containsFixturePhoto(image)) && clock.now < deadline
+        if scenario != "missing" { text = try await recognizePhotoText(image) }
         #expect(text.replacingOccurrences(of: " ", with: "").contains("2of3"), "Requested photo remains page 2: \(text)")
         #expect(text.contains("A caption"), "Caption remains readable: \(text)")
         if scenario == "missing" { #expect(text.contains("Photo unavailable")) }
@@ -257,6 +258,17 @@ extension PhotoGalleryTests {
 private actor PhotoRequestLog {
     private(set) var paths: Set<String> = []
     func record(_ url: URL) { paths.insert(url.path) }
+}
+
+private func recognizePhotoText(_ image: UIImage) async throws -> String {
+    let source = try #require(image.cgImage)
+    return try await Task.detached {
+        let request = VNRecognizeTextRequest()
+        request.minimumTextHeight = 0.003 // Fitted portrait text is small in landscape.
+        try VNImageRequestHandler(cgImage: source).perform([request])
+        return (request.results?.compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ") ?? "")
+            .replacingOccurrences(of: "0f", with: "of") // Vision can read the counter's "o" as zero.
+    }.value
 }
 
 private func containsFixturePhoto(_ image: UIImage) -> Bool {

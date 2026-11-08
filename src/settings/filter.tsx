@@ -1,12 +1,16 @@
-import { RulerHorizontalIcon, StopwatchIcon } from '@radix-ui/react-icons';
-import { Flag, LockKeyhole, Mountain } from 'lucide-react';
-import { FaBriefcase } from 'react-icons/fa6';
-
+import {
+  BriefcaseBusiness,
+  Flag,
+  LockKeyhole,
+  Mountain,
+  Ruler,
+  Timer,
+} from 'lucide-react';
 import { type ReactElement } from 'react';
 
 export const inequalityFilters = {
   distance: {
-    icon: <RulerHorizontalIcon />,
+    icon: <Ruler />,
     label: 'Distance',
     measurement: 'distance',
   },
@@ -16,7 +20,7 @@ export const inequalityFilters = {
     measurement: 'elevation',
   },
   elapsed_time: {
-    icon: <StopwatchIcon />,
+    icon: <Timer />,
     label: 'Elapsed time',
     unit: 'h',
     scale: 3600,
@@ -30,7 +34,7 @@ export type BinaryFilter = {
 
 export const binaryFilters = {
   commute: {
-    icon: <FaBriefcase />,
+    icon: <BriefcaseBusiness />,
     label: 'Commute',
   },
   private: {

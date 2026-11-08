@@ -1669,6 +1669,30 @@
         }
       }
     },
+    "filters.group.totals": {
+      "comment": "Section heading for the distance, elevation gain and elapsed time filters.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Totals"
+          }
+        }
+      }
+    },
+    "filters.group.flags": {
+      "comment": "Section heading for the commute, private and flagged activity filters.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Flags"
+          }
+        }
+      }
+    },
     "navigation.settings": {
       "comment": "App-owned activity and navigation copy. User content passed as arguments stays verbatim.",
       "extractionState": "manual",

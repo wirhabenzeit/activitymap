@@ -87,7 +87,7 @@ The new database proof is included in CI.
 | Category | Population                                 | Source of truth                                                       | Automatic work                                                                         |
 | -------- | ------------------------------------------ | --------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | History  | Activity summaries                         | `user.last_summary_reconciled_at` and `strava_summary_reconciliation` | Hourly summary reconciliation, a full rescan every 6 days                              |
-| Details  | Every stored activity                      | `activities.geometry_state`                                           | Legacy sync job, twice daily                                                           |
+| Details  | Every stored activity                      | `activities.geometry_state`                                           | Hourly activity sync                                                                   |
 | Photos   | Activities Strava reports as having photos | `activities.photos_state`                                             | Every detail fetch and an hourly photo-only catch-up, enabled by default in production |
 | Streams  | Every stored activity                      | `activity_streams` and `stream_backfill_attempt`                      | Hourly stream backfill, if enabled                                                     |
 
@@ -176,15 +176,9 @@ example after a reconnect, even before the next run reports.
 
 ## Scheduler observation
 
-Three things gate the scheduled jobs:
-
-- the GitHub workflow schedule
-- repository variables, such as `ACTIVITYMAP_STREAM_BACKFILL=disabled`
-- server environment switches
-
-The server cannot observe the first two. Each cron route therefore records a
-heartbeat in `background_job_run`: when the job started, when it finished,
-whether it `completed`, `failed` or was `disabled`, and its own stop reason.
+Cloudflare cron triggers and server environment switches gate the scheduled
+jobs. Each ingestion cron route reports a heartbeat in `background_job_run`
+with its start and finish times, outcome and stop reason.
 
 The status uses the heartbeats as follows:
 
@@ -316,12 +310,11 @@ details. Detail confirmations from history reconciliation also queue photos
 when they have not fetched the collection themselves.
 
 `POST /api/cron/backfill-activity-photos` requires the cron secret and production
-external effects. Photo catch-up and its hourly workflow are enabled by default
-in production; no additional Vercel or GitHub opt-in is required. Setting
-`ACTIVITYMAP_PHOTO_BACKFILL=disabled` in Vercel pauses the endpoint; setting the
-GitHub repository variable of that name to `disabled` pauses the scheduled step.
-An absent switch leaves catch-up enabled. The cron and Settings use the same
-server configuration check, including the external-effects guard.
+external effects. Cloudflare runs photo catch-up hourly. Set
+`ACTIVITYMAP_PHOTO_BACKFILL=disabled` in the Vercel Production environment
+and redeploy to pause catch-up. The endpoint is enabled by default. The cron
+and Settings use the same server configuration check, including the
+external-effects guard.
 It has a durable cap of 20
 activity selections and 48 requests per UTC hour, including both image
 sizes and OAuth requests, and uses the shared Strava budget with background
@@ -342,23 +335,17 @@ follow-up. Complete the rollout in this order:
    the Preview migration/build.
 2. Apply migrations through 0019 using the existing Production migration
    workflow, and confirm that no migrations remain pending for the release.
-3. Deploy the dependent code. Photo catch-up starts with the hourly workflow
-   automatically, unless an operator has explicitly set either pause switch to
-   `disabled`. No new environment variable is needed for the normal rollout.
-4. Dispatch `gh workflow run reconcile-strava-summaries.yml --ref main` and
-   inspect the photo step's result and the ingestion status in Settings. A
-   successful skipped or disabled step does not verify catch-up. Confirm an
-   enabled run, its selected/fetched counts and stop reason, and that Settings
-   reflects the resulting photo coverage and remaining refresh work.
+3. Deploy the dependent code. Cloudflare invokes photo catch-up on the next
+   hourly run.
+4. Inspect the photo job in Workers Logs. Confirm an enabled run, its
+   selected/fetched counts and stop reason, and that ingestion status in
+   Settings reflects the resulting photo coverage and remaining refresh work.
 
 The rollout is complete only after photo catch-up is enabled and its first
 production run is verified. The hourly cap is
-20 activities and 48 requests; it was raised from 5/12 once scheduling moved to
-the Cloudflare Worker (`docs/scheduled-jobs.md`). To pause scheduled
-catch-up, set the GitHub variable to `disabled`. To disable the endpoint as
-well, set the Vercel Production variable to `disabled` and redeploy.
-To resume, remove the pause switches (or set them to `enabled`); redeploy after
-changing the Vercel environment. The next hourly workflow resumes catch-up.
+20 activities and 48 requests. To resume after a pause, remove the Vercel
+Production pause switch (or set it to `enabled`) and redeploy. The next
+[Cloudflare run](scheduled-jobs.md) resumes catch-up.
 
 Preview never runs this production cron; the database proof injects a fake
 Strava source to exercise failure and deletion cases without touching Strava.

@@ -34,6 +34,8 @@ import {
   nativeSuiteEligibility,
   nativeSuites,
   nativeTestProfile,
+  runNativeHarness,
+  selectNativeSimulator,
   validateNativeSuites,
   validateNativeSummary,
 } from './native-harness.mjs';
@@ -101,20 +103,24 @@ test('native profiles retain all unit suites and select exactly the intended PR 
     suite.startsWith('ActivityMapTests/'),
   );
   const expectedUI = [
+    'ActivityMapUITests/FilterPanelUITests/testSearchRowRidesOnTheKeyboardAndKeepsFilters',
+    'ActivityMapUITests/PlaceSearchUITests/testPlaceAutocompleteFilteringDetailsAndStatsHistory',
+    'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
+    'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
     'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
     'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
     'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
     'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
     'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
   ];
-  assert.equal(unitSuites.length, 30);
+  assert.equal(unitSuites.length, 33);
   assert.deepEqual(nativePRUISelectors, expectedUI);
   assert.deepEqual(pr.suites, [...unitSuites, ...expectedUI]);
-  assert.equal(new Set(pr.suites).size, 35);
+  assert.equal(new Set(pr.suites).size, 42);
   assert.equal(pr.name, 'pr');
-  assert.equal(pr.runtimeTimeoutMs, 8 * 60 * 1000);
+  assert.equal(pr.runtimeTimeoutMs, 12 * 60 * 1000);
   assert.deepEqual(full.suites, nativeSuites);
-  assert.equal(full.suites.length, 36);
+  assert.equal(full.suites.length, 42);
   assert.equal(full.name, 'full');
   assert.equal(full.runtimeTimeoutMs, 45 * 60 * 1000);
   assert.deepEqual(nativeTestProfile('full'), full);
@@ -146,7 +152,7 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
       (item) => item.actual === '26.2' && item.requires === 'iOS 27+',
     ),
   );
-  assert.equal(result.suites.length, 30);
+  assert.equal(result.suites.length, 37);
   assert(
     result.suites.includes(
       'ActivityMapTests/StatsCalendarScrollRenderingTests',
@@ -155,7 +161,13 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
   assert(result.suites.includes('ActivityMapTests/StatsCalendarLayoutTests'));
   assert.deepEqual(
     result.suites.filter((suite) => suite.startsWith('ActivityMapUITests/')),
-    [nativePRUISelectors[0]],
+    nativePRUISelectors.filter(
+      (selector) =>
+        selector.includes('/ActivityPlacesUITests/') ||
+        selector.includes('/PlaceSearchUITests/') ||
+        selector.includes('/FilterPanelUITests/') ||
+        selector.includes('/ActivityActionUITests/'),
+    ),
   );
   assert.deepEqual(nativeSuiteEligibility('27.0', 'pr'), {
     suites: nativeTestProfile('pr').suites,
@@ -322,6 +334,138 @@ test('native results reject zero executed, skipped, or failed tests', () => {
     /failures/,
   );
 });
+
+for (const failure of [
+  undefined,
+  'build-for-testing',
+  'test-without-building',
+]) {
+  test(`native cache readiness and evidence survive ${failure ?? 'a passing run'}`, async (t) => {
+    const root = await temporary(t);
+    const output = join(root, 'evidence');
+    const buildStatusPath = join(root, 'step-output');
+    const calls = [];
+    const runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0';
+    const phone = { name: 'iPhone 17 Pro', identifier: 'phone17' };
+    const suites = nativeTestProfile('pr').suites;
+    const run = async (command, args) => {
+      calls.push({ command, args });
+      if (command === 'xcodebuild') {
+        if (args[0] === '-version') return 'Xcode 27.1\nBuild version 27A9275';
+        if (args[0] === failure)
+          throw Object.assign(new Error('Xcode failed'), { exitCode: 65 });
+        return '';
+      }
+      if (args[0] === 'xcresulttool') {
+        if (args.includes('summary'))
+          return JSON.stringify({
+            passedTests: suites.length,
+            failedTests: failure ? 1 : 0,
+            skippedTests: 0,
+            result: failure ? 'Failed' : 'Passed',
+            testFailures: failure
+              ? [
+                  {
+                    testIdentifierString: 'PhotoGalleryTests/example',
+                    failureText: 'Photo missing',
+                  },
+                ]
+              : [],
+          });
+        return JSON.stringify({
+          testNodes: suites.map((selector) => {
+            const [target, name, method = 'example'] = selector.split('/');
+            return {
+              nodeType: 'Test Suite',
+              nodeIdentifier: `${target}/${name}`,
+              children: [
+                {
+                  nodeType: 'Test Case',
+                  nodeIdentifier: `${name}/${method}()`,
+                  result: 'Passed',
+                },
+              ],
+            };
+          }),
+        });
+      }
+      if (args[1] === 'create') return 'owned-phone\n';
+      if (args[2] === 'runtimes')
+        return JSON.stringify({
+          runtimes: [
+            {
+              identifier: runtime,
+              version: '27.0',
+              isAvailable: true,
+              supportedDeviceTypes: [phone],
+            },
+          ],
+        });
+      if (args[2] === 'devicetypes')
+        return JSON.stringify({ devicetypes: [phone] });
+      if (args[2] === 'devices')
+        return JSON.stringify({
+          devices: {
+            [runtime]: [
+              { udid: 'owned-phone', isAvailable: true, state: 'Shutdown' },
+            ],
+          },
+        });
+      return '';
+    };
+    const result = runNativeHarness({
+      root,
+      output,
+      profile: 'pr',
+      run,
+      platform: 'darwin',
+      buildStatusPath,
+    });
+    if (failure) await assert.rejects(result, { exitCode: 65 });
+    else await result;
+    const summary = JSON.parse(
+      await readFile(join(output, 'summary.json'), 'utf8'),
+    );
+    assert.equal(summary.passed, !failure);
+    assert.equal(summary.phases.build.passed, failure !== 'build-for-testing');
+    assert.equal(
+      summary.phases.test?.passed,
+      failure === 'build-for-testing' ? undefined : !failure,
+    );
+    for (const phase of Object.values(summary.phases))
+      assert(phase.durationMs >= 0);
+    if (failure === 'build-for-testing')
+      await assert.rejects(access(buildStatusPath));
+    else
+      assert.equal(
+        await readFile(buildStatusPath, 'utf8'),
+        'build_succeeded=true\n',
+      );
+    assert.deepEqual(
+      calls
+        .filter(({ args }) => ['shutdown', 'delete'].includes(args[1]))
+        .map(({ args }) => args),
+      [
+        ['simctl', 'shutdown', 'owned-phone'],
+        ['simctl', 'delete', 'owned-phone'],
+      ],
+    );
+    const build = calls.find(
+      ({ args }) => args[0] === 'build-for-testing',
+    ).args;
+    for (const flag of [
+      '-onlyUsePackageVersionsFromResolvedFile',
+      '-skipPackageUpdates',
+      'ONLY_ACTIVE_ARCH=YES',
+      'COMPILER_INDEX_STORE_ENABLE=NO',
+    ])
+      assert(build.includes(flag));
+    assert.deepEqual(
+      build.filter((arg) => arg.startsWith('-only-testing:')),
+      suites.map((suite) => `-only-testing:${suite}`),
+    );
+  });
+}
 
 // Exercise the real ownership/finally boundary before a browser or server exists.
 test('early startup failure cleans its workspace and still writes evidence', async (t) => {
@@ -580,5 +724,106 @@ test('fixture write failure removes only its newly created partial route', async
   assert.equal(
     await readFile(join(route, 'page.tsx'), 'utf8'),
     'developer fixture',
+  );
+});
+
+test('default simulator preserves the phone and selects its newest compatible runtime', () => {
+  const oldPhone = {
+    name: 'iPhone 17 Pro',
+    identifier: 'phone17',
+    productFamily: 'iPhone',
+  };
+  const newPhone = {
+    name: 'iPhone Duo',
+    identifier: 'phone-duo',
+    productFamily: 'iPhone',
+  };
+  const older = {
+    identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-0',
+    version: '27.0',
+    isAvailable: true,
+    supportedDeviceTypes: [oldPhone],
+  };
+  const newest = {
+    identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-1',
+    version: '27.1',
+    isAvailable: true,
+    supportedDeviceTypes: [newPhone],
+  };
+  assert.deepEqual(
+    selectNativeSimulator([older, newest], [oldPhone, newPhone]),
+    { runtime: older, type: oldPhone },
+  );
+  assert.deepEqual(
+    selectNativeSimulator([older, newest], [oldPhone, newPhone], newPhone.name),
+    { runtime: newest, type: newPhone },
+  );
+  assert.deepEqual(
+    selectNativeSimulator([older, newest], [oldPhone, newPhone], oldPhone.name),
+    { runtime: older, type: oldPhone },
+  );
+  assert.deepEqual(selectNativeSimulator([older], [oldPhone, newPhone]), {
+    runtime: older,
+    type: oldPhone,
+  });
+});
+
+test('simulator selection ignores unavailable and unsupported platforms and preserves explicit-device errors', () => {
+  const phone = {
+    name: 'iPhone 17 Pro',
+    identifier: 'phone17',
+    productFamily: 'iPhone',
+  };
+  const runtime = {
+    identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-27-0',
+    version: '27.0',
+    isAvailable: true,
+    supportedDeviceTypes: [phone],
+  };
+  const unavailable = { ...runtime, version: '27.2', isAvailable: false };
+  const vision = {
+    ...runtime,
+    identifier: 'com.apple.CoreSimulator.SimRuntime.xrOS-27-1',
+    version: '27.1',
+  };
+  assert.deepEqual(
+    selectNativeSimulator([unavailable, vision, runtime], [phone]),
+    { runtime, type: phone },
+  );
+  assert.throws(
+    () => selectNativeSimulator([runtime], [phone], 'Missing phone'),
+    /IOS_DEVICE_NAME is unavailable/,
+  );
+  assert.throws(
+    () =>
+      selectNativeSimulator(
+        [{ ...runtime, supportedDeviceTypes: [] }],
+        [phone],
+        phone.name,
+      ),
+    /No available iOS 26\+ runtime supports/,
+  );
+});
+
+test('simulator selection does not lower the runtime floor or guess compatibility when the inventory is incomplete', () => {
+  const phone = {
+    name: 'iPhone 17 Pro',
+    identifier: 'phone17',
+    productFamily: 'iPhone',
+  };
+  const runtime = {
+    identifier: 'com.apple.CoreSimulator.SimRuntime.iOS-25-0',
+    version: '25.0',
+    isAvailable: true,
+    supportedDeviceTypes: [phone],
+  };
+  assert.throws(() => selectNativeSimulator([runtime], [phone]), /iOS 26\+/);
+  assert.throws(
+    () =>
+      selectNativeSimulator(
+        [{ ...runtime, version: '27.1', supportedDeviceTypes: undefined }],
+        [phone],
+      ),
+    /No available iOS 26\+ runtime supports/,
   );
 });

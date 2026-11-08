@@ -13,14 +13,16 @@ import {
   activityStreams,
   backgroundJobRuns,
   photoFetchAttempts,
-  streamBackfillAttempts,
   stravaRequestBudgets,
   stravaWebhookEvents,
+  streamBackfillAttempts,
   users,
 } from '~/server/db/schema';
+import { logger } from '~/server/logging/logger';
 import { detailEnrichmentPending } from '~/server/repositories/ingestion';
-import { photoRefreshPending } from '~/server/repositories/photo-backfill';
 import { ingestionStatusRepository } from '~/server/repositories/ingestion-status';
+import { photoRefreshPending } from '~/server/repositories/photo-backfill';
+import { createPlaceMatchingRepository } from '~/server/repositories/place-matching';
 import { scheduledJobLogRepository } from '~/server/repositories/scheduled-job-log';
 import { getWebhookInboxMetrics } from '~/server/strava/webhook-drain';
 
@@ -127,6 +129,7 @@ async function loadActivityFailures(): Promise<ActivityFailure[]> {
  * tokens or activity names.
  */
 export async function loadAdminDashboard(now = new Date()) {
+  const started = Date.now();
   const [
     jobs,
     runs,
@@ -136,6 +139,7 @@ export async function loadAdminDashboard(now = new Date()) {
     budgets,
     athletes,
     failures,
+    matching,
   ] = await Promise.all([
     db.select().from(backgroundJobRuns).orderBy(backgroundJobRuns.job),
     scheduledJobLogRepository.recent(RECENT_RUNS),
@@ -172,12 +176,22 @@ export async function loadAdminDashboard(now = new Date()) {
       .where(isNotNull(users.athlete_id))
       .orderBy(users.name),
     loadActivityFailures(),
+    (async () => {
+      const repository = createPlaceMatchingRepository();
+      const catalogue = await repository.catalogue();
+      return {
+        available: catalogue.snapshotId !== null,
+        coverage: await repository.coverage(catalogue),
+      };
+    })(),
   ]);
 
   const options = {
     streamBackfillEnabled: streamBackfillEnabled(),
     photoBackfillEnabled: photoBackfillEnabled(),
   };
+  const initialReadMs = Date.now() - started;
+  const ingestionStarted = Date.now();
   const coverage = await Promise.all(
     athletes.map(async (athlete) => ({
       ...athlete,
@@ -192,6 +206,13 @@ export async function loadAdminDashboard(now = new Date()) {
     })),
   );
 
+  logger.info('[Admin dashboard] Loaded', {
+    durationMs: Date.now() - started,
+    initialReadMs,
+    ingestionReadMs: Date.now() - ingestionStarted,
+    accounts: coverage.length,
+  });
+
   return {
     observedAt: now,
     jobs,
@@ -201,6 +222,7 @@ export async function loadAdminDashboard(now = new Date()) {
     webhookFailures,
     budgets,
     coverage,
+    matching,
     activityFailures: failures,
     switches: options,
   };

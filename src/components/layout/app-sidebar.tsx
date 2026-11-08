@@ -46,18 +46,41 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
         <SidebarGroup>
-          <SidebarGroupLabel>{message('navigation.filters')}</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               <SearchFilter />
-              <SelectedActivitiesFilter />
               <MonthPicker />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>
+            {message('filters.group.totals')}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
               <InequalityFilter name="distance" />
               <InequalityFilter name="total_elevation_gain" />
               <InequalityFilter name="elapsed_time" />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupLabel>
+            {message('filters.group.flags')}
+          </SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
               <BinaryFilter name="commute" />
               <BinaryFilter name="private" />
               <BinaryFilter name="flagged" />
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              <SelectedActivitiesFilter />
               <ResetFilters />
             </SidebarMenu>
           </SidebarGroupContent>

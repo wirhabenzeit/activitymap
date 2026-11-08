@@ -1,7 +1,7 @@
 import Foundation
 
 nonisolated struct SyncEngine: Sendable {
-    enum ProtocolError: Error { case invalidPage, stalledCursor, missingSnapshot }
+    enum ProtocolError: Error { case invalidPage, stalledCursor, missingSnapshot, placesBootstrapRequired }
 
     let source: any SyncPageSource
     let store: LocalStore
@@ -14,6 +14,8 @@ nonisolated struct SyncEngine: Sendable {
             if let checkpoint, checkpoint.bootstrapComplete, let cursor = checkpoint.changesCursor, !cursor.isEmpty {
                 return try await catchUp(checkpoint)
             }
+            return try await bootstrap()
+        } catch ProtocolError.placesBootstrapRequired {
             return try await bootstrap()
         } catch let error as APIClient.RequestError {
             guard case .server("sync_rebootstrap_required", _, 409, _, _, _) = error else { throw error }
@@ -50,6 +52,7 @@ nonisolated struct SyncEngine: Sendable {
                     (next, snapshot) = (page.nextCursor, page.snapshotCursor)
                     checkpoint.retention = page.retention
                     checkpoint.freshness = page.freshness
+                    checkpoint.placesSyncReady = (checkpoint.placesSyncReady ?? true) && page.freshness.placeMatchingVersion != nil
                 case (.photos, .photos(let page)):
                     mutations = page.items.map(StoreMutation.upsertPhoto)
                     (next, snapshot) = (page.nextCursor, page.snapshotCursor)
@@ -95,6 +98,9 @@ nonisolated struct SyncEngine: Sendable {
             guard let cursor = checkpoint.changesCursor else { throw ProtocolError.missingSnapshot }
             let page = try await source.changes(cursor: cursor)
             try Task.checkCancellation()
+            if page.freshness.placeMatchingVersion != nil && checkpoint.placesSyncReady != true {
+                throw ProtocolError.placesBootstrapRequired
+            }
             guard !page.nextCursor.isEmpty else { throw ProtocolError.invalidPage }
             // The server may omit superseded upserts from a page while still
             // advancing its cursor. Only an empty page at the same cursor is
