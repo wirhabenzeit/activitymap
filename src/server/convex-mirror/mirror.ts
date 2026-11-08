@@ -68,7 +68,15 @@ type OwnerState = {
   revoked: boolean;
   catalogue: string;
   matchingVersion: string;
-  mirror: { sequence: number; revision: number } | null;
+  mirror: MirrorPosition | null;
+};
+
+/** A run's position. `full` is an unfinished full copy: the last copied
+ * activity ID and the change sequence the copy started from. */
+export type MirrorPosition = {
+  sequence: number;
+  revision: number;
+  full?: { after: string; through: number };
 };
 
 export type MirrorResult = {
@@ -82,7 +90,7 @@ export type MirrorResult = {
   /** False when the run stopped early (deadline, limit or catalogue change);
    * the next run continues from the checkpoint. */
   complete: boolean;
-  checkpoint: { sequence: number; revision: number };
+  checkpoint: MirrorPosition;
 };
 
 const CHUNK = 256;
@@ -120,6 +128,12 @@ function batches<T>(items: T[]) {
   return result;
 }
 
+/**
+ * One mirror run. Without a checkpoint (a newly provisioned owner) or with an
+ * unfinished full copy, it copies the whole library in activity-ID order and
+ * resumes from the last copied ID on the next run; afterwards runs are
+ * incremental. `full: true` restarts a full copy (the importer).
+ */
 export async function mirrorOwner({
   source,
   writer,
@@ -152,8 +166,10 @@ export async function mirrorOwner({
     writer.write<T>(operation, epoch);
   const revision = Math.max(now(), (state.mirror?.revision ?? 0) + 1);
   const common = { generation: state.generation, sourceRevision: revision };
+  const resume = full ? undefined : state.mirror?.full;
+  const fullMode = full || !state.mirror || resume !== undefined;
   const result: MirrorResult = {
-    mode: full ? 'full' : 'incremental',
+    mode: fullMode ? 'full' : 'incremental',
     activities: 0,
     applied: 0,
     deleted: 0,
@@ -161,85 +177,62 @@ export async function mirrorOwner({
     matches: 0,
     catalogueSelected: false,
     complete: true,
-    checkpoint: { sequence: state.mirror?.sequence ?? 0, revision },
-  };
-
-  // Which activities to copy, in the order their checkpoint can advance.
-  let chunks: { ids: string[]; through: number | null }[];
-  let fullThrough = 0;
-  if (full) {
-    // Everything visible at this sequence is copied; later changes are newer.
-    fullThrough = await source.latestSequence();
-    const ids: string[] = [];
-    let after: string | null = null;
-    for (;;) {
-      const page = await source.activityIds(after, 1_000);
-      ids.push(...page);
-      if (page.length < 1_000) break;
-      after = page.at(-1)!;
-    }
-    chunks = [];
-    for (let i = 0; i < ids.length; i += CHUNK)
-      chunks.push({ ids: ids.slice(i, i + CHUNK), through: null });
-  } else {
-    const changed = await source.changedActivities(
-      result.checkpoint.sequence,
-      new Date(now() - overlapMs),
-      maxActivities + 1,
-    );
-    if (changed.length > maxActivities) {
-      changed.length = maxActivities;
-      result.complete = false;
-    }
-    chunks = [];
-    for (let i = 0; i < changed.length; i += CHUNK) {
-      const slice = changed.slice(i, i + CHUNK);
-      // Sorted by latest sequence: every later activity's latest change is
-      // above this chunk's, so the checkpoint can safely move to it.
-      chunks.push({
-        ids: slice.map((item) => item.id),
-        through: Math.max(...slice.map((item) => item.sequence)),
-      });
-    }
-  }
-
-  const advance = async (sequence: number) => {
-    result.checkpoint = {
-      sequence: Math.max(result.checkpoint.sequence, sequence),
+    checkpoint: {
+      sequence: state.mirror?.sequence ?? 0,
       revision,
-    };
-    await write({ kind: 'checkpoint', ...result.checkpoint });
+      ...(resume && { full: resume }),
+    },
   };
 
-  // Select the Postgres catalogue first, so matches publish under it.
+  /** Positions only move forward; `full: null` marks a finished full copy. */
+  const save = async (
+    next: { sequence?: number; full?: MirrorPosition['full'] | null } = {},
+  ) => {
+    const { full: progress, ...rest } = result.checkpoint;
+    result.checkpoint = {
+      ...rest,
+      sequence: Math.max(rest.sequence, next.sequence ?? 0),
+      ...(next.full === undefined
+        ? progress && { full: progress }
+        : next.full && { full: next.full }),
+    };
+    await write({
+      kind: 'checkpoint',
+      sequence: result.checkpoint.sequence,
+      revision,
+      ...(next.full !== undefined && { full: next.full }),
+    });
+  };
+
+  // Select the Postgres catalogue before the first matches publish.
   let catalogue = state.catalogue;
   let matchingVersion = state.matchingVersion;
-  const firstId = chunks[0]?.ids[0];
-  if (firstId) {
-    const { version } = await source.matches([firstId]);
-    if (version !== matchingVersion) {
-      catalogue = catalogueFor(version);
-      matchingVersion = version;
-      await write({ kind: 'selectCatalogue', catalogue, matchingVersion });
-      result.catalogueSelected = true;
-      log(`Selected catalogue for matching version ${version}`);
-    }
-  }
+  let catalogueChecked = false;
+  const ensureCatalogue = async (id: string) => {
+    if (catalogueChecked) return;
+    catalogueChecked = true;
+    const { version } = await source.matches([id]);
+    if (version === matchingVersion) return;
+    catalogue = catalogueFor(version);
+    matchingVersion = version;
+    await write({ kind: 'selectCatalogue', catalogue, matchingVersion });
+    result.catalogueSelected = true;
+    log(`Selected catalogue for matching version ${version}`);
+  };
 
-  for (const chunk of chunks) {
-    if (now() > deadline) {
-      result.complete = false;
-      break;
-    }
-    result.activities += chunk.ids.length;
-    const activities = await source.activities(chunk.ids);
+  /** Copy the current state of `ids`. False when the catalogue changed
+   * mid-run, so the caller stops before checkpointing this chunk. */
+  const copy = async (ids: string[]) => {
+    await ensureCatalogue(ids[0]!);
+    result.activities += ids.length;
+    const activities = await source.activities(ids);
     const present = new Set(activities.map((activity) => activity.id));
-    const gone = chunk.ids.filter((id) => !present.has(id));
-    for (const ids of batches(gone))
+    const gone = ids.filter((id) => !present.has(id));
+    for (const batch of batches(gone))
       result.deleted += await write<number>({
         kind: 'deleteSources',
         ...common,
-        ids,
+        ids: batch,
       });
 
     const identities = new Map(
@@ -295,11 +288,8 @@ export async function mirrorOwner({
     if (needsMatch.size) {
       const { version, results } = await source.matches([...needsMatch]);
       if (version !== matchingVersion) {
-        // The catalogue changed mid-run: stop before this chunk's checkpoint
-        // so the next run selects the new catalogue and replays it.
         log('The Postgres catalogue changed during the run; stopping early');
-        result.complete = false;
-        break;
+        return false;
       }
       const finished = results.filter((item) => FINISHED.has(item.status));
       for (const items of batches(finished))
@@ -310,10 +300,58 @@ export async function mirrorOwner({
           items,
         });
     }
-    if (chunk.through !== null) await advance(chunk.through);
     log(JSON.stringify({ ...result, checkpoint: undefined }));
+    return true;
+  };
+
+  if (fullMode) {
+    // Everything visible at `through` is copied; later changes are newer and
+    // reach Convex through the incremental runs that follow.
+    const through = resume?.through ?? (await source.latestSequence());
+    let after: string | null = resume?.after ?? null;
+    for (;;) {
+      if (now() > deadline) {
+        result.complete = false;
+        break;
+      }
+      const ids = await source.activityIds(after, CHUNK);
+      if (ids.length > 0 && !(await copy(ids))) {
+        result.complete = false;
+        break;
+      }
+      if (ids.length < CHUNK) {
+        await save({ sequence: through, full: null });
+        break;
+      }
+      after = ids.at(-1)!;
+      await save({ full: { after, through } });
+    }
+    return result;
   }
-  if (full && result.complete) await advance(fullThrough);
-  else if (!full && chunks.length === 0) await advance(0);
+
+  const changed = await source.changedActivities(
+    result.checkpoint.sequence,
+    new Date(now() - overlapMs),
+    maxActivities + 1,
+  );
+  if (changed.length > maxActivities) {
+    changed.length = maxActivities;
+    result.complete = false;
+  }
+  if (changed.length === 0) await save();
+  for (let i = 0; i < changed.length; i += CHUNK) {
+    if (now() > deadline) {
+      result.complete = false;
+      break;
+    }
+    const slice = changed.slice(i, i + CHUNK);
+    if (!(await copy(slice.map((item) => item.id)))) {
+      result.complete = false;
+      break;
+    }
+    // Sorted by latest sequence: every later activity's latest change is
+    // above this chunk's, so the checkpoint can safely move to it.
+    await save({ sequence: Math.max(...slice.map((item) => item.sequence)) });
+  }
   return result;
 }

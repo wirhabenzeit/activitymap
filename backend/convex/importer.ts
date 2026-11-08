@@ -74,16 +74,26 @@ export const mirrorState = internalQuery({
 
 /** Positions only move forward, so a delayed run cannot rewind a newer one. */
 export const checkpoint = internalMutation({
-  args: { scope, sequence: v.number(), revision: v.number() },
-  handler: async (ctx, { scope, sequence, revision }) => {
+  args: {
+    scope,
+    sequence: v.number(),
+    revision: v.number(),
+    /** Full-copy progress; null marks the copy finished. */
+    full: v.optional(
+      v.union(v.null(), v.object({ after: v.string(), through: v.number() })),
+    ),
+  },
+  handler: async (ctx, { scope, sequence, revision, full }) => {
     const owner = await requireOwner(ctx, scope);
     const head = await requireHead(ctx, owner._id);
     if (!Number.isSafeInteger(sequence) || !Number.isSafeInteger(revision))
       throw new Error('Invalid mirror position');
+    const progress = full === undefined ? head.mirror?.full : full;
     await ctx.db.patch('ownerHeads', head._id, {
       mirror: {
         sequence: Math.max(head.mirror?.sequence ?? 0, sequence),
         revision: Math.max(head.mirror?.revision ?? 0, revision),
+        ...(progress && { full: progress }),
       },
     });
   },

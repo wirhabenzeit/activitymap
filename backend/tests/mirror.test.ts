@@ -320,3 +320,47 @@ void test('bridge writes need the writer key and a fresh nonce', async (t) => {
   });
   assert.equal((await signed(writerSecret, 'writer', stale)).status, 400);
 });
+
+void test('a new owner is copied across runs and then mirrored incrementally', async (t) => {
+  const { convex, writer, upload, read } = setup(t);
+  const { db, source } = fakePostgres();
+  for (let i = 0; i < 300; i++) db.upsert(String(1000 + i), `Ride ${i}`);
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: catalogueFor(db.version()),
+    matchingVersion: db.version(),
+  });
+  // The clock jumps whenever a page of IDs is read, so the first run runs
+  // out of time after one chunk.
+  let clock = Date.now();
+  const timed: MirrorSource = {
+    ...source,
+    activityIds: async (after, limit) => {
+      clock += 10_000;
+      return source.activityIds(after, limit);
+    },
+  };
+  const run = (deadline = Number.POSITIVE_INFINITY) =>
+    mirrorOwner({ source: timed, writer, upload, now: () => clock, deadline });
+
+  const first = await run(clock + 1);
+  assert.equal(first.mode, 'full');
+  assert.equal(first.complete, false);
+  assert.equal(first.applied, 256);
+  assert.deepEqual(first.checkpoint.full, { after: '1255', through: 300 });
+
+  const second = await run();
+  assert.equal(second.mode, 'full');
+  assert.equal(second.complete, true);
+  assert.equal(second.applied, 44);
+  assert.equal(second.checkpoint.full, undefined);
+  assert.equal(second.checkpoint.sequence, 300);
+  assert.equal((await read()).items.length, 300);
+
+  db.upsert('1000', 'Renamed');
+  const third = await run();
+  assert.equal(third.mode, 'incremental');
+  assert.equal((await read()).items[0]!.name, 'Renamed');
+});
