@@ -132,7 +132,19 @@ void test('deleteSubscription accepts the empty 204 Strava returns', async (t) =
     return new Response(null, { status: 204 });
   });
 
-  await StravaClient.withoutAuth().deleteSubscription(42);
+  // A fake budget keeps the test off the database-backed default budget.
+  const client = StravaClient.withRefreshToken(
+    'fixture-refresh',
+    async () => undefined,
+    {
+      requestBudget: {
+        reserve: async (read) => ({ read, startedAt: new Date() }),
+        observe: async () => undefined,
+      },
+    },
+  );
+
+  await client.deleteSubscription(42);
 
   assert.deepEqual(calls, ['DELETE /api/v3/push_subscriptions/42']);
 });
