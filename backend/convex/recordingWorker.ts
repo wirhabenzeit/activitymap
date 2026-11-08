@@ -22,10 +22,12 @@ export const prepare = internalAction({
     recordingRevision: v.string(),
     file: v.id('_storage'),
     manifest: manifestValidator,
+    /** When the samples were fetched from the provider (imports keep it). */
+    fetchedAt: v.optional(v.string()),
   },
   handler: async (
     ctx,
-    { recordingGeneration, recordingRevision, ...args },
+    { recordingGeneration, recordingRevision, fetchedAt, ...args },
   ): Promise<boolean> => {
     // Schedule before decoding/publication: survives action exceptions and
     // worker interruption. Successful publications are protected by references.
@@ -53,7 +55,7 @@ export const prepare = internalAction({
             available_types: Object.keys(
               args.manifest.counts,
             ) as StreamMetadata['available_types'],
-            fetched_at: new Date().toISOString(),
+            fetched_at: fetchedAt ?? new Date().toISOString(),
             expires_at: null,
           },
           summary: recordingSummary(streams),

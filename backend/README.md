@@ -38,12 +38,57 @@ after in-flight requests expire. Use different keys for each environment.
 Requests can be replayed within the time window; a single-use nonce is required
 before adding any write operation.
 
-The app routes currently use Postgres or the isolated lab preview contract from
-#495. The preview requires `ACTIVITYMAP_CONVEX_PREVIEW_SITE`, an HTTPS origin
-without a path or credentials, separate from the application bridge's site.
-Lab performance measurements do not validate this package. Connecting the
-missing photo/raw/status operations, coordinated provider cutover, Convex
-authentication and reactive web subscriptions remain implementation-plan work.
+## Serving preview owners from this package
+
+Preview owners are listed in `ACTIVITYMAP_CONVEX_PREVIEW_OWNERS`, keyed by
+application user ID. An entry selects its data source:
+
+- `{ "epoch": "…", "transport": "app" }` reads this package through the signed
+  bridge. The epoch must be the owner's current Convex assignment; any other
+  epoch fails closed. Requires the three `ACTIVITYMAP_CONVEX_*` bridge settings.
+- `{ "epoch": "…", "key": "…" }` reads the isolated lab deployment from #495
+  and requires `ACTIVITYMAP_CONVEX_PREVIEW_SITE`.
+
+Both use the same adapter (`src/server/preview/convex.ts`), so the v1 sync,
+list, summary, stream, places and status routes behave identically. This
+package serves activity metadata, streams, recordings, summaries and matches.
+Photos are not persisted yet, so photo reads are empty; ingestion status
+reports stored data only, because provider ingestion does not run here.
+
+## Development deployment and import
+
+The development project is `activitymap-backend-dev` (team
+`dominik-schroder`). `convex dev --configure` writes its deployment to
+`backend/.env.local`, which is not committed. Add the local bridge signer to
+the same file and the matching verification key to the deployment:
+
+```sh
+pnpm exec convex env set ACTIVITYMAP_BRIDGE_SIGNING_KEYS '{"dev1":"<hex>"}'
+# backend/.env.local
+ACTIVITYMAP_CONVEX_SITE=https://<deployment>.convex.site
+ACTIVITYMAP_CONVEX_KEY_ID=dev1
+ACTIVITYMAP_CONVEX_SIGNING_KEY=<hex>
+```
+
+Copy an owner from the local development Postgres, then compare what the v1
+handlers serve from both backends:
+
+```sh
+pnpm convex:import-owner --user <userId>
+pnpm convex:verify-owner --user <userId>
+```
+
+The importer writes through `owners.provision`, `applySource`, recording
+preparation and `publishMatch` (batched in `convex/importer.ts`), so imports
+exercise the same fences as live ingestion. Each run uses a newer source
+revision; re-runs keep unchanged recordings and matches and only publish what is
+missing. Both scripts refuse to read anything but the local database. They call
+internal functions through the logged-in Convex CLI, so no deploy key is
+needed. The verifier runs the real bootstrap and stream-summary handlers against
+Postgres and against this package, and exits non-zero on any difference.
+
+Coordinated provider cutover, Convex authentication and reactive web
+subscriptions remain implementation-plan work.
 
 ## Recordings and publication
 
