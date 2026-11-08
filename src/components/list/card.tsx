@@ -49,6 +49,8 @@ import { formatLocalTime } from '~/lib/local-date-time';
 import { semanticAction } from '~/lib/presentation/icons';
 import { message } from '~/lib/presentation/messages';
 import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
+import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
+import { loadLiveActivityDetail } from '~/lib/sync/live-detail';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { cn } from '~/lib/utils';
 import { categorySettings } from '~/settings/category';
@@ -168,9 +170,20 @@ export function ActivityCardContent({
     }
   };
 
-  const handleDownloadGpx = () => {
+  const handleDownloadGpx = async () => {
     if (!canExport) return;
     const name: string = activity.name;
+    // Live preview libraries hold cards without the detailed polyline; fetch
+    // it so the export keeps full resolution.
+    const userId = store.getState().user?.id;
+    const detail =
+      activity.map_polyline || !userId
+        ? null
+        : await loadLiveActivityDetail(
+            authenticatedLibraryScope(userId),
+            String(activity.id),
+          ).catch(() => null);
+    const exported = detail ? activityGPXCoordinates(detail) : coordinates;
 
     // Create GeoJSON object
     const geojson: Feature<LineString> = {
@@ -181,7 +194,7 @@ export function ActivityCardContent({
       },
       geometry: {
         type: 'LineString',
-        coordinates,
+        coordinates: exported,
       },
     };
 

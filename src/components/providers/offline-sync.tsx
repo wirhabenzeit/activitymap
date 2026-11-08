@@ -33,6 +33,7 @@ import {
   requestLibrarySync,
   retireLibrarySync,
 } from '~/lib/sync/library-sync';
+import { startLiveSession } from '~/lib/sync/live-session';
 import {
   clearStreamSummarySyncAttempts,
   syncStoredStreamSummaries,
@@ -54,14 +55,14 @@ export function OfflineSyncProvider() {
   const summaryRetryAtRef = useRef(new Map<string, number>());
   const summariesRef = useRef(new Map<string, Promise<void>>());
   const queryClient = useQueryClient();
-  const { userId, isInitialized, isGuest, initializeAuth } = useShallowStore(
-    (state) => ({
+  const { userId, convexLiveUrl, isInitialized, isGuest, initializeAuth } =
+    useShallowStore((state) => ({
       userId: state.user?.id,
+      convexLiveUrl: state.user?.convexLive?.url,
       isInitialized: state.isInitialized,
       isGuest: state.isGuest,
       initializeAuth: state.initializeAuth,
-    }),
-  );
+    }));
 
   const clearAccount = useCallback(
     (departingUserId: string) => {
@@ -91,6 +92,69 @@ export function OfflineSyncProvider() {
       });
     },
     [queryClient],
+  );
+
+  // Profiles are optional resumable follow-up work. A library refresh must
+  // not wait for every profile in a large account to download.
+  const startSummarySync = useCallback(
+    (currentUserId: string, signal: AbortSignal, isCurrent: () => boolean) => {
+      if (
+        !summariesRef.current.has(currentUserId) &&
+        (summaryRetryAtRef.current.get(currentUserId) ?? 0) <= Date.now()
+      ) {
+        const task = syncStoredStreamSummaries({
+          userId: currentUserId,
+          signal,
+          onResults: (results) => {
+            if (!isCurrent()) return;
+            for (const [id, result] of results) {
+              const queryKey = streamSummaryQueryKey(currentUserId, id);
+              if (queryClient.getQueryState(queryKey)) {
+                queryClient.setQueryData<StreamSummaryResult>(
+                  queryKey,
+                  (current) => mergeStoredStreamSummaryResult(current, result),
+                );
+              }
+            }
+          },
+        })
+          .then(() => {
+            // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
+            summaryRetryAtRef.current.delete(currentUserId);
+          })
+          .catch(async (error: unknown) => {
+            if (!isCurrent()) return;
+            if (
+              error instanceof StreamSummaryBatchError &&
+              error.status === 401
+            ) {
+              await removeStreamSummaryScope(queryClient, currentUserId).catch(
+                () => undefined,
+              );
+              if (isCurrent()) initializeAuth({ currentUser: null });
+              return;
+            }
+            summaryRetryAtRef.current.set(
+              currentUserId,
+              error instanceof StreamSummaryBatchError && error.retryAt !== null
+                ? error.retryAt
+                : Date.now() + 60_000,
+            );
+            console.warn(
+              'Profile downloads paused; missing summaries will be retried on the next sync.',
+              error,
+            );
+          })
+          .finally(() => {
+            if (summariesRef.current.get(currentUserId) === task) {
+              // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
+              summariesRef.current.delete(currentUserId);
+            }
+          });
+        summariesRef.current.set(currentUserId, task);
+      }
+    },
+    [initializeAuth, queryClient],
   );
 
   const runSync = useCallback(
@@ -168,66 +232,7 @@ export function OfflineSyncProvider() {
           })
           .catch(() => undefined);
 
-        // Profiles are optional resumable follow-up work. A library refresh must
-        // not wait for every profile in a large account to download.
-        if (
-          !summariesRef.current.has(currentUserId) &&
-          (summaryRetryAtRef.current.get(currentUserId) ?? 0) <= Date.now()
-        ) {
-          const task = syncStoredStreamSummaries({
-            userId: currentUserId,
-            signal,
-            onResults: (results) => {
-              if (!isCurrent()) return;
-              for (const [id, result] of results) {
-                const queryKey = streamSummaryQueryKey(currentUserId, id);
-                if (queryClient.getQueryState(queryKey)) {
-                  queryClient.setQueryData<StreamSummaryResult>(
-                    queryKey,
-                    (current) =>
-                      mergeStoredStreamSummaryResult(current, result),
-                  );
-                }
-              }
-            },
-          })
-            .then(() => {
-              // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
-              summaryRetryAtRef.current.delete(currentUserId);
-            })
-            .catch(async (error: unknown) => {
-              if (!isCurrent()) return;
-              if (
-                error instanceof StreamSummaryBatchError &&
-                error.status === 401
-              ) {
-                await removeStreamSummaryScope(
-                  queryClient,
-                  currentUserId,
-                ).catch(() => undefined);
-                if (isCurrent()) initializeAuth({ currentUser: null });
-                return;
-              }
-              summaryRetryAtRef.current.set(
-                currentUserId,
-                error instanceof StreamSummaryBatchError &&
-                  error.retryAt !== null
-                  ? error.retryAt
-                  : Date.now() + 60_000,
-              );
-              console.warn(
-                'Profile downloads paused; missing summaries will be retried on the next sync.',
-                error,
-              );
-            })
-            .finally(() => {
-              if (summariesRef.current.get(currentUserId) === task) {
-                // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
-                summariesRef.current.delete(currentUserId);
-              }
-            });
-          summariesRef.current.set(currentUserId, task);
-        }
+        startSummarySync(currentUserId, signal, isCurrent);
       } catch (error) {
         if (isCurrent()) {
           updateBrowserSyncStatus(currentUserId, {
@@ -246,7 +251,7 @@ export function OfflineSyncProvider() {
         throw error;
       }
     },
-    [initializeAuth, queryClient],
+    [initializeAuth, queryClient, startSummarySync],
   );
 
   useEffect(() => {
@@ -290,9 +295,6 @@ export function OfflineSyncProvider() {
     if (!activeUserId) return;
 
     const scope = authenticatedLibraryScope(activeUserId);
-    const unregister = registerLibrarySync(queryClient, scope, (signal) =>
-      runSync(activeUserId, signal),
-    );
     const owner = getLibraryOwner(queryClient, scope);
     const releaseOwner = owner.retain();
     let mounted = true;
@@ -309,35 +311,96 @@ export function OfflineSyncProvider() {
           updateBrowserSyncStatus(activeUserId, { lastSuccess });
       })
       .catch(() => undefined);
-    const sync = () => {
-      void requestLibrarySync(queryClient, scope).catch(() => undefined);
+
+    // The REST sync: bootstrap, then poll the change feed.
+    const startRest = () => {
+      const unregister = registerLibrarySync(queryClient, scope, (signal) =>
+        runSync(activeUserId, signal),
+      );
+      const sync = () => {
+        void requestLibrarySync(queryClient, scope).catch(() => undefined);
+      };
+      const offline = () =>
+        updateBrowserSyncStatus(activeUserId, { phase: 'offline' });
+      // Backend jobs publish encounters and other server-side changes through
+      // the changes feed; poll it gently while the page is visible.
+      const syncVisible = () => {
+        if (document.visibilityState === 'visible') sync();
+      };
+      const interval = window.setInterval(
+        syncVisible,
+        LIBRARY_SYNC_INTERVAL_MS,
+      );
+      sync();
+      document.addEventListener('visibilitychange', syncVisible);
+      window.addEventListener('online', sync);
+      window.addEventListener('offline', offline);
+      window.addEventListener('activitymap:retry-browser-sync', sync);
+      return () => {
+        unregister();
+        window.clearInterval(interval);
+        document.removeEventListener('visibilitychange', syncVisible);
+        window.removeEventListener('online', sync);
+        window.removeEventListener('offline', offline);
+        window.removeEventListener('activitymap:retry-browser-sync', sync);
+      };
     };
-    const offline = () =>
-      updateBrowserSyncStatus(activeUserId, { phase: 'offline' });
-    // Backend jobs publish encounters and other server-side changes through
-    // the changes feed; poll it gently while the page is visible.
-    const syncVisible = () => {
-      if (document.visibilityState === 'visible') sync();
-    };
-    const interval = window.setInterval(syncVisible, LIBRARY_SYNC_INTERVAL_MS);
-    sync();
-    document.addEventListener('visibilitychange', syncVisible);
-    window.addEventListener('online', sync);
-    window.addEventListener('offline', offline);
-    window.addEventListener('activitymap:retry-browser-sync', sync);
+
+    // Live preview owners read from Convex; any failure falls back to REST.
+    const stops: (() => void)[] = [];
+    if (convexLiveUrl)
+      stops.push(
+        startLiveSession({
+          url: convexLiveUrl,
+          scope,
+          queryClient,
+          refresh: () => owner.refresh(),
+          isCurrent: () =>
+            mounted &&
+            useShallowStore.getState().user?.id === activeUserId &&
+            !useShallowStore.getState().isGuest,
+          onSyncing: () =>
+            updateBrowserSyncStatus(activeUserId, {
+              phase: 'syncing',
+              error: null,
+              retryAt: null,
+            }),
+          onComplete: (signal) => {
+            updateBrowserSyncStatus(activeUserId, {
+              phase: 'ready',
+              lastSuccess: new Date().toISOString(),
+              error: null,
+            });
+            startSummarySync(activeUserId, signal, () => mounted);
+          },
+          fallBack: (error) => {
+            if (!mounted) return;
+            console.warn(
+              'Live library unavailable; using the REST sync.',
+              error,
+            );
+            stops.push(startRest());
+          },
+        }),
+      );
+    else stops.push(startRest());
     return () => {
       mounted = false;
-      unregister();
+      for (const stop of stops) stop();
       releaseOwner();
-      window.clearInterval(interval);
-      document.removeEventListener('visibilitychange', syncVisible);
-      window.removeEventListener('online', sync);
-      window.removeEventListener('offline', offline);
-      window.removeEventListener('activitymap:retry-browser-sync', sync);
       // Preserve the owner on ordinary remounts (including Strict Mode); hooks
       // retain its subscription and cached reopen must retain persisted rows.
     };
-  }, [clearAccount, isGuest, isInitialized, queryClient, runSync, userId]);
+  }, [
+    clearAccount,
+    convexLiveUrl,
+    isGuest,
+    isInitialized,
+    queryClient,
+    runSync,
+    startSummarySync,
+    userId,
+  ]);
 
   return null;
 }

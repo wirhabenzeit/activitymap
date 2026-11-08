@@ -48,6 +48,16 @@ application user ID. An entry selects its data source:
   epoch fails closed. Requires the three `ACTIVITYMAP_CONVEX_*` bridge settings.
 - `{ "epoch": "…", "key": "…" }` reads the isolated lab deployment from #495
   and requires `ACTIVITYMAP_CONVEX_PREVIEW_SITE`.
+- `{ "epoch": "…", "transport": "app", "live": true }` additionally moves the
+  web client's library onto live Convex queries (`src/lib/sync/convex-live.ts`):
+  it subscribes to `library.list` instead of running the REST sync, commits
+  pages into the browser library store, and fetches `library.activity` for the
+  detailed polyline (GPX export). Requires `ACTIVITYMAP_CONVEX_URL` (the
+  deployment's `.convex.cloud` URL), an app issuer
+  (`ACTIVITYMAP_AUTH_JWT_ISSUER`) and the matching Convex auth settings. If the
+  token is rejected, a query fails or no page arrives within 20 seconds, the
+  client falls back to the REST sync. Chart summaries and the status panel
+  still use their REST routes.
 
 Both use the same adapter (`src/server/preview/convex.ts`), so the v1 sync,
 list, summary, stream, places and status routes behave identically. This
