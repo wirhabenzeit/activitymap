@@ -332,29 +332,35 @@ void test('a new owner is copied across runs and then mirrored incrementally', a
     catalogue: catalogueFor(db.version()),
     matchingVersion: db.version(),
   });
-  // The clock jumps whenever a page of IDs is read, so the first run runs
-  // out of time after one chunk.
+  // The clock jumps whenever a checkpoint is written, so the first run runs
+  // out of time right after its first chunk.
   let clock = Date.now();
-  const timed: MirrorSource = {
-    ...source,
-    activityIds: async (after, limit) => {
-      clock += 10_000;
-      return source.activityIds(after, limit);
+  const timedWriter: typeof writer = {
+    write: async (operation, epoch) => {
+      const result = await writer.write(operation, epoch);
+      if (operation.kind === 'checkpoint') clock += 10_000;
+      return result as never;
     },
   };
   const run = (deadline = Number.POSITIVE_INFINITY) =>
-    mirrorOwner({ source: timed, writer, upload, now: () => clock, deadline });
+    mirrorOwner({
+      source,
+      writer: timedWriter,
+      upload,
+      now: () => clock,
+      deadline,
+    });
 
   const first = await run(clock + 1);
   assert.equal(first.mode, 'full');
   assert.equal(first.complete, false);
-  assert.equal(first.applied, 256);
-  assert.deepEqual(first.checkpoint.full, { after: '1255', through: 300 });
+  assert.equal(first.applied, 64);
+  assert.deepEqual(first.checkpoint.full, { after: '1063', through: 300 });
 
   const second = await run();
   assert.equal(second.mode, 'full');
   assert.equal(second.complete, true);
-  assert.equal(second.applied, 44);
+  assert.equal(second.applied, 236);
   assert.equal(second.checkpoint.full, undefined);
   assert.equal(second.checkpoint.sequence, 300);
   assert.equal((await read()).items.length, 300);
@@ -363,4 +369,49 @@ void test('a new owner is copied across runs and then mirrored incrementally', a
   const third = await run();
   assert.equal(third.mode, 'incremental');
   assert.equal((await read()).items[0]!.name, 'Renamed');
+});
+
+void test('a run that runs out of time mid-chunk resumes without redoing published work', async (t) => {
+  const { convex, writer, read } = setup(t);
+  const { db, source } = fakePostgres();
+  for (let i = 0; i < 40; i++) {
+    const id = String(2000 + i);
+    db.upsert(id, `Ride ${i}`);
+    db.record(id, '1');
+  }
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: catalogueFor(db.version()),
+    matchingVersion: db.version(),
+  });
+  // Every upload takes a second; the budget allows about one recording batch.
+  let clock = Date.now();
+  const slowUpload = async (_url: string, file: Uint8Array) => {
+    clock += 1_000;
+    return convex.run((ctx) =>
+      ctx.storage.store(new Blob([new Uint8Array(file)])),
+    );
+  };
+  const run = (deadline = Number.POSITIVE_INFINITY) =>
+    mirrorOwner({
+      source,
+      writer,
+      upload: slowUpload,
+      now: () => clock,
+      deadline,
+    });
+
+  const first = await run(clock + 5_000);
+  assert.equal(first.complete, false);
+  assert.equal(first.recordings, 16, 'stops after the first recording batch');
+  assert.equal(first.checkpoint.full, undefined, 'no partial chunk checkpoint');
+
+  const second = await run();
+  assert.equal(second.complete, true);
+  assert.equal(second.recordings, 24, 'published recordings are not redone');
+  const items = (await read()).items;
+  assert.equal(items.length, 40);
+  assert(items.every((item) => item.streams?.state === 'current'));
 });

@@ -38,7 +38,8 @@ export function createConvexShadowCronHandler(deps: {
       );
     if (request.headers.get('x-cron-secret') !== secret)
       return Response.json({ error: 'Unauthorized' }, { status: 401 });
-    const deadline = now() + (deps.budgetMs ?? 45_000);
+    // Steps finish after the deadline, and the route is killed at 60s.
+    const deadline = now() + (deps.budgetMs ?? 40_000);
     const results: Record<string, unknown> = {};
     let failed = false;
     for (const userId of owners) {
