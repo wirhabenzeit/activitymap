@@ -23,6 +23,7 @@ import {
 } from './activityValidators';
 import { idKey, requireHead, requireOwner, scopeFields } from './owners';
 import { manifestValidator, summaryValidator } from './recordingValidators';
+import { applyStats, contribution } from './stats';
 
 const fence = {
   scope: v.object(scopeFields),
@@ -101,6 +102,8 @@ export async function applySourceRecord(
         JSON.stringify(prior.dto![field]) === JSON.stringify(args.dto![field]),
     )
   );
+  // Counted before the old recording can be deleted below.
+  const countedBefore = await contribution(ctx, owner, prior);
   const oldRecording =
     prior?.recording && (await ctx.db.get('recordings', prior.recording));
   if (oldRecording && !preserve) {
@@ -130,6 +133,7 @@ export async function applySourceRecord(
     else await ctx.db.insert('activities', next);
     if (prior && !prior.deleted)
       await publishChange(ctx, owner, args.id, 'delete');
+    await applyStats(ctx, owner._id, key, countedBefore, null);
     return true;
   }
   const {
@@ -175,6 +179,13 @@ export async function applySourceRecord(
   // advances the revision fence; clients have nothing new to sync.
   if (!(preserve && sameValue(prior!.dto, dto)))
     await publishChange(ctx, owner, args.id, 'upsert');
+  await applyStats(
+    ctx,
+    owner._id,
+    key,
+    countedBefore,
+    await contribution(ctx, owner, await activityFor(ctx, owner._id, key)),
+  );
   return true;
 }
 
@@ -256,6 +267,7 @@ export const publishRecording = internalMutation({
     )
       return false;
     const { owner, row, dto, projection } = scope;
+    const countedBefore = await contribution(ctx, owner, row);
     const streams = streamMetadataSchema.parse(args.metadata);
     if (
       !streams.generation ||
@@ -315,6 +327,13 @@ export const publishRecording = internalMutation({
       await ctx.db.delete('recordings', prior._id);
     }
     await publishChange(ctx, owner, args.id, 'upsert');
+    await applyStats(
+      ctx,
+      owner._id,
+      row.key,
+      countedBefore,
+      await contribution(ctx, owner, await ctx.db.get('activities', row._id)),
+    );
     return true;
   },
 });
