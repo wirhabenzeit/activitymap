@@ -40,7 +40,7 @@ export function activityClusterPoint(
 }
 
 export const ACTIVITY_CLUSTER_RADIUS_M = 25_000;
-export const PLACE_MATCHING_CANDIDATE_MULTIPLIER = 4;
+export { PLACE_MATCHING_CANDIDATE_MULTIPLIER } from './matching-batch-limits';
 
 /** Each group starts in freshness order, then takes the seed's nearest
  * neighbours from a bounded metadata pool. Larger groups stay within a fixed

@@ -10,20 +10,9 @@ import {
   type CoverageGeometry,
   parseCoverageGeometry,
 } from '~/server/places/coverage';
-import type {
-  PlaceKind,
-  PlacePoint,
-  PlaceSubtype,
-} from '~/server/places/types';
+import type { CandidatePlace } from '~/server/places/run-types';
 
-export type CandidatePlace = {
-  id: string;
-  displayName: string;
-  kinds: PlaceKind[];
-  subtypes: PlaceSubtype[];
-  location: PlacePoint;
-  elevationM?: number;
-};
+export type { CandidatePlace } from '~/server/places/run-types';
 
 const position = z.tuple([
   z.number().finite().min(-180).max(180),

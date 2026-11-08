@@ -5,7 +5,13 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['.claude/**', '.quality/**', 'output/**'],
+    ignores: [
+      '.claude/**',
+      '.quality/**',
+      'output/**',
+      'backend/**',
+      'scripts/investigations/convex-geo/lab/**/*.ts',
+    ],
   },
   ...nextVitals,
   ...tseslint.configs.recommendedTypeChecked,
