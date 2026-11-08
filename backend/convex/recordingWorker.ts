@@ -2,7 +2,7 @@
 
 import { v } from 'convex/values';
 
-import type { StreamMetadata } from '../../src/contracts/v1/activity-streams';
+import { ACTIVITY_STREAM_TYPES } from '../../src/server/strava/streams';
 import { MAX_RECORDING_BYTES, decodeWhole, sha256 } from '../recording/codec';
 import { recordingSummary } from '../recording/summary';
 import { internal } from './_generated/api';
@@ -22,10 +22,12 @@ export const prepare = internalAction({
     recordingRevision: v.string(),
     file: v.id('_storage'),
     manifest: manifestValidator,
+    /** When the samples were fetched from the provider (imports keep it). */
+    fetchedAt: v.optional(v.string()),
   },
   handler: async (
     ctx,
-    { recordingGeneration, recordingRevision, ...args },
+    { recordingGeneration, recordingRevision, fetchedAt, ...args },
   ): Promise<boolean> => {
     // Schedule before decoding/publication: survives action exceptions and
     // worker interruption. Successful publications are protected by references.
@@ -50,10 +52,12 @@ export const prepare = internalAction({
             revision: recordingRevision,
             state: 'current',
             fetch_status: 'succeeded',
-            available_types: Object.keys(
-              args.manifest.counts,
-            ) as StreamMetadata['available_types'],
-            fetched_at: new Date().toISOString(),
+            // Convex stores object fields sorted by name; keep the canonical
+            // stream order that Postgres and the clients use.
+            available_types: ACTIVITY_STREAM_TYPES.filter(
+              (type) => args.manifest.counts[type] !== undefined,
+            ),
+            fetched_at: fetchedAt ?? new Date().toISOString(),
             expires_at: null,
           },
           summary: recordingSummary(streams),

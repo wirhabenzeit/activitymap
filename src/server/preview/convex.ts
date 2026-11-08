@@ -27,6 +27,7 @@ import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
 } from '~/server/strava/streams';
+import { convexSyncBridge } from '~/server/sync/convex-bridge';
 
 import { previewSelection } from './selection';
 import { previewIngestionStatus, statusPageSchema } from './status';
@@ -132,12 +133,26 @@ function summaryRow(
   };
 }
 
-export function convexPreviewFor(
-  actor: Actor | null,
-  fetcher: typeof fetch = fetch,
-) {
-  const config = previewSelection(actor);
-  if (!actor || !config) return null;
+type Operation = { kind: string; [field: string]: unknown };
+type Transport = {
+  /** Binds bootstrap continuation cursors to one backend, owner and epoch. */
+  cursorBackend: string;
+  /** Largest list page one call returns; a shorter page ends the list. */
+  pageSize: number;
+  summaryBatch: number;
+  send: (operation: Operation) => Promise<Response>;
+};
+
+function scopeHash(parts: unknown[]) {
+  return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
+}
+
+/** The isolated lab deployment (#495), authenticated with a per-owner key. */
+function labTransport(
+  { userId, athleteId }: Actor,
+  { epoch, key }: { epoch: string; key: string },
+  fetcher: typeof fetch,
+): Transport {
   const configuredSite = process.env.ACTIVITYMAP_CONVEX_PREVIEW_SITE;
   if (!configuredSite) throw new Error('Convex preview site is required');
   const site = new URL(configuredSite);
@@ -151,34 +166,98 @@ export function convexPreviewFor(
   )
     throw new Error('Invalid Convex preview site');
   const bridge = new URL('/existing-client-preview', site).href;
-  const { userId, athleteId } = actor;
-  const { epoch, key } = config;
-  const cursorBackend = createHash('sha256')
-    .update(JSON.stringify([bridge, userId, athleteId, epoch]))
-    .digest('hex');
-
-  const send = async (operation: {
-    kind: string;
-    [field: string]: unknown;
-  }) => {
-    const response = await fetcher(bridge, {
-      method: 'POST',
-      cache: 'no-store',
-      redirect: 'error',
-      signal: AbortSignal.timeout(15_000),
-      headers: {
-        Authorization: `Bearer ${key}`,
-        'Content-Type': 'application/json',
-        'X-Preview-User': userId,
-      },
-      body: JSON.stringify({ athleteId, epoch, operation }),
-    }).catch(() => {
-      throw new Error('Preview bridge unavailable');
-    });
-    if (!response.ok)
-      throw new Error(`Preview bridge returned ${response.status}`);
-    return response;
+  return {
+    cursorBackend: scopeHash([bridge, userId, athleteId, epoch]),
+    pageSize: maxBridgePage,
+    summaryBatch: maxBridgePage,
+    send: async (operation) => {
+      const response = await fetcher(bridge, {
+        method: 'POST',
+        cache: 'no-store',
+        redirect: 'error',
+        signal: AbortSignal.timeout(15_000),
+        headers: {
+          Authorization: `Bearer ${key}`,
+          'Content-Type': 'application/json',
+          'X-Preview-User': userId,
+        },
+        body: JSON.stringify({ athleteId, epoch, operation }),
+      }).catch(() => {
+        throw new Error('Preview bridge unavailable');
+      });
+      if (!response.ok)
+        throw new Error(`Preview bridge returned ${response.status}`);
+      return response;
+    },
   };
+}
+
+/** `backend/` keeps 64-bit-safe string IDs and takes no retention cutoff. */
+export function appOperation(operation: Operation): Operation {
+  const id = (value: string | number | null) =>
+    value === null ? null : String(value);
+  switch (operation.kind) {
+    case 'activities':
+    case 'photos':
+    case 'status':
+      return {
+        ...operation,
+        after: id(operation.after as string | number | null),
+      };
+    case 'activityIds':
+    case 'photoIds':
+    case 'summaries':
+      return {
+        ...operation,
+        ids: (operation.ids as (string | number)[]).map(String),
+      };
+    case 'raw':
+      return { ...operation, id: String(operation.id) };
+    case 'retention':
+      return { kind: 'retention' };
+    default:
+      return operation;
+  }
+}
+
+/** The application backend (`backend/`) through the signed sync bridge. Its
+ * owner assignment check rejects an epoch that is not current for Convex. */
+function appTransport(
+  actor: Actor,
+  epoch: string,
+  fetcher: typeof fetch,
+): Transport {
+  const bridge = convexSyncBridge(actor, fetcher);
+  if (!bridge)
+    throw new Error(
+      'ACTIVITYMAP_CONVEX_SITE is required for app preview owners',
+    );
+  return {
+    cursorBackend: scopeHash([
+      'app',
+      process.env.ACTIVITYMAP_CONVEX_SITE,
+      actor.userId,
+      actor.athleteId,
+      epoch,
+    ]),
+    // Mirrors the list and summary limits in backend/convex/sync.ts.
+    pageSize: 32,
+    summaryBatch: 48,
+    send: (operation) => bridge.send(appOperation(operation), epoch),
+  };
+}
+
+export function convexPreviewFor(
+  actor: Actor | null,
+  fetcher: typeof fetch = fetch,
+) {
+  const config = previewSelection(actor);
+  if (!actor || !config) return null;
+  const { userId, athleteId } = actor;
+  const { cursorBackend, send, pageSize, summaryBatch } =
+    'key' in config
+      ? labTransport(actor, config, fetcher)
+      : appTransport(actor, config.epoch, fetcher);
   const query = async <T>(
     operation: { kind: string; [field: string]: unknown },
     schema: z.ZodType<T>,
@@ -190,10 +269,11 @@ export function convexPreviewFor(
     after: K,
     read: (after: K, limit: number) => Promise<T[]>,
     next: (row: T) => K,
+    size = pageSize,
   ) {
     const all: T[] = [];
     while (all.length < limit) {
-      const count = Math.min(maxBridgePage, limit - all.length);
+      const count = Math.min(size, limit - all.length);
       const rows = await read(after, count);
       all.push(...rows);
       if (rows.length < count) break;
@@ -204,7 +284,7 @@ export function convexPreviewFor(
   async function byIds<T, K>(
     ids: K[],
     read: (batch: K[]) => Promise<T[]>,
-    batchSize = maxBridgePage,
+    batchSize = pageSize,
   ) {
     const batches: K[][] = [];
     for (let i = 0; i < ids.length; i += batchSize)
@@ -396,6 +476,7 @@ export function convexPreviewFor(
               z.array(changeSchema),
             ),
           (row) => row.sequence,
+          maxBridgePage,
         );
         return rows.map((row) => ({
           ...row,
@@ -447,6 +528,7 @@ export function convexPreviewFor(
         const reads = await byIds(
           ids.map(Number).filter(Number.isSafeInteger),
           (batch) => query({ kind: 'summaries', ids: batch }, summariesSchema),
+          summaryBatch,
         );
         return reads.map(({ activityId, metadata, summary }) => ({
           activityId,
@@ -458,9 +540,9 @@ export function convexPreviewFor(
         if (!Number.isSafeInteger(Number(id)))
           throw new ActivityStreamsUnavailableError();
         const response = await send({ kind: 'raw', id: Number(id) });
-        const binaryMetadata = response.headers.get(
-          'x-preview-stream-metadata',
-        );
+        const binaryMetadata =
+          response.headers.get('x-stream-metadata') ??
+          response.headers.get('x-preview-stream-metadata');
         if (binaryMetadata) {
           const metadata = streamMetadataSchema.parse(
             JSON.parse(binaryMetadata),

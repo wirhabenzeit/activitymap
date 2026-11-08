@@ -73,6 +73,24 @@ router.route({
       if (!(await allowed(request, body)))
         return new Response(null, { status: 401, headers });
       const { userId, athleteId, epoch, operation } = JSON.parse(body);
+      if (operation?.kind === 'raw') {
+        const args = { userId, athleteId, epoch, id: operation.id };
+        const raw = await ctx.runQuery(internal.sync.raw, args);
+        if (!raw?.file)
+          return Response.json(raw && { metadata: raw.metadata }, { headers });
+        const bytes = await ctx.storage.get(raw.file);
+        // Publication may replace the recording between the two reads.
+        const latest = await ctx.runQuery(internal.sync.raw, args);
+        if (!bytes || latest?.file !== raw.file)
+          return new Response(null, { status: 409, headers });
+        return new Response(bytes, {
+          headers: {
+            ...headers,
+            'Content-Type': 'application/octet-stream',
+            'X-Stream-Metadata': JSON.stringify(raw.metadata),
+          },
+        });
+      }
       const result =
         operation?.kind === 'assignment'
           ? await ctx.runQuery(internal.owners.assignment, {

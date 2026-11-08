@@ -11,6 +11,8 @@
     "start": "next start",
     "db:generate": "drizzle-kit generate",
     "db:migrations:check": "drizzle-kit check",
+    "convex:import-owner": "tsx --conditions=react-server scripts/convex/import-owner.ts",
+    "convex:verify-owner": "tsx --conditions=react-server scripts/convex/verify-owner.ts",
     "db:migrate": "tsx scripts/database/migrate.ts apply",
     "db:migrate:status": "tsx scripts/database/migrate.ts status",
     "db:migrate:check": "tsx scripts/database/migrate.ts check",
