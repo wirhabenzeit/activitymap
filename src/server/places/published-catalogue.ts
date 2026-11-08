@@ -4,34 +4,17 @@ import type postgres from 'postgres';
 
 import { placeCatalogues } from '~/server/db/schema';
 
-import {
-  type ValidatedCatalogue,
-  canonicalJson,
-  catalogueManifestSchema,
-  catalogueRegionSchema,
-  catalogueSnapshotId,
-  sha256,
-} from './catalogue-artifact';
+import { catalogueRegionSchema } from './catalogue-artifact';
 import { isServingRegion, servingRegionRank } from './catalogue-regions';
-import { parseCoverageGeometry } from './coverage';
+import {
+  type PublishedCatalogue,
+  validatePublishedCatalogue,
+} from './published-catalogue-core';
 
-export type PublishedCatalogue = Pick<
-  ValidatedCatalogue,
-  'manifest' | 'coverage'
->;
-
-export function validatePublishedCatalogue(
-  input: PublishedCatalogue,
-): PublishedCatalogue {
-  const manifest = catalogueManifestSchema.parse(input.manifest);
-  const coverage = parseCoverageGeometry(input.coverage);
-  if (
-    manifest.catalogue_snapshot_id !== catalogueSnapshotId(manifest) ||
-    manifest.coverage.sha256 !== sha256(`${canonicalJson(coverage)}\n`)
-  )
-    throw new Error('Published catalogue metadata failed integrity validation');
-  return { manifest, coverage };
-}
+export {
+  type PublishedCatalogue,
+  validatePublishedCatalogue,
+} from './published-catalogue-core';
 
 /** Call within a repeatable-read transaction when using the result to match
  * tracks, so a concurrent refresh cannot mix coverage with another rowset. */

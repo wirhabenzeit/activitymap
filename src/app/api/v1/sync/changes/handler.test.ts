@@ -8,6 +8,7 @@ import { syncChangesPageDTOSchema } from '~/contracts/v1/sync.ts';
 import type { Actor } from '~/server/auth/actor.ts';
 import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
 import { encodeSyncCursor } from '~/server/sync/cursor.ts';
+import { SyncRebootstrapRequiredError } from '~/server/sync/errors';
 
 import { createSyncChangesHandler } from './handler.ts';
 
@@ -659,4 +660,75 @@ void test('GET /api/v1/sync/changes never hydrates an activity or photo now owne
   assert.equal(response.status, 200);
   assert.deepEqual(body.data.items, []);
   assert.equal(body.data.nextCursor, encode(2));
+});
+
+void test('byte-bounded pages resume before the first deferred upsert', async () => {
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    itemByteBudget: 2_000,
+    activitiesRepo: fakeActivitiesRepo([
+      buildActivity({ id: 1 }),
+      buildActivity({ id: 2, description: 'é'.repeat(900) }),
+    ]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo({
+      changes: [
+        buildChange({ sequence: 1 }),
+        buildChange({ sequence: 4, entityId: '8' }), // Current row is gone.
+        buildChange({ sequence: 9, entityId: '2' }),
+        buildChange({ sequence: 10, entityId: '8', operation: 'delete' }),
+      ],
+    }),
+  });
+  const fetchPage = async (cursor: string) => {
+    const response = await GET(
+      new Request(`https://example.test/api/v1/sync/changes?cursor=${cursor}`),
+    );
+    assert.equal(response.status, 200);
+    return responseEnvelope(syncChangesPageDTOSchema).parse(
+      await response.json(),
+    ).data;
+  };
+
+  const first = await fetchPage(encode(0));
+  assert.deepEqual(
+    first.items.map((item) => item.sequence),
+    ['1'],
+  );
+  assert.equal(first.nextCursor, encode(4));
+  const second = await fetchPage(first.nextCursor);
+  assert.deepEqual(
+    second.items.map((item) => item.sequence),
+    ['9'],
+  );
+  const third = await fetchPage(second.nextCursor);
+  assert.deepEqual(
+    third.items.map((item) => item.sequence),
+    ['10'],
+  );
+});
+
+void test('compaction between retention preflight and changes read returns rebootstrap rather than 500', async () => {
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: fakeActivitiesRepo([]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: {
+      retentionFloor: async () => 0,
+      latestSequence: async () => 2,
+      findAfter: async () => {
+        throw new SyncRebootstrapRequiredError();
+      },
+    },
+    onError: () => assert.fail('Cursor expiry is not an internal error'),
+  });
+  const response = await GET(
+    new Request(`https://example.test/api/v1/sync/changes?cursor=${encode(1)}`),
+  );
+  assert.equal(response.status, 409);
+  const body = errorEnvelopeSchema.parse(await response.json());
+  assert.equal(body.error.code, 'sync_rebootstrap_required');
+  assert.equal(body.error.retryable, false);
 });

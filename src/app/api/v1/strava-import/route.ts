@@ -7,6 +7,7 @@ import {
 } from '~/server/application/strava-import';
 import { stravaAccessEnabled } from '~/server/config/external-effects';
 import { logger } from '~/server/logging/logger';
+import { previewDataUnavailable } from '~/server/preview/selection';
 import { stravaImportRepository } from '~/server/repositories/strava-import';
 
 import { createStravaImportHandler } from './handler';
@@ -23,18 +24,30 @@ const dependencies = {
     logger.error('Strava import failed', { error, requestId }),
 };
 export const GET = withAuthenticatedApiV1(
-  (request, context) =>
-    createStravaImportHandler(
+  async (request, context) => {
+    const unavailable = await previewDataUnavailable(
+      context.actor,
+      context.requestId,
+    );
+    if (unavailable) return unavailable;
+    return createStravaImportHandler(
       { ...dependencies, resolveActor: context.actor },
       'GET',
-    )(request),
+    )(request);
+  },
   { route: 'GET /api/v1/strava-import', cache: 'private-no-store' },
 );
 export const POST = withAuthenticatedApiV1(
-  (request, context) =>
-    createStravaImportHandler(
+  async (request, context) => {
+    const unavailable = await previewDataUnavailable(
+      context.actor,
+      context.requestId,
+    );
+    if (unavailable) return unavailable;
+    return createStravaImportHandler(
       { ...dependencies, resolveActor: context.actor },
       'POST',
-    )(request),
+    )(request);
+  },
   { route: 'POST /api/v1/strava-import', cache: 'private-no-store' },
 );

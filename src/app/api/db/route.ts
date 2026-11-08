@@ -1,8 +1,10 @@
-import { auth } from '~/lib/auth';
-import { db } from '~/server/db';
-import { resolveRequestSession } from '~/server/auth/request-session';
 import { stringify } from 'csv-stringify/sync';
 import { type NextRequest } from 'next/server';
+
+import { auth } from '~/lib/auth';
+import { resolveRequestSession } from '~/server/auth/request-session';
+import { db } from '~/server/db';
+import { previewSelection } from '~/server/preview/selection';
 
 export async function GET(request: NextRequest) {
   // Authenticate via the secure session cookie or an `Authorization: Bearer`
@@ -13,6 +15,10 @@ export async function GET(request: NextRequest) {
   if (!session?.user?.id)
     return new Response('Not authenticated', {
       status: 401,
+    });
+  if (previewSelection({ userId: session.user.id }))
+    return new Response('CSV export is unavailable in the fixture preview', {
+      status: 503,
     });
   const userID = session.user.id;
 

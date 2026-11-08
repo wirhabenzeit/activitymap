@@ -90,3 +90,28 @@ export function tryDecodeBootstrapCursor(token: string): string | null {
     return null;
   }
 }
+
+const PREVIEW_PREFIX = 'bp1.';
+
+/** Bind continuation pages to the preview owner, dataset epoch and resource. */
+export function encodeScopedBootstrapCursor(key: string, scope?: string) {
+  const cursor = encodeBootstrapCursor(key);
+  return scope === undefined ? cursor : `${PREVIEW_PREFIX}${scope}.${cursor}`;
+}
+
+export function decodeScopedBootstrapCursor(token: string, scope?: string) {
+  const preview = token.startsWith(PREVIEW_PREFIX);
+  if (!preview) {
+    const key = tryDecodeBootstrapCursor(token);
+    return scope === undefined
+      ? { key, foreign: false }
+      : { key: null, foreign: key !== null };
+  }
+  const prefix = `${PREVIEW_PREFIX}${scope}.`;
+  if (scope === undefined || !token.startsWith(prefix))
+    return { key: null, foreign: true };
+  return {
+    key: tryDecodeBootstrapCursor(token.slice(prefix.length)),
+    foreign: false,
+  };
+}

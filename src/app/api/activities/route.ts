@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 
 import { getActivitiesForActor } from '~/server/application/activities';
-import { requireActor, UnauthenticatedError } from '~/server/auth/actor';
+import { UnauthenticatedError, requireActor } from '~/server/auth/actor';
 import { logger } from '~/server/logging/logger';
+import { previewSelection } from '~/server/preview/selection';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -14,6 +15,11 @@ export async function GET(request: Request) {
 
   try {
     const actor = await requireActor(request.headers);
+    if (previewSelection(actor))
+      return NextResponse.json(
+        { error: 'This operation is unavailable in the fixture preview' },
+        { status: 503 },
+      );
     const activities = await getActivitiesForActor(
       actor,
       ids.split(',').map(Number),

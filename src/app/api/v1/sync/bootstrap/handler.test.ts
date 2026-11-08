@@ -1,20 +1,111 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
+import { toActivityDTO } from '~/contracts/v1/activity';
 import { responseEnvelope } from '~/contracts/v1/envelope.ts';
+import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
 import { syncBootstrapPageDTOSchema } from '~/contracts/v1/sync.ts';
-import { decodeSyncCursor } from '~/server/sync/cursor.ts';
-import { encodeBootstrapCursor } from '~/server/sync/bootstrap-cursor.ts';
-import type { Activity, Photo } from '~/server/db/schema.ts';
 import type { Actor } from '~/server/auth/actor.ts';
+import type { Activity, Photo } from '~/server/db/schema.ts';
+import { encodeScopedBootstrapCursor } from '~/server/sync/bootstrap-cursor';
+import { encodeBootstrapCursor } from '~/server/sync/bootstrap-cursor.ts';
+import { decodeSyncCursor } from '~/server/sync/cursor.ts';
+
 import { createSyncBootstrapHandler } from './handler.ts';
 
 const now = new Date('2026-09-20T12:00:00.000Z');
 
-const ACTOR: Actor = { userId: 'user-1', athleteId: 42, authentication: 'cookie' };
+const ACTOR: Actor = {
+  userId: 'user-1',
+  athleteId: 42,
+  authentication: 'cookie',
+};
 
-function buildActivity(overrides: Partial<Activity> & { id: number }): Activity {
+void test('native snapshot keeps byte-limited continuations and the first high-water without extra reads', async () => {
+  const unexpected = async (): Promise<never> => {
+    throw new Error('Unexpected separate repository read');
+  };
+  const requests: { resource: string; afterKey?: string; limit: number }[] = [];
+  const GET = createSyncBootstrapHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    cursorBackend: 'preview-owner',
+    defaultPageSize: 250,
+    activitiesRepo: { findPageByAthlete: unexpected },
+    photosRepo: { findPageByAthlete: unexpected },
+    changesRepo: { latestSequence: unexpected },
+    freshnessRepo: { lastCompletedAt: unexpected },
+    placesRepo: { sync: unexpected },
+    bootstrapPage: async (actor, args) => {
+      assert.deepEqual(actor, ACTOR);
+      requests.push(args);
+      return {
+        sequence: requests.length === 1 ? 42 : 43,
+        lastSummaryReconciledAt: now,
+        matchingVersion: 'a'.repeat(64),
+        more: args.resource === 'activities' && !args.afterKey,
+        page:
+          args.resource === 'activities'
+            ? {
+                resource: 'activities',
+                items: [
+                  toActivityDTO(buildActivity({ id: args.afterKey ? 2 : 1 })),
+                ],
+              }
+            : { resource: 'photos', items: [] },
+      };
+    },
+  });
+  const call = async (query = '') => {
+    const response = await GET(
+      new Request(`https://example.test/api/v1/sync/bootstrap${query}`),
+    );
+    assert.equal(response.status, 200);
+    return responseEnvelope(syncBootstrapPageDTOSchema).parse(
+      await response.json(),
+    ).data;
+  };
+  const first = await call();
+  assert.equal(requests[0]!.limit, 250);
+  assert(
+    first.nextCursor,
+    'A short byte-limited page still has a continuation',
+  );
+  assert(first.snapshotCursor);
+  assert.equal(decodeSyncCursor(first.snapshotCursor).sequence, 42);
+  const next = await call(
+    `?cursor=${encodeURIComponent(first.nextCursor)}&limit=2`,
+  );
+  assert.equal(requests[1]!.afterKey, '1');
+  assert.equal(requests[1]!.limit, 2);
+  assert.equal(next.snapshotCursor, null);
+  assert.equal(next.nextCursor, null);
+  assert.equal((await call('?resource=photos')).snapshotCursor, null);
+  const foreign = encodeScopedBootstrapCursor(
+    '1',
+    'different-owner.activities',
+  );
+  assert.equal(
+    (
+      await GET(
+        new Request(
+          `https://example.test/api/v1/sync/bootstrap?cursor=${foreign}`,
+        ),
+      )
+    ).status,
+    409,
+  );
+  assert.equal(
+    requests.length,
+    3,
+    'Foreign cursors fail before the backend read',
+  );
+});
+
+function buildActivity(
+  overrides: Partial<Activity> & { id: number },
+): Activity {
   return {
     athlete: ACTOR.athleteId,
     public_id: overrides.id * 7,
@@ -99,7 +190,10 @@ function buildPhoto(overrides: Partial<Photo> & { unique_id: string }): Photo {
 
 function fakeActivitiesRepo(rows: Activity[]) {
   return {
-    async findPageByAthlete(athleteId: number, { afterId = 0, limit }: { afterId?: number; limit: number }) {
+    async findPageByAthlete(
+      athleteId: number,
+      { afterId = 0, limit }: { afterId?: number; limit: number },
+    ) {
       return rows
         .filter((row) => row.athlete === athleteId && row.id > afterId)
         .sort((a, b) => a.id - b.id)
@@ -110,9 +204,14 @@ function fakeActivitiesRepo(rows: Activity[]) {
 
 function fakePhotosRepo(rows: Photo[]) {
   return {
-    async findPageByAthlete(athleteId: number, { afterId = '', limit }: { afterId?: string; limit: number }) {
+    async findPageByAthlete(
+      athleteId: number,
+      { afterId = '', limit }: { afterId?: string; limit: number },
+    ) {
       return rows
-        .filter((row) => row.athlete_id === athleteId && row.unique_id > afterId)
+        .filter(
+          (row) => row.athlete_id === athleteId && row.unique_id > afterId,
+        )
         .sort((a, b) => (a.unique_id < b.unique_id ? -1 : 1))
         .slice(0, limit);
     },
@@ -120,7 +219,11 @@ function fakePhotosRepo(rows: Photo[]) {
 }
 
 function fakeChangesRepo(latestSequence: number) {
-  return { async latestSequence() { return latestSequence; } };
+  return {
+    async latestSequence() {
+      return latestSequence;
+    },
+  };
 }
 
 void test('GET /api/v1/sync/bootstrap returns 401 without an actor', async () => {
@@ -186,9 +289,16 @@ void test('GET /api/v1/sync/bootstrap does not repeat snapshotCursor on later pa
     new Request('https://example.test/api/v1/sync/bootstrap?limit=2'),
   );
   const firstBody = (await first.json()) as {
-    data: { items: { id: string }[]; nextCursor: string | null; snapshotCursor: string | null };
+    data: {
+      items: { id: string }[];
+      nextCursor: string | null;
+      snapshotCursor: string | null;
+    };
   };
-  assert.deepEqual(firstBody.data.items.map((i) => i.id), ['1', '2']);
+  assert.deepEqual(
+    firstBody.data.items.map((i) => i.id),
+    ['1', '2'],
+  );
   assert.ok(firstBody.data.nextCursor);
   assert.ok(firstBody.data.snapshotCursor);
 
@@ -198,10 +308,21 @@ void test('GET /api/v1/sync/bootstrap does not repeat snapshotCursor on later pa
     ),
   );
   const secondBody = (await second.json()) as {
-    data: { items: { id: string }[]; nextCursor: string | null; snapshotCursor: string | null };
+    data: {
+      items: { id: string }[];
+      nextCursor: string | null;
+      snapshotCursor: string | null;
+    };
   };
-  assert.deepEqual(secondBody.data.items.map((i) => i.id), ['3']);
-  assert.equal(secondBody.data.nextCursor, null, 'exhausted resource must return a null nextCursor');
+  assert.deepEqual(
+    secondBody.data.items.map((i) => i.id),
+    ['3'],
+  );
+  assert.equal(
+    secondBody.data.nextCursor,
+    null,
+    'exhausted resource must return a null nextCursor',
+  );
   assert.equal(
     secondBody.data.snapshotCursor,
     null,
@@ -220,10 +341,16 @@ void test('GET /api/v1/sync/bootstrap resource=photos paginates independently of
   });
 
   const response = await GET(
-    new Request('https://example.test/api/v1/sync/bootstrap?resource=photos&limit=10'),
+    new Request(
+      'https://example.test/api/v1/sync/bootstrap?resource=photos&limit=10',
+    ),
   );
   const body = (await response.json()) as {
-    data: { resource: string; items: { unique_id: string }[]; nextCursor: string | null };
+    data: {
+      resource: string;
+      items: { unique_id: string }[];
+      nextCursor: string | null;
+    };
   };
 
   assert.equal(body.data.resource, 'photos');
@@ -249,7 +376,9 @@ void test('GET /api/v1/sync/bootstrap resource=photos first page does not mint i
   const response = await GET(
     new Request('https://example.test/api/v1/sync/bootstrap?resource=photos'),
   );
-  const body = (await response.json()) as { data: { snapshotCursor: string | null } };
+  const body = (await response.json()) as {
+    data: { snapshotCursor: string | null };
+  };
 
   assert.equal(body.data.snapshotCursor, null);
 });
@@ -264,7 +393,9 @@ void test('GET /api/v1/sync/bootstrap rejects a malformed cursor', async () => {
   });
 
   const response = await GET(
-    new Request('https://example.test/api/v1/sync/bootstrap?cursor=not-a-real-cursor'),
+    new Request(
+      'https://example.test/api/v1/sync/bootstrap?cursor=not-a-real-cursor',
+    ),
   );
   const body: unknown = await response.json();
 
@@ -335,7 +466,9 @@ void test('GET /api/v1/sync/bootstrap pagination boundary: a page exactly fillin
   // size could terminate one page too early and silently drop the last
   // page's worth of rows.
   const limit = 5;
-  const activities = Array.from({ length: limit }, (_, i) => buildActivity({ id: i + 1 }));
+  const activities = Array.from({ length: limit }, (_, i) =>
+    buildActivity({ id: i + 1 }),
+  );
   const GET = createSyncBootstrapHandler({
     now: () => now,
     resolveActor: async () => ACTOR,
@@ -371,7 +504,9 @@ void test('GET /api/v1/sync/bootstrap pagination boundary: a page exactly fillin
 void test('GET /api/v1/sync/bootstrap holds up for a large account: thousands of activities paginate completely, in order, with no duplicates or gaps', async () => {
   const TOTAL = 4237; // Deliberately not a round number or a multiple of the page size.
   const limit = 200;
-  const activities = Array.from({ length: TOTAL }, (_, i) => buildActivity({ id: i + 1 }));
+  const activities = Array.from({ length: TOTAL }, (_, i) =>
+    buildActivity({ id: i + 1 }),
+  );
   const GET = createSyncBootstrapHandler({
     now: () => now,
     resolveActor: async () => ACTOR,
@@ -395,11 +530,22 @@ void test('GET /api/v1/sync/bootstrap holds up for a large account: thousands of
     for (const item of body.data.items) seenIds.push(Number(item.id));
     cursor = body.data.nextCursor ?? undefined;
     pages += 1;
-    assert.ok(pages <= MAX_PAGES, 'pagination must terminate within the expected number of pages');
+    assert.ok(
+      pages <= MAX_PAGES,
+      'pagination must terminate within the expected number of pages',
+    );
   } while (cursor);
 
-  assert.equal(seenIds.length, TOTAL, 'every activity must be returned exactly once');
-  assert.equal(new Set(seenIds).size, TOTAL, 'no activity id may repeat across pages');
+  assert.equal(
+    seenIds.length,
+    TOTAL,
+    'every activity must be returned exactly once',
+  );
+  assert.equal(
+    new Set(seenIds).size,
+    TOTAL,
+    'no activity id may repeat across pages',
+  );
   assert.deepEqual(
     seenIds,
     activities.map((a) => a.id),

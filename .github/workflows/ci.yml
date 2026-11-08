@@ -66,6 +66,23 @@ jobs:
       - name: Check for breaking OpenAPI changes vs main
         run: pnpm openapi:check-breaking -- --base=origin/main
 
+  convex-schema:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            backend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir backend install --frozen-lockfile
+      - run: pnpm --dir backend check
+      - run: pnpm exec tsx --conditions=react-server --tsconfig backend/convex/tsconfig.json --test backend/tests/sync.test.ts
+
   browser-runtime:
     runs-on: ubuntu-24.04
     timeout-minutes: 18

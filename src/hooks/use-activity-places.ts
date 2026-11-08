@@ -8,6 +8,7 @@ import {
   selectedMatchedPlaces,
   syncedActivityPlaces,
 } from '~/lib/activity-places';
+import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { useShallowStore } from '~/store';
 
 import { useLibrarySnapshot } from './use-library-snapshot';
@@ -16,8 +17,8 @@ const noActivityIds: number[] = [];
 
 function usePlaceUser() {
   return useShallowStore((state) =>
-    state.isInitialized && !state.isGuest && state.user?.stravaConnected
-      ? state.user.id
+    state.isInitialized && !state.isGuest && hasStoredLibraryAccess(state.user)
+      ? state.user?.id
       : undefined,
   );
 }

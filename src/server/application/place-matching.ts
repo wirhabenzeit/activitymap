@@ -4,6 +4,15 @@ import {
   PLACE_MATCHING_CANDIDATE_MULTIPLIER,
   createActivityClusterQueue,
 } from '~/server/places/activity-clusters';
+import {
+  PLACE_MATCHING_BATCH_SIZE,
+  PLACE_MATCHING_GROUP_ACTIVITIES,
+  PLACE_MATCHING_GROUP_MIN_ACTIVITIES,
+  PLACE_MATCHING_GROUP_PREPARE_TIME_MS,
+  PLACE_MATCHING_GROUP_SAMPLES,
+  PLACE_MATCHING_GROUP_SECTIONS,
+  PLACE_MATCHING_TIME_MS,
+} from '~/server/places/matching-batch-limits';
 import { SERVER_MATCHER_POLICY } from '~/server/places/matching-version';
 import {
   type PlaceQueryWindow,
@@ -28,13 +37,16 @@ import {
 } from './batch-activity-places';
 import type { ActivityPlaceInput } from './match-activity-places';
 
-export const PLACE_MATCHING_BATCH_SIZE = 500;
-export const PLACE_MATCHING_TIME_MS = 40_000;
-export const PLACE_MATCHING_GROUP_ACTIVITIES = PLACE_MATCHING_BATCH_SIZE;
-export const PLACE_MATCHING_GROUP_MIN_ACTIVITIES = 25;
-export const PLACE_MATCHING_GROUP_PREPARE_TIME_MS = 5_000;
-export const PLACE_MATCHING_GROUP_SAMPLES = 100_000;
-export const PLACE_MATCHING_GROUP_SECTIONS = 1_000;
+export {
+  PLACE_MATCHING_BATCH_SIZE,
+  PLACE_MATCHING_TIME_MS,
+  PLACE_MATCHING_GROUP_ACTIVITIES,
+  PLACE_MATCHING_GROUP_MIN_ACTIVITIES,
+  PLACE_MATCHING_GROUP_PREPARE_TIME_MS,
+  PLACE_MATCHING_GROUP_SAMPLES,
+  PLACE_MATCHING_GROUP_SECTIONS,
+} from '~/server/places/matching-batch-limits';
+
 type PreparedCandidate = {
   candidate: MatchingCandidate;
   input: ActivityPlaceInput;

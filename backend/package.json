@@ -1,0 +1,17 @@
+{
+  "name": "activitymap-convex",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "convex codegen --system-udfs --typecheck enable"
+  },
+  "dependencies": {
+    "convex": "1.46.0",
+    "convex-helpers": "0.1.134",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "convex-test": "0.0.59",
+    "typescript": "5.9.3"
+  }
+}

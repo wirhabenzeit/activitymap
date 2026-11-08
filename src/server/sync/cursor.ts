@@ -38,6 +38,8 @@ export type SyncCursor = {
   athleteId: number;
   /** Canonical ISO instant from which the cursor retention window starts. */
   issuedAt: string;
+  /** Present only for the isolated preview feed. */
+  backend?: string;
 };
 
 /** Thrown by `decodeSyncCursor` for anything that is not a well-formed, current-version cursor. */
@@ -53,6 +55,8 @@ export class InvalidSyncCursorError extends Error {
 // can use a different prefix ("sc2.") without any ambiguity against tokens
 // already issued under v1.
 const CURSOR_PREFIX = `sc${SYNC_CURSOR_VERSION}.`;
+// Older deployments reject this prefix rather than ignoring the backend scope.
+const PREVIEW_CURSOR_PREFIX = 'sp1.';
 
 function isNonNegativeSafeInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0;
@@ -65,7 +69,10 @@ function isPositiveSafeInteger(value: unknown): value is number {
 function isCanonicalIsoInstant(value: unknown): value is string {
   if (typeof value !== 'string') return false;
   const milliseconds = Date.parse(value);
-  return Number.isFinite(milliseconds) && new Date(milliseconds).toISOString() === value;
+  return (
+    Number.isFinite(milliseconds) &&
+    new Date(milliseconds).toISOString() === value
+  );
 }
 
 /** Encode a scoped `sync_change.sequence` into an opaque, versioned cursor token. */
@@ -73,10 +80,12 @@ export function encodeSyncCursor({
   sequence,
   athleteId,
   issuedAt,
+  backend,
 }: {
   sequence: number;
   athleteId: number;
   issuedAt: Date;
+  backend?: string;
 }): string {
   if (!isNonNegativeSafeInteger(sequence)) {
     throw new RangeError(
@@ -96,8 +105,10 @@ export function encodeSyncCursor({
     seq: sequence,
     aid: athleteId,
     iat: issuedAt.toISOString(),
+    backend,
   });
-  return CURSOR_PREFIX + Buffer.from(payload, 'utf8').toString('base64url');
+  const prefix = backend === undefined ? CURSOR_PREFIX : PREVIEW_CURSOR_PREFIX;
+  return prefix + Buffer.from(payload, 'utf8').toString('base64url');
 }
 
 /**
@@ -110,13 +121,15 @@ export function decodeSyncCursor(token: string): SyncCursor {
   if (typeof token !== 'string' || token.length === 0) {
     throw new InvalidSyncCursorError('cursor must be a non-empty string');
   }
-  if (!token.startsWith(CURSOR_PREFIX)) {
+  const preview = token.startsWith(PREVIEW_CURSOR_PREFIX);
+  const prefix = preview ? PREVIEW_CURSOR_PREFIX : CURSOR_PREFIX;
+  if (!token.startsWith(prefix)) {
     throw new InvalidSyncCursorError(
       'unrecognized or unsupported cursor version',
     );
   }
 
-  const body = token.slice(CURSOR_PREFIX.length);
+  const body = token.slice(prefix.length);
   let decoded: string;
   try {
     decoded = Buffer.from(body, 'base64url').toString('utf8');
@@ -134,21 +147,34 @@ export function decodeSyncCursor(token: string): SyncCursor {
   if (typeof parsed !== 'object' || parsed === null) {
     throw new InvalidSyncCursorError('payload is not an object');
   }
-  const { v, seq, aid, iat } = parsed as Record<string, unknown>;
+  const { v, seq, aid, iat, backend } = parsed as Record<string, unknown>;
   if (v !== SYNC_CURSOR_VERSION) {
-    throw new InvalidSyncCursorError(`unsupported cursor payload version ${String(v)}`);
+    throw new InvalidSyncCursorError(
+      `unsupported cursor payload version ${String(v)}`,
+    );
   }
   if (!isNonNegativeSafeInteger(seq)) {
-    throw new InvalidSyncCursorError('sequence must be a non-negative safe integer');
+    throw new InvalidSyncCursorError(
+      'sequence must be a non-negative safe integer',
+    );
   }
   if (!isPositiveSafeInteger(aid)) {
-    throw new InvalidSyncCursorError('athleteId must be a positive safe integer');
+    throw new InvalidSyncCursorError(
+      'athleteId must be a positive safe integer',
+    );
   }
   if (!isCanonicalIsoInstant(iat)) {
-    throw new InvalidSyncCursorError('issuedAt must be a canonical ISO instant');
+    throw new InvalidSyncCursorError(
+      'issuedAt must be a canonical ISO instant',
+    );
+  }
+
+  if (preview ? typeof backend !== 'string' : backend !== undefined) {
+    throw new InvalidSyncCursorError('invalid backend scope');
   }
 
   return {
+    ...(typeof backend === 'string' ? { backend } : {}),
     version: SYNC_CURSOR_VERSION,
     sequence: seq,
     athleteId: aid,

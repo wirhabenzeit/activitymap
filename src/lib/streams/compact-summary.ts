@@ -1,8 +1,9 @@
 import { z } from 'zod';
+
 import {
-  streamSummarySchema,
   type StreamSummary,
-} from '~/server/strava/stream-summary';
+  streamSummarySchema,
+} from '../../server/strava/stream-summary';
 
 export const COMPACT_SUMMARY_CODEC = 'polyline-v1';
 export const MAX_SUMMARY_POINTS = 300;

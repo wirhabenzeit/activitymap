@@ -1,5 +1,6 @@
 import { type StateCreator } from 'zustand';
 
+import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import type { CurrentUserDTO } from '~/server/db/dto';
 
 import { resetActivityPlaceFocus } from './activity-place-focus';
@@ -59,7 +60,7 @@ export const createAuthSlice: StateCreator<
       if (
         state.place &&
         (state.place.userId !== nextUser?.id ||
-          !nextUser?.stravaConnected ||
+          !hasStoredLibraryAccess(nextUser) ||
           auth.guestMode)
       )
         state.place = undefined;
@@ -71,7 +72,8 @@ export const createAuthSlice: StateCreator<
       if (
         !state.isInitialized ||
         accountChanged ||
-        state.user?.stravaConnected !== nextUser?.stravaConnected
+        state.user?.stravaConnected !== nextUser?.stravaConnected ||
+        state.user?.storedLibraryPreview !== nextUser?.storedLibraryPreview
       ) {
         resetActivityPlaceFocus();
         usePlaceDebug.setState({ userId: null });

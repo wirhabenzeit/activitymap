@@ -1,21 +1,34 @@
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
+import { previewDataUnavailable } from '~/server/preview/selection';
 
 import { shareLinkDependencies } from './dependencies';
 import { createShareLinksHandler } from './handler';
 
 export const GET = withAuthenticatedApiV1(
-  (request, context) =>
-    createShareLinksHandler(
+  async (request, context) => {
+    const unavailable = await previewDataUnavailable(
+      context.actor,
+      context.requestId,
+    );
+    if (unavailable) return unavailable;
+    return createShareLinksHandler(
       { ...shareLinkDependencies, resolveActor: context.actor },
       'list',
-    )(request),
+    )(request);
+  },
   { route: 'GET /api/v1/share-links', cache: 'private-no-store' },
 );
 export const POST = withAuthenticatedApiV1(
-  (request, context) =>
-    createShareLinksHandler(
+  async (request, context) => {
+    const unavailable = await previewDataUnavailable(
+      context.actor,
+      context.requestId,
+    );
+    if (unavailable) return unavailable;
+    return createShareLinksHandler(
       { ...shareLinkDependencies, resolveActor: context.actor },
       'create',
-    )(request),
+    )(request);
+  },
   { route: 'POST /api/v1/share-links', cache: 'private-no-store' },
 );

@@ -48,6 +48,7 @@ import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
 import { semanticAction } from '~/lib/presentation/icons';
 import { message } from '~/lib/presentation/messages';
+import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { cn } from '~/lib/utils';
 import { categorySettings } from '~/settings/category';
@@ -120,11 +121,13 @@ export function ActivityCardContent({
   const boundCommands = useActivityMutations(activity.id);
   const commands = suppliedCommands ?? boundCommands;
   const loading = commands.isPending;
-  const { isGuest, stravaConnected, userId } = useShallowStore((state) => ({
-    isGuest: state.isGuest,
-    stravaConnected: state.user?.stravaConnected ?? false,
-    userId: state.user?.id,
-  }));
+  const { isGuest, stravaConnected, storedLibraryAccess, userId } =
+    useShallowStore((state) => ({
+      isGuest: state.isGuest,
+      stravaConnected: state.user?.stravaConnected ?? false,
+      storedLibraryAccess: hasStoredLibraryAccess(state.user),
+      userId: state.user?.id,
+    }));
   const { canEdit, editReason } = useShallowStore(activityMutationAvailability);
   const { data: allPhotos = [] } = usePhotos();
   const { toast } = useToast();
@@ -208,7 +211,7 @@ export function ActivityCardContent({
   };
 
   const elevationProfile =
-    !isGuest && stravaConnected && userId ? (
+    !isGuest && storedLibraryAccess && userId ? (
       <ElevationChart
         activityId={String(activityId)}
         userId={userId}
