@@ -91,6 +91,18 @@ router.route({
           },
         });
       }
+      if (operation?.kind === 'bootstrap') {
+        // Already serialized by the query; sent as is.
+        const page = await ctx.runQuery(internal.sync.bootstrapJson, {
+          userId,
+          athleteId,
+          epoch,
+          operation,
+        });
+        return new Response(page, {
+          headers: { ...headers, 'Content-Type': 'application/json' },
+        });
+      }
       const result =
         operation?.kind === 'assignment'
           ? await ctx.runQuery(internal.owners.assignment, {

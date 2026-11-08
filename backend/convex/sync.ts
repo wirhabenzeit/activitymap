@@ -7,7 +7,6 @@ import { type QueryCtx, internalQuery } from './_generated/server';
 import {
   MAX_PAGE_BYTES,
   PROJECTION_VERSION,
-  jsonBytes,
   projectedActivity,
 } from './activityProjection';
 import { activityFor } from './activityWrites';
@@ -95,6 +94,52 @@ function liveRows(
     .take(count);
 }
 
+const utf8 = new TextEncoder();
+
+/** One bootstrap page of activities, bounded by `op.limit` and MAX_PAGE_BYTES.
+ * Each item is serialized once: `json` holds the exact text of `items`, so the
+ * HTTP bridge can send the page without re-serializing it. */
+async function bootstrapPage(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  op: { after: string | null; limit: number },
+) {
+  let after = op.after === null ? '' : idKey(op.after);
+  const items: ActivityDTO[] = [];
+  const json: string[] = [];
+  let size = 2;
+  // Each `take` is a sequential index read, so size the next batch from the
+  // remaining byte budget instead of reading a fixed 32 rows at a time.
+  let batch = 64;
+  while (items.length < op.limit) {
+    const count = Math.min(batch, op.limit - items.length);
+    const rows = await liveRows(ctx, owner, after, count);
+    for (const row of rows) {
+      const item = project(row, owner);
+      if (!item) {
+        after = row.key;
+        continue;
+      }
+      const text = JSON.stringify(item);
+      size += utf8.encode(text).length + Number(items.length > 0);
+      if (size > MAX_PAGE_BYTES) return { items, json, more: true };
+      items.push(item);
+      json.push(text);
+      after = row.key;
+    }
+    if (rows.length < count) return { items, json, more: false };
+    const average = items.length > 0 ? (size - 2) / items.length : 0;
+    batch =
+      average > 0
+        ? Math.min(
+            256,
+            Math.max(8, Math.ceil((MAX_PAGE_BYTES - size) / average) + 1),
+          )
+        : 256;
+  }
+  return { items, json, more: true };
+}
+
 const LIST_PAGE_LIMIT = 32;
 const STATUS_PAGE_LIMIT = 96;
 
@@ -125,27 +170,8 @@ export const read = internalQuery({
         const response = { head, resource: op.resource };
         if (op.resource === 'photos')
           return { ...response, items: [], more: false };
-        let after = op.after === null ? '' : idKey(op.after);
-        const items = [];
-        let size = 2;
-        while (items.length < op.limit) {
-          const count = Math.min(32, op.limit - items.length);
-          const rows = await liveRows(ctx, owner, after, count);
-          for (const row of rows) {
-            const item = project(row, owner);
-            if (!item) {
-              after = row.key;
-              continue;
-            }
-            size += jsonBytes(item) + Number(items.length > 0);
-            if (size > MAX_PAGE_BYTES)
-              return { ...response, items, more: true };
-            items.push(item);
-            after = row.key;
-          }
-          if (rows.length < count) return { ...response, items, more: false };
-        }
-        return { ...response, items, more: true };
+        const { items, more } = await bootstrapPage(ctx, owner, op);
+        return { ...response, items, more };
       }
       case 'changes': {
         if (
@@ -295,6 +321,37 @@ export const read = internalQuery({
         };
       }
     }
+  },
+});
+
+/** The bootstrap page as the JSON text `read` would return for it. Returning
+ * one string avoids converting a ~2 MB object tree into a Convex value, back
+ * into the HTTP action, and serializing it again for the response. */
+export const bootstrapJson = internalQuery({
+  args: {
+    ...scopeFields,
+    operation: v.object({
+      kind: v.literal('bootstrap'),
+      resource,
+      after: cursor,
+      limit: v.number(),
+    }),
+  },
+  handler: async (ctx, { operation: op, ...scope }) => {
+    const owner = await requireOwner(ctx, scope);
+    const feed = await requireHead(ctx, owner._id);
+    const head = JSON.stringify({
+      sequence: feed.sequence,
+      matchingVersion: owner.matchingVersion,
+      lastSummaryReconciledAt: null,
+    });
+    if (!Number.isInteger(op.limit) || op.limit < 1 || op.limit > 500)
+      throw new Error('Invalid sync page limit');
+    const page =
+      op.resource === 'photos'
+        ? { json: [], more: false }
+        : await bootstrapPage(ctx, owner, op);
+    return `{"head":${head},"resource":"${op.resource}","items":[${page.json.join(',')}],"more":${page.more}}`;
   },
 });
 

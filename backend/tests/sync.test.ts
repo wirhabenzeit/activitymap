@@ -855,3 +855,52 @@ void test('orphaned change rows cannot block retention for other owners', async 
     1,
   );
 });
+
+void test('bootstrap pages fill the byte budget and the bridge text matches the page', async () => {
+  const convex = convexTest(schema, modules);
+  await convex.mutation(internal.owners.provision, config);
+  const polyline = 'x'.repeat(20_000);
+  for (let i = 1; i <= 150; i++)
+    await convex.mutation(internal.activityWrites.applySource, {
+      ...source,
+      id: String(1000 + i),
+      dto: { ...fixture, id: String(1000 + i), map_polyline: polyline },
+    });
+  const seen: string[] = [];
+  let after: string | null = null;
+  for (let pages = 0; ; pages++) {
+    assert(pages < 5, 'bootstrap did not finish');
+    const op = { ...operation, after };
+    const [page, text] = await Promise.all([
+      convex.query(internal.sync.read, { ...scope, operation: op }),
+      convex.query(internal.sync.bootstrapJson, { ...scope, operation: op }),
+    ]);
+    // Same page; only key order may differ from Convex's sorted values.
+    assert.deepEqual(JSON.parse(text), page);
+    const bytes = new TextEncoder().encode(JSON.stringify(page.items)).length;
+    assert(bytes <= 2 * 1024 * 1024);
+    if (page.more) {
+      // Greedy: the next item would not have fit.
+      const next = JSON.stringify(page.items[0]).length;
+      assert(bytes + next + 1 > 2 * 1024 * 1024);
+    }
+    seen.push(...page.items.map((item) => item.id));
+    if (!page.more) break;
+    after = page.items.at(-1)!.id;
+  }
+  assert.deepEqual(
+    seen,
+    Array.from({ length: 150 }, (_, i) => String(1001 + i)),
+  );
+  const photos = await convex.query(internal.sync.bootstrapJson, {
+    ...scope,
+    operation: { ...operation, resource: 'photos' },
+  });
+  assert.deepEqual(
+    JSON.parse(photos),
+    await convex.query(internal.sync.read, {
+      ...scope,
+      operation: { ...operation, resource: 'photos' },
+    }),
+  );
+});
