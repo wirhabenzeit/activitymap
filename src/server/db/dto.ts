@@ -1,7 +1,8 @@
 import {
-  stravaPermissionsFromScope,
   type StravaPermissions,
+  stravaPermissionsFromScope,
 } from '~/lib/strava-permissions';
+
 import type { Account, User } from './schema';
 
 /**
@@ -15,6 +16,8 @@ export type CurrentUserDTO = {
   image: string | null;
   athleteId: number | null;
   stravaConnected: boolean;
+  /** Server-selected web preview; enables stored-data reads, never provider writes. */
+  storedLibraryPreview?: boolean;
   /** What the approved Strava scopes allow; `null` when not yet known. */
   stravaPermissions: StravaPermissions | null;
 };

@@ -7,6 +7,7 @@ import { assertLegacySharingEnabled } from '~/lib/legacy-sharing';
 import * as activitiesService from '~/server/application/activities';
 import { requireActor } from '~/server/auth/actor';
 import { getRequestUserInternal } from '~/server/auth/request-account';
+import { assertPostgresDataActor } from '~/server/preview/selection';
 
 import { db } from './index';
 import { getUserInternal } from './internal';
@@ -38,6 +39,7 @@ export async function getUserActivities({
   offset?: number;
 } = {}) {
   const actor = await requireActor(await headers());
+  assertPostgresDataActor(actor);
 
   if (userId && userId !== actor.userId) {
     throw new Error('Unauthorized');
@@ -56,6 +58,7 @@ export async function getUserActivities({
  */
 export async function getActivitiesByIds(ids: number[]) {
   const actor = await requireActor(await headers());
+  assertPostgresDataActor(actor);
   return activitiesService.getActivitiesForActor(actor, ids);
 }
 
@@ -122,5 +125,6 @@ export async function getPublicUserActivities({
  */
 export async function getPhotos() {
   const actor = await requireActor(await headers());
+  assertPostgresDataActor(actor);
   return activitiesService.getPhotosForActor(actor);
 }

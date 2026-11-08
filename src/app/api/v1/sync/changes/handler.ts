@@ -29,7 +29,11 @@ export interface SyncChangesHandlerDependencies {
   resolveActor: (request: Request) => Promise<Actor | null>;
   activitiesRepo: Pick<ActivitiesRepository, 'findManyByIds'>;
   photosRepo: Pick<PhotosRepository, 'findManyByIds'>;
-  changesRepo: Pick<ChangesRepository, 'findAfter' | 'latestSequence'>;
+  changesRepo: Pick<ChangesRepository, 'findAfter' | 'latestSequence'> & {
+    retentionFloor?: (observedAt: Date) => Promise<number>;
+  };
+  cursorBackend?: string;
+  itemByteBudget?: number;
   placesRepo?: Pick<PlaceMatchingRepository, 'sync'>;
   freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
@@ -60,6 +64,8 @@ export function createSyncChangesHandler({
   activitiesRepo,
   photosRepo,
   changesRepo,
+  cursorBackend,
+  itemByteBudget,
   freshnessRepo = { lastCompletedAt: async () => null },
   placesRepo,
   retentionDays = DEFAULT_RETENTION_DAYS,
@@ -106,6 +112,13 @@ export function createSyncChangesHandler({
         );
       }
 
+      if (decoded.backend !== cursorBackend) {
+        return rebootstrapRequired(
+          requestId,
+          'The requested cursor belongs to a different sync backend.',
+        );
+      }
+
       if (decoded.athleteId !== actor.athleteId) {
         return rebootstrapRequired(
           requestId,
@@ -118,6 +131,16 @@ export function createSyncChangesHandler({
         Date.parse(decoded.issuedAt) + retentionDays * 24 * 60 * 60 * 1000,
       );
       if (nowValue.getTime() >= cursorValidUntil.getTime()) {
+        return rebootstrapRequired(
+          requestId,
+          'The requested cursor is older than the retained change history.',
+        );
+      }
+
+      if (
+        changesRepo.retentionFloor &&
+        decoded.sequence < (await changesRepo.retentionFloor(nowValue))
+      ) {
         return rebootstrapRequired(
           requestId,
           'The requested cursor is older than the retained change history.',
@@ -144,32 +167,11 @@ export function createSyncChangesHandler({
         photosRepo,
       });
 
-      const lastSequence = changes.at(-1)?.sequence ?? decoded.sequence;
-      const nextCursor =
-        changes.length === 0
-          ? cursor
-          : encodeSyncCursor({
-              sequence: lastSequence,
-              athleteId: actor.athleteId,
-              issuedAt: nowValue,
-            });
-      const nextCursorValidUntil =
-        changes.length === 0
-          ? cursorValidUntil
-          : new Date(nowValue.getTime() + retentionDays * 24 * 60 * 60 * 1000);
-      const payload = {
-        items,
-        nextCursor,
-        retention: {
-          retentionDays,
-          cursorValidUntil: nextCursorValidUntil.toISOString(),
-        },
-        freshness: {
-          lastSummaryReconciledAt:
-            (
-              await freshnessRepo.lastCompletedAt(actor.athleteId)
-            )?.toISOString() ?? null,
-        },
+      const freshness = {
+        lastSummaryReconciledAt:
+          (
+            await freshnessRepo.lastCompletedAt(actor.athleteId)
+          )?.toISOString() ?? null,
       };
 
       if (placesRepo) {
@@ -177,7 +179,7 @@ export function createSyncChangesHandler({
           actor,
           items.flatMap((item) => (item.activity ? [item.id] : [])),
         );
-        Object.assign(payload.freshness, {
+        Object.assign(freshness, {
           placeMatchingVersion: matches.version,
         });
         for (const item of items) {
@@ -186,8 +188,50 @@ export function createSyncChangesHandler({
         }
       }
 
+      let lastSequence = changes.at(-1)?.sequence ?? decoded.sequence;
+      if (itemByteBudget !== undefined) {
+        let bytes = 2;
+        for (let i = 0; i < items.length; i++) {
+          bytes += Buffer.byteLength(JSON.stringify(items[i])) + Number(i > 0);
+          // The first item always advances the cursor. Convex separately
+          // bounds individual projection documents.
+          if (i > 0 && bytes > itemByteBudget) {
+            const deferred = Number(items[i]!.sequence);
+            const next = changes.findIndex(
+              (change) => change.sequence === deferred,
+            );
+            lastSequence = changes[next - 1]!.sequence;
+            items.length = i;
+            break;
+          }
+        }
+      }
+      const nextCursor =
+        lastSequence === decoded.sequence
+          ? cursor
+          : encodeSyncCursor({
+              sequence: lastSequence,
+              athleteId: actor.athleteId,
+              issuedAt: nowValue,
+              backend: cursorBackend,
+            });
+      const nextCursorValidUntil =
+        lastSequence === decoded.sequence
+          ? cursorValidUntil
+          : new Date(nowValue.getTime() + retentionDays * 24 * 60 * 60 * 1000);
       const body = responseEnvelope(syncChangesPageDTOSchema).parse(
-        makeEnvelope(payload, nowValue),
+        makeEnvelope(
+          {
+            items,
+            nextCursor,
+            retention: {
+              retentionDays,
+              cursorValidUntil: nextCursorValidUntil.toISOString(),
+            },
+            freshness,
+          },
+          nowValue,
+        ),
       );
       return Response.json(body);
     } catch (error) {

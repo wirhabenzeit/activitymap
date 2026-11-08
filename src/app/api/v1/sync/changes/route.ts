@@ -1,5 +1,7 @@
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
+import { compressSyncResponse } from '~/server/api/sync-compression';
 import { logger } from '~/server/logging/logger';
+import { convexPreviewFor } from '~/server/preview/convex';
 import { activitiesRepository } from '~/server/repositories/activities';
 import { changesRepository } from '~/server/repositories/changes';
 import { photosRepository } from '~/server/repositories/photos';
@@ -10,18 +12,26 @@ import { createSyncChangesHandler } from './handler';
 
 const ROUTE = 'GET /api/v1/sync/changes';
 
-export const GET = withAuthenticatedApiV1(
-  (request, context) =>
-    createSyncChangesHandler({
+const handle = withAuthenticatedApiV1(
+  async (request, context) => {
+    const preview = convexPreviewFor(await context.actor());
+    return createSyncChangesHandler({
       resolveActor: context.actor,
-      activitiesRepo: activitiesRepository,
-      photosRepo: photosRepository,
-      changesRepo: changesRepository,
-      freshnessRepo: summaryReconciliationRepository,
-      placesRepo: createPlaceMatchingRepository(),
+      activitiesRepo: preview?.activitiesRepo ?? activitiesRepository,
+      photosRepo: preview?.photosRepo ?? photosRepository,
+      changesRepo: preview?.changesRepo ?? changesRepository,
+      cursorBackend: preview?.cursorBackend,
+      itemByteBudget: preview ? 2 * 1024 * 1024 : undefined,
+      freshnessRepo: preview?.freshnessRepo ?? summaryReconciliationRepository,
+      placesRepo: preview?.placesRepo ?? createPlaceMatchingRepository(),
       onError: (error, requestId) => {
         logger.error('GET /api/v1/sync/changes failed', { error, requestId });
       },
-    })(request),
+    })(request);
+  },
   { route: ROUTE, cache: 'private-no-store' },
 );
+
+export async function GET(request: Request) {
+  return compressSyncResponse(request, await handle(request));
+}

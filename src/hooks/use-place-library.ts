@@ -4,12 +4,15 @@ import { useMemo } from 'react';
 
 import { useActivities } from '~/hooks/use-activities';
 import { buildPlaceLibrary } from '~/lib/place-library';
+import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { useShallowStore } from '~/store';
 
 export function usePlaceLibrary() {
   const query = useActivities();
   const userId = useShallowStore((state) =>
-    !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
+    !state.isGuest && hasStoredLibraryAccess(state.user)
+      ? state.user?.id
+      : undefined,
   );
   const library = useMemo(
     () =>

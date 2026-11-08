@@ -9,6 +9,7 @@ import {
   isStreamSummaryCurrent,
   streamSummaryQueryKey,
 } from '~/lib/activity-stream-summary';
+import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { useShallowStore } from '~/store';
 import { useElevationCursor } from '~/store/elevation-cursor';
@@ -30,7 +31,12 @@ export const ElevationRouteMarker = memo(function ElevationRouteMarker({
     isGuest: state.isGuest,
   }));
   const queryClient = useQueryClient();
-  if (!cursor || isGuest || !user?.stravaConnected || cursor.userId !== user.id)
+  if (
+    !cursor ||
+    isGuest ||
+    !hasStoredLibraryAccess(user) ||
+    cursor.userId !== user?.id
+  )
     return null;
   const id = Number(cursor.activityId);
   const activity = activities.get(id);

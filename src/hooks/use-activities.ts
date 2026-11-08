@@ -13,6 +13,7 @@ import { toActivityDTO } from '~/contracts/v1/activity';
 import type { Activity } from '~/lib/activity';
 import { createFeature } from '~/lib/activity-utils';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { libraryQueryState } from '~/lib/sync/library-query-state';
 import { fetchAndPersistPage } from '~/lib/sync/persisted-page';
 import {
@@ -213,7 +214,9 @@ export function useActivities() {
   const loaded = library.snapshot?.loaded;
   const matchingVersion = library.snapshot?.syncState?.placeMatchingVersion;
   const placeUserId = useShallowStore((state) =>
-    !state.isGuest && state.user?.stravaConnected ? state.user.id : undefined,
+    !state.isGuest && hasStoredLibraryAccess(state.user)
+      ? state.user?.id
+      : undefined,
   );
   const authenticatedData = useMemo(
     () =>

@@ -660,3 +660,50 @@ void test('GET /api/v1/sync/changes never hydrates an activity or photo now owne
   assert.deepEqual(body.data.items, []);
   assert.equal(body.data.nextCursor, encode(2));
 });
+
+void test('byte-bounded pages resume before the first deferred upsert', async () => {
+  const GET = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    itemByteBudget: 2_000,
+    activitiesRepo: fakeActivitiesRepo([
+      buildActivity({ id: 1 }),
+      buildActivity({ id: 2, description: 'é'.repeat(900) }),
+    ]),
+    photosRepo: fakePhotosRepo([]),
+    changesRepo: fakeChangesRepo({
+      changes: [
+        buildChange({ sequence: 1 }),
+        buildChange({ sequence: 4, entityId: '8' }), // Current row is gone.
+        buildChange({ sequence: 9, entityId: '2' }),
+        buildChange({ sequence: 10, entityId: '8', operation: 'delete' }),
+      ],
+    }),
+  });
+  const fetchPage = async (cursor: string) => {
+    const response = await GET(
+      new Request(`https://example.test/api/v1/sync/changes?cursor=${cursor}`),
+    );
+    assert.equal(response.status, 200);
+    return responseEnvelope(syncChangesPageDTOSchema).parse(
+      await response.json(),
+    ).data;
+  };
+
+  const first = await fetchPage(encode(0));
+  assert.deepEqual(
+    first.items.map((item) => item.sequence),
+    ['1'],
+  );
+  assert.equal(first.nextCursor, encode(4));
+  const second = await fetchPage(first.nextCursor);
+  assert.deepEqual(
+    second.items.map((item) => item.sequence),
+    ['9'],
+  );
+  const third = await fetchPage(second.nextCursor);
+  assert.deepEqual(
+    third.items.map((item) => item.sequence),
+    ['10'],
+  );
+});

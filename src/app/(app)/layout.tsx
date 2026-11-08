@@ -18,6 +18,7 @@ import { auth } from '~/lib/auth';
 import { QueryProvider } from '~/providers/query-provider';
 import { toCurrentUserDTO } from '~/server/db/dto';
 import { getAccountInternal, getUserInternal } from '~/server/db/internal';
+import { previewSelection } from '~/server/preview/selection';
 import type { InitialAuth } from '~/store/auth';
 
 /**
@@ -47,8 +48,20 @@ export default async function AppShellLayout({
   // issue #116.
   if (session?.user?.id) {
     const user = await getUserInternal(session.user.id);
-    const account = user ? await getAccountInternal({ userId: user.id }) : null;
-    initialAuth.currentUser = user ? toCurrentUserDTO(user, account) : null;
+    // Fixture owners browse stored Convex data without a live provider account.
+    // Avoid credential refresh/reconnection while rendering their preview.
+    const account =
+      user && !previewSelection({ userId: user.id })
+        ? await getAccountInternal({ userId: user.id })
+        : null;
+    initialAuth.currentUser = user
+      ? {
+          ...toCurrentUserDTO(user, account),
+          ...(previewSelection({ userId: user.id }) && {
+            storedLibraryPreview: true,
+          }),
+        }
+      : null;
   }
 
   return (

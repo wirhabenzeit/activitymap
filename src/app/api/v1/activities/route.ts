@@ -4,6 +4,8 @@ import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { warmSignupActivitiesForActor } from '~/server/application/signup-warmup';
 import { logger } from '~/server/logging/logger';
+import { convexPreviewFor } from '~/server/preview/convex';
+import { previewDataUnavailable } from '~/server/preview/selection';
 import { activitiesRepository } from '~/server/repositories/activities';
 
 import { createListHandler } from '../list-handler';
@@ -13,8 +15,13 @@ const ROUTE = 'GET /api/v1/activities';
 export const maxDuration = 60;
 
 export const POST = withAuthenticatedApiV1(
-  (request, context) =>
-    createFetchActivitySummariesHandler({
+  async (request, context) => {
+    const unavailable = await previewDataUnavailable(
+      context.actor,
+      context.requestId,
+    );
+    if (unavailable) return unavailable;
+    return createFetchActivitySummariesHandler({
       resolveActor: context.actor,
       afterResponse: after,
       warmSignup: async (actor, count, options) => {
@@ -28,32 +35,41 @@ export const POST = withAuthenticatedApiV1(
       },
       onError: (error, requestId) =>
         logger.error('Summary fetch failed', { error, requestId }),
-    })(request),
+    })(request);
+  },
   { route: 'POST /api/v1/activities', cache: 'private-no-store' },
 );
 
 export const GET = withAuthenticatedApiV1(
-  (request, context) =>
-    createListHandler({
+  async (request, context) => {
+    const preview = convexPreviewFor(await context.actor());
+    return createListHandler({
       resolveActor: context.actor,
       itemSchema: activityDTOSchema,
       findPage: (
         athleteId,
         { afterKey, limit }: { afterKey?: number; limit: number },
       ) =>
-        activitiesRepository.findPageByAthlete(athleteId, {
-          afterId: afterKey,
-          limit,
-        }),
+        (preview?.activitiesRepo ?? activitiesRepository).findPageByAthlete(
+          athleteId,
+          {
+            afterId: afterKey,
+            limit,
+          },
+        ),
       parseCursorKey: (key): number | null => {
         const parsed = Number(key);
         return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : null;
       },
+      cursorScope: preview
+        ? `${preview.cursorBackend}.list-activities`
+        : undefined,
       cursorKeyFor: (activity) => String(activity.id),
       toItem: toActivityDTO,
       onError: (error, requestId) => {
         logger.error('GET /api/v1/activities failed', { error, requestId });
       },
-    })(request),
+    })(request);
+  },
   { route: ROUTE, cache: 'private-no-store' },
 );

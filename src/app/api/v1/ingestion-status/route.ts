@@ -4,6 +4,7 @@ import { deriveIngestionStatus } from '~/server/application/ingestion-status';
 import { photoBackfillEnabled } from '~/server/config/photo-backfill';
 import { streamBackfillEnabled } from '~/server/config/stream-backfill';
 import { logger } from '~/server/logging/logger';
+import { convexPreviewFor } from '~/server/preview/convex';
 import { ingestionStatusRepository } from '~/server/repositories/ingestion-status';
 
 import { createIngestionStatusHandler } from './handler';
@@ -11,28 +12,32 @@ import { createIngestionStatusHandler } from './handler';
 const ROUTE = 'GET /api/v1/ingestion-status';
 
 export const GET = withAuthenticatedApiV1(
-  (request, context) =>
-    createIngestionStatusHandler({
+  async (request, context) => {
+    const preview = convexPreviewFor(await context.actor());
+    return createIngestionStatusHandler({
       resolveActor: context.actor,
-      loadStatus: async (actor, observedAt) =>
-        deriveIngestionStatus(
-          await ingestionStatusRepository.snapshot(
-            actor.userId,
-            actor.athleteId,
-            observedAt,
-          ),
-          {
-            photoBackfillEnabled: photoBackfillEnabled(),
-            streamBackfillEnabled: streamBackfillEnabled(),
-          },
-        ),
+      loadStatus:
+        preview?.loadStatus ??
+        (async (actor, observedAt) =>
+          deriveIngestionStatus(
+            await ingestionStatusRepository.snapshot(
+              actor.userId,
+              actor.athleteId,
+              observedAt,
+            ),
+            {
+              photoBackfillEnabled: photoBackfillEnabled(),
+              streamBackfillEnabled: streamBackfillEnabled(),
+            },
+          )),
       onError: (error, requestId) => {
         logger.error('GET /api/v1/ingestion-status failed', {
           error,
           requestId,
         });
       },
-    })(request),
+    })(request);
+  },
   {
     route: ROUTE,
     cache: { privateMaxAgeSeconds: INGESTION_STATUS_MAX_AGE_SECONDS },
