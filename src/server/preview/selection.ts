@@ -5,13 +5,18 @@ import { z } from 'zod';
 import { apiFailure } from '~/server/api/transport';
 import type { Actor } from '~/server/auth/actor';
 
+const epoch = z.string().regex(/^[A-Za-z0-9_-]{16,80}$/);
 const configSchema = z.record(
   z.string(),
-  z.object({
-    epoch: z.string().regex(/^[A-Za-z0-9_-]{16,80}$/),
-    key: z.string().regex(/^[0-9a-f]{64}$/),
-  }),
+  z.union([
+    // Isolated lab deployment (#495), authenticated with a per-owner key.
+    z.object({ epoch, key: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
+    // Application backend (`backend/`) through the signed sync bridge. The
+    // epoch must match the owner's current Convex assignment.
+    z.object({ epoch, transport: z.literal('app') }).strict(),
+  ]),
 );
+export type PreviewOwnerConfig = z.infer<typeof configSchema>[string];
 export function previewModeEnabled() {
   return (
     process.env.ACTIVITYMAP_CLIENT_BACKEND === 'convex-preview' &&
