@@ -98,6 +98,32 @@ anything but the local database. The verifier runs the real bootstrap and
 stream-summary handlers against Postgres and against this package, and exits
 non-zero on any difference.
 
+## Authenticated clients
+
+Public functions (`convex/library.ts`) identify the caller from a short-lived
+token issued by the app's Better Auth `jwt` plugin (`src/lib/auth-jwt.ts`):
+ES256, `sub` = application user ID, `aud` = `convex`, 15 minutes, no profile
+claims. `convex/viewer.ts` resolves the owner from the token subject and
+serves only owners assigned to Convex. Public functions take no user argument.
+
+`convex/auth.config.ts` reads two variables per deployment. Convex refuses to
+deploy an auth config that reads an unset variable, so set the issuer before
+deploying:
+
+```sh
+# No authenticated access (the default until an app environment is wired):
+pnpm exec convex env set ACTIVITYMAP_AUTH_JWT_ISSUER disabled
+# Wired to an app environment (must equal that app's ACTIVITYMAP_AUTH_JWT_ISSUER):
+pnpm exec convex env set ACTIVITYMAP_AUTH_JWT_ISSUER https://activitymap.cc
+pnpm exec convex env set ACTIVITYMAP_AUTH_JWKS 'data:text/plain;charset=utf-8;base64,<public JWKS>'
+```
+
+The JWKS is the app's `/api/auth/jwks` response; the plugin creates its key on
+the first token request. To rotate, publish old and new public keys together,
+rotate in the app, and drop the old key after 15 minutes. Change variables
+only after the matching auth config is deployed: Convex validates each change
+against the deployed config.
+
 ## Shadow writes
 
 While Postgres remains the writer, `src/server/convex-mirror/mirror.ts` copies
