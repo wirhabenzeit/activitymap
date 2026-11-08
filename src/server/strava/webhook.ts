@@ -1,5 +1,7 @@
+import { and, eq, sql } from 'drizzle-orm';
+
 import { db as defaultDb } from '~/server/db';
-import { lockActiveStravaAccount } from '~/server/repositories/account-lifecycle';
+import { getAccountInternal } from '~/server/db/internal';
 import {
   accounts,
   activities,
@@ -9,18 +11,17 @@ import {
   stravaWebhookEvents,
   stravaWebhooks,
 } from '~/server/db/schema';
-import { getAccountInternal } from '~/server/db/internal';
-import {
-  fetchStravaActivities,
-  ForeignStravaActivityError,
-} from '~/server/strava/service';
-import { activityOwnershipFilter } from '~/server/strava/webhook-filters';
-import { eq, sql, and } from 'drizzle-orm';
 import { logger } from '~/server/logging/logger';
-import type { WebhookRequest } from '~/types/strava';
+import { lockActiveStravaAccount } from '~/server/repositories/account-lifecycle';
 import { createChangesRepository } from '~/server/repositories/changes';
 import { createWebhookEventsRepository } from '~/server/repositories/webhook-events';
+import {
+  ForeignStravaActivityError,
+  fetchStravaActivities,
+} from '~/server/strava/service';
+import { activityOwnershipFilter } from '~/server/strava/webhook-filters';
 import { PermanentWebhookError } from '~/server/strava/webhook-retry';
+import type { WebhookRequest } from '~/types/strava';
 
 /** Full erasure of a deauthorized athlete's data must complete within 30 days of revocation (docs/strava-data-policy.md §1/§3). */
 const ERASURE_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
@@ -310,11 +311,14 @@ export async function processWebhookEvent(
       // `aspect_type: 'update'` with `updates.authorized: 'false'`. Anything
       // else is not a revocation and must never clear tokens or schedule
       // erasure.
-      logger.warn('[Webhook] Ignored athlete event that is not a deauthorization', {
-        aspect_type: data.aspect_type,
-        owner_id,
-        updated_fields: data.updates ? Object.keys(data.updates) : [],
-      });
+      logger.warn(
+        '[Webhook] Ignored athlete event that is not a deauthorization',
+        {
+          aspect_type: data.aspect_type,
+          owner_id,
+          updated_fields: data.updates ? Object.keys(data.updates) : [],
+        },
+      );
       return;
     }
     await handleAthleteDeauthorization(data, database);
@@ -367,7 +371,7 @@ export async function processWebhookEvent(
   // retry and skip the tombstone (and the change record) forever.
   if (notFoundIds.includes(object_id)) {
     await database.transaction(async (tx) => {
-      if (!await lockActiveStravaAccount(tx, account)) return;
+      if (!(await lockActiveStravaAccount(tx, account))) return;
       // `photos.activity_id` cascades on delete, so this also silently
       // deletes any photos for this activity. Read which ones before the
       // delete so each gets its own change record too - see the identical
@@ -444,7 +448,7 @@ export async function processWebhookEvent(
 
   // Database Operations within a transaction for atomicity
   await database.transaction(async (tx) => {
-    if (!await lockActiveStravaAccount(tx, account)) return;
+    if (!(await lockActiveStravaAccount(tx, account))) return;
     // 1. Upsert the activity. The conflict update only applies to a row this
     // athlete already owns: an existing activity owned by anyone else is
     // never re-attributed, whatever the delivery claims.

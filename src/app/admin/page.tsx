@@ -1,19 +1,21 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 
-import {
-  loadAdminDashboard,
-  type ActivityFailure,
-  type AdminDashboard,
-} from '~/server/application/admin-dashboard';
-import { requireAdmin } from '~/server/auth/admin';
-import { jobHealth, type JobHealth } from '~/lib/admin/job-health';
-import { runFailures, type RunFailure } from '~/lib/admin/job-run-summary';
+import { type JobHealth, jobHealth } from '~/lib/admin/job-health';
+import { type RunFailure, runFailures } from '~/lib/admin/job-run-summary';
 import {
   coverageSummaries,
   schedulingLabel,
 } from '~/lib/ingestion/presentation';
 import { cn } from '~/lib/utils';
+import {
+  type ActivityFailure,
+  type AdminDashboard,
+  loadAdminDashboard,
+} from '~/server/application/admin-dashboard';
+import { requireAdmin } from '~/server/auth/admin';
+
+import { WebhookControls } from './webhook-controls';
 
 /**
  * Read-only operations dashboard (issue #328): scheduled job health and run
@@ -426,6 +428,13 @@ export default async function AdminPage({
             ))}
           </tbody>
         </table>
+      </Section>
+
+      <Section
+        title="Strava webhook subscription"
+        description="Registering points Strava's single push subscription at this deployment's secret callback URL and removes any subscription for another URL."
+      >
+        <WebhookControls />
       </Section>
 
       <Section

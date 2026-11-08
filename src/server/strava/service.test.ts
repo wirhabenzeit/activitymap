@@ -1,10 +1,11 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import { StravaApiError } from './client';
 import {
-  fetchStravaActivities,
   ForeignStravaActivityError,
+  fetchStravaActivities,
   withLockedExistingActivities,
 } from './service';
 import type { StravaActivity } from './types';
@@ -294,7 +295,9 @@ void test('detail fetch never returns or persists an activity owned by a differe
       createClient: () => ({
         async getActivity(id) {
           return id === 2
-            ? stravaActivity(id, { athlete: { id: 7777 } as StravaActivity['athlete'] })
+            ? stravaActivity(id, {
+                athlete: { id: 7777 } as StravaActivity['athlete'],
+              })
             : stravaActivity(id);
         },
         async getActivities() {
@@ -326,7 +329,9 @@ void test('list fetch drops summaries owned by a different athlete', async () =>
         async getActivities() {
           return [
             stravaActivity(1),
-            stravaActivity(2, { athlete: { id: 7777 } as StravaActivity['athlete'] }),
+            stravaActivity(2, {
+              athlete: { id: 7777 } as StravaActivity['athlete'],
+            }),
           ];
         },
         async getActivityPhotos() {

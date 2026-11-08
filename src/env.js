@@ -134,11 +134,15 @@ export const env = createEnv({
         }
       }
 
-      if (Boolean(values.OAUTH_PROXY_SECRET) !== Boolean(values.OAUTH_PROXY_PRODUCTION_URL)) {
+      if (
+        Boolean(values.OAUTH_PROXY_SECRET) !==
+        Boolean(values.OAUTH_PROXY_PRODUCTION_URL)
+      ) {
         context.addIssue({
           code: 'custom',
           path: ['OAUTH_PROXY_SECRET'],
-          message: 'OAUTH_PROXY_SECRET and OAUTH_PROXY_PRODUCTION_URL must be configured together',
+          message:
+            'OAUTH_PROXY_SECRET and OAUTH_PROXY_PRODUCTION_URL must be configured together',
         });
       }
     }),

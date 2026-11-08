@@ -21,7 +21,9 @@ async function main() {
     }
     const expectedUrl = webhookCallbackUrl(publicUrl, secret);
     const subscriptions = await StravaClient.withoutAuth().getSubscriptions();
-    const matching = subscriptions.find((sub) => sub.callback_url === expectedUrl);
+    const matching = subscriptions.find(
+      (sub) => sub.callback_url === expectedUrl,
+    );
 
     console.log('Strava subscriptions for this app:', subscriptions.length);
     console.log('- Points at the secret callback URL:', Boolean(matching));

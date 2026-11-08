@@ -1,14 +1,21 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import { accounts, activities, photos, syncChanges, users } from '~/server/db/schema';
+import {
+  accounts,
+  activities,
+  photos,
+  syncChanges,
+  users,
+} from '~/server/db/schema';
 
 import { ForeignStravaActivityError } from './service.ts';
 import { PermanentWebhookError } from './webhook-retry.ts';
 import {
+  type ProcessWebhookEventDeps,
   isRegisteredStravaAthlete,
   processWebhookEvent,
-  type ProcessWebhookEventDeps,
 } from './webhook.ts';
 import type { StravaWebhookEvent } from './webhook.ts';
 
@@ -43,7 +50,11 @@ function buildFakeDb(opts: {
             return {
               where: () => {
                 if (table === users || table === accounts) {
-                  return { for: async () => [{ id: table === users ? 'user-42' : 'account-42' }] };
+                  return {
+                    for: async () => [
+                      { id: table === users ? 'user-42' : 'account-42' },
+                    ],
+                  };
                 }
                 calls.push({ method: 'select', via });
                 if (table === photos) {
@@ -137,7 +148,8 @@ function deps(
   overrides: Partial<ProcessWebhookEventDeps> = {},
 ): ProcessWebhookEventDeps {
   return {
-    resolveAccount: async () => ({ id: 'account-42', userId: 'user-42', access_token: 'token' }) as never,
+    resolveAccount: async () =>
+      ({ id: 'account-42', userId: 'user-42', access_token: 'token' }) as never,
     ...overrides,
   };
 }
@@ -617,7 +629,10 @@ void test('processWebhookEvent dead-letters an activity event whose Strava owner
             notFoundIds: [],
             failedIds: [100],
             failures: [
-              { activityId: 100, error: new ForeignStravaActivityError(100, 42) },
+              {
+                activityId: 100,
+                error: new ForeignStravaActivityError(100, 42),
+              },
             ],
           }),
         }),

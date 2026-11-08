@@ -1,21 +1,19 @@
 'use server';
 
-import { stravaWebhooks } from '~/server/db/schema';
-
-import { db } from '~/server/db';
-import { logger } from '~/server/logging/logger';
-import { StravaClient } from './client';
-import { type UpdateActivityInput } from './validators';
-import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
+import { ne } from 'drizzle-orm';
 import { headers } from 'next/headers';
+
+import * as activitiesService from '~/server/application/activities';
 import { requireActor } from '~/server/auth/actor';
 import { requireAdmin } from '~/server/auth/admin';
-import {
-  webhookCallbackSecret,
-  webhookCallbackUrl,
-} from './webhook-callback';
-import { ne } from 'drizzle-orm';
-import * as activitiesService from '~/server/application/activities';
+import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
+import { db } from '~/server/db';
+import { stravaWebhooks } from '~/server/db/schema';
+import { logger } from '~/server/logging/logger';
+
+import { StravaClient } from './client';
+import { type UpdateActivityInput } from './validators';
+import { webhookCallbackSecret, webhookCallbackUrl } from './webhook-callback';
 
 /**
  * Thin compatibility adapter: resolves the caller's `Actor` from the current
@@ -96,7 +94,9 @@ export async function checkWebhookStatus() {
     if (matchingSubscription) {
       const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
       if (!verifyToken) {
-        throw new Error('STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set');
+        throw new Error(
+          'STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set',
+        );
       }
 
       await upsertActiveSubscription({
@@ -119,7 +119,8 @@ export async function checkWebhookStatus() {
       matchingSubscription: matchingSubscription
         ? { id: matchingSubscription.id }
         : undefined,
-      otherSubscriptionCount: stravaSubscriptions.length - (matchingSubscription ? 1 : 0),
+      otherSubscriptionCount:
+        stravaSubscriptions.length - (matchingSubscription ? 1 : 0),
     };
   } catch (error) {
     logger.error('Failed to manage webhook subscription:', error);
@@ -158,9 +159,12 @@ export async function createWebhookSubscription() {
     for (const stale of existingSubscriptions) {
       if (stale.callback_url === callbackUrl) continue;
       await client.deleteSubscription(stale.id);
-      logger.info('[Webhook] Deleted Strava subscription for a stale callback URL', {
-        subscription_id: stale.id,
-      });
+      logger.info(
+        '[Webhook] Deleted Strava subscription for a stale callback URL',
+        {
+          subscription_id: stale.id,
+        },
+      );
     }
 
     const message = subscription

@@ -1,22 +1,30 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
-import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
 import { responseEnvelope } from '~/contracts/v1/envelope.ts';
+import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
 import { syncChangesPageDTOSchema } from '~/contracts/v1/sync.ts';
-import { encodeSyncCursor } from '~/server/sync/cursor.ts';
-import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
 import type { Actor } from '~/server/auth/actor.ts';
+import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
+import { encodeSyncCursor } from '~/server/sync/cursor.ts';
+
 import { createSyncChangesHandler } from './handler.ts';
 
 const now = new Date('2026-09-20T12:00:00.000Z');
-const ACTOR: Actor = { userId: 'user-1', athleteId: 42, authentication: 'cookie' };
+const ACTOR: Actor = {
+  userId: 'user-1',
+  athleteId: 42,
+  authentication: 'cookie',
+};
 
 function encode(sequence: number, athleteId = ACTOR.athleteId, issuedAt = now) {
   return encodeSyncCursor({ sequence, athleteId, issuedAt });
 }
 
-function buildActivity(overrides: Partial<Activity> & { id: number }): Activity {
+function buildActivity(
+  overrides: Partial<Activity> & { id: number },
+): Activity {
   return {
     athlete: ACTOR.athleteId,
     public_id: overrides.id * 7,
@@ -99,7 +107,9 @@ function buildPhoto(overrides: Partial<Photo> & { unique_id: string }): Photo {
   };
 }
 
-function buildChange(overrides: Partial<SyncChange> & { sequence: number }): SyncChange {
+function buildChange(
+  overrides: Partial<SyncChange> & { sequence: number },
+): SyncChange {
   return {
     athleteId: ACTOR.athleteId,
     entityType: 'activity',
@@ -128,9 +138,16 @@ function fakePhotosRepo(rows: Photo[]) {
   };
 }
 
-function fakeChangesRepo(opts: { changes: SyncChange[]; latestSequence?: number }) {
+function fakeChangesRepo(opts: {
+  changes: SyncChange[];
+  latestSequence?: number;
+}) {
   return {
-    async findAfter(athleteId: number, afterSequence: number, { limit = 500 }: { limit?: number } = {}) {
+    async findAfter(
+      athleteId: number,
+      afterSequence: number,
+      { limit = 500 }: { limit?: number } = {},
+    ) {
       return opts.changes
         .filter((c) => c.athleteId === athleteId && c.sequence > afterSequence)
         .sort((a, b) => a.sequence - b.sequence)
@@ -159,7 +176,9 @@ void test('GET /api/v1/sync/changes returns 401 without an actor', async () => {
     changesRepo: fakeChangesRepo({ changes: [] }),
   });
 
-  const response = await GET(new Request('https://example.test/api/v1/sync/changes?cursor=x'));
+  const response = await GET(
+    new Request('https://example.test/api/v1/sync/changes?cursor=x'),
+  );
   assert.equal(response.status, 401);
 });
 
@@ -172,7 +191,9 @@ void test('GET /api/v1/sync/changes requires a cursor', async () => {
     changesRepo: fakeChangesRepo({ changes: [] }),
   });
 
-  const response = await GET(new Request('https://example.test/api/v1/sync/changes'));
+  const response = await GET(
+    new Request('https://example.test/api/v1/sync/changes'),
+  );
   const body: unknown = await response.json();
 
   assert.equal(response.status, 400);
@@ -256,7 +277,9 @@ void test('GET /api/v1/sync/changes offline-expiry boundary: a cursor exactly at
     retentionDays: 90,
   });
 
-  const issuedExactlyAtBoundary = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000);
+  const issuedExactlyAtBoundary = new Date(
+    now.getTime() - 90 * 24 * 60 * 60 * 1000,
+  );
   const response = await GET(
     new Request(
       `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0, ACTOR.athleteId, issuedExactlyAtBoundary))}`,
@@ -278,7 +301,9 @@ void test('GET /api/v1/sync/changes offline-expiry boundary: a cursor one millis
     retentionDays: 90,
   });
 
-  const issuedOneMsInsideWindow = new Date(now.getTime() - 90 * 24 * 60 * 60 * 1000 + 1);
+  const issuedOneMsInsideWindow = new Date(
+    now.getTime() - 90 * 24 * 60 * 60 * 1000 + 1,
+  );
   const response = await GET(
     new Request(
       `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0, ACTOR.athleteId, issuedOneMsInsideWindow))}`,
@@ -312,9 +337,24 @@ void test('GET /api/v1/sync/changes returns ordered upserts and tombstones after
   const activity = buildActivity({ id: 1 });
   const photo = buildPhoto({ unique_id: 'p1' });
   const changes = [
-    buildChange({ sequence: 1, entityType: 'activity', entityId: '1', operation: 'upsert' }),
-    buildChange({ sequence: 2, entityType: 'photo', entityId: 'p1', operation: 'upsert' }),
-    buildChange({ sequence: 3, entityType: 'activity', entityId: '2', operation: 'delete' }),
+    buildChange({
+      sequence: 1,
+      entityType: 'activity',
+      entityId: '1',
+      operation: 'upsert',
+    }),
+    buildChange({
+      sequence: 2,
+      entityType: 'photo',
+      entityId: 'p1',
+      operation: 'upsert',
+    }),
+    buildChange({
+      sequence: 3,
+      entityType: 'activity',
+      entityId: '2',
+      operation: 'delete',
+    }),
   ];
   const GET = createSyncChangesHandler({
     now: () => now,
@@ -332,12 +372,21 @@ void test('GET /api/v1/sync/changes returns ordered upserts and tombstones after
   const body: unknown = await response.json();
 
   assert.equal(response.status, 200);
-  assert.equal(responseEnvelope(syncChangesPageDTOSchema).safeParse(body).success, true);
+  assert.equal(
+    responseEnvelope(syncChangesPageDTOSchema).safeParse(body).success,
+    true,
+  );
 
   const data = (
     body as {
       data: {
-        items: { entityType: string; operation: string; id: string; activity?: unknown; photo?: unknown }[];
+        items: {
+          entityType: string;
+          operation: string;
+          id: string;
+          activity?: unknown;
+          photo?: unknown;
+        }[];
         nextCursor: string;
       };
     }
@@ -350,13 +399,24 @@ void test('GET /api/v1/sync/changes returns ordered upserts and tombstones after
       ['activity', 'delete', '2'],
     ],
   );
-  assert.ok(data.items[0]?.activity, 'an activity upsert must include the current activity DTO');
-  assert.ok(data.items[1]?.photo, 'a photo upsert must include the current photo DTO');
+  assert.ok(
+    data.items[0]?.activity,
+    'an activity upsert must include the current activity DTO',
+  );
+  assert.ok(
+    data.items[1]?.photo,
+    'a photo upsert must include the current photo DTO',
+  );
 });
 
 void test('GET /api/v1/sync/changes drops an upsert whose current row is already gone (a later delete supersedes it)', async () => {
   const changes = [
-    buildChange({ sequence: 1, entityType: 'activity', entityId: '99', operation: 'upsert' }),
+    buildChange({
+      sequence: 1,
+      entityType: 'activity',
+      entityId: '99',
+      operation: 'upsert',
+    }),
   ];
   const GET = createSyncChangesHandler({
     now: () => now,
@@ -372,7 +432,9 @@ void test('GET /api/v1/sync/changes drops an upsert whose current row is already
       `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0))}`,
     ),
   );
-  const body = (await response.json()) as { data: { items: unknown[]; nextCursor: string } };
+  const body = (await response.json()) as {
+    data: { items: unknown[]; nextCursor: string };
+  };
 
   assert.deepEqual(body.data.items, []);
   // The cursor still advances past the dropped change, so it is never re-delivered.
@@ -393,7 +455,9 @@ void test('GET /api/v1/sync/changes returns the same cursor back when there is n
   const issuedAt = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const cursor = encode(5, ACTOR.athleteId, issuedAt);
   const response = await GET(
-    new Request(`https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`),
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`,
+    ),
   );
   const body = (await response.json()) as {
     data: {
@@ -419,7 +483,14 @@ void test('GET /api/v1/sync/changes returns the same cursor back when there is n
 
 void test('GET /api/v1/sync/changes replaying the same page is idempotent (same input cursor -> same output)', async () => {
   const activity = buildActivity({ id: 1 });
-  const changes = [buildChange({ sequence: 1, entityType: 'activity', entityId: '1', operation: 'upsert' })];
+  const changes = [
+    buildChange({
+      sequence: 1,
+      entityType: 'activity',
+      entityId: '1',
+      operation: 'upsert',
+    }),
+  ];
   const GET = createSyncChangesHandler({
     now: () => now,
     resolveActor: async () => ACTOR,
@@ -429,8 +500,16 @@ void test('GET /api/v1/sync/changes replaying the same page is idempotent (same 
   });
 
   const cursor = encode(0);
-  const first = await GET(new Request(`https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`));
-  const second = await GET(new Request(`https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`));
+  const first = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`,
+    ),
+  );
+  const second = await GET(
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}`,
+    ),
+  );
 
   assert.deepEqual(await first.json(), await second.json());
 });
@@ -438,7 +517,12 @@ void test('GET /api/v1/sync/changes replaying the same page is idempotent (same 
 void test('GET /api/v1/sync/changes pagination boundary: a page exactly filling the limit is followed by an empty page returning the same cursor back', async () => {
   const limit = 5;
   const changes = Array.from({ length: limit }, (_, i) =>
-    buildChange({ sequence: i + 1, entityType: 'activity', entityId: String(i + 1), operation: 'delete' }),
+    buildChange({
+      sequence: i + 1,
+      entityType: 'activity',
+      entityId: String(i + 1),
+      operation: 'delete',
+    }),
   );
   const GET = createSyncChangesHandler({
     now: () => now,
@@ -482,7 +566,9 @@ void test('GET /api/v1/sync/changes holds up for a large account: thousands of c
       operation: i % 7 === 0 ? 'delete' : 'upsert',
     }),
   );
-  const activities = Array.from({ length: 500 }, (_, i) => buildActivity({ id: i + 1 }));
+  const activities = Array.from({ length: 500 }, (_, i) =>
+    buildActivity({ id: i + 1 }),
+  );
   const GET = createSyncChangesHandler({
     now: () => now,
     resolveActor: async () => ACTOR,
@@ -505,14 +591,26 @@ void test('GET /api/v1/sync/changes holds up for a large account: thousands of c
       data: { items: { sequence: string }[]; nextCursor: string };
     };
     if (body.data.items.length === 0) break;
-    for (const item of body.data.items) seenSequences.push(Number(item.sequence));
+    for (const item of body.data.items)
+      seenSequences.push(Number(item.sequence));
     cursor = body.data.nextCursor;
     pages += 1;
-    assert.ok(pages <= MAX_PAGES, 'pagination must terminate within the expected number of pages');
+    assert.ok(
+      pages <= MAX_PAGES,
+      'pagination must terminate within the expected number of pages',
+    );
   }
 
-  assert.equal(seenSequences.length, TOTAL, 'every change must be delivered exactly once');
-  assert.equal(new Set(seenSequences).size, TOTAL, 'no sequence may repeat across pages');
+  assert.equal(
+    seenSequences.length,
+    TOTAL,
+    'every change must be delivered exactly once',
+  );
+  assert.equal(
+    new Set(seenSequences).size,
+    TOTAL,
+    'no sequence may repeat across pages',
+  );
   assert.deepEqual(
     seenSequences,
     [...seenSequences].sort((a, b) => a - b),
@@ -522,16 +620,30 @@ void test('GET /api/v1/sync/changes holds up for a large account: thousands of c
 
 void test('GET /api/v1/sync/changes never hydrates an activity or photo now owned by another athlete', async () => {
   const changes = [
-    buildChange({ sequence: 1, entityType: 'activity', entityId: '7', operation: 'upsert' }),
-    buildChange({ sequence: 2, entityType: 'photo', entityId: 'p7', operation: 'upsert' }),
+    buildChange({
+      sequence: 1,
+      entityType: 'activity',
+      entityId: '7',
+      operation: 'upsert',
+    }),
+    buildChange({
+      sequence: 2,
+      entityType: 'photo',
+      entityId: 'p7',
+      operation: 'upsert',
+    }),
   ];
   const GET = createSyncChangesHandler({
     now: () => now,
     resolveActor: async () => ACTOR,
     // The change rows are in this athlete's feed, but the rows they name
     // currently belong to athlete 2002.
-    activitiesRepo: fakeActivitiesRepo([buildActivity({ id: 7, athlete: 2002 })]),
-    photosRepo: fakePhotosRepo([buildPhoto({ unique_id: 'p7', athlete_id: 2002 })]),
+    activitiesRepo: fakeActivitiesRepo([
+      buildActivity({ id: 7, athlete: 2002 }),
+    ]),
+    photosRepo: fakePhotosRepo([
+      buildPhoto({ unique_id: 'p7', athlete_id: 2002 }),
+    ]),
     changesRepo: fakeChangesRepo({ changes }),
   });
 
@@ -540,7 +652,9 @@ void test('GET /api/v1/sync/changes never hydrates an activity or photo now owne
       `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(encode(0))}`,
     ),
   );
-  const body = (await response.json()) as { data: { items: unknown[]; nextCursor: string } };
+  const body = (await response.json()) as {
+    data: { items: unknown[]; nextCursor: string };
+  };
 
   assert.equal(response.status, 200);
   assert.deepEqual(body.data.items, []);

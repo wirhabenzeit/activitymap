@@ -1,5 +1,7 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+
+import { test } from 'node:test';
+
 import { webhookEventSchema } from './webhook-schema.ts';
 
 void test('accepts a valid activity update delivery', () => {
@@ -85,9 +87,17 @@ const validDelivery = {
 };
 
 void test('rejects non-positive or fractional ids and event times', () => {
-  for (const field of ['object_id', 'owner_id', 'subscription_id', 'event_time']) {
+  for (const field of [
+    'object_id',
+    'owner_id',
+    'subscription_id',
+    'event_time',
+  ]) {
     for (const value of [0, -1, 1.5]) {
-      const result = webhookEventSchema.safeParse({ ...validDelivery, [field]: value });
+      const result = webhookEventSchema.safeParse({
+        ...validDelivery,
+        [field]: value,
+      });
       assert.equal(result.success, false, `${field}=${value} must be rejected`);
     }
   }

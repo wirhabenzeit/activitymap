@@ -1,29 +1,30 @@
 import 'server-only';
 
-import {
-  activities as activitySchema,
-  accounts,
-  users,
-  photoDeletions,
-  photos as photosSchema,
-  type Activity,
-  type Photo,
-} from '~/server/db/schema';
+import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
 
 import { db } from '~/server/db';
-import { logger } from '~/server/logging/logger';
-import { isStravaActivityNotFoundError, StravaClient } from './client';
-import { transformStravaActivity, transformStravaPhoto } from './transforms';
-import { type StravaPhoto } from './types';
-import { and, eq, inArray, isNull, or, sql } from 'drizzle-orm';
-import { lockActiveStravaAccount } from '~/server/repositories/account-lifecycle';
-import type { StravaActivity } from './types';
-import { fetchActivitiesSchema, type FetchActivitiesInput } from './validators';
 import {
-  createChangesRepository,
+  type Activity,
+  type Photo,
+  accounts,
+  activities as activitySchema,
+  photoDeletions,
+  photos as photosSchema,
+  users,
+} from '~/server/db/schema';
+import { logger } from '~/server/logging/logger';
+import { lockActiveStravaAccount } from '~/server/repositories/account-lifecycle';
+import {
   type NewSyncChange,
+  createChangesRepository,
 } from '~/server/repositories/changes';
 import { summaryConflictSet } from '~/server/repositories/summary-reconciliation';
+
+import { StravaClient, isStravaActivityNotFoundError } from './client';
+import { transformStravaActivity, transformStravaPhoto } from './transforms';
+import { type StravaPhoto } from './types';
+import type { StravaActivity } from './types';
+import { type FetchActivitiesInput, fetchActivitiesSchema } from './validators';
 
 type ActivityPersistenceTransaction = Parameters<
   Parameters<typeof db.transaction>[0]
@@ -37,7 +38,12 @@ async function lockExistingActivities(
   const existing = await tx
     .select({ id: activitySchema.id })
     .from(activitySchema)
-    .where(and(eq(activitySchema.athlete, athleteId), inArray(activitySchema.id, activityIds)))
+    .where(
+      and(
+        eq(activitySchema.athlete, athleteId),
+        inArray(activitySchema.id, activityIds),
+      ),
+    )
     .for('update');
   return existing.length === activityIds.length;
 }
@@ -54,7 +60,8 @@ export async function withLockedExistingActivities<T>(
   persist: (tx: ActivityPersistenceTransaction) => Promise<T>,
 ): Promise<T | null> {
   return database.transaction(async (tx) => {
-    if (!await lockExistingActivities(tx, athleteId, activityIds)) return null;
+    if (!(await lockExistingActivities(tx, athleteId, activityIds)))
+      return null;
     return persist(tx);
   });
 }
@@ -182,12 +189,28 @@ export async function fetchStravaActivities(
 
   // Preserve the account identity across the upstream request. Looking up only
   // by athlete afterwards could attach stale work to a fresh signup.
-  const persistenceAccount = persist ? (await database.select({ id: accounts.id, userId: accounts.userId })
-    .from(accounts).innerJoin(users, eq(users.id, accounts.userId))
-    .where(and(eq(users.athlete_id, athleteId), eq(accounts.providerId, 'strava'),
-      isNull(accounts.revokedAt), or(eq(accounts.accessToken, accessToken), eq(accounts.access_token, accessToken))))
-    .limit(1))[0] : null;
-  if (persist && !persistenceAccount) throw new Error('Strava account is no longer active');
+  const persistenceAccount = persist
+    ? (
+        await database
+          .select({ id: accounts.id, userId: accounts.userId })
+          .from(accounts)
+          .innerJoin(users, eq(users.id, accounts.userId))
+          .where(
+            and(
+              eq(users.athlete_id, athleteId),
+              eq(accounts.providerId, 'strava'),
+              isNull(accounts.revokedAt),
+              or(
+                eq(accounts.accessToken, accessToken),
+                eq(accounts.access_token, accessToken),
+              ),
+            ),
+          )
+          .limit(1)
+      )[0]
+    : null;
+  if (persist && !persistenceAccount)
+    throw new Error('Strava account is no longer active');
 
   // Token refresh is now handled outside this function
   const client = (deps.createClient ?? StravaClient.withAccessToken)(
@@ -530,8 +553,20 @@ export async function fetchStravaActivities(
         return dbActivities.length > 0 ? savedStats : dbActivities;
       };
       savedActivities = await database.transaction(async (tx) => {
-        if (!persistenceAccount || !await lockActiveStravaAccount(tx, persistenceAccount)) return [];
-        if (requireExisting && !await lockExistingActivities(tx, athleteId, requestedActivityIds ?? [])) return [];
+        if (
+          !persistenceAccount ||
+          !(await lockActiveStravaAccount(tx, persistenceAccount))
+        )
+          return [];
+        if (
+          requireExisting &&
+          !(await lockExistingActivities(
+            tx,
+            athleteId,
+            requestedActivityIds ?? [],
+          ))
+        )
+          return [];
         return persistRows(tx);
       });
     } catch (error) {
