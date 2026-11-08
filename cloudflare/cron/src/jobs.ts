@@ -46,8 +46,12 @@ export const SCHEDULES: Record<string, CronJob[]> = {
     },
     // Match after ingestion so this run can use newly stored streams.
     { name: 'match-activity-places', path: '/api/cron/match-activity-places' },
-    // Shadow-write the hour's changes into Convex; answers 503 until
-    // ACTIVITYMAP_CONVEX_SHADOW_OWNERS is configured.
+  ],
+  // Shadow-write recent changes into Convex. Runs every ten minutes so a first
+  // full copy (about 40s of work per run) finishes within hours; incremental
+  // runs with nothing to copy return quickly. Answers 503 until
+  // ACTIVITYMAP_CONVEX_SHADOW_OWNERS is configured.
+  '*/10 * * * *': [
     { name: 'mirror-convex-shadow', path: '/api/cron/mirror-convex-shadow' },
   ],
 };
