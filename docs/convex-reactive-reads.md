@@ -1,7 +1,8 @@
 # Convex auth and reactive reads (design)
 
-Status: steps 1 to 3 are implemented (#505 merged; #507 and #508 open);
-step 4, the measurement and decision, is open. Step 2 of the Convex migration
+Status: implemented and measured. Steps 1 to 3 are merged (#505, #507, #508
+through #510) and step 4 was measured on production on 2026-11-09: the live
+path met the decision rule (section 4). Step 2 of the Convex migration
 (follows shadow writes, #499). Tracks #496.
 
 Sections 2 and 3 describe what was built. Where that differs from the first
@@ -202,8 +203,37 @@ owners and plan the cutover around it. If not, the numbers show whether the
 remaining cost is payload (drop more fields, compress), query execution or
 the client.
 
-Numbers so far, all from the dev deployment with the 4,602-activity library
-(none from production, none from a browser benchmark):
+### Production result (2026-11-09)
+
+One production account with 4,626 activities and 720 photos, listed as a live
+owner (section 5), loaded `/map` in a desktop browser with the browser store
+deleted first (cold). Three runs per path, seconds after navigation start:
+
+| Cold load                      | Live (Convex)   | REST (Postgres)           |
+| ------------------------------ | --------------- | ------------------------- |
+| First activities in the store  | 2.5, 1.6, 1.0   | 3.0, 1.7, 2.3             |
+| Activities in that first write | 256             | 100 to 300                |
+| Full library                   | 8.4, 10.0, 6.7  | 27.0, 18.3, 20.2          |
+| Photos present                 | 10.6, 11.6, 8.1 | with the library          |
+| REST requests                  | 8 (photo list)  | 56 to 57                  |
+| REST bytes transferred         | 90 KB           | 10.4 MB (23.9 MB decoded) |
+
+A warm load on the live path made no library request over REST and resumed
+from the stored feed position; the REST path made five `changes` requests
+(3 KB).
+
+Decision: the live path reaches first activities in one to three seconds and
+the full library in a median of 8.4 s, against 20.2 s for REST, so it meets
+the rule above. It stays on for that account, and the cutover planning builds
+on it.
+
+Limits of this measurement: one machine and network, three runs, and a
+browser pane that was in the background for two of the REST runs. "First
+activities" is the first write to the browser store, polled every 200 ms, not
+a map paint. Bytes sent over the Convex WebSocket were not measured; the dev
+figures below give the payload size.
+
+### Earlier numbers (dev deployment, 4,602 activities)
 
 - Payload: 13.5 MB as cards (18 pages of 256) against 23.1 MB of full DTOs in
   the REST bootstrap, before compression (#507).
@@ -221,20 +251,28 @@ the live path shortens loading, not the time for a Postgres change to appear.
    `auth.config.ts`, the viewer helper and a `library.whoami` query; tests
    with `convex-test` identities, plus a token round trip test against the
    plugin.
-2. Queries (#507, open): `library.list`, `activity`, `summaries` and `status`,
-   `ownerStats` with its rebuild, contract and read-limit tests.
-3. Client (#508, open, stacked on #507): `library.changes`, the live session,
+2. Queries (#507, merged): `library.list`, `activity`, `summaries` and
+   `status`, `ownerStats` with its rebuild, contract and read-limit tests.
+3. Client (#508, merged through #510): `library.changes`, the live session,
    store wiring and fallback, behind `live: true`.
-4. Measurement report and the decision above (not started).
+4. Live owners on production (#511, merged): preview owners exist only
+   outside Vercel Production, so `ACTIVITYMAP_CONVEX_LIVE_OWNERS` lists
+   ordinary accounts whose library download moves to Convex while edits,
+   charts, status and photos stay on Postgres. The client reads the photo
+   list from the REST bootstrap for them.
+5. Measurement and decision (done, section 4).
 
 Each step is its own PR; nothing changes for users who are not listed as live
-preview owners.
+owners.
 
 Enabling an environment: apply migration `0030` and set
-`ACTIVITYMAP_AUTH_JWT_ISSUER` in the app; set `ACTIVITYMAP_AUTH_JWKS`, then
-the same issuer, on the matching Convex deployment; run `stats:rebuild` for
-each existing owner; set `ACTIVITYMAP_CONVEX_URL` in the app and add
-`"live": true` to the owner's preview entry.
+`ACTIVITYMAP_AUTH_JWT_ISSUER` in the app; deploy `backend/`; set
+`ACTIVITYMAP_AUTH_JWKS`, then the same issuer, on the matching Convex
+deployment; run `stats:rebuild` for each existing owner; set
+`ACTIVITYMAP_CONVEX_URL` in the app and either add `"live": true` to the
+owner's preview entry or, on production, list the account in
+`ACTIVITYMAP_CONVEX_LIVE_OWNERS`. Production (`artful-mosquito-425`, issuer
+`https://activitymap.cc`) is set up this way.
 
 ## Changes from the proposal
 
@@ -257,8 +295,8 @@ each existing owner; set `ACTIVITYMAP_CONVEX_URL` in the app and add
 
 ## Open questions
 
-- Production issuer value and who holds the JWKS rotation step (Convex env
-  variables are per deployment).
+- Who holds the JWKS rotation step: the Convex deployment keeps a static copy
+  of the app's public key and must be updated when the key rotates.
 - Whether live owners should keep the REST fallback permanently or only during
   measurement. A fallback costs a full REST bootstrap, and the next live load
   is a full reload.
