@@ -6,6 +6,7 @@ import {
   activityProjectionValidator,
 } from './activityValidators';
 import { manifestValidator, summaryValidator } from './recordingValidators';
+import { countsValidator } from './statsShape';
 
 export default defineSchema({
   owners: defineTable({
@@ -36,6 +37,13 @@ export default defineSchema({
       }),
     ),
   }).index('by_owner', ['owner']),
+  /** Library counts per owner (convex/stats.ts). `rebuildAfter` is set while
+   * a recount runs: the last activity key it has counted. */
+  ownerStats: defineTable({
+    owner: v.id('owners'),
+    counts: countsValidator,
+    rebuildAfter: v.optional(v.string()),
+  }).index('by_owner', ['owner']),
   /** Single-use nonces for signed bridge writes, kept until they expire. */
   bridgeNonces: defineTable({ nonce: v.string(), expiresAt: v.number() })
     .index('by_nonce', ['nonce'])
@@ -56,7 +64,14 @@ export default defineSchema({
     recording: v.optional(v.id('recordings')),
   })
     .index('by_owner_key', ['owner', 'key'])
-    .index('by_owner_live_key', ['owner', 'generation', 'deleted', 'key']),
+    .index('by_owner_live_key', ['owner', 'generation', 'deleted', 'key'])
+    // Oldest and newest activity for the live status view.
+    .index('by_owner_live_start', [
+      'owner',
+      'generation',
+      'deleted',
+      'dto.start_date',
+    ]),
   recordings: defineTable({
     activity: v.id('activities'),
     file: v.id('_storage'),

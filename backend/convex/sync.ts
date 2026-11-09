@@ -4,12 +4,9 @@ import type { ActivityDTO } from '~/contracts/v1/activity';
 
 import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, internalQuery } from './_generated/server';
-import {
-  MAX_PAGE_BYTES,
-  PROJECTION_VERSION,
-  projectedActivity,
-} from './activityProjection';
+import { MAX_PAGE_BYTES } from './activityProjection';
 import { activityFor } from './activityWrites';
+import { currentRecording, liveRows, project } from './liveProjection';
 import { idKey, requireHead, requireOwner, scopeFields } from './owners';
 
 const id = v.string();
@@ -38,61 +35,6 @@ const operation = v.union(
     limit: v.number(),
   }),
 );
-
-function project(row: Doc<'activities'>, owner: Doc<'owners'>) {
-  if (!row.dto || row.deleted || row.generation !== owner.generation)
-    return null;
-  if (
-    row.projection?.version !== PROJECTION_VERSION ||
-    row.projection.generation !== owner.generation
-  ) {
-    // Preserve the activity in the library while a projection is rebuilt.
-    // Omit derived state rather than presenting stale streams or matches.
-    return { ...row.dto };
-  }
-  return projectedActivity(
-    row.dto,
-    row.projection,
-    owner,
-    owner.matchingVersion,
-  );
-}
-
-/** A row's recording only while it still describes the projected streams. */
-async function currentRecording(
-  ctx: QueryCtx,
-  row: Doc<'activities'>,
-  item: Pick<Partial<ActivityDTO>, 'streams'>,
-) {
-  const recording =
-    row.recording && (await ctx.db.get('recordings', row.recording));
-  return recording &&
-    recording.activity === row._id &&
-    item.streams?.state === 'current' &&
-    recording.sourceRevision === row.sourceRevision &&
-    recording.generation === item.streams.generation &&
-    recording.revision === item.streams.revision
-    ? recording
-    : null;
-}
-
-function liveRows(
-  ctx: QueryCtx,
-  owner: Doc<'owners'>,
-  after: string,
-  count: number,
-) {
-  return ctx.db
-    .query('activities')
-    .withIndex('by_owner_live_key', (q) =>
-      q
-        .eq('owner', owner._id)
-        .eq('generation', owner.generation)
-        .eq('deleted', false)
-        .gt('key', after),
-    )
-    .take(count);
-}
 
 const utf8 = new TextEncoder();
 
@@ -142,6 +84,32 @@ async function bootstrapPage(
 
 const LIST_PAGE_LIMIT = 32;
 const STATUS_PAGE_LIMIT = 96;
+
+/** Chart summaries and stream metadata for the owner's activities among
+ * `ids`; unknown or deleted IDs are left out. */
+export async function summariesFor(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  ids: string[],
+) {
+  const rows = await Promise.all(
+    ids.map((key) => activityFor(ctx, owner._id, idKey(key))),
+  );
+  const summaries = await Promise.all(
+    rows.map(async (row) => {
+      if (!row || row.deleted) return null;
+      const item = project(row, owner);
+      if (!item) return null;
+      const summary = (await currentRecording(ctx, row, item))?.summary ?? null;
+      return {
+        activityId: item.id,
+        metadata: item.streams ?? null,
+        summary,
+      };
+    }),
+  );
+  return summaries.filter((summary) => summary !== null);
+}
 
 export const read = internalQuery({
   args: { ...scopeFields, operation },
@@ -200,24 +168,7 @@ export const read = internalQuery({
       }
       case 'summaries': {
         if (op.ids.length > 48) throw new Error('Too many summary IDs');
-        const rows = await Promise.all(
-          op.ids.map((key) => activityFor(ctx, owner._id, idKey(key))),
-        );
-        const summaries = await Promise.all(
-          rows.map(async (row) => {
-            if (!row || row.deleted) return null;
-            const item = project(row, owner);
-            if (!item) return null;
-            const summary =
-              (await currentRecording(ctx, row, item))?.summary ?? null;
-            return {
-              activityId: item.id,
-              metadata: item.streams ?? null,
-              summary,
-            };
-          }),
-        );
-        return summaries.filter((summary) => summary !== null);
+        return summariesFor(ctx, owner, op.ids);
       }
       case 'activityIds': {
         // Explicitly bounded so one lookup cannot exceed the byte limit even

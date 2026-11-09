@@ -6,6 +6,7 @@ import type { QueryCtx } from './_generated/server';
 import { internalMutation, internalQuery } from './_generated/server';
 import { PROJECTION_VERSION } from './activityProjection';
 import { actorFields, scopeFields } from './ownerScope';
+import { zeroCounts } from './statsShape';
 
 export { scopeFields } from './ownerScope';
 
@@ -91,6 +92,8 @@ export const provision = internalMutation({
         retentionFloor: 0,
       });
       await ctx.db.insert('ownerEpochs', { owner: id, epoch: args.epoch });
+      // A new owner has no activities yet; writes keep its counts current.
+      await ctx.db.insert('ownerStats', { owner: id, counts: zeroCounts() });
       return id;
     }
     if (
