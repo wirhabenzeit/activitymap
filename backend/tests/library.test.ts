@@ -313,3 +313,91 @@ void test('reads across many large activities stay within transaction limits', a
   assert.equal(status.counts.total, count);
   assert.equal(status.counts.chartSummaries, count);
 });
+
+void test('changes resumes from a sequence with current cards and deletions', async () => {
+  const convex = await setup(3);
+  const viewer = convex.withIdentity(identity);
+  const apply = (id: string, index: number, extra: object, revision: number) =>
+    convex.mutation(internal.activityWrites.applySource, {
+      scope,
+      id,
+      generation,
+      sourceRevision: revision,
+      dto: activity(id, index, extra),
+    });
+
+  await assert.rejects(
+    convex.query(api.library.changes, { after: null }),
+    /not_authorized/,
+  );
+  // No position yet: load the library and continue from the head.
+  const start = await viewer.query(api.library.changes, { after: null });
+  assert(start.reload);
+  assert.equal(start.sequence, 3);
+  const nothing = await viewer.query(api.library.changes, {
+    after: start.sequence,
+  });
+  assert(!nothing.reload);
+  assert.equal(nothing.version, start.version);
+  assert.deepEqual(
+    [nothing.sequence, nothing.more, nothing.upserts, nothing.deletes],
+    [3, false, [], []],
+  );
+
+  // Two writes to one activity collapse into its current card.
+  await apply('1001', 1, { name: 'First' }, 11);
+  await apply('1001', 1, { name: 'Second' }, 12);
+  await convex.mutation(internal.importer.deleteSources, {
+    scope,
+    generation,
+    sourceRevision: 12,
+    ids: ['1002'],
+  });
+  await apply('2000', 200, {}, 12);
+  const next = await viewer.query(api.library.changes, { after: 3 });
+  assert(!next.reload);
+  assert.equal(next.sequence, 7);
+  assert.deepEqual(
+    next.upserts.map((item) => [item.id, item.name]),
+    [
+      ['1001', 'Second'],
+      ['2000', 'Ride 200'],
+    ],
+  );
+  for (const item of next.upserts) assert.equal('map_polyline' in item, false);
+  assert.deepEqual(next.deletes, ['1002']);
+
+  // Compacted history or a position this owner never reached: reload.
+  await convex.run(async (ctx) => {
+    const head = (await ctx.db.query('ownerHeads').first())!;
+    await ctx.db.patch('ownerHeads', head._id, { retentionFloor: 5 });
+  });
+  const compacted = await viewer.query(api.library.changes, { after: 4 });
+  assert(compacted.reload);
+  assert.equal(compacted.sequence, 7);
+  assert(!(await viewer.query(api.library.changes, { after: 5 })).reload);
+  assert((await viewer.query(api.library.changes, { after: 99 })).reload);
+});
+
+void test('changes reads large libraries in batches within transaction limits', async () => {
+  const count = 80;
+  const convex = await setup(count, { large: true });
+  const viewer = convex.withIdentity(identity);
+  const seen: string[] = [];
+  let after = 0;
+  let reads = 0;
+  for (;;) {
+    const result = await viewer.query(api.library.changes, { after });
+    assert(!result.reload);
+    reads += 1;
+    seen.push(...result.upserts.map((item) => item.id));
+    after = result.sequence;
+    if (!result.more) break;
+  }
+  assert.deepEqual(
+    seen,
+    Array.from({ length: count }, (_, i) => String(1000 + i)),
+  );
+  assert.equal(after, count);
+  assert.equal(reads, 3, 'at most 32 activities per read');
+});

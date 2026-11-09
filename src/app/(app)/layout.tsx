@@ -59,6 +59,12 @@ export default async function AppShellLayout({
           ...(preview && {
             storedLibraryPreview: true,
           }),
+          ...(preview &&
+            'transport' in preview &&
+            preview.live &&
+            process.env.ACTIVITYMAP_CONVEX_URL && {
+              convexLive: { url: process.env.ACTIVITYMAP_CONVEX_URL },
+            }),
         }
       : null;
   }

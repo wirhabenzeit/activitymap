@@ -18,6 +18,8 @@ export type CurrentUserDTO = {
   stravaConnected: boolean;
   /** Server-selected web preview; enables stored-data reads, never provider writes. */
   storedLibraryPreview?: boolean;
+  /** Live preview: the Convex deployment the client subscribes to. */
+  convexLive?: { url: string };
   /** What the approved Strava scopes allow; `null` when not yet known. */
   stravaPermissions: StravaPermissions | null;
 };
