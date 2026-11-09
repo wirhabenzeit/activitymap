@@ -81,7 +81,7 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --dir backend install --frozen-lockfile
       - run: pnpm --dir backend check
-      - run: pnpm exec tsx --conditions=react-server --tsconfig backend/convex/tsconfig.json --test backend/tests/sync.test.ts backend/tests/app-bridge.test.ts backend/tests/mirror.test.ts
+      - run: pnpm exec tsx --conditions=react-server --tsconfig backend/convex/tsconfig.json --test backend/tests/sync.test.ts backend/tests/app-bridge.test.ts backend/tests/mirror.test.ts backend/tests/viewer.test.ts backend/tests/library.test.ts
 
   browser-runtime:
     runs-on: ubuntu-24.04
@@ -162,7 +162,7 @@ jobs:
     concurrency:
       group: ios-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-    timeout-minutes: 35
+    timeout-minutes: 42
     env:
       IOS_TEST_PROFILE: pr
     steps:

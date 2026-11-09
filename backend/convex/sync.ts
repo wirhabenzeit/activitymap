@@ -4,13 +4,9 @@ import type { ActivityDTO } from '~/contracts/v1/activity';
 
 import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, internalQuery } from './_generated/server';
-import {
-  MAX_PAGE_BYTES,
-  PROJECTION_VERSION,
-  jsonBytes,
-  projectedActivity,
-} from './activityProjection';
+import { MAX_PAGE_BYTES } from './activityProjection';
 import { activityFor } from './activityWrites';
+import { currentRecording, liveRows, project } from './liveProjection';
 import { idKey, requireHead, requireOwner, scopeFields } from './owners';
 
 const id = v.string();
@@ -40,63 +36,80 @@ const operation = v.union(
   }),
 );
 
-function project(row: Doc<'activities'>, owner: Doc<'owners'>) {
-  if (!row.dto || row.deleted || row.generation !== owner.generation)
-    return null;
-  if (
-    row.projection?.version !== PROJECTION_VERSION ||
-    row.projection.generation !== owner.generation
-  ) {
-    // Preserve the activity in the library while a projection is rebuilt.
-    // Omit derived state rather than presenting stale streams or matches.
-    return { ...row.dto };
-  }
-  return projectedActivity(
-    row.dto,
-    row.projection,
-    owner,
-    owner.matchingVersion,
-  );
-}
+const utf8 = new TextEncoder();
 
-/** A row's recording only while it still describes the projected streams. */
-async function currentRecording(
-  ctx: QueryCtx,
-  row: Doc<'activities'>,
-  item: Pick<Partial<ActivityDTO>, 'streams'>,
-) {
-  const recording =
-    row.recording && (await ctx.db.get('recordings', row.recording));
-  return recording &&
-    recording.activity === row._id &&
-    item.streams?.state === 'current' &&
-    recording.sourceRevision === row.sourceRevision &&
-    recording.generation === item.streams.generation &&
-    recording.revision === item.streams.revision
-    ? recording
-    : null;
-}
-
-function liveRows(
+/** One bootstrap page of activities, bounded by `op.limit` and MAX_PAGE_BYTES.
+ * Each item is serialized once: `json` holds the exact text of `items`, so the
+ * HTTP bridge can send the page without re-serializing it. */
+async function bootstrapPage(
   ctx: QueryCtx,
   owner: Doc<'owners'>,
-  after: string,
-  count: number,
+  op: { after: string | null; limit: number },
 ) {
-  return ctx.db
-    .query('activities')
-    .withIndex('by_owner_live_key', (q) =>
-      q
-        .eq('owner', owner._id)
-        .eq('generation', owner.generation)
-        .eq('deleted', false)
-        .gt('key', after),
-    )
-    .take(count);
+  let after = op.after === null ? '' : idKey(op.after);
+  const items: ActivityDTO[] = [];
+  const json: string[] = [];
+  let size = 2;
+  // Each `take` is a sequential index read, so size the next batch from the
+  // remaining byte budget instead of reading a fixed 32 rows at a time.
+  let batch = 64;
+  while (items.length < op.limit) {
+    const count = Math.min(batch, op.limit - items.length);
+    const rows = await liveRows(ctx, owner, after, count);
+    for (const row of rows) {
+      const item = project(row, owner);
+      if (!item) {
+        after = row.key;
+        continue;
+      }
+      const text = JSON.stringify(item);
+      size += utf8.encode(text).length + Number(items.length > 0);
+      if (size > MAX_PAGE_BYTES) return { items, json, more: true };
+      items.push(item);
+      json.push(text);
+      after = row.key;
+    }
+    if (rows.length < count) return { items, json, more: false };
+    const average = items.length > 0 ? (size - 2) / items.length : 0;
+    batch =
+      average > 0
+        ? Math.min(
+            256,
+            Math.max(8, Math.ceil((MAX_PAGE_BYTES - size) / average) + 1),
+          )
+        : 256;
+  }
+  return { items, json, more: true };
 }
 
 const LIST_PAGE_LIMIT = 32;
 const STATUS_PAGE_LIMIT = 96;
+
+/** Chart summaries and stream metadata for the owner's activities among
+ * `ids`; unknown or deleted IDs are left out. */
+export async function summariesFor(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  ids: string[],
+) {
+  const rows = await Promise.all(
+    ids.map((key) => activityFor(ctx, owner._id, idKey(key))),
+  );
+  const summaries = await Promise.all(
+    rows.map(async (row) => {
+      if (!row || row.deleted) return null;
+      const item = project(row, owner);
+      if (!item) return null;
+      const summary = (await currentRecording(ctx, row, item))?.summary ?? null;
+      return {
+        activityId: item.id,
+        metadata: item.streams ?? null,
+        summary,
+      };
+    }),
+  );
+  return summaries.filter((summary) => summary !== null);
+}
 
 export const read = internalQuery({
   args: { ...scopeFields, operation },
@@ -125,27 +138,8 @@ export const read = internalQuery({
         const response = { head, resource: op.resource };
         if (op.resource === 'photos')
           return { ...response, items: [], more: false };
-        let after = op.after === null ? '' : idKey(op.after);
-        const items = [];
-        let size = 2;
-        while (items.length < op.limit) {
-          const count = Math.min(32, op.limit - items.length);
-          const rows = await liveRows(ctx, owner, after, count);
-          for (const row of rows) {
-            const item = project(row, owner);
-            if (!item) {
-              after = row.key;
-              continue;
-            }
-            size += jsonBytes(item) + Number(items.length > 0);
-            if (size > MAX_PAGE_BYTES)
-              return { ...response, items, more: true };
-            items.push(item);
-            after = row.key;
-          }
-          if (rows.length < count) return { ...response, items, more: false };
-        }
-        return { ...response, items, more: true };
+        const { items, more } = await bootstrapPage(ctx, owner, op);
+        return { ...response, items, more };
       }
       case 'changes': {
         if (
@@ -174,24 +168,7 @@ export const read = internalQuery({
       }
       case 'summaries': {
         if (op.ids.length > 48) throw new Error('Too many summary IDs');
-        const rows = await Promise.all(
-          op.ids.map((key) => activityFor(ctx, owner._id, idKey(key))),
-        );
-        const summaries = await Promise.all(
-          rows.map(async (row) => {
-            if (!row || row.deleted) return null;
-            const item = project(row, owner);
-            if (!item) return null;
-            const summary =
-              (await currentRecording(ctx, row, item))?.summary ?? null;
-            return {
-              activityId: item.id,
-              metadata: item.streams ?? null,
-              summary,
-            };
-          }),
-        );
-        return summaries.filter((summary) => summary !== null);
+        return summariesFor(ctx, owner, op.ids);
       }
       case 'activityIds': {
         // Explicitly bounded so one lookup cannot exceed the byte limit even
@@ -295,6 +272,37 @@ export const read = internalQuery({
         };
       }
     }
+  },
+});
+
+/** The bootstrap page as the JSON text `read` would return for it. Returning
+ * one string avoids converting a ~2 MB object tree into a Convex value, back
+ * into the HTTP action, and serializing it again for the response. */
+export const bootstrapJson = internalQuery({
+  args: {
+    ...scopeFields,
+    operation: v.object({
+      kind: v.literal('bootstrap'),
+      resource,
+      after: cursor,
+      limit: v.number(),
+    }),
+  },
+  handler: async (ctx, { operation: op, ...scope }) => {
+    const owner = await requireOwner(ctx, scope);
+    const feed = await requireHead(ctx, owner._id);
+    const head = JSON.stringify({
+      sequence: feed.sequence,
+      matchingVersion: owner.matchingVersion,
+      lastSummaryReconciledAt: null,
+    });
+    if (!Number.isInteger(op.limit) || op.limit < 1 || op.limit > 500)
+      throw new Error('Invalid sync page limit');
+    const page =
+      op.resource === 'photos'
+        ? { json: [], more: false }
+        : await bootstrapPage(ctx, owner, op);
+    return `{"head":${head},"resource":"${op.resource}","items":[${page.json.join(',')}],"more":${page.more}}`;
   },
 });
 

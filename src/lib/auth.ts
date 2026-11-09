@@ -1,18 +1,26 @@
 import { betterAuth } from 'better-auth';
 import { drizzleAdapter } from 'better-auth/adapters/drizzle';
-import { genericOAuth } from 'better-auth/plugins/generic-oauth';
-import { bearer, oAuthProxy } from 'better-auth/plugins';
 import { createAuthMiddleware } from 'better-auth/api';
-import { db } from '~/server/db';
-import { users, accounts, sessions, verification } from '~/server/db/schema';
+import { bearer, jwt, oAuthProxy } from 'better-auth/plugins';
+import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { logger } from '~/server/logging/logger';
-import { stravaAccessEnabled } from '~/server/config/external-effects';
+
+import { convexJwtOptions } from '~/lib/auth-jwt';
 import {
   callbackScopeParam,
   grantedStravaScope,
 } from '~/lib/strava-permissions';
+import { stravaAccessEnabled } from '~/server/config/external-effects';
+import { db } from '~/server/db';
+import {
+  accounts,
+  jwks,
+  sessions,
+  users,
+  verification,
+} from '~/server/db/schema';
+import { logger } from '~/server/logging/logger';
 
 const stravaProfileSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -30,6 +38,8 @@ function getSessionUserId(value: unknown): string | null {
   const session = value as { user?: { id?: unknown } };
   return typeof session.user?.id === 'string' ? session.user.id : null;
 }
+
+const convexJwt = convexJwtOptions();
 
 export const auth = betterAuth({
   baseURL: {
@@ -50,6 +60,7 @@ export const auth = betterAuth({
       account: accounts,
       session: sessions,
       verification: verification,
+      jwks,
     },
   }),
   plugins: [
@@ -127,6 +138,9 @@ export const auth = betterAuth({
     // accepted, so a raw `sessions.sessionToken` value leaked some other
     // way (e.g. serialized into client state) can't be replayed here.
     bearer({ requireSignature: true }),
+    // Short-lived tokens for the Convex application backend; off unless an
+    // issuer is configured for this environment.
+    ...(convexJwt ? [jwt(convexJwt)] : []),
   ],
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 days

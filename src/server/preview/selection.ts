@@ -13,7 +13,15 @@ const configSchema = z.record(
     z.object({ epoch, key: z.string().regex(/^[0-9a-f]{64}$/) }).strict(),
     // Application backend (`backend/`) through the signed sync bridge. The
     // epoch must match the owner's current Convex assignment.
-    z.object({ epoch, transport: z.literal('app') }).strict(),
+    // `live`: the web client reads through live Convex queries instead of
+    // the REST sync (docs/convex-reactive-reads.md).
+    z
+      .object({
+        epoch,
+        transport: z.literal('app'),
+        live: z.boolean().optional(),
+      })
+      .strict(),
   ]),
 );
 export type PreviewOwnerConfig = z.infer<typeof configSchema>[string];

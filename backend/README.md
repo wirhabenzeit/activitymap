@@ -48,6 +48,16 @@ application user ID. An entry selects its data source:
   epoch fails closed. Requires the three `ACTIVITYMAP_CONVEX_*` bridge settings.
 - `{ "epoch": "…", "key": "…" }` reads the isolated lab deployment from #495
   and requires `ACTIVITYMAP_CONVEX_PREVIEW_SITE`.
+- `{ "epoch": "…", "transport": "app", "live": true }` additionally moves the
+  web client's library onto live Convex queries (`src/lib/sync/convex-live.ts`):
+  it subscribes to `library.list` instead of running the REST sync, commits
+  pages into the browser library store, and fetches `library.activity` for the
+  detailed polyline (GPX export). Requires `ACTIVITYMAP_CONVEX_URL` (the
+  deployment's `.convex.cloud` URL), an app issuer
+  (`ACTIVITYMAP_AUTH_JWT_ISSUER`) and the matching Convex auth settings. If the
+  token is rejected, a query fails or no page arrives within 20 seconds, the
+  client falls back to the REST sync. Chart summaries and the status panel
+  still use their REST routes.
 
 Both use the same adapter (`src/server/preview/convex.ts`), so the v1 sync,
 list, summary, stream, places and status routes behave identically. This
@@ -97,6 +107,79 @@ it is not exposed on the write bridge. All three scripts refuse to read
 anything but the local database. The verifier runs the real bootstrap and
 stream-summary handlers against Postgres and against this package, and exits
 non-zero on any difference.
+
+## Authenticated clients
+
+Public functions (`convex/library.ts`) identify the caller from a short-lived
+token issued by the app's Better Auth `jwt` plugin (`src/lib/auth-jwt.ts`):
+ES256, `sub` = application user ID, `aud` = `convex`, 15 minutes, no profile
+claims. `convex/viewer.ts` resolves the owner from the token subject and
+serves only owners assigned to Convex. Public functions take no user argument.
+
+`convex/auth.config.ts` reads two variables per deployment. Convex refuses to
+deploy an auth config that reads an unset variable, so set the issuer before
+deploying:
+
+```sh
+# No authenticated access (the default until an app environment is wired):
+pnpm exec convex env set ACTIVITYMAP_AUTH_JWT_ISSUER disabled
+# Wired to an app environment (must equal that app's ACTIVITYMAP_AUTH_JWT_ISSUER):
+pnpm exec convex env set ACTIVITYMAP_AUTH_JWT_ISSUER https://activitymap.cc
+pnpm exec convex env set ACTIVITYMAP_AUTH_JWKS 'data:text/plain;charset=utf-8;base64,<public JWKS>'
+```
+
+The JWKS is the app's `/api/auth/jwks` response; the plugin creates its key on
+the first token request. To rotate, publish old and new public keys together,
+rotate in the app, and drop the old key after 15 minutes. Change variables
+only after the matching auth config is deployed: Convex validates each change
+against the deployed config.
+
+## Live library queries
+
+`convex/library.ts` holds the public queries for authenticated clients
+(`requireViewer`): `list` (paginated activity cards: the v1 DTO without the
+detailed `map_polyline`, up to 256 per page), `activity` (the full DTO),
+`summaries` (up to 32 chart summaries) and `status`. None reads `ownerHeads`,
+so subscriptions re-run only when the rows they read change.
+
+Convex limits the data one transaction reads to 16 MiB, counted on whole
+documents, and an activity document can hold about 256 KiB. Functions that
+read many activities stay within half of that (`convex/activityProjection.ts`):
+`list` pages and the stats recount stop after 6 MiB of activities
+(`maximumBytesRead`), so a page can hold fewer than requested and continues
+from `continueCursor`; reads by ID take at most 32 activities with their
+recordings. `tests/library.test.ts` checks this with near-maximum activities
+and transaction limits enabled.
+
+`status` reads `ownerStats`, a per-owner counts document that `applySource`
+and recording publication update in the same transaction (skipping writes
+that change no count), plus the oldest and newest activity from the
+`by_owner_live_start` index. New owners start with zero counts. For owners that
+existed before `ownerStats`, run a recount once; writes keep counts consistent
+while it runs, and `status` reports `ready: false` until it finishes:
+
+```sh
+pnpm exec convex run stats:rebuild '{"userId":"<userId>"}'
+```
+
+### Live owners in production
+
+Preview owners exist only outside Vercel Production. To load an ordinary
+production account's library through these queries, list it as a live owner in
+the app:
+
+```sh
+ACTIVITYMAP_CONVEX_URL=https://<deployment>.convex.cloud
+ACTIVITYMAP_CONVEX_LIVE_OWNERS='["<userId>"]'
+```
+
+Only the library download changes for such an account
+(`src/server/convex-live-owners.ts`): edits, charts, status and photos keep
+their Postgres routes, and the client reads the photo list from the REST
+bootstrap because photos are not stored here. The account must also be a
+shadow owner, so the mirror keeps this deployment current, and its counts need
+one `stats:rebuild`. Library changes reach the browser after the next mirror
+run. Remove the account from the list to return it to the REST sync.
 
 ## Shadow writes
 

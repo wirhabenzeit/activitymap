@@ -171,6 +171,21 @@ export const verification = pgTable('verification', {
   updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
 });
 
+// Key pairs of Better Auth's `jwt` plugin, which signs the short-lived tokens
+// Convex accepts (docs/convex-reactive-reads.md). The plugin encrypts the
+// private key with the Better Auth secret.
+export const jwks = pgTable('jwks', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  publicKey: text('publicKey').notNull(),
+  privateKey: text('privateKey').notNull(),
+  createdAt: timestamp('createdAt', { mode: 'date' }).notNull(),
+  expiresAt: timestamp('expiresAt', { mode: 'date' }),
+  alg: text('alg'),
+  crv: text('crv'),
+});
+
 // The legacy `webhook` table (superseded by `stravaWebhooks`/
 // `stravaWebhookEvents` from issue #124's durable webhook inbox) was dropped
 // in issue #126 phase 3 - see that migration and PR for the "nothing reads

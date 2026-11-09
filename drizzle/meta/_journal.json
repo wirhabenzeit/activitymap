@@ -211,6 +211,13 @@
       "when": 1793522276573,
       "tag": "0029_place-noise-filter",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1794175092758,
+      "tag": "0030_auth-jwks",
+      "breakpoints": true
     }
   ]
 }

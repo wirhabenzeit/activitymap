@@ -109,7 +109,10 @@ export function nativeTestProfile(name = 'full') {
           ]
         : [...nativeSuites],
     // Keep runtime separate from compilation; every selected UI journey must run.
-    runtimeTimeoutMs: (name === 'pr' ? 12 : 45) * 60 * 1000,
+    // The PR suite now holds nine UI journeys (40-55s each on hosted runners)
+    // and passed in 477-665s; a slow runner reached the old 12-minute limit
+    // during the last journey with every test passing.
+    runtimeTimeoutMs: (name === 'pr' ? 15 : 45) * 60 * 1000,
   };
 }
 
@@ -369,7 +372,8 @@ export async function runNativeHarness({
       await command(
         ['simctl', 'bootstatus', simulator, '-b'],
         'boot-status.log',
-        180000,
+        // Hosted boots take 85-185s; slow runners exceeded three minutes.
+        300000,
       );
     });
     const commonArguments = [

@@ -16,6 +16,7 @@ import { Toaster } from '~/components/ui/toaster';
 import { BrowsingProvider } from '~/hooks/use-browsing-library';
 import { auth } from '~/lib/auth';
 import { QueryProvider } from '~/providers/query-provider';
+import { convexLiveUrl } from '~/server/convex-live-owners';
 import { toCurrentUserDTO } from '~/server/db/dto';
 import { getAccountInternal, getUserInternal } from '~/server/db/internal';
 import { previewSelection } from '~/server/preview/selection';
@@ -53,12 +54,24 @@ export default async function AppShellLayout({
     const preview = user ? previewSelection({ userId: user.id }) : null;
     const account =
       user && !preview ? await getAccountInternal({ userId: user.id }) : null;
+    // Live library reads: a `live` preview owner, or an ordinary account
+    // listed as a live owner (only its library download moves to Convex).
+    const previewLiveUrl =
+      preview && 'transport' in preview && preview.live
+        ? process.env.ACTIVITYMAP_CONVEX_URL
+        : undefined;
+    const liveUrl = !user
+      ? null
+      : preview
+        ? previewLiveUrl
+        : convexLiveUrl(user.id);
     initialAuth.currentUser = user
       ? {
           ...toCurrentUserDTO(user, account),
           ...(preview && {
             storedLibraryPreview: true,
           }),
+          ...(liveUrl && { convexLive: { url: liveUrl } }),
         }
       : null;
   }
