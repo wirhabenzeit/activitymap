@@ -7,7 +7,8 @@ import {
   type QueryCtx,
   internalMutation,
 } from './_generated/server';
-import { currentRecording, liveRows, project } from './liveProjection';
+import { READ_BUDGET_BYTES } from './activityProjection';
+import { currentRecording, project } from './liveProjection';
 import { ownerFor } from './owners';
 import { COUNT_FIELDS, type Counts, zeroCounts } from './statsShape';
 
@@ -107,16 +108,32 @@ export const rebuildStep = internalMutation({
       statsFor(ctx, ownerId),
     ]);
     if (!owner || stats?.rebuildAfter === undefined) return;
-    const rows = await liveRows(ctx, owner, stats.rebuildAfter, REBUILD_PAGE);
+    // Activities stop at the read budget; their recordings (one per
+    // activity, a few KiB each) stay well within the rest of the limit.
+    const { page: rows, isDone: done } = await ctx.db
+      .query('activities')
+      .withIndex('by_owner_live_key', (q) =>
+        q
+          .eq('owner', owner._id)
+          .eq('generation', owner.generation)
+          .eq('deleted', false)
+          .gt('key', stats.rebuildAfter!),
+      )
+      .paginate({
+        numItems: REBUILD_PAGE,
+        cursor: null,
+        maximumBytesRead: READ_BUDGET_BYTES,
+      });
     const counts = { ...stats.counts };
     for (const row of rows) {
       const add = await contribution(ctx, owner, row);
       if (add) for (const field of COUNT_FIELDS) counts[field] += add[field];
     }
-    const done = rows.length < REBUILD_PAGE;
+    const last = rows.at(-1);
+    if (!done && !last) throw new Error('Stats rebuild made no progress');
     await ctx.db.patch('ownerStats', stats._id, {
       counts,
-      rebuildAfter: done ? undefined : rows.at(-1)!.key,
+      rebuildAfter: done ? undefined : last!.key,
     });
     if (!done)
       await ctx.scheduler.runAfter(0, internal.stats.rebuildStep, {

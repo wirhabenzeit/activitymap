@@ -45,6 +45,23 @@ const streams: RawActivityStreams = {
   },
 };
 const day = 86_400_000;
+// Close to MAX_ACTIVITY_BYTES (256 KiB for DTO and projection together).
+const LARGE_POLYLINE = 251 * 1024;
+const series = (points: number, value: (i: number) => unknown) => ({
+  data: Array.from({ length: points }, (_, i) => value(i)),
+  original_size: points,
+  resolution: 'high',
+  series_type: 'distance',
+});
+/** A long recording with every series, so its chart summary is full size. */
+const largeStreams = {
+  time: series(3000, (i) => i),
+  distance: series(3000, (i) => i * 7.3),
+  latlng: series(3000, (i) => [47 + Math.sin(i) / 50, 8 + Math.cos(i) / 50]),
+  altitude: series(3000, (i) => 400 + 300 * Math.sin(i / 37)),
+  heartrate: series(3000, (i) => 120 + (i % 61)),
+  watts: series(3000, (i) => 150 + ((i * 13) % 211)),
+} as RawActivityStreams;
 const base = Date.UTC(2026, 0, 1);
 
 function activity(id: string, index: number, extra: object = {}) {
@@ -62,8 +79,10 @@ function activity(id: string, index: number, extra: object = {}) {
   };
 }
 
-async function setup(count: number) {
-  const convex = convexTest(schema, modules);
+/** `large` activities carry near-maximum detailed polylines and run with
+ * Convex's transaction limits (16 MiB read and written per transaction). */
+async function setup(count: number, { large = false } = {}) {
+  const convex = convexTest({ schema, modules, transactionLimits: large });
   await convex.mutation(internal.owners.provision, {
     ...scope,
     backend: 'convex',
@@ -72,43 +91,53 @@ async function setup(count: number) {
     matchingVersion,
   });
   const items = Array.from({ length: count }, (_, i) =>
-    activity(String(1000 + i), i),
+    activity(
+      String(1000 + i),
+      i,
+      large ? { map_polyline: `${i}`.padEnd(LARGE_POLYLINE, 'x') } : {},
+    ),
   );
-  for (let i = 0; i < items.length; i += 64)
+  const batch = large ? 16 : 64;
+  for (let i = 0; i < items.length; i += batch)
     await convex.mutation(internal.importer.applySources, {
       scope,
       generation,
       sourceRevision: 10,
-      items: items.slice(i, i + 64),
+      items: items.slice(i, i + batch),
       recordings: [],
     });
   return convex;
 }
 
-async function record(convex: Awaited<ReturnType<typeof setup>>, id: string) {
-  const { file, manifest } = encodeWhole(streams);
-  const storageId = await convex.run((ctx) =>
-    ctx.storage.store(new Blob([new Uint8Array(file)])),
+async function record(
+  convex: Awaited<ReturnType<typeof setup>>,
+  ids: string[],
+  recorded: RawActivityStreams = streams,
+) {
+  const { file, manifest } = encodeWhole(recorded);
+  const items = await Promise.all(
+    ids.map(async (id) => ({
+      id,
+      file: await convex.run((ctx) =>
+        ctx.storage.store(new Blob([new Uint8Array(file)])),
+      ),
+      manifest,
+      recordingGeneration: 'pg-generation',
+      recordingRevision: '1',
+    })),
   );
-  await convex.action(internal.importer.prepareRecordings, {
-    scope,
-    generation,
-    sourceRevision: 10,
-    items: [
-      {
-        id,
-        file: storageId,
-        manifest,
-        recordingGeneration: 'pg-generation',
-        recordingRevision: '1',
-      },
-    ],
-  });
+  for (let i = 0; i < items.length; i += 16)
+    await convex.action(internal.importer.prepareRecordings, {
+      scope,
+      generation,
+      sourceRevision: 10,
+      items: items.slice(i, i + 16),
+    });
 }
 
 void test('live queries serve cards, detail, summaries and counts to the owner only', async () => {
   const convex = await setup(3);
-  await record(convex, '1000');
+  await record(convex, ['1000']);
   const viewer = convex.withIdentity(identity);
 
   await assert.rejects(
@@ -172,7 +201,7 @@ void test('live queries serve cards, detail, summaries and counts to the owner o
 
 void test('write paths keep counts equal to a full recount, also during a rebuild', async () => {
   const convex = await setup(100);
-  await record(convex, '1003');
+  await record(convex, ['1003']);
   const viewer = convex.withIdentity(identity);
   const counts = async () => {
     const status = await viewer.query(api.library.status, {});
@@ -233,4 +262,54 @@ void test('write paths keep counts equal to a full recount, also during a rebuil
   for (let i = 0; i < 3; i++)
     await convex.mutation(internal.stats.rebuildStep, { owner });
   assert.deepEqual(await counts(), rebuilt);
+});
+
+void test('reads across many large activities stay within transaction limits', async () => {
+  const count = 100;
+  const convex = await setup(count, { large: true });
+  const ids = Array.from({ length: count }, (_, i) => String(1000 + i));
+  await record(convex, ids, largeStreams);
+  const viewer = convex.withIdentity(identity);
+
+  // A page stops at the read budget and continues where it stopped.
+  const seen: string[] = [];
+  let cursor: string | null = null;
+  let pages = 0;
+  for (;;) {
+    const page: {
+      page: { id: string }[];
+      isDone: boolean;
+      continueCursor: string;
+    } = await viewer.query(api.library.list, {
+      paginationOpts: { numItems: 256, cursor },
+    });
+    pages += 1;
+    seen.push(...page.page.map((card) => card.id));
+    if (page.isDone) break;
+    cursor = page.continueCursor;
+  }
+  assert.deepEqual(seen, ids);
+  assert(pages > 1, 'the byte budget split the library into several pages');
+
+  const summaries = await viewer.query(api.library.summaries, {
+    ids: ids.slice(0, 32),
+  });
+  assert.equal(summaries.filter((item) => item.summary).length, 32);
+  await assert.rejects(
+    viewer.query(api.library.summaries, { ids: ids.slice(0, 33) }),
+    /Too many summary IDs/,
+  );
+
+  await convex.mutation(internal.stats.rebuild, { userId: scope.userId });
+  const owner = await convex.run(
+    async (ctx) => (await ctx.db.query('owners').first())!._id,
+  );
+  let status = await viewer.query(api.library.status, {});
+  for (let step = 0; step < 50 && !status.ready; step++) {
+    await convex.mutation(internal.stats.rebuildStep, { owner });
+    status = await viewer.query(api.library.status, {});
+  }
+  assert(status.ready, 'the rebuild finished');
+  assert.equal(status.counts.total, count);
+  assert.equal(status.counts.chartSummaries, count);
 });

@@ -129,8 +129,17 @@ against the deployed config.
 `convex/library.ts` holds the public queries for authenticated clients
 (`requireViewer`): `list` (paginated activity cards: the v1 DTO without the
 detailed `map_polyline`, up to 256 per page), `activity` (the full DTO),
-`summaries` (up to 100 chart summaries) and `status`. None reads `ownerHeads`,
+`summaries` (up to 32 chart summaries) and `status`. None reads `ownerHeads`,
 so subscriptions re-run only when the rows they read change.
+
+Convex limits the data one transaction reads to 16 MiB, counted on whole
+documents, and an activity document can hold about 256 KiB. Functions that
+read many activities stay within half of that (`convex/activityProjection.ts`):
+`list` pages and the stats recount stop after 6 MiB of activities
+(`maximumBytesRead`), so a page can hold fewer than requested and continues
+from `continueCursor`; reads by ID take at most 32 activities with their
+recordings. `tests/library.test.ts` checks this with near-maximum activities
+and transaction limits enabled.
 
 `status` reads `ownerStats`, a per-owner counts document that `applySource`
 and recording publication update in the same transaction (skipping writes

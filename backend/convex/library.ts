@@ -3,6 +3,10 @@ import { v } from 'convex/values';
 
 import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, query } from './_generated/server';
+import {
+  MAX_ACTIVITIES_PER_READ,
+  READ_BUDGET_BYTES,
+} from './activityProjection';
 import { activityFor } from './activityWrites';
 import { project } from './liveProjection';
 import { idKey } from './owners';
@@ -33,7 +37,9 @@ export const whoami = query({
 
 /** Cards are the v1 activity DTO without `map_polyline`: the map draws from
  * the summary polyline, and detailed polylines are most of the library's
- * bytes. `library.activity` returns them on demand. */
+ * bytes. `library.activity` returns them on demand. A page holds up to 256
+ * cards, and fewer when its documents reach the read budget: continue from
+ * `continueCursor` until `isDone`. */
 const MAX_CARDS_PER_PAGE = 256;
 
 export const list = query({
@@ -51,6 +57,10 @@ export const list = query({
       .paginate({
         ...paginationOpts,
         numItems: Math.min(paginationOpts.numItems, MAX_CARDS_PER_PAGE),
+        maximumBytesRead: Math.min(
+          paginationOpts.maximumBytesRead ?? READ_BUDGET_BYTES,
+          READ_BUDGET_BYTES,
+        ),
       });
     return {
       ...result,
@@ -75,11 +85,12 @@ export const activity = query({
   },
 });
 
-/** Chart summaries and stream metadata for up to 100 activities. */
+/** Chart summaries and stream metadata for up to 32 activities. */
 export const summaries = query({
   args: { ids: v.array(v.string()) },
   handler: async (ctx, { ids }) => {
-    if (ids.length > 100) throw new Error('Too many summary IDs');
+    if (ids.length > MAX_ACTIVITIES_PER_READ)
+      throw new Error('Too many summary IDs');
     return summariesFor(ctx, await requireViewer(ctx), ids);
   },
 });
