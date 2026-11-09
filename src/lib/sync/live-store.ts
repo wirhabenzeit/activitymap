@@ -2,6 +2,7 @@ import type { QueryClient } from '@tanstack/react-query';
 
 import type { LiveLibraryStore } from './convex-live';
 import { requestLibrarySync } from './library-sync';
+import type { V1ActivityStreamChange } from './v1-sync';
 
 /** A live library store whose operations receive the library writer's signal. */
 export type SignalledLiveStore = {
@@ -42,5 +43,38 @@ export function coordinatedLiveStore(
     cursor: () => commit((signal) => store.cursor(signal)),
     apply: (change) => commit((signal) => store.apply(change, signal)),
     heldIds: () => commit((signal) => store.heldIds(signal)),
+  };
+}
+
+/**
+ * Report each committed batch's activities and their stream metadata, as the
+ * REST sync does (`onActivityChanges`), so in-memory chart data loaded for an
+ * earlier recording is dropped. The report runs after the batch's commit,
+ * inside the same writer operation, and is skipped once the writer is fenced.
+ */
+export function observedLiveStore(
+  store: SignalledLiveStore,
+  onActivityChanges: (
+    changes: V1ActivityStreamChange[],
+  ) => void | Promise<void>,
+): SignalledLiveStore {
+  return {
+    ...store,
+    apply: async (change, signal) => {
+      await store.apply(change, signal);
+      signal.throwIfAborted();
+      const changes: V1ActivityStreamChange[] = [
+        ...change.upserts.map((activity) => ({
+          activityId: activity.id,
+          operation: 'upsert' as const,
+          metadata: activity.streams,
+        })),
+        ...change.deletes.map((activityId) => ({
+          activityId,
+          operation: 'delete' as const,
+        })),
+      ];
+      if (changes.length > 0) await onActivityChanges(changes);
+    },
   };
 }

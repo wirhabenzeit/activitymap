@@ -3,8 +3,15 @@ import assert from 'node:assert/strict';
 import type { QueryClient } from '@tanstack/react-query';
 import test from 'node:test';
 
+import type { ActivityDTO } from '~/contracts/v1/activity';
+
 import { registerLibrarySync, retireLibrarySync } from './library-sync';
-import { type SignalledLiveStore, coordinatedLiveStore } from './live-store';
+import {
+  type SignalledLiveStore,
+  coordinatedLiveStore,
+  observedLiveStore,
+} from './live-store';
+import type { V1ActivityStreamChange } from './v1-sync';
 
 const scope = 'auth:user-a';
 
@@ -101,4 +108,65 @@ void test('an operation resolves once its commit has run, before its pass ends',
   await apply;
   assert.deepEqual(log, ['heldIds', 'apply 0']);
   unregister();
+});
+
+void test('committed batches report their activities and stream metadata', async () => {
+  const log: string[] = [];
+  const seen: V1ActivityStreamChange[][] = [];
+  const store = observedLiveStore(innerStore(log), (changes) => {
+    log.push('observed');
+    seen.push(changes);
+  });
+  const streams = { state: 'current', revision: '2' };
+  const signal = new AbortController().signal;
+  await store.apply(
+    {
+      upserts: [{ id: '1', streams }, { id: '2' }] as unknown as ActivityDTO[],
+      deletes: ['3'],
+      cursor: { sequence: 8, version: 'v1' },
+      matchingVersion: 'm',
+    },
+    signal,
+  );
+  // Reported after the commit, like the REST sync's observations.
+  assert.deepEqual(log, ['apply 2', 'observed']);
+  assert.deepEqual(seen, [
+    [
+      { activityId: '1', operation: 'upsert', metadata: streams },
+      { activityId: '2', operation: 'upsert', metadata: undefined },
+      { activityId: '3', operation: 'delete' },
+    ],
+  ]);
+
+  // A batch that only moves the position reports nothing.
+  await store.apply(
+    { upserts: [], deletes: [], cursor: null, matchingVersion: 'm' },
+    signal,
+  );
+  assert.equal(seen.length, 1);
+});
+
+void test('a batch committed as the writer is fenced is not reported', async () => {
+  const session = new AbortController();
+  const seen: V1ActivityStreamChange[][] = [];
+  const store = observedLiveStore(
+    {
+      ...innerStore([]),
+      apply: async () => session.abort(),
+    },
+    (changes) => void seen.push(changes),
+  );
+  await assert.rejects(
+    store.apply(
+      {
+        upserts: [{ id: '1' }] as unknown as ActivityDTO[],
+        deletes: [],
+        cursor: null,
+        matchingVersion: 'm',
+      },
+      session.signal,
+    ),
+    { name: 'AbortError' },
+  );
+  assert.deepEqual(seen, []);
 });

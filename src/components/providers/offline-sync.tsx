@@ -44,7 +44,7 @@ import {
   clearV1Scope,
   deleteLegacyOfflineDatabase,
 } from '~/lib/sync/v1-store';
-import { runV1Sync } from '~/lib/sync/v1-sync';
+import { type V1ActivityStreamChange, runV1Sync } from '~/lib/sync/v1-sync';
 import { useShallowStore } from '~/store';
 
 const LIBRARY_SYNC_INTERVAL_MS = 2 * 60_000;
@@ -157,6 +157,35 @@ export function OfflineSyncProvider() {
     [initializeAuth, queryClient],
   );
 
+  // Chart data held in memory belongs to the stream metadata it was loaded
+  // for: drop it when a synced activity's recording changed or it was deleted.
+  const reconcileSummaries = useCallback(
+    async (
+      currentUserId: string,
+      changes: V1ActivityStreamChange[],
+      checkCurrent: () => void,
+    ) => {
+      for (const change of changes) {
+        checkCurrent();
+        if (change.operation === 'delete') {
+          await removeStreamSummaryActivity(
+            queryClient,
+            currentUserId,
+            change.activityId,
+          );
+        } else {
+          await reconcileStreamSummaryMetadata(
+            queryClient,
+            currentUserId,
+            change.activityId,
+            change.metadata,
+          );
+        }
+      }
+    },
+    [queryClient],
+  );
+
   const runSync = useCallback(
     async (currentUserId: string, signal: AbortSignal) => {
       const isCurrent = () =>
@@ -192,25 +221,8 @@ export function OfflineSyncProvider() {
             clearStreamSummarySyncAttempts(currentUserId);
             return reloadStreamSummaryScope(queryClient, currentUserId);
           },
-          onActivityChanges: async (changes) => {
-            for (const change of changes) {
-              checkCurrent();
-              if (change.operation === 'delete') {
-                await removeStreamSummaryActivity(
-                  queryClient,
-                  currentUserId,
-                  change.activityId,
-                );
-              } else {
-                await reconcileStreamSummaryMetadata(
-                  queryClient,
-                  currentUserId,
-                  change.activityId,
-                  change.metadata,
-                );
-              }
-            }
-          },
+          onActivityChanges: (changes) =>
+            reconcileSummaries(currentUserId, changes, checkCurrent),
         });
         checkCurrent();
         const owner = getLibraryOwner(queryClient, scope);
@@ -251,7 +263,7 @@ export function OfflineSyncProvider() {
         throw error;
       }
     },
-    [initializeAuth, queryClient, startSummarySync],
+    [initializeAuth, queryClient, reconcileSummaries, startSummarySync],
   );
 
   useEffect(() => {
@@ -398,6 +410,14 @@ export function OfflineSyncProvider() {
           summaries();
         },
         onChange: summaries,
+        onActivityChanges: (changes) =>
+          reconcileSummaries(activeUserId, changes, () => {
+            if (!mounted)
+              throw new DOMException(
+                'The library session changed',
+                'AbortError',
+              );
+          }),
         fallBack: (error) => {
           if (!mounted) return;
           console.warn('Live library unavailable; using the REST sync.', error);
@@ -424,6 +444,7 @@ export function OfflineSyncProvider() {
     isGuest,
     isInitialized,
     queryClient,
+    reconcileSummaries,
     runSync,
     startSummarySync,
     userId,

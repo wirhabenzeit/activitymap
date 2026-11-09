@@ -7,13 +7,18 @@ import { authClient } from '~/lib/auth-client';
 import { type LiveClient, LiveLibrary, createLiveClient } from './convex-live';
 import { LibrarySyncNotReadyError, registerLibrarySync } from './library-sync';
 import { setLiveDetailLoader } from './live-detail';
-import { type SignalledLiveStore, coordinatedLiveStore } from './live-store';
+import {
+  type SignalledLiveStore,
+  coordinatedLiveStore,
+  observedLiveStore,
+} from './live-store';
 import {
   type V1SyncState,
   applyV1SyncPage,
   getCachedActivityDTOs,
   getV1SyncState,
 } from './v1-store';
+import type { V1ActivityStreamChange } from './v1-sync';
 
 // The REST sync takes over if the library is not usable by then: resumed
 // from the stored position, or its first page loaded.
@@ -99,6 +104,11 @@ export function startLiveSession(options: {
   onComplete: (signal: AbortSignal) => void;
   /** Activities were added or changed after the first catch-up. */
   onChange?: (signal: AbortSignal) => void;
+  /** Activities committed to the store, with their stream metadata, so
+   * chart data loaded for an earlier recording can be dropped. */
+  onActivityChanges?: (
+    changes: V1ActivityStreamChange[],
+  ) => void | Promise<void>;
   fallBack: (error: Error) => void;
   client?: LiveClient;
   timeoutMs?: number;
@@ -143,7 +153,14 @@ export function startLiveSession(options: {
     );
   live = new LiveLibrary(
     client,
-    coordinatedLiveStore(options.queryClient, scope, indexedDbLiveStore(scope)),
+    coordinatedLiveStore(
+      options.queryClient,
+      scope,
+      observedLiveStore(indexedDbLiveStore(scope), async (changes) => {
+        if (!stopped && options.isCurrent())
+          await options.onActivityChanges?.(changes);
+      }),
+    ),
     {
       onReady: () => window.clearTimeout(timeout),
       onComplete: () => {
