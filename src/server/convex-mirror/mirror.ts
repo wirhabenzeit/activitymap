@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import type { ActivityPlacesResponse } from '~/contracts/activity-places';
 import type { ActivityDTO } from '~/contracts/v1/activity';
+import type { PhotoDTO } from '~/contracts/v1/photo';
 import type { RawActivityStreams } from '~/server/strava/streams';
 import type { ConvexWriter } from '~/server/sync/convex-writer';
 
@@ -17,6 +18,12 @@ import { encodeRecording } from './recording';
  * functions in `backend/convex/importer.ts`, labelled with a run revision that
  * only ever increases. Because each run sends current state rather than
  * individual events, out-of-order or repeated changes cannot regress Convex.
+ *
+ * Photos travel as the current photo set of each copied activity. A photo
+ * change on its own (`sync_change` rows of type `photo`) copies the set of the
+ * photo's activity, or deletes the photo in Convex when Postgres no longer
+ * has it. Libraries copied before photos were mirrored are caught up by a
+ * resumable pass over all activities (`MirrorPosition.photos`).
  *
  * Some writers (the stream trigger) add `sync_change` rows without the
  * per-athlete lock, so a lower sequence can commit after a higher one was
@@ -59,6 +66,18 @@ export type MirrorSource = {
   matches(
     ids: string[],
   ): Promise<{ version: string; results: ActivityPlacesResponse[] }>;
+  /** Photos with a change after `afterSequence` or since `since`, each with
+   * its latest sequence, ordered by that sequence. */
+  changedPhotos(
+    afterSequence: number,
+    since: Date,
+    limit: number,
+  ): Promise<{ id: string; sequence: number }[]>;
+  /** The activity of each of the owner's photos among `ids`. Missing IDs no
+   * longer exist. */
+  photoActivities(ids: string[]): Promise<{ id: string; activityId: string }[]>;
+  /** The current photos of the owner's activities among `activityIds`. */
+  photos(activityIds: string[]): Promise<PhotoDTO[]>;
 };
 
 type OwnerState = {
@@ -77,6 +96,10 @@ export type MirrorPosition = {
   sequence: number;
   revision: number;
   full?: { after: string; through: number };
+  /** Photo catch-up for a library copied before photos were mirrored: the
+   * last activity ID whose photos were copied, or null when it is finished.
+   * Absent means it has not started. */
+  photos?: string | null;
 };
 
 export type MirrorResult = {
@@ -86,6 +109,10 @@ export type MirrorResult = {
   deleted: number;
   recordings: number;
   matches: number;
+  /** Photo documents added, changed or removed. */
+  photos: number;
+  /** Activities whose photo set Convex rejected in this run. */
+  photoErrors: number;
   catalogueSelected: boolean;
   /** False when the run stopped early (deadline, limit or catalogue change);
    * the next run continues from the checkpoint. */
@@ -178,18 +205,27 @@ export async function mirrorOwner({
     deleted: 0,
     recordings: 0,
     matches: 0,
+    photos: 0,
+    photoErrors: 0,
     catalogueSelected: false,
     complete: true,
     checkpoint: {
       sequence: state.mirror?.sequence ?? 0,
       revision,
       ...(resume && { full: resume }),
+      ...(state.mirror?.photos !== undefined && {
+        photos: state.mirror.photos,
+      }),
     },
   };
 
   /** Positions only move forward; `full: null` marks a finished full copy. */
   const save = async (
-    next: { sequence?: number; full?: MirrorPosition['full'] | null } = {},
+    next: {
+      sequence?: number;
+      full?: MirrorPosition['full'] | null;
+      photos?: string | null;
+    } = {},
   ) => {
     const { full: progress, ...rest } = result.checkpoint;
     result.checkpoint = {
@@ -198,13 +234,44 @@ export async function mirrorOwner({
       ...(next.full === undefined
         ? progress && { full: progress }
         : next.full && { full: next.full }),
+      ...(next.photos !== undefined && { photos: next.photos }),
     };
     await write({
       kind: 'checkpoint',
       sequence: result.checkpoint.sequence,
       revision,
       ...(next.full !== undefined && { full: next.full }),
+      ...(next.photos !== undefined && { photos: next.photos }),
     });
+  };
+
+  /** Make Convex's photos of `activityIds` equal the source's. Activities
+   * Convex does not hold are skipped there. */
+  const copyPhotos = async (activityIds: string[]) => {
+    if (activityIds.length === 0) return;
+    const sets = new Map<string, PhotoDTO[]>(activityIds.map((id) => [id, []]));
+    for (const photo of await source.photos(activityIds))
+      sets.get(photo.activity_id)?.push(photo);
+    const items = [...sets].map(([activityId, photos]) => ({
+      activityId,
+      photos,
+    }));
+    for (const batch of batches(items)) {
+      try {
+        result.photos += await write<number>({
+          kind: 'applyPhotoSets',
+          ...common,
+          items: batch,
+        });
+      } catch (error) {
+        // Photos are secondary: a set Convex rejects must not stop the
+        // activities, recordings and matches behind it from being copied.
+        result.photoErrors += batch.length;
+        log(
+          `Photo sets of ${batch.length} activities were rejected: ${String(error)}`,
+        );
+      }
+    }
   };
 
   // Select the Postgres catalogue before the first matches publish.
@@ -227,6 +294,7 @@ export async function mirrorOwner({
    * stops before checkpointing this chunk: the time budget ran out between
    * steps, or the catalogue changed. Work already published stays, and the
    * next run skips it (identical metadata, current recordings and matches). */
+  const photosCopied = new Set<string>();
   const copy = async (ids: string[]): Promise<'done' | 'stopped'> => {
     await ensureCatalogue(ids[0]!);
     result.activities += ids.length;
@@ -260,6 +328,8 @@ export async function mirrorOwner({
       applied.needsRecording.forEach((id) => needsRecording.add(id));
       applied.needsMatch.forEach((id) => needsMatch.add(id));
     }
+    await copyPhotos([...present]);
+    present.forEach((id) => photosCopied.add(id));
 
     const recordings = needsRecording.size
       ? await source.payloads([...needsRecording])
@@ -316,6 +386,9 @@ export async function mirrorOwner({
     // reach Convex through the incremental runs that follow.
     const through = resume?.through ?? (await source.latestSequence());
     let after: string | null = resume?.after ?? null;
+    // A copy started by this code carries photos from its first activity;
+    // one resumed from an older run is caught up afterwards.
+    const photos = resume ? undefined : null;
     for (;;) {
       if (now() > deadline) {
         result.complete = false;
@@ -327,18 +400,41 @@ export async function mirrorOwner({
         break;
       }
       if (ids.length < FULL_CHUNK) {
-        await save({ sequence: through, full: null });
+        await save({ sequence: through, full: null, photos });
         break;
       }
       after = ids.at(-1)!;
-      await save({ full: { after, through } });
+      await save({ full: { after, through }, photos });
     }
     return result;
   }
 
+  const since = new Date(now() - overlapMs);
+  // Photo changes first: deletions need nothing else, and the activities of
+  // changed photos are copied below (with the changed activities, or alone).
+  const changedPhotos = await source.changedPhotos(
+    result.checkpoint.sequence,
+    since,
+    maxActivities + 1,
+  );
+  if (changedPhotos.length > maxActivities) {
+    changedPhotos.length = maxActivities;
+    result.complete = false;
+  }
+  const photoIds = changedPhotos.map((item) => item.id);
+  const located = photoIds.length ? await source.photoActivities(photoIds) : [];
+  const existing = new Set(located.map((item) => item.id));
+  for (const ids of batches(photoIds.filter((id) => !existing.has(id))))
+    result.photos += await write<number>({
+      kind: 'deletePhotos',
+      generation: state.generation,
+      ids,
+    });
+  const photoActivities = new Set(located.map((item) => item.activityId));
+
   const changed = await source.changedActivities(
     result.checkpoint.sequence,
-    new Date(now() - overlapMs),
+    since,
     maxActivities + 1,
   );
   if (changed.length > maxActivities) {
@@ -359,6 +455,40 @@ export async function mirrorOwner({
     // Sorted by latest sequence: every later activity's latest change is
     // above this chunk's, so the checkpoint can safely move to it.
     await save({ sequence: Math.max(...slice.map((item) => item.sequence)) });
+  }
+  if (!result.complete) return result;
+
+  // Photo-only changes: activities not already copied above.
+  const remaining = [...photoActivities].filter((id) => !photosCopied.has(id));
+  for (let i = 0; i < remaining.length; i += CHUNK) {
+    if (now() > deadline) {
+      result.complete = false;
+      return result;
+    }
+    await copyPhotos(remaining.slice(i, i + CHUNK));
+  }
+  // Every activity change up to here is copied, so the checkpoint can pass
+  // the photo changes too.
+  if (changedPhotos.length > 0)
+    await save({ sequence: Math.max(...changedPhotos.map((p) => p.sequence)) });
+
+  // One-time catch-up for a library copied before photos were mirrored.
+  if (result.checkpoint.photos !== null) {
+    let after = result.checkpoint.photos ?? null;
+    for (;;) {
+      if (now() > deadline) {
+        result.complete = false;
+        break;
+      }
+      const ids = await source.activityIds(after, CHUNK);
+      await copyPhotos(ids);
+      if (ids.length < CHUNK) {
+        await save({ photos: null });
+        break;
+      }
+      after = ids.at(-1)!;
+      await save({ photos: after });
+    }
   }
   return result;
 }

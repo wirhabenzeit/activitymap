@@ -4,6 +4,7 @@ import { v } from 'convex/values';
 import {
   activityMetadataValidator,
   activityProjectionValidator,
+  photoValidator,
 } from './activityValidators';
 import { manifestValidator, summaryValidator } from './recordingValidators';
 import { countsValidator } from './statsShape';
@@ -34,6 +35,8 @@ export default defineSchema({
         /** An unfinished full copy: last copied activity ID and the change
          * sequence it started from. */
         full: v.optional(v.object({ after: v.string(), through: v.number() })),
+        /** Photo catch-up: last activity ID copied, or null when finished. */
+        photos: v.optional(v.union(v.string(), v.null())),
       }),
     ),
   }).index('by_owner', ['owner']),
@@ -81,10 +84,23 @@ export default defineSchema({
     manifest: manifestValidator,
     summary: summaryValidator,
   }).index('by_file', ['file']),
+  /** Provider photo metadata, one document per photo (convex/photos.ts).
+   * `key` is the provider's unique ID and `activity` the activity key. */
+  photos: defineTable({
+    owner: v.id('owners'),
+    key: v.string(),
+    activity: v.string(),
+    generation: v.string(),
+    sourceRevision: v.number(),
+    dto: photoValidator,
+  })
+    .index('by_owner_key', ['owner', 'key'])
+    .index('by_owner_live_key', ['owner', 'generation', 'key'])
+    .index('by_owner_activity', ['owner', 'activity']),
   changes: defineTable({
     owner: v.id('owners'),
     sequence: v.number(),
-    entityType: v.literal('activity'),
+    entityType: v.union(v.literal('activity'), v.literal('photo')),
     entityId: v.string(),
     operation: v.union(v.literal('upsert'), v.literal('delete')),
     changedAt: v.number(),
