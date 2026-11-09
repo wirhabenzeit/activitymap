@@ -208,7 +208,11 @@ The mirror sends the current photo set of every activity it copies. A photo
 change on its own copies the set of that photo's activity, or deletes the
 photo here when Postgres no longer has it. Photo changes appear in the change
 feed as `photo` entries; deleting an activity removes its photos without
-separate entries, as clients drop them with the activity. A library copied
+separate entries, as clients drop them with the activity. Each activity's
+photo set carries a source revision (`photoSets`, also for an empty set), so a
+stale writer can neither replace nor delete newer photos. Photo changes have
+their own position in the checkpoint (`mirror.photoSequence`), separate from
+the activity position. A library copied
 before photos were mirrored is caught up by a resumable pass over all
 activities, tracked in the checkpoint (`mirror.photos`, `null` when done).
 Deploy this package before the app version that mirrors photos: an older

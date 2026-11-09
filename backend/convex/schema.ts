@@ -37,6 +37,8 @@ export default defineSchema({
         full: v.optional(v.object({ after: v.string(), through: v.number() })),
         /** Photo catch-up: last activity ID copied, or null when finished. */
         photos: v.optional(v.union(v.string(), v.null())),
+        /** The last mirrored photo change sequence. */
+        photoSequence: v.optional(v.number()),
       }),
     ),
   }).index('by_owner', ['owner']),
@@ -97,6 +99,13 @@ export default defineSchema({
     .index('by_owner_key', ['owner', 'key'])
     .index('by_owner_live_key', ['owner', 'generation', 'key'])
     .index('by_owner_activity', ['owner', 'activity']),
+  /** The source revision of each activity's photo set, kept also for an
+   * empty set, so a stale writer can neither replace nor delete photos. */
+  photoSets: defineTable({
+    owner: v.id('owners'),
+    activity: v.string(),
+    revision: v.number(),
+  }).index('by_owner_activity', ['owner', 'activity']),
   changes: defineTable({
     owner: v.id('owners'),
     sequence: v.number(),

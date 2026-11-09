@@ -602,3 +602,186 @@ void test('a library copied before photos were mirrored is caught up once', asyn
   assert.equal(again.photos, 0);
   assert.equal(again.checkpoint.photos, null);
 });
+
+void test('a photo backlog larger than one run is worked off across runs', async (t) => {
+  const { convex, writer, upload } = setup(t);
+  const { db, source } = fakePostgres();
+  db.upsert('101', 'First');
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: catalogueFor(db.version()),
+    matchingVersion: db.version(),
+  });
+  let clock = Date.now();
+  const run = (full = false) =>
+    mirrorOwner({
+      source,
+      writer,
+      upload,
+      full,
+      maxActivities: 2,
+      now: () => (clock += 1000),
+    });
+  await run(true);
+  db.photo('p-1', '101');
+  db.photo('p-2', '101');
+  db.photo('p-3', '101');
+  // Outside the replay window, so only the positions decide what is read.
+  clock += 16 * 60_000;
+  mock.timers.tick(16 * 60_000);
+
+  const first = await run();
+  assert.equal(first.complete, false);
+  assert.equal(first.photos, 3, 'the selected batch is copied');
+  const second = await run();
+  assert.equal(second.complete, true);
+  assert(
+    second.checkpoint.photoSequence! > first.checkpoint.photoSequence!,
+    'the position moved past the first batch',
+  );
+  assert.equal((await run()).photos, 0);
+});
+
+void test('neither position passes the other resource when a run fails midway', async (t) => {
+  const { convex, writer, upload } = setup(t);
+  const { db, source } = fakePostgres();
+  db.upsert('101', 'First');
+  db.upsert('102', 'Second');
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: catalogueFor(db.version()),
+    matchingVersion: db.version(),
+  });
+  let clock = Date.now();
+  const run = (from: MirrorSource = source, full = false) =>
+    mirrorOwner({
+      source: from,
+      writer,
+      upload,
+      full,
+      now: () => (clock += 1000),
+    });
+  const later = () => {
+    clock += 16 * 60_000;
+    mock.timers.tick(16 * 60_000);
+  };
+  const names = async () =>
+    (
+      await convex.query(internal.sync.read, {
+        ...scope,
+        operation: {
+          kind: 'bootstrap',
+          resource: 'activities',
+          after: null,
+          limit: 500,
+        },
+      })
+    ).items.map((item) => item.name);
+  const photoIds = async () =>
+    (
+      (
+        await convex.query(internal.sync.read, {
+          ...scope,
+          operation: {
+            kind: 'bootstrap',
+            resource: 'photos',
+            after: null,
+            limit: 500,
+          },
+        })
+      ).items as PhotoDTO[]
+    ).map((photo) => photo.unique_id);
+  await run(source, true);
+
+  // A photo change, then an unrelated activity change with a higher sequence.
+  // The photos are copied, then the activity pass fails.
+  db.photo('p-1', '101');
+  db.upsert('102', 'Renamed');
+  await assert.rejects(
+    run({
+      ...source,
+      activities: async () => {
+        throw new Error('database unavailable');
+      },
+    }),
+    /database unavailable/,
+  );
+  assert.deepEqual(await photoIds(), ['p-1']);
+  later();
+  await run();
+  assert.deepEqual(await names(), ['First', 'Renamed']);
+
+  // The other way round: an activity change, then a photo change, and the
+  // photo pass fails before anything is saved.
+  db.upsert('101', 'Also renamed');
+  db.photo('p-2', '102');
+  await assert.rejects(
+    run({
+      ...source,
+      photos: async () => {
+        throw new Error('database unavailable');
+      },
+    }),
+    /database unavailable/,
+  );
+  later();
+  await run();
+  assert.deepEqual(await names(), ['Also renamed', 'Renamed']);
+  assert.deepEqual(await photoIds(), ['p-1', 'p-2']);
+});
+
+void test('a stale photo set or deletion cannot undo a newer one', async (t) => {
+  const { convex, feed } = setup(t);
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: catalogueFor('a'.repeat(64)),
+    matchingVersion: 'a'.repeat(64),
+  });
+  const common = { scope, generation: 'shadow-generation-01' };
+  await convex.mutation(internal.importer.applySources, {
+    ...common,
+    sourceRevision: 10,
+    items: [previewFixtureActivity('101', '42', 'First', 0)],
+    recordings: [],
+  });
+  const { db, source } = fakePostgres();
+  db.photo('p-1', '101');
+  const photos = await source.photos(['101']);
+  const apply = (sourceRevision: number, set: PhotoDTO[]) =>
+    convex.mutation(internal.importer.applyPhotoSets, {
+      ...common,
+      sourceRevision,
+      items: [{ activityId: '101', photos: set }],
+    });
+
+  assert.equal(await apply(200, photos), 1);
+  const before = await feed();
+  // An older run that read the activity before the photo existed.
+  assert.equal(await apply(100, []), 0);
+  assert.equal(
+    await convex.mutation(internal.importer.deletePhotos, {
+      ...common,
+      sourceRevision: 100,
+      ids: ['p-1'],
+    }),
+    0,
+  );
+  assert.equal(await feed(), before, 'no delete was published');
+
+  // An empty set is fenced as well: the older set cannot bring photos back.
+  assert.equal(await apply(300, []), 1);
+  assert.equal(await apply(250, photos), 0);
+  assert.deepEqual(
+    await convex.query(internal.sync.read, {
+      ...scope,
+      operation: { kind: 'photoIds', ids: ['p-1'] },
+    }),
+    [],
+  );
+});

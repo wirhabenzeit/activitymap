@@ -86,12 +86,25 @@ export const checkpoint = internalMutation({
     ),
     /** Photo catch-up progress; null marks it finished. */
     photos: v.optional(v.union(v.null(), v.string())),
+    /** Position in the source's photo changes. */
+    photoSequence: v.optional(v.number()),
   },
-  handler: async (ctx, { scope, sequence, revision, full, photos }) => {
+  handler: async (
+    ctx,
+    { scope, sequence, revision, full, photos, photoSequence },
+  ) => {
     const owner = await requireOwner(ctx, scope);
     const head = await requireHead(ctx, owner._id);
-    if (!Number.isSafeInteger(sequence) || !Number.isSafeInteger(revision))
+    if (
+      !Number.isSafeInteger(sequence) ||
+      !Number.isSafeInteger(revision) ||
+      (photoSequence !== undefined && !Number.isSafeInteger(photoSequence))
+    )
       throw new Error('Invalid mirror position');
+    const photoPosition =
+      photoSequence === undefined
+        ? head.mirror?.photoSequence
+        : Math.max(head.mirror?.photoSequence ?? 0, photoSequence);
     const progress = full === undefined ? head.mirror?.full : full;
     // Finished stays finished: a delayed run cannot reopen the catch-up.
     const caughtUp =
@@ -104,6 +117,7 @@ export const checkpoint = internalMutation({
         revision: Math.max(head.mirror?.revision ?? 0, revision),
         ...(progress && { full: progress }),
         ...(caughtUp !== undefined && { photos: caughtUp }),
+        ...(photoPosition !== undefined && { photoSequence: photoPosition }),
       },
     });
   },
@@ -278,7 +292,12 @@ export const applyPhotoSets = internalMutation({
 /** Photos that no longer exist at the source and whose activity the writer
  * no longer knows. */
 export const deletePhotos = internalMutation({
-  args: { scope, generation: v.string(), ids: v.array(v.string()) },
+  args: {
+    scope,
+    generation: v.string(),
+    sourceRevision: v.number(),
+    ids: v.array(v.string()),
+  },
   handler: async (ctx, args) => {
     bounded(args.ids.length);
     return deletePhotoRecords(ctx, args);

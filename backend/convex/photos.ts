@@ -14,7 +14,11 @@ import { idKey, requireOwner } from './owners';
  * Writers send the current photo set of an activity (`applyPhotoSet`), which
  * adds, updates and removes documents to match, or delete photos by ID when
  * the activity they belonged to is no longer known. Re-applying an unchanged
- * set writes nothing and publishes nothing.
+ * set changes no photo and publishes nothing.
+ *
+ * Each activity's set has a source revision (`photoSets`), recorded for empty
+ * sets too. A writer with an older or equal revision is ignored as a whole,
+ * so a stale set can neither replace nor delete what a newer one wrote.
  */
 
 export const MAX_PHOTOS_PER_ACTIVITY = 200;
@@ -35,6 +39,15 @@ function photosOf(
       q.eq('owner', owner).eq('activity', activity),
     )
     .take(MAX_PHOTOS_PER_ACTIVITY + 1);
+}
+
+function setFor(ctx: QueryCtx, owner: Doc<'owners'>['_id'], activity: string) {
+  return ctx.db
+    .query('photoSets')
+    .withIndex('by_owner_activity', (q) =>
+      q.eq('owner', owner).eq('activity', activity),
+    )
+    .unique();
 }
 
 /** Structural equality that ignores key order (Convex sorts fields). */
@@ -89,6 +102,19 @@ export async function applyPhotoSet(
       throw new Error('Photo source owner mismatch');
     next.set(photoKey(dto.unique_id), dto);
   }
+  const fence = await setFor(ctx, owner._id, activity);
+  if (fence && args.sourceRevision <= fence.revision) return 0;
+  if (fence)
+    await ctx.db.patch('photoSets', fence._id, {
+      revision: args.sourceRevision,
+    });
+  else
+    await ctx.db.insert('photoSets', {
+      owner: owner._id,
+      activity,
+      revision: args.sourceRevision,
+    });
+
   let changed = 0;
   const stored = await photosOf(ctx, owner._id, activity);
   for (const doc of stored) {
@@ -101,8 +127,6 @@ export async function applyPhotoSet(
     }
     // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
     next.delete(doc.key);
-    // A stale writer cannot replace a newer copy of the same photo.
-    if (args.sourceRevision <= doc.sourceRevision) continue;
     if (doc.generation === owner.generation && same(doc.dto, dto)) continue;
     await ctx.db.patch('photos', doc._id, {
       dto,
@@ -139,11 +163,14 @@ export async function deletePhotoRecords(
   args: {
     scope: { userId: string; athleteId: string; epoch: string };
     generation: string;
+    sourceRevision: number;
     ids: string[];
   },
 ) {
   const owner = await requireOwner(ctx, args.scope);
   if (owner.generation !== args.generation) return 0;
+  if (!Number.isSafeInteger(args.sourceRevision) || args.sourceRevision < 1)
+    throw new Error('Invalid source revision');
   let deleted = 0;
   for (const id of args.ids) {
     const doc = await ctx.db
@@ -153,6 +180,9 @@ export async function deletePhotoRecords(
       )
       .unique();
     if (!doc) continue;
+    // A newer set of its activity has already decided about this photo.
+    const fence = await setFor(ctx, owner._id, doc.activity);
+    if (fence && args.sourceRevision <= fence.revision) continue;
     await ctx.db.delete('photos', doc._id);
     await publishChange(ctx, owner, doc.key, 'delete', 'photo');
     deleted++;
@@ -169,6 +199,9 @@ export async function removeActivityPhotos(
 ) {
   for (const doc of await photosOf(ctx, owner, activity))
     await ctx.db.delete('photos', doc._id);
+  // The deleted activity itself now refuses photo sets.
+  const fence = await setFor(ctx, owner, activity);
+  if (fence) await ctx.db.delete('photoSets', fence._id);
 }
 
 /** The owner's current photos after `after`, in photo-ID order. */
