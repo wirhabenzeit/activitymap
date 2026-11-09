@@ -33,6 +33,7 @@ import {
   requestLibrarySync,
   retireLibrarySync,
 } from '~/lib/sync/library-sync';
+import { syncLivePhotos } from '~/lib/sync/live-photos';
 import { startLiveSession } from '~/lib/sync/live-session';
 import {
   clearStreamSummarySyncAttempts,
@@ -371,19 +372,54 @@ export function OfflineSyncProvider() {
       const summariesVisible = () => {
         if (document.visibilityState === 'visible') summaries();
       };
+      // Convex holds no photos: read the photo list from REST once the
+      // library is current, and again when activities change. A request made
+      // during a run starts one more run after it.
+      let photosRunning = false;
+      let photosRequested = false;
+      const photos = () => {
+        const signal = liveSignal;
+        if (!signal || signal.aborted) return;
+        if (photosRunning) {
+          photosRequested = true;
+          return;
+        }
+        photosRunning = true;
+        photosRequested = false;
+        void syncLivePhotos({
+          scope,
+          signal,
+          commit: (write) => requestLibrarySync(queryClient, scope, write),
+        })
+          .catch((error: unknown) => {
+            if (!signal.aborted)
+              console.warn(
+                'Photo download paused; it is retried with the next change.',
+                error,
+              );
+          })
+          .finally(() => {
+            photosRunning = false;
+            if (photosRequested) photos();
+          });
+      };
+      const followUps = () => {
+        summaries();
+        photos();
+      };
       const interval = window.setInterval(
         summariesVisible,
         LIBRARY_SYNC_INTERVAL_MS,
       );
       document.addEventListener('visibilitychange', summariesVisible);
-      window.addEventListener('online', summaries);
-      window.addEventListener('activitymap:retry-browser-sync', summaries);
+      window.addEventListener('online', followUps);
+      window.addEventListener('activitymap:retry-browser-sync', followUps);
       const stopTriggers = () => {
         liveSignal = null;
         window.clearInterval(interval);
         document.removeEventListener('visibilitychange', summariesVisible);
-        window.removeEventListener('online', summaries);
-        window.removeEventListener('activitymap:retry-browser-sync', summaries);
+        window.removeEventListener('online', followUps);
+        window.removeEventListener('activitymap:retry-browser-sync', followUps);
       };
       const stopSession = startLiveSession({
         url,
@@ -407,9 +443,9 @@ export function OfflineSyncProvider() {
             error: null,
           });
           liveSignal = signal;
-          summaries();
+          followUps();
         },
-        onChange: summaries,
+        onChange: followUps,
         onActivityChanges: (changes) =>
           reconcileSummaries(activeUserId, changes, () => {
             if (!mounted)
