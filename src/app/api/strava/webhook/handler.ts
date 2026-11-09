@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse, after } from 'next/server';
 
+import { mirrorShadowAthleteAfterWrite } from '~/server/convex-mirror/shadow-run';
 import { db } from '~/server/db';
 import { stravaWebhooks } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
@@ -154,7 +155,12 @@ export async function handleWebhookDelivery(request: NextRequest) {
   }
 
   if (recorded) {
-    after(() => processInboxEvent(recorded.id, recorded.payload));
+    after(async () => {
+      await processInboxEvent(recorded.id, recorded.payload);
+      // Shadow owners: copy the result to Convex now, not at the next
+      // scheduled mirror run.
+      await mirrorShadowAthleteAfterWrite(data.owner_id);
+    });
   } else {
     logger.info('[Webhook] Duplicate delivery ignored', {
       object_type: data.object_type,
