@@ -138,6 +138,12 @@ export const changes = query({
     const touchedIds = new Set<string>();
     const rows: typeof read = [];
     for (const row of read) {
+      // Photo changes move the position only: live clients read the photo
+      // list separately (src/lib/sync/live-photos.ts).
+      if (row.entityType === 'photo') {
+        rows.push(row);
+        continue;
+      }
       if (
         !touchedIds.has(row.entityId) &&
         touchedIds.size === MAX_ACTIVITIES_PER_READ

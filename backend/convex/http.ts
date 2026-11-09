@@ -197,6 +197,18 @@ router.route({
             ...args,
           });
           break;
+        case 'applyPhotoSets':
+          result = await ctx.runMutation(internal.importer.applyPhotoSets, {
+            scope,
+            ...args,
+          });
+          break;
+        case 'deletePhotos':
+          result = await ctx.runMutation(internal.importer.deletePhotos, {
+            scope,
+            ...args,
+          });
+          break;
         case 'uploadUrls':
           // Upload URLs carry no owner scope; require a current assignment.
           await ctx.runQuery(internal.sync.read, {

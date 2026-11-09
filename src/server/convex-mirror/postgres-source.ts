@@ -3,9 +3,10 @@ import 'server-only';
 import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 
 import { toActivityDTO } from '~/contracts/v1/activity';
+import { toPhotoDTO } from '~/contracts/v1/photo';
 import type { Actor } from '~/server/auth/actor';
 import { db } from '~/server/db';
-import { activityStreams, syncChanges } from '~/server/db/schema';
+import { activityStreams, photos, syncChanges } from '~/server/db/schema';
 import { activitiesRepository } from '~/server/repositories/activities';
 import { changesRepository } from '~/server/repositories/changes';
 import { createPlaceMatchingRepository } from '~/server/repositories/place-matching';
@@ -112,6 +113,61 @@ export function postgresMirrorSource(actor: Actor): MirrorSource {
     async matches(ids) {
       const { version, results } = await places.sync(actor, ids);
       return { version, results: [...results.values()] };
+    },
+
+    async changedPhotos(afterSequence, since, limit) {
+      const rows = await db
+        .select({
+          id: syncChanges.entityId,
+          sequence: sql<string>`max(${syncChanges.sequence})::text`,
+        })
+        .from(syncChanges)
+        .where(
+          and(
+            eq(syncChanges.athleteId, actor.athleteId),
+            eq(syncChanges.entityType, 'photo'),
+            sql`(${syncChanges.sequence} > ${afterSequence} OR ${syncChanges.changedAt} > ${since.toISOString()}::timestamptz)`,
+          ),
+        )
+        .groupBy(syncChanges.entityId)
+        .orderBy(sql`max(${syncChanges.sequence})`)
+        .limit(limit);
+      return rows.map((row) => ({
+        id: row.id,
+        sequence: Number(row.sequence),
+      }));
+    },
+
+    async photoActivities(ids) {
+      if (ids.length === 0) return [];
+      const rows = await db
+        .select({ id: photos.unique_id, activityId: photos.activity_id })
+        .from(photos)
+        .where(
+          and(
+            eq(photos.athlete_id, actor.athleteId),
+            inArray(photos.unique_id, ids),
+          ),
+        );
+      return rows.map((row) => ({
+        id: row.id,
+        activityId: String(row.activityId),
+      }));
+    },
+
+    async photos(activityIds) {
+      const ids = activityIds.map(Number).filter(Number.isSafeInteger);
+      if (ids.length === 0) return [];
+      const rows = await db
+        .select()
+        .from(photos)
+        .where(
+          and(
+            eq(photos.athlete_id, actor.athleteId),
+            inArray(photos.activity_id, ids),
+          ),
+        );
+      return rows.map(toPhotoDTO);
     },
   };
 }

@@ -8,6 +8,7 @@ import {
 } from './_generated/server';
 import {
   activityMetadataValidator,
+  photoValidator,
   placeMatchValidator,
 } from './activityValidators';
 import {
@@ -17,6 +18,7 @@ import {
 } from './activityWrites';
 import { scopeFields } from './ownerScope';
 import { idKey, ownerFor, requireHead, requireOwner } from './owners';
+import { applyPhotoSet, deletePhotoRecords } from './photos';
 import { manifestValidator } from './recordingValidators';
 
 /**
@@ -82,18 +84,40 @@ export const checkpoint = internalMutation({
     full: v.optional(
       v.union(v.null(), v.object({ after: v.string(), through: v.number() })),
     ),
+    /** Photo catch-up progress; null marks it finished. */
+    photos: v.optional(v.union(v.null(), v.string())),
+    /** Position in the source's photo changes. */
+    photoSequence: v.optional(v.number()),
   },
-  handler: async (ctx, { scope, sequence, revision, full }) => {
+  handler: async (
+    ctx,
+    { scope, sequence, revision, full, photos, photoSequence },
+  ) => {
     const owner = await requireOwner(ctx, scope);
     const head = await requireHead(ctx, owner._id);
-    if (!Number.isSafeInteger(sequence) || !Number.isSafeInteger(revision))
+    if (
+      !Number.isSafeInteger(sequence) ||
+      !Number.isSafeInteger(revision) ||
+      (photoSequence !== undefined && !Number.isSafeInteger(photoSequence))
+    )
       throw new Error('Invalid mirror position');
+    const photoPosition =
+      photoSequence === undefined
+        ? head.mirror?.photoSequence
+        : Math.max(head.mirror?.photoSequence ?? 0, photoSequence);
     const progress = full === undefined ? head.mirror?.full : full;
+    // Finished stays finished: a delayed run cannot reopen the catch-up.
+    const caughtUp =
+      head.mirror?.photos === null || photos === undefined
+        ? head.mirror?.photos
+        : photos;
     await ctx.db.patch('ownerHeads', head._id, {
       mirror: {
         sequence: Math.max(head.mirror?.sequence ?? 0, sequence),
         revision: Math.max(head.mirror?.revision ?? 0, revision),
         ...(progress && { full: progress }),
+        ...(caughtUp !== undefined && { photos: caughtUp }),
+        ...(photoPosition !== undefined && { photoSequence: photoPosition }),
       },
     });
   },
@@ -242,5 +266,40 @@ export const publishMatches = internalMutation({
         published++;
     }
     return published;
+  },
+});
+
+/** The current photo sets of up to 64 activities. An activity listed with no
+ * photos loses the ones stored for it. Returns how many photos changed. */
+export const applyPhotoSets = internalMutation({
+  args: {
+    scope,
+    generation: v.string(),
+    sourceRevision: v.number(),
+    items: v.array(
+      v.object({ activityId: v.string(), photos: v.array(photoValidator) }),
+    ),
+  },
+  handler: async (ctx, { items, ...common }) => {
+    bounded(items.length);
+    let changed = 0;
+    for (const item of items)
+      changed += await applyPhotoSet(ctx, { ...common, ...item });
+    return changed;
+  },
+});
+
+/** Photos that no longer exist at the source and whose activity the writer
+ * no longer knows. */
+export const deletePhotos = internalMutation({
+  args: {
+    scope,
+    generation: v.string(),
+    sourceRevision: v.number(),
+    ids: v.array(v.string()),
+  },
+  handler: async (ctx, args) => {
+    bounded(args.ids.length);
+    return deletePhotoRecords(ctx, args);
   },
 });
