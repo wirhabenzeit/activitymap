@@ -162,6 +162,25 @@ while it runs, and `status` reports `ready: false` until it finishes:
 pnpm exec convex run stats:rebuild '{"userId":"<userId>"}'
 ```
 
+### Live owners in production
+
+Preview owners exist only outside Vercel Production. To load an ordinary
+production account's library through these queries, list it as a live owner in
+the app:
+
+```sh
+ACTIVITYMAP_CONVEX_URL=https://<deployment>.convex.cloud
+ACTIVITYMAP_CONVEX_LIVE_OWNERS='["<userId>"]'
+```
+
+Only the library download changes for such an account
+(`src/server/convex-live-owners.ts`): edits, charts, status and photos keep
+their Postgres routes, and the client reads the photo list from the REST
+bootstrap because photos are not stored here. The account must also be a
+shadow owner, so the mirror keeps this deployment current, and its counts need
+one `stats:rebuild`. Library changes reach the browser after the next mirror
+run. Remove the account from the list to return it to the REST sync.
+
 ## Shadow writes
 
 While Postgres remains the writer, `src/server/convex-mirror/mirror.ts` copies
