@@ -348,42 +348,69 @@ export function OfflineSyncProvider() {
 
     // Live preview owners read from Convex; any failure falls back to REST.
     const stops: (() => void)[] = [];
-    if (convexLiveUrl)
-      stops.push(
-        startLiveSession({
-          url: convexLiveUrl,
-          scope,
-          queryClient,
-          refresh: () => owner.refresh(),
-          isCurrent: () =>
-            mounted &&
-            useShallowStore.getState().user?.id === activeUserId &&
-            !useShallowStore.getState().isGuest,
-          onSyncing: () =>
-            updateBrowserSyncStatus(activeUserId, {
-              phase: 'syncing',
-              error: null,
-              retryAt: null,
-            }),
-          onComplete: (signal) => {
-            updateBrowserSyncStatus(activeUserId, {
-              phase: 'ready',
-              lastSuccess: new Date().toISOString(),
-              error: null,
-            });
-            startSummarySync(activeUserId, signal, () => mounted);
-          },
-          fallBack: (error) => {
-            if (!mounted) return;
-            console.warn(
-              'Live library unavailable; using the REST sync.',
-              error,
-            );
-            stops.push(startRest());
-          },
-        }),
+    const startLive = (url: string) => {
+      // Convex pushes library changes, but profile downloads still need the
+      // REST sync's triggers: after new activities, and as retries.
+      let liveSignal: AbortSignal | null = null;
+      const summaries = () => {
+        if (liveSignal && !liveSignal.aborted)
+          startSummarySync(activeUserId, liveSignal, () => mounted);
+      };
+      const summariesVisible = () => {
+        if (document.visibilityState === 'visible') summaries();
+      };
+      const interval = window.setInterval(
+        summariesVisible,
+        LIBRARY_SYNC_INTERVAL_MS,
       );
-    else stops.push(startRest());
+      document.addEventListener('visibilitychange', summariesVisible);
+      window.addEventListener('online', summaries);
+      window.addEventListener('activitymap:retry-browser-sync', summaries);
+      const stopTriggers = () => {
+        liveSignal = null;
+        window.clearInterval(interval);
+        document.removeEventListener('visibilitychange', summariesVisible);
+        window.removeEventListener('online', summaries);
+        window.removeEventListener('activitymap:retry-browser-sync', summaries);
+      };
+      const stopSession = startLiveSession({
+        url,
+        scope,
+        queryClient,
+        refresh: () => owner.refresh(),
+        isCurrent: () =>
+          mounted &&
+          useShallowStore.getState().user?.id === activeUserId &&
+          !useShallowStore.getState().isGuest,
+        onSyncing: () =>
+          updateBrowserSyncStatus(activeUserId, {
+            phase: 'syncing',
+            error: null,
+            retryAt: null,
+          }),
+        onComplete: (signal) => {
+          updateBrowserSyncStatus(activeUserId, {
+            phase: 'ready',
+            lastSuccess: new Date().toISOString(),
+            error: null,
+          });
+          liveSignal = signal;
+          summaries();
+        },
+        onChange: summaries,
+        fallBack: (error) => {
+          if (!mounted) return;
+          console.warn('Live library unavailable; using the REST sync.', error);
+          stopTriggers();
+          stops.push(startRest());
+        },
+      });
+      return () => {
+        stopTriggers();
+        stopSession();
+      };
+    };
+    stops.push(convexLiveUrl ? startLive(convexLiveUrl) : startRest());
     return () => {
       mounted = false;
       for (const stop of stops) stop();

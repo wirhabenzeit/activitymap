@@ -113,6 +113,7 @@ function events() {
     events: {
       onReady: () => seen.push('ready'),
       onComplete: () => seen.push('complete'),
+      onChange: () => seen.push('change'),
       onError: (error: Error) => seen.push(`error ${error.message}`),
     },
   };
@@ -130,7 +131,7 @@ void test('a stored position resumes with only the changes since, then follows n
   // Nothing is read through `list`: the cached library stays.
   assert.deepEqual(reads, ['changes 5']);
   assert.deepEqual(log, ['+a:null -b @7/v1']);
-  assert.deepEqual(seen, ['ready', 'complete']);
+  assert.deepEqual(seen, ['ready', 'change', 'complete']);
   assert.equal(following().after, 7);
 
   // A re-run with nothing new keeps the subscription and writes nothing.
@@ -153,7 +154,8 @@ void test('a stored position resumes with only the changes since, then follows n
   library.dispose();
   assert.equal(active().length, 0);
   assert.equal(closed(), true);
-  assert.deepEqual(seen, ['ready', 'complete']);
+  // Each committed batch with added or changed activities reports a change.
+  assert.deepEqual(seen, ['ready', 'change', 'complete', 'change', 'change']);
 });
 
 void test('without a usable position the library is read once and followed from the head read first', async () => {

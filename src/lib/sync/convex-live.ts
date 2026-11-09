@@ -80,6 +80,8 @@ export type LiveLibraryEvents = {
   onReady?: () => void;
   /** The store has caught up with Convex once. */
   onComplete?: () => void;
+  /** A batch that added or changed activities was committed. */
+  onChange?: () => void;
   /** Authentication or a query failed; the caller falls back to REST. */
   onError: (error: Error) => void;
 };
@@ -219,13 +221,15 @@ export class LiveLibrary {
       await this.resume(null);
       return;
     }
-    if (result.sequence !== after)
+    if (result.sequence !== after) {
       await this.store.apply({
         upserts: result.upserts.map(toDTO),
         deletes: result.deletes,
         cursor: { sequence: result.sequence, version: result.version },
         matchingVersion: result.matchingVersion,
       });
+      if (result.upserts.length > 0) this.events.onChange?.();
+    }
     if (!result.more) this.markComplete();
     this.follow(result.sequence);
   }
