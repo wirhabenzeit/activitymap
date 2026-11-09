@@ -8,19 +8,21 @@ import { type LiveClient, LiveLibrary, createLiveClient } from './convex-live';
 import { registerLibrarySync } from './library-sync';
 import { setLiveDetailLoader } from './live-detail';
 import {
-  deleteActivityDTOsByIds,
+  type V1SyncState,
+  applyV1SyncPage,
   getCachedActivityDTOs,
-  setV1SyncState,
-  upsertActivityDTOs,
+  getV1SyncState,
 } from './v1-store';
 
-// The REST sync takes over if Convex has not delivered the first page by then.
+// The REST sync takes over if the library is not usable by then: resumed
+// from the stored position, or its first page loaded.
 export const LIVE_FIRST_PAGE_TIMEOUT_MS = 20_000;
 
 /**
- * Run a live preview owner's library from Convex: subscribe, commit pages to
- * the browser library store and register as the scope's library writer.
- * Convex pushes changes, so nothing polls. Any failure (token rejected, query
+ * Run a live preview owner's library from Convex: resume the browser library
+ * store from its change-feed position (or load it once), follow new changes
+ * and register as the scope's library writer. Convex pushes changes, so
+ * nothing polls. Any failure (token rejected, query
  * error, no first page in time) stops the session and calls `fallBack`.
  * Returns a function that stops the session.
  */
@@ -57,7 +59,7 @@ export function startLiveSession(options: {
     options.fallBack(error);
   };
   const timeout = window.setTimeout(
-    () => fail(new Error('Convex did not deliver the first page')),
+    () => fail(new Error('The live library was not ready in time')),
     options.timeoutMs ?? LIVE_FIRST_PAGE_TIMEOUT_MS,
   );
   options.onSyncing();
@@ -74,30 +76,65 @@ export function startLiveSession(options: {
   live = new LiveLibrary(
     client,
     {
-      upsert: (items) => upsertActivityDTOs(scope, items),
-      remove: (ids) => deleteActivityDTOsByIds(scope, ids),
-      heldIds: async () =>
-        (await getCachedActivityDTOs(scope)).map((item) => item.id),
-      complete: async ({ placeMatchingVersion }) => {
+      cursor: async () => {
+        const state = await getV1SyncState(scope);
+        return state?.bootstrapComplete ? (state.live ?? null) : null;
+      },
+      apply: async ({ upserts, deletes, cursor, matchingVersion }) => {
+        const previous = await getV1SyncState(scope);
         const now = new Date().toISOString();
-        await setV1SyncState({
+        const state: V1SyncState = {
           scope,
           bootstrapCursor: null,
-          bootstrapComplete: true,
+          bootstrapComplete: cursor
+            ? true
+            : (previous?.bootstrapComplete ?? false),
           // No REST cursor: a later REST sync starts with a bootstrap.
           changesCursor: null,
-          lastSyncAt: now,
+          lastSyncAt: cursor ? now : (previous?.lastSyncAt ?? null),
           updatedAt: now,
-          ...(placeMatchingVersion && { placeMatchingVersion }),
+          placeMatchingVersion: matchingVersion,
           placesSyncReady: true,
-        });
-        await options.refresh();
+          ...(cursor && { live: cursor }),
+        };
+        // Sequence numbers in these mutations are diagnostic only.
+        const sequence = String(cursor?.sequence ?? 0);
+        await applyV1SyncPage(
+          scope,
+          [
+            ...upserts.map((activity) => ({
+              sequence,
+              entityType: 'activity' as const,
+              operation: 'upsert' as const,
+              id: activity.id,
+              activity,
+            })),
+            ...deletes.map((id) => ({
+              sequence,
+              entityType: 'activity' as const,
+              operation: 'delete' as const,
+              id,
+            })),
+          ],
+          state,
+          { signal: session.signal },
+        );
       },
+      heldIds: async () =>
+        (await getCachedActivityDTOs(scope)).map((item) => item.id),
     },
     {
-      onFirstPage: () => window.clearTimeout(timeout),
+      onReady: () => window.clearTimeout(timeout),
       onComplete: () => {
-        if (!stopped && options.isCurrent()) options.onComplete(session.signal);
+        if (stopped || !options.isCurrent()) return;
+        options.refresh().then(
+          () => {
+            if (!stopped && options.isCurrent())
+              options.onComplete(session.signal);
+          },
+          (error: unknown) =>
+            fail(error instanceof Error ? error : new Error(String(error))),
+        );
       },
       onError: fail,
     },

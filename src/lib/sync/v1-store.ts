@@ -65,6 +65,11 @@ export type V1SyncState = {
   updatedAt: string;
   placeMatchingVersion?: string;
   placesSyncReady?: boolean;
+  /** Live preview owners: the Convex change-feed position the stored
+   * activities are current to (src/lib/sync/convex-live.ts). Any other
+   * writer of the sync state drops it, which makes the next live load
+   * read the library again. */
+  live?: { sequence: number; version: string };
 };
 
 let dbPromise: Promise<IDBDatabase | null> | null = null;

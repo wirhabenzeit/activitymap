@@ -9,30 +9,46 @@ import type { ActivityDTO } from '~/contracts/v1/activity';
  * Live library reads from the Convex application backend for `live` preview
  * owners (docs/convex-reactive-reads.md).
  *
- * `library.list` is subscribed page by page. Once a page's end is known it is
- * re-subscribed pinned to that cursor range, so page boundaries never move and
- * a row disappearing from a page means it was deleted. The last page stays
- * open-ended and picks up new activities.
+ * The browser library store is the cache. It remembers the change-feed
+ * position its cards were brought up to (`LiveCursor`). A load resumes from
+ * there: one subscription to `library.changes` delivers only what changed
+ * since, and keeps delivering new changes while the page is open. Only
+ * without a usable position (first load, compacted history, or a different
+ * library version) is the library read once through `library.list`, after
+ * which the feed continues from the head sequence read before the first page.
  *
- * Writes into the browser library store are diffed against the previous
- * *Convex* version of each row, not against the store: a local edit that has
- * not reached Convex yet (it arrives through the shadow mirror) is not
- * reverted when an unrelated row on the same page changes.
+ * Only activities that changed in Convex are written, so a local edit that
+ * has not reached Convex yet (it arrives through the shadow mirror) is not
+ * reverted by unrelated changes.
  */
 
 type Card = Omit<ActivityDTO, 'map_polyline'>;
 type ListPage = { page: Card[]; isDone: boolean; continueCursor: string };
-type PaginationOpts = {
-  numItems: number;
-  cursor: string | null;
-  endCursor?: string | null;
+type PaginationOpts = { numItems: number; cursor: string | null };
+type Position = {
+  sequence: number;
+  version: string;
+  matchingVersion: string;
 };
+export type ChangesResult =
+  | (Position & { reload: true })
+  | (Position & {
+      reload: false;
+      more: boolean;
+      upserts: Card[];
+      deletes: string[];
+    });
 
 const listQuery = makeFunctionReference<
   'query',
   { paginationOpts: PaginationOpts },
   ListPage
 >('library:list');
+const changesQuery = makeFunctionReference<
+  'query',
+  { after: number | null },
+  ChangesResult
+>('library:changes');
 const activityQuery = makeFunctionReference<
   'query',
   { id: string },
@@ -41,54 +57,60 @@ const activityQuery = makeFunctionReference<
 
 export const LIVE_PAGE_SIZE = 256;
 
+/** The change-feed position the stored cards are current to. */
+export type LiveCursor = { sequence: number; version: string };
+
 export type LiveLibraryStore = {
-  upsert: (items: ActivityDTO[]) => Promise<void>;
-  remove: (ids: string[]) => Promise<void>;
+  /** The stored position, or null when the store must be loaded again. */
+  cursor: () => Promise<LiveCursor | null>;
+  /** Commit cards, deletions and the position they bring the store to in
+   * one transaction. A null cursor marks the store as being reloaded. */
+  apply: (change: {
+    upserts: ActivityDTO[];
+    deletes: string[];
+    cursor: LiveCursor | null;
+    matchingVersion: string;
+  }) => Promise<void>;
   /** IDs currently held for this account, to drop rows Convex no longer has. */
   heldIds: () => Promise<string[]>;
-  complete: (state: { placeMatchingVersion?: string }) => Promise<void>;
 };
 
 export type LiveLibraryEvents = {
-  /** The first page is written: the map can render. */
-  onFirstPage?: () => void;
-  /** Every page is written once. */
+  /** The store holds a usable library: resumed, or the first page loaded. */
+  onReady?: () => void;
+  /** The store has caught up with Convex once. */
   onComplete?: () => void;
   /** Authentication or a query failed; the caller falls back to REST. */
   onError: (error: Error) => void;
 };
 
-/** The minimal client surface used here, so tests can drive pages directly. */
+/** The minimal client surface used here, so tests can drive results. */
 export type LiveClient = {
   onUpdate: (
-    query: typeof listQuery,
-    args: { paginationOpts: PaginationOpts },
-    callback: (page: ListPage) => void,
+    query: typeof changesQuery,
+    args: { after: number },
+    callback: (result: ChangesResult) => void,
     onError: (error: Error) => void,
   ) => () => void;
-  query: (
-    query: typeof activityQuery,
-    args: { id: string },
-  ) => Promise<unknown>;
+  query: <
+    Query extends typeof listQuery | typeof changesQuery | typeof activityQuery,
+  >(
+    query: Query,
+    args: Query['_args'],
+  ) => Promise<Query['_returnType']>;
   close: () => Promise<void> | void;
-};
-
-type PageState = {
-  cursor: string | null;
-  /** Set once the page's end is known and its subscription is pinned. */
-  end: string | null;
-  unsubscribe: () => void;
-  rows: Map<string, string>;
-  loaded: boolean;
 };
 
 const toDTO = (card: Card): ActivityDTO => ({ ...card, map_polyline: null });
 
 export class LiveLibrary {
-  private readonly pages: PageState[] = [];
   private writes: Promise<void> = Promise.resolve();
+  private unsubscribe: () => void = () => undefined;
+  /** The sequence the current subscription reads after. */
+  private following: number | null = null;
+  private version = '';
   private disposed = false;
-  private firstPage = false;
+  private ready = false;
   private completed = false;
   private failed = false;
 
@@ -98,89 +120,126 @@ export class LiveLibrary {
     private readonly events: LiveLibraryEvents,
     private readonly pageSize = LIVE_PAGE_SIZE,
   ) {
-    this.subscribe(0, null, null);
+    this.enqueue(async () => this.resume(await this.store.cursor()));
   }
 
   /** The full activity, including the detailed polyline. */
   async activity(id: string): Promise<ActivityDTO | null> {
-    return (await this.client.query(activityQuery, {
-      id,
-    })) as ActivityDTO | null;
+    return await this.client.query(activityQuery, { id });
   }
 
-  private subscribe(index: number, cursor: string | null, end: string | null) {
-    const previous = this.pages[index];
-    const state: PageState = {
-      cursor,
-      end,
-      rows: previous?.rows ?? new Map<string, string>(),
-      loaded: previous?.loaded ?? false,
-      unsubscribe: () => undefined,
-    };
-    this.pages[index] = state;
-    state.unsubscribe = this.client.onUpdate(
-      listQuery,
-      {
-        paginationOpts: {
-          numItems: this.pageSize,
-          cursor,
-          ...(end !== null && { endCursor: end }),
-        },
-      },
-      (page) => {
-        if (this.disposed || this.pages[index] !== state) return;
-        this.receive(index, state, page);
+  /** Continue from a stored position, or load the library when there is none
+   * (or it is no longer valid). */
+  private async resume(saved: LiveCursor | null) {
+    this.stopFollowing();
+    let result = await this.client.query(changesQuery, {
+      after: saved?.sequence ?? null,
+    });
+    if (!result.reload && result.version !== saved?.version)
+      result = await this.client.query(changesQuery, { after: null });
+    if (result.reload) {
+      await this.reload(result);
+      return;
+    }
+    // The stored cards are current up to `saved`: usable right away.
+    this.version = result.version;
+    this.markReady();
+    await this.receive(saved!.sequence, result);
+  }
+
+  /** Read the whole library once, then follow the feed from `start`. */
+  private async reload(start: Position) {
+    const seen = new Set<string>();
+    let cursor: string | null = null;
+    for (;;) {
+      const page: ListPage = await this.client.query(listQuery, {
+        paginationOpts: { numItems: this.pageSize, cursor },
+      });
+      if (this.disposed) return;
+      for (const card of page.page) seen.add(card.id);
+      await this.store.apply({
+        upserts: page.page.map(toDTO),
+        deletes: [],
+        cursor: null,
+        matchingVersion: start.matchingVersion,
+      });
+      this.markReady();
+      if (page.isDone) break;
+      cursor = page.continueCursor;
+    }
+    // Rows from an earlier load that Convex no longer has. Changes made while
+    // the pages were read have sequences after `start` and follow below.
+    const stale = (await this.store.heldIds()).filter((id) => !seen.has(id));
+    await this.store.apply({
+      upserts: [],
+      deletes: stale,
+      cursor: { sequence: start.sequence, version: start.version },
+      matchingVersion: start.matchingVersion,
+    });
+    this.version = start.version;
+    this.follow(start.sequence);
+  }
+
+  private follow(after: number) {
+    this.stopFollowing();
+    this.following = after;
+    this.unsubscribe = this.client.onUpdate(
+      changesQuery,
+      { after },
+      (result) => {
+        if (this.disposed || this.following !== after) return;
+        // Nothing new (the first result, or a re-run for an unrelated head
+        // update): the store is current; keep this subscription.
+        if (
+          !result.reload &&
+          result.version === this.version &&
+          result.sequence === after
+        ) {
+          this.markComplete();
+          return;
+        }
+        // Stop listening to this position while its result is written.
+        this.stopFollowing();
+        this.enqueue(() => this.receive(after, result));
       },
       (error) => this.fail(error),
     );
-    previous?.unsubscribe();
   }
 
-  private receive(index: number, state: PageState, page: ListPage) {
-    const next = new Map(
-      page.page.map((card) => [card.id, JSON.stringify(card)]),
-    );
-    const changed = page.page.filter(
-      (card) => state.rows.get(card.id) !== next.get(card.id),
-    );
-    const removed = [...state.rows.keys()].filter((id) => !next.has(id));
-    state.rows = next;
-    const firstLoad = !state.loaded;
-    state.loaded = true;
-    this.enqueue(async () => {
-      await this.store.upsert(changed.map(toDTO));
-      await this.store.remove(removed);
-    });
-    if (index === 0 && !this.firstPage) {
-      this.firstPage = true;
-      this.enqueue(async () => this.events.onFirstPage?.());
-    }
-    if (!page.isDone && state.end === null) {
-      // Pin this page to its range, then load the one after it.
-      this.subscribe(index, state.cursor, page.continueCursor);
-      if (!this.pages[index + 1])
-        this.subscribe(index + 1, page.continueCursor, null);
-    }
-    if (firstLoad && page.isDone) this.maybeComplete();
+  private stopFollowing() {
+    this.following = null;
+    const unsubscribe = this.unsubscribe;
+    this.unsubscribe = () => undefined;
+    unsubscribe();
   }
 
-  private maybeComplete() {
+  private async receive(after: number, result: ChangesResult) {
+    if (this.disposed) return;
+    if (result.reload || result.version !== this.version) {
+      await this.resume(null);
+      return;
+    }
+    if (result.sequence !== after)
+      await this.store.apply({
+        upserts: result.upserts.map(toDTO),
+        deletes: result.deletes,
+        cursor: { sequence: result.sequence, version: result.version },
+        matchingVersion: result.matchingVersion,
+      });
+    if (!result.more) this.markComplete();
+    this.follow(result.sequence);
+  }
+
+  private markComplete() {
     if (this.completed) return;
-    const last = this.pages.at(-1);
-    if (!last?.loaded || !this.pages.every((page) => page.loaded)) return;
     this.completed = true;
-    const seen = new Set(this.pages.flatMap((page) => [...page.rows.keys()]));
-    const placeMatchingVersion = this.pages
-      .flatMap((page) => [...page.rows.values()])
-      .map((json) => (JSON.parse(json) as Card).placeMatches?.matchingVersion)
-      .find((version) => version !== undefined);
-    this.enqueue(async () => {
-      // Rows left over from an earlier REST sync that Convex does not have.
-      const stale = (await this.store.heldIds()).filter((id) => !seen.has(id));
-      await this.store.remove(stale);
-      await this.store.complete({ placeMatchingVersion });
-      this.events.onComplete?.();
-    });
+    this.events.onComplete?.();
+  }
+
+  private markReady() {
+    if (this.ready) return;
+    this.ready = true;
+    this.events.onReady?.();
   }
 
   private enqueue(task: () => Promise<void> | void) {
@@ -196,10 +255,11 @@ export class LiveLibrary {
   private fail(error: Error) {
     if (this.disposed || this.failed) return;
     this.failed = true;
+    this.stopFollowing();
     this.events.onError(error);
   }
 
-  /** Resolves once every write received so far is committed. */
+  /** Resolves once every result received so far is committed. */
   settled() {
     return this.writes;
   }
@@ -207,7 +267,7 @@ export class LiveLibrary {
   dispose() {
     if (this.disposed) return;
     this.disposed = true;
-    for (const page of this.pages) page.unsubscribe();
+    this.stopFollowing();
     void this.client.close();
   }
 }

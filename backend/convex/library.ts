@@ -5,19 +5,20 @@ import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, query } from './_generated/server';
 import {
   MAX_ACTIVITIES_PER_READ,
+  PROJECTION_VERSION,
   READ_BUDGET_BYTES,
 } from './activityProjection';
 import { activityFor } from './activityWrites';
 import { project } from './liveProjection';
-import { idKey } from './owners';
+import { idKey, requireHead } from './owners';
 import { summariesFor } from './sync';
 import { requireViewer, viewer } from './viewer';
 
 /**
  * Public library queries for authenticated clients (docs/convex-reactive-
  * reads.md). Every function derives the owner from the caller's token and
- * takes no user argument. None reads `ownerHeads`, which changes on every
- * write and would re-run every subscription.
+ * takes no user argument. Only `changes` reads `ownerHeads`, which changes on
+ * every write: the others would re-run on every write anywhere in the library.
  */
 
 /** Who the caller is to this backend: signed in, and served from Convex. */
@@ -34,6 +35,16 @@ export const whoami = query({
     };
   },
 });
+
+type Card = Omit<NonNullable<ReturnType<typeof project>>, 'map_polyline'>;
+
+function card(row: Doc<'activities'>, owner: Doc<'owners'>): Card | null {
+  const item = project(row, owner);
+  if (!item) return null;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { map_polyline, ...rest } = item;
+  return rest;
+}
 
 /** Cards are the v1 activity DTO without `map_polyline`: the map draws from
  * the summary polyline, and detailed polylines are most of the library's
@@ -65,12 +76,91 @@ export const list = query({
     return {
       ...result,
       page: result.page.flatMap((row) => {
-        const item = project(row, owner);
-        if (!item) return [];
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { map_polyline, ...card } = item;
-        return [card];
+        const item = card(row, owner);
+        return item ? [item] : [];
       }),
+    };
+  },
+});
+
+/** Everything that, when it changes, changes every card: a client holding
+ * cards for another version must load the library again. */
+function libraryVersion(owner: Doc<'owners'>) {
+  return [
+    owner.epoch,
+    owner.generation,
+    owner.matchingVersion,
+    owner.projectionVersion,
+    PROJECTION_VERSION,
+  ].join(':');
+}
+
+const MAX_CHANGES_PER_READ = 256;
+
+/**
+ * The library's changes after `after` (a sequence this query returned
+ * earlier), collapsed per activity: the current card for each changed
+ * activity and the IDs of deleted ones. One read covers up to 256 change
+ * entries and at most 32 distinct activities, whose documents it reads.
+ * `sequence` is the position to continue from; `more` means another read
+ * is ready at once.
+ *
+ * `after: null`, a sequence below the retention floor or one this owner never
+ * reached returns `reload` with the head sequence: the client loads the
+ * library through `list` and continues from there. Clients also reload when
+ * `version` differs from the one their cards were loaded under.
+ */
+export const changes = query({
+  args: { after: v.union(v.number(), v.null()) },
+  handler: async (ctx, { after }) => {
+    const owner = await requireViewer(ctx);
+    const head = await requireHead(ctx, owner._id);
+    const version = libraryVersion(owner);
+    if (
+      after === null ||
+      !Number.isSafeInteger(after) ||
+      after < head.retentionFloor ||
+      after > head.sequence
+    )
+      return {
+        reload: true as const,
+        sequence: head.sequence,
+        version,
+        matchingVersion: owner.matchingVersion,
+      };
+    const read = await ctx.db
+      .query('changes')
+      .withIndex('by_owner_sequence', (q) =>
+        q.eq('owner', owner._id).gt('sequence', after),
+      )
+      .take(MAX_CHANGES_PER_READ);
+    // Stop before the change that would add a 33rd activity to read.
+    const touchedIds = new Set<string>();
+    const rows: typeof read = [];
+    for (const row of read) {
+      if (
+        !touchedIds.has(row.entityId) &&
+        touchedIds.size === MAX_ACTIVITIES_PER_READ
+      )
+        break;
+      touchedIds.add(row.entityId);
+      rows.push(row);
+    }
+    const touched = [...touchedIds];
+    const current = await Promise.all(
+      touched.map(async (id) => {
+        const row = await activityFor(ctx, owner._id, idKey(id));
+        return { id, card: row && card(row, owner) };
+      }),
+    );
+    return {
+      reload: false as const,
+      sequence: rows.at(-1)?.sequence ?? after,
+      more: rows.length < read.length || read.length === MAX_CHANGES_PER_READ,
+      version,
+      matchingVersion: owner.matchingVersion,
+      upserts: current.flatMap(({ card }) => (card ? [card] : [])),
+      deletes: current.flatMap(({ id, card }) => (card ? [] : [id])),
     };
   },
 });
