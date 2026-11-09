@@ -209,6 +209,13 @@ off unless that list is set and `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`, and it
 requires `CRON_SECRET` plus the writer settings above in the app's
 environment. The Cloudflare cron worker calls it every ten minutes.
 
+Shadow owners are also mirrored right after a write: once a Strava webhook
+event has been processed and once an activity edit has been answered
+(`src/server/convex-mirror/shadow-run.ts`). These runs have a 20-second
+budget and can overlap the scheduled one; fenced writes make that safe, and
+the scheduled run remains the safety net for everything else (hourly
+ingestion, stream and match jobs, and any trigger that failed).
+
 ### Production parity check
 
 `pnpm convex:verify-owner` compares a whole library but reads only the local

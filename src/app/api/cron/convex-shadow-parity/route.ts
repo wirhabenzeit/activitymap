@@ -1,25 +1,21 @@
 import { toActivityStreamSummaryDTO } from '~/contracts/v1/activity-streams';
-import { externalEffectsEnabled } from '~/server/config/external-effects';
 import type { MirrorPosition } from '~/server/convex-mirror/mirror';
 import { checkParity } from '~/server/convex-mirror/parity';
 import {
   postgresParitySource,
   shadowActor,
 } from '~/server/convex-mirror/postgres-source';
+import { configuredShadowOwners } from '~/server/convex-mirror/shadow-run';
 import { logger } from '~/server/logging/logger';
 import { convexAppAdapter } from '~/server/preview/convex';
 import { convexWriteBridge } from '~/server/sync/convex-writer';
 
-import { shadowOwners } from '../mirror-convex-shadow/handler';
 import { createConvexParityCronHandler } from './handler';
 
 export const maxDuration = 60;
 export const POST = createConvexParityCronHandler({
   // Same switch as the shadow writes it checks.
-  owners: () =>
-    externalEffectsEnabled()
-      ? shadowOwners(process.env.ACTIVITYMAP_CONVEX_SHADOW_OWNERS)
-      : null,
+  owners: configuredShadowOwners,
   secret: () => process.env.CRON_SECRET,
   check: async (userId) => {
     const actor = await shadowActor(userId);
