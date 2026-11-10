@@ -142,7 +142,7 @@ void test('multi-ID detail fetch retains partial success and only tombstones an 
           if (id === 3) throw new StravaApiError('Record Not Found', 404);
           if (id === 4)
             throw new StravaApiError('Record Not Found in cache', 404);
-          return stravaActivity(id);
+          return stravaActivity(Number(id));
         },
         async getActivities() {
           throw new Error('list fetch must not run');
@@ -255,7 +255,7 @@ void test('detail callers cannot opt out of photos, including metadata-only non-
           throw new Error('must not fetch history');
         },
         getActivityPhotos: async (id) => {
-          calls.push(id);
+          calls.push(Number(id));
           return [];
         },
       }),
@@ -298,7 +298,7 @@ void test('detail fetch never returns or persists an activity owned by a differe
             ? stravaActivity(id, {
                 athlete: { id: 7777 } as StravaActivity['athlete'],
               })
-            : stravaActivity(id);
+            : stravaActivity(Number(id));
         },
         async getActivities() {
           throw new Error('list fetch must not run');
