@@ -3,7 +3,14 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
 import { publishChange } from './activityWrites';
-import { ownerFor, requireHead, requireOwner, scopeFields } from './owners';
+import { writerValidator } from './ownerScope';
+import {
+  ownerFor,
+  requireHead,
+  requireWritableOwner,
+  scopeFields,
+  writerOf,
+} from './owners';
 
 /** Hide old matches immediately, then durably publish their invalidations. */
 export const select = internalMutation({
@@ -13,7 +20,8 @@ export const select = internalMutation({
     matchingVersion: v.string(),
   },
   handler: async (ctx, { scope, catalogue, matchingVersion }) => {
-    const owner = await requireOwner(ctx, scope);
+    // Selected by the Postgres mirror, for the catalogue Postgres matched with.
+    const owner = await requireWritableOwner(ctx, scope);
     if (
       !/^[0-9a-f]{64}$/.test(catalogue) ||
       !/^[0-9a-f]{64}$/.test(matchingVersion)
@@ -35,20 +43,39 @@ export const select = internalMutation({
     await ctx.scheduler.runAfter(0, internal.catalogue.next, {
       scope,
       catalogue,
+      writer: 'postgres',
     });
     return true;
   },
 });
 
-/** Each transaction commits its cursor and schedules its continuation together. */
+/**
+ * Each transaction commits its cursor and schedules its continuation together.
+ *
+ * A continuation works for the writer it was scheduled under and checks it
+ * in every transaction, like any other write to the library. When the writer
+ * changes, queued continuations become no-ops and the cursor stays where it
+ * is: nothing runs during a handoff, and `owners.setWriter` schedules the
+ * rest for the store that writes next.
+ */
 export const next = internalMutation({
-  args: { scope: v.object(scopeFields), catalogue: v.string() },
-  handler: async (ctx, { scope, catalogue }): Promise<{ done: boolean }> => {
+  args: {
+    scope: v.object(scopeFields),
+    catalogue: v.string(),
+    /** Absent on work queued before owners had a writer: Postgres. */
+    writer: v.optional(writerValidator),
+  },
+  handler: async (
+    ctx,
+    { scope, catalogue, writer = 'postgres' },
+  ): Promise<{ done: boolean }> => {
     const owner = await ownerFor(ctx, scope.userId);
     // Revocation, handoff and a superseding catalogue make queued work a no-op.
     if (
       !owner ||
       owner.revoked ||
+      writer === 'handoff' ||
+      writerOf(owner) !== writer ||
       owner.backend !== 'convex' ||
       owner.epoch !== scope.epoch ||
       owner.athleteId !== scope.athleteId ||
@@ -89,6 +116,7 @@ export const next = internalMutation({
       await ctx.scheduler.runAfter(0, internal.catalogue.next, {
         scope,
         catalogue,
+        writer,
       });
     return { done };
   },

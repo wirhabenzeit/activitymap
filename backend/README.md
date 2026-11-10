@@ -318,6 +318,52 @@ while erasure locks the user row first. The two can deadlock; Postgres ends
 one of them with an error and the job retries. `pnpm db:test-writer-fence`
 proves the behaviour against a real database.
 
+### In Convex
+
+The Convex owner carries the same field: `owners.writer` (absent means
+`postgres`) and `owners.writerEpoch`, changed only by `owners.setWriter` with
+a compare-and-set on the epoch. It is separate from `owners.backend` and the
+routing `epoch`, which say who serves reads: a handoff of the writer changes
+no client cursor and no read setting.
+
+Every write to an owner's library calls `requireWritableOwner` in its own
+transaction, naming who is writing. The shadow mirror and the importer write
+as `postgres` (the default), so once an owner is `handoff` or `convex` each
+of their writes is refused, including one from a run that started before the
+handoff. A mirror run also stops up front when it sees the owner is not
+written by Postgres, and the scheduled mirror skips an owner whose Postgres
+writer is `convex`. During a handoff from Postgres the Postgres side is
+`handoff` while Convex is still `postgres`, so the mirror can reach the head.
+Convex ingestion (step 5) will write as `convex`.
+
+Scheduled continuations are fenced the same way. A catalogue invalidation
+(`catalogue.next`) works for the writer it was queued under and checks it in
+every transaction, so a writer change makes queued continuations no-ops and
+leaves the cursor where it is. Nothing runs during a handoff; `setWriter`
+queues the rest for the store that writes next.
+
+The two sides are changed one after the other by the handoff (step 9), not
+in one transaction. Until both agree, at most one side accepts writes.
+
+### Webhook events for an owner Convex writes
+
+Strava is acknowledged once an event is in the Postgres inbox, for every
+owner. For an owner whose writer is `convex`, the drain leaves activity
+events alone and `src/server/strava/webhook-dispatch.ts` passes them on:
+right after the delivery, and again in each drain run for what is still
+due. The write bridge operation `recordEvents` stores the event in
+`providerEvents` (`convex/providerEvents.ts`), once per inbox event ID, and
+only when Convex is the owner's writer. The inbox row is marked done after
+that mutation has committed, so one of the two stores always holds the
+event. A refused or undelivered event goes back to the inbox for five
+minutes and is never dead-lettered. That includes a dispatcher that dies
+between claim and delivery: the dispatch claim marks its lease in
+`last_error`, and stale-lease recovery returns a marked row without counting
+an attempt.
+
+Nothing reads `providerEvents` yet. Convex ingestion (step 5) works from it;
+until then no owner should be handed to Convex.
+
 ## Shadow writes
 
 While Postgres remains the writer, `src/server/convex-mirror/mirror.ts` copies

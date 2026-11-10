@@ -7,6 +7,7 @@ import {
   photoValidator,
   placeMatchValidator,
 } from './activityValidators';
+import { writerValidator } from './ownerScope';
 import { placeValidator } from './placeValidators';
 import { manifestValidator, summaryValidator } from './recordingValidators';
 import { countsValidator } from './statsShape';
@@ -16,6 +17,11 @@ export default defineSchema({
     userId: v.string(),
     athleteId: v.string(),
     backend: v.union(v.literal('postgres'), v.literal('convex')),
+    /** Who writes the library, separately from who serves it (`backend`).
+     * Absent means Postgres. Changed only by `owners.setWriter`, which
+     * counts `writerEpoch` up; the routing `epoch` stays as it is. */
+    writer: v.optional(writerValidator),
+    writerEpoch: v.optional(v.number()),
     epoch: v.string(),
     generation: v.string(),
     revoked: v.boolean(),
@@ -55,6 +61,22 @@ export default defineSchema({
   bridgeNonces: defineTable({ nonce: v.string(), expiresAt: v.number() })
     .index('by_nonce', ['nonce'])
     .index('by_expiry', ['expiresAt']),
+  /** Provider events received for an owner Convex writes for
+   * (convex/providerEvents.ts): the durable receipt its ingestion works
+   * from. `event` is the sender's ID for the delivery, so a repeat is one
+   * row. */
+  providerEvents: defineTable({
+    owner: v.id('owners'),
+    event: v.string(),
+    activity: v.string(),
+    aspect: v.union(
+      v.literal('create'),
+      v.literal('update'),
+      v.literal('delete'),
+    ),
+    eventTime: v.number(),
+    receivedAt: v.number(),
+  }).index('by_owner_event', ['owner', 'event']),
   ownerEpochs: defineTable({ owner: v.id('owners'), epoch: v.string() }).index(
     'by_owner_epoch',
     ['owner', 'epoch'],

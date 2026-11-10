@@ -82,6 +82,8 @@ export type MirrorSource = {
 
 type OwnerState = {
   backend: 'postgres' | 'convex';
+  /** Who writes the owner's library in Convex. */
+  writer?: 'postgres' | 'handoff' | 'convex';
   epoch: string;
   generation: string;
   revoked: boolean;
@@ -194,6 +196,9 @@ export async function mirrorOwner({
   if (!state) throw new Error('The owner is not provisioned in Convex');
   if (state.revoked || state.backend !== 'convex')
     throw new Error('The Convex owner is not assigned to Convex');
+  // The mirror writes as Postgres; Convex refuses each write otherwise.
+  if (state.writer && state.writer !== 'postgres')
+    throw new Error('The Convex owner is not written by Postgres');
   const epoch = state.epoch;
   const write = <T>(operation: { kind: string; [field: string]: unknown }) =>
     writer.write<T>(operation, epoch);

@@ -13,6 +13,10 @@ import {
   recordWebhookEvent,
 } from '~/server/strava/webhook';
 import {
+  convexDispatchConfigured,
+  dispatchEventToConvex,
+} from '~/server/strava/webhook-dispatch';
+import {
   WEBHOOK_MAX_BODY_BYTES,
   webhookEventSchema,
 } from '~/server/strava/webhook-schema';
@@ -157,6 +161,12 @@ export async function handleWebhookDelivery(request: NextRequest) {
   if (recorded) {
     after(async () => {
       await processInboxEvent(recorded.id, recorded.payload);
+      // An owner Convex writes for: the event was left unprocessed above
+      // and is passed on. Claims nothing for anyone else.
+      if (convexDispatchConfigured() && data.object_type === 'activity')
+        await dispatchEventToConvex(recorded.id).catch((error: unknown) =>
+          logger.error('[Webhook] Dispatch to Convex failed', { error }),
+        );
       // Shadow owners: copy the result to Convex now, not at the next
       // scheduled mirror run.
       await mirrorShadowAthleteAfterWrite(data.owner_id);

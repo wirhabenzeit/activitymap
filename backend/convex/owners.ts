@@ -5,7 +5,12 @@ import type { Doc } from './_generated/dataModel';
 import type { QueryCtx } from './_generated/server';
 import { internalMutation, internalQuery } from './_generated/server';
 import { PROJECTION_VERSION } from './activityProjection';
-import { actorFields, scopeFields } from './ownerScope';
+import {
+  type Writer,
+  actorFields,
+  scopeFields,
+  writerValidator,
+} from './ownerScope';
 import { zeroCounts } from './statsShape';
 
 export { scopeFields } from './ownerScope';
@@ -40,6 +45,28 @@ export async function requireOwner(
     owner.revoked
   )
     throw new Error('Activity owner unavailable');
+  return owner;
+}
+
+/** Who writes the owner's library; Postgres until a handoff says otherwise. */
+export function writerOf(owner: Doc<'owners'>): Writer {
+  return owner.writer ?? 'postgres';
+}
+
+/**
+ * The owner, for a write by `writer`. Every write to an owner's library
+ * goes through this in its own transaction, so a writer that picked its
+ * work before a handoff is refused when it publishes after it. Copies from
+ * Postgres (the mirror and the importer) write as `postgres`, the default.
+ */
+export async function requireWritableOwner(
+  ctx: QueryCtx,
+  scope: { userId: string; athleteId: string; epoch: string },
+  writer: Writer = 'postgres',
+) {
+  const owner = await requireOwner(ctx, scope);
+  if (writerOf(owner) !== writer)
+    throw new Error('Activity owner is written by another store');
   return owner;
 }
 
@@ -120,7 +147,12 @@ export const provision = internalMutation({
       epoch: args.epoch,
     });
     const head = await requireHead(ctx, prior._id);
-    if (args.backend === 'convex' && head.catalogueAfter !== undefined)
+    // Not during a writer handoff: setWriter resumes it afterwards.
+    if (
+      args.backend === 'convex' &&
+      head.catalogueAfter !== undefined &&
+      writerOf(prior) !== 'handoff'
+    )
       await ctx.scheduler.runAfter(0, internal.catalogue.next, {
         scope: {
           userId: args.userId,
@@ -128,8 +160,48 @@ export const provision = internalMutation({
           epoch: args.epoch,
         },
         catalogue: args.catalogue,
+        writer: writerOf(prior),
       });
     return prior._id;
+  },
+});
+
+/**
+ * Move an owner to another writer if it is still at `expectedEpoch` (0 for
+ * an owner that was never handed off). Returns the new epoch, or null when
+ * the epoch has moved on. Mirrors `setWriter` on the Postgres user.
+ */
+export const setWriter = internalMutation({
+  args: {
+    ...actorFields,
+    writer: writerValidator,
+    expectedEpoch: v.number(),
+  },
+  handler: async (
+    ctx,
+    { userId, athleteId, writer, expectedEpoch },
+  ): Promise<number | null> => {
+    const owner = await ownerFor(ctx, userId);
+    if (!owner || owner.revoked || owner.athleteId !== athleteId)
+      throw new Error('Activity owner unavailable');
+    if ((owner.writerEpoch ?? 0) !== expectedEpoch) return null;
+    const writerEpoch = expectedEpoch + 1;
+    await ctx.db.patch('owners', owner._id, { writer, writerEpoch });
+    // An unfinished catalogue invalidation stopped with the previous writer
+    // (catalogue.next). The store that writes next finishes it; during a
+    // handoff it waits.
+    const head = await requireHead(ctx, owner._id);
+    if (
+      writer !== 'handoff' &&
+      owner.backend === 'convex' &&
+      head.catalogueAfter !== undefined
+    )
+      await ctx.scheduler.runAfter(0, internal.catalogue.next, {
+        scope: { userId, athleteId, epoch: owner.epoch },
+        catalogue: owner.catalogue,
+        writer,
+      });
+    return writerEpoch;
   },
 });
 

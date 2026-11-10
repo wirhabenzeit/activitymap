@@ -679,6 +679,72 @@ void test('catalogue invalidation pauses at handoff and resumes under a fresh Co
   );
 });
 
+void test('catalogue invalidation stops with its writer and is finished by the next one', async () => {
+  const convex = convexTest(schema, modules);
+  await convex.mutation(internal.owners.provision, config);
+  // More activities than one continuation handles.
+  const ids = Array.from({ length: 40 }, (_, index) => String(1000 + index));
+  for (const id of ids)
+    await convex.mutation(internal.activityWrites.applySource, {
+      ...source,
+      id,
+      dto: { ...fixture, id },
+    });
+  const cursor = () =>
+    convex.run(
+      async (ctx) =>
+        (await ctx.db.query('ownerHeads').first())!.catalogueAfter ?? null,
+    );
+  const head = async () =>
+    (
+      await convex.query(internal.sync.read, {
+        ...scope,
+        operation: { kind: 'head' },
+      })
+    ).sequence;
+  const hand = (writer: 'postgres' | 'handoff' | 'convex', expected: number) =>
+    convex.mutation(internal.owners.setWriter, {
+      userId: scope.userId,
+      athleteId: scope.athleteId,
+      writer,
+      expectedEpoch: expected,
+    });
+  const nextCatalogue = 'c'.repeat(64);
+  await convex.mutation(internal.catalogue.select, {
+    scope,
+    catalogue: nextCatalogue,
+    matchingVersion: 'd'.repeat(64),
+  });
+  // The writer changes between selection and its queued continuation.
+  assert.equal(await hand('handoff', 0), 1);
+  const before = await head();
+  await drainScheduled(convex);
+  assert.equal(await cursor(), '', 'the cursor did not move');
+  assert.equal(await head(), before, 'nothing was published');
+  // A continuation queued for the old writer stays a no-op afterwards too.
+  assert.deepEqual(
+    await convex.mutation(internal.catalogue.next, {
+      scope,
+      catalogue: nextCatalogue,
+      writer: 'postgres',
+    }),
+    { done: true },
+  );
+  assert.deepEqual(
+    await convex.mutation(internal.catalogue.next, {
+      scope,
+      catalogue: nextCatalogue,
+    }),
+    { done: true },
+  );
+  assert.equal(await cursor(), '');
+
+  // The next writer finishes it, across several continuations.
+  assert.equal(await hand('convex', 1), 2);
+  await drainScheduled(convex);
+  assert.equal(await cursor(), null);
+});
+
 void test('metadata updates allow in-flight recording and first match publication, but source changes fence them', async () => {
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, config);

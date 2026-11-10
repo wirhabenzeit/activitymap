@@ -3,7 +3,8 @@ import { photoDTOSchema } from '../../src/contracts/v1/photo';
 import type { Doc } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { activityFor, publishChange } from './activityWrites';
-import { idKey, requireOwner } from './owners';
+import type { Writer } from './ownerScope';
+import { idKey, requireWritableOwner } from './owners';
 import { applyStats, contribution } from './stats';
 
 /**
@@ -126,9 +127,10 @@ export async function applyPhotoSet(
     sourceRevision: number;
     activityId: string;
     photos: PhotoDTO[];
+    writer?: Writer;
   },
 ) {
-  const owner = await requireOwner(ctx, args.scope);
+  const owner = await requireWritableOwner(ctx, args.scope, args.writer);
   if (owner.generation !== args.generation) return 0;
   if (!Number.isSafeInteger(args.sourceRevision) || args.sourceRevision < 1)
     throw new Error('Invalid source revision');
@@ -220,9 +222,10 @@ export async function deletePhotoRecords(
     generation: string;
     sourceRevision: number;
     ids: string[];
+    writer?: Writer;
   },
 ) {
-  const owner = await requireOwner(ctx, args.scope);
+  const owner = await requireWritableOwner(ctx, args.scope, args.writer);
   if (owner.generation !== args.generation) return 0;
   if (!Number.isSafeInteger(args.sourceRevision) || args.sourceRevision < 1)
     throw new Error('Invalid source revision');

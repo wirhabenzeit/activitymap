@@ -16,7 +16,11 @@ import {
   isWriterFencedError,
   setWriter,
 } from '../../src/server/db/writer-fence';
-import { createWebhookEventsRepository } from '../../src/server/repositories/webhook-events';
+import {
+  CONVEX_DISPATCH_RETRY_MS,
+  createWebhookDispatchRepository,
+  createWebhookEventsRepository,
+} from '../../src/server/repositories/webhook-events';
 
 /**
  * Proves the writer fence of migration 0031 against a real database: which
@@ -384,6 +388,100 @@ try {
     (await events.claim('fence-activity', new Date()))?.id,
     'fence-activity',
   );
+  // 6c. Under `convex` the drain still leaves the activity event alone and
+  // the dispatcher takes it, for that owner only. A deferred event keeps
+  // its attempt count and waits; a completed one is done.
+  await db
+    .update(stravaWebhookEvents)
+    .set({ status: 'pending', nextAttemptAt: eventTime })
+    .where(inArray(stravaWebhookEvents.id, eventIds));
+  const dispatch = createWebhookDispatchRepository(
+    db as unknown as Parameters<typeof createWebhookDispatchRepository>[0],
+  );
+  const dispatchable = async () =>
+    (await dispatch.selectCandidates(500, new Date()))
+      .map((candidate) => candidate.id)
+      .filter((id) => eventIds.includes(id));
+  assert.deepEqual(await dispatchable(), []);
+  assert.equal(await dispatch.claim('fence-activity', new Date()), null);
+  await hand(owner.id, 'handoff');
+  assert.deepEqual(await dispatchable(), [], 'not during a handoff');
+  await hand(owner.id, 'convex');
+  assert.deepEqual(await dispatchable(), ['fence-activity']);
+  assert.deepEqual(await drainable(), ['fence-athlete', 'fence-other']);
+  assert.equal(await events.claim('fence-activity', new Date()), null);
+  assert.equal(await dispatch.claim('fence-other', new Date()), null);
+  assert.equal(await dispatch.claim('fence-athlete', new Date()), null);
+  const claimedAt = new Date();
+  const first = await dispatch.claim('fence-activity', claimedAt);
+  assert.equal(first?.userId, owner.id);
+  assert.equal(
+    await dispatch.claim('fence-activity', new Date()),
+    null,
+    'one claim at a time',
+  );
+  assert.ok(first);
+  assert.equal(
+    await dispatch.defer(first.event, new Error('refused'), claimedAt),
+    true,
+  );
+  const [deferred] = await db
+    .select()
+    .from(stravaWebhookEvents)
+    .where(eq(stravaWebhookEvents.id, 'fence-activity'));
+  assert.equal(deferred?.status, 'failed');
+  assert.equal(deferred?.attemptCount, 0);
+  assert.ok(deferred && deferred.nextAttemptAt > claimedAt);
+  assert.deepEqual(await dispatchable(), [], 'waits before it is sent again');
+  const later = new Date(claimedAt.getTime() + CONVEX_DISPATCH_RETRY_MS);
+  const second = await dispatch.claim('fence-activity', later);
+  assert.ok(second);
+  assert.equal(await dispatch.complete(second.event, later), true);
+  assert.equal(
+    await dispatch.complete(second.event, later),
+    false,
+    'a lease completes once',
+  );
+  assert.equal(await dispatch.claim('fence-activity', later), null);
+
+  // A dispatcher that dies between claim and delivery: stale-lease recovery
+  // returns the event without counting an attempt, even at nine attempts,
+  // where one more counted attempt would dead-letter it. A drain lease of
+  // the same age is still counted.
+  await db
+    .update(stravaWebhookEvents)
+    .set({ status: 'pending', attemptCount: 9, nextAttemptAt: eventTime })
+    .where(inArray(stravaWebhookEvents.id, eventIds));
+  const crashedAt = new Date();
+  assert.ok(await dispatch.claim('fence-activity', crashedAt));
+  assert.ok(await events.claim('fence-other', crashedAt));
+  const recoveredAt = new Date(crashedAt.getTime() + 60_000);
+  assert.ok(
+    (await events.resetStaleProcessing(
+      new Date(crashedAt.getTime() + 1),
+      recoveredAt,
+    )) >= 2,
+  );
+  const afterCrash = new Map(
+    (
+      await db
+        .select()
+        .from(stravaWebhookEvents)
+        .where(inArray(stravaWebhookEvents.id, eventIds))
+    ).map((row) => [row.id, row]),
+  );
+  assert.equal(afterCrash.get('fence-activity')?.status, 'failed');
+  assert.equal(afterCrash.get('fence-activity')?.attemptCount, 9);
+  assert.equal(afterCrash.get('fence-other')?.status, 'dead_letter');
+  assert.deepEqual(
+    (await dispatch.selectCandidates(500, recoveredAt))
+      .map((candidate) => candidate.id)
+      .filter((id) => eventIds.includes(id)),
+    ['fence-activity'],
+  );
+  const resent = await dispatch.claim('fence-activity', recoveredAt);
+  assert.ok(resent, 'the interrupted event is sent again');
+  assert.equal(await dispatch.complete(resent.event, recoveredAt), true);
   await db
     .delete(stravaWebhookEvents)
     .where(inArray(stravaWebhookEvents.id, eventIds));

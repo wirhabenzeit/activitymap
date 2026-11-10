@@ -7,7 +7,7 @@ import { MAX_RECORDING_BYTES, decodeWhole, sha256 } from '../recording/codec';
 import { recordingSummary } from '../recording/summary';
 import { internal } from './_generated/api';
 import { internalAction } from './_generated/server';
-import { scopeFields } from './ownerScope';
+import { scopeFields, writerValidator } from './ownerScope';
 import { manifestValidator } from './recordingValidators';
 
 /** The trusted worker passes a staged immutable file and its manifest. Raw
@@ -18,6 +18,8 @@ export const prepare = internalAction({
     id: v.string(),
     generation: v.string(),
     sourceRevision: v.number(),
+    /** Who is writing; Postgres when absent. */
+    writer: v.optional(writerValidator),
     recordingGeneration: v.string(),
     recordingRevision: v.string(),
     file: v.id('_storage'),
