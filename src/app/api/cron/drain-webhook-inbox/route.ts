@@ -7,6 +7,10 @@ import {
 } from '~/server/config/external-effects';
 import { logger } from '~/server/logging/logger';
 import {
+  convexDispatchConfigured,
+  dispatchWebhookInboxToConvex,
+} from '~/server/strava/webhook-dispatch';
+import {
   DEFAULT_DRAIN_BATCH_SIZE,
   DEFAULT_DRAIN_CONCURRENCY,
   drainWebhookInbox,
@@ -19,12 +23,18 @@ const drainInbox = withJobLog(
   async (options: { batchSize: number; concurrency: number }) => {
     const reconciled = await reconcileStuckWebhookEvents();
     const drainResult = await drainWebhookInbox(options);
+    // Events of owners Convex writes for, which the drain leaves alone.
+    const convex = convexDispatchConfigured()
+      ? await dispatchWebhookInboxToConvex()
+      : null;
     const metrics = await getWebhookInboxMetrics();
-    return { reconciled, ...drainResult, metrics };
+    return { reconciled, ...drainResult, convex, metrics };
   },
   {
-    summarize: ({ metrics, ...counts }) => ({
+    summarize: ({ metrics, convex, ...counts }) => ({
       ...counts,
+      convexSent: convex?.sent ?? 0,
+      convexDeferred: convex?.deferred ?? 0,
       deadLetterTotal: metrics.countsByStatus.dead_letter ?? 0,
       failedTotal: metrics.countsByStatus.failed ?? 0,
       pendingTotal: metrics.countsByStatus.pending ?? 0,

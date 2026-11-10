@@ -17,7 +17,14 @@ import {
   publishMatchRecord,
 } from './activityWrites';
 import { scopeFields } from './ownerScope';
-import { idKey, ownerFor, requireHead, requireOwner } from './owners';
+import {
+  idKey,
+  ownerFor,
+  requireHead,
+  requireOwner,
+  requireWritableOwner,
+  writerOf,
+} from './owners';
 import { applyPhotoSet, deletePhotoRecords } from './photos';
 import { manifestValidator } from './recordingValidators';
 
@@ -45,6 +52,8 @@ export const owner = internalQuery({
       owner && {
         athleteId: owner.athleteId,
         backend: owner.backend,
+        writer: writerOf(owner),
+        writerEpoch: owner.writerEpoch ?? 0,
         epoch: owner.epoch,
         generation: owner.generation,
         revoked: owner.revoked,
@@ -64,6 +73,7 @@ export const mirrorState = internalQuery({
     const head = await requireHead(ctx, owner._id);
     return {
       backend: owner.backend,
+      writer: writerOf(owner),
       epoch: owner.epoch,
       generation: owner.generation,
       revoked: owner.revoked,
@@ -93,7 +103,7 @@ export const checkpoint = internalMutation({
     ctx,
     { scope, sequence, revision, full, photos, photoSequence },
   ) => {
-    const owner = await requireOwner(ctx, scope);
+    const owner = await requireWritableOwner(ctx, scope);
     const head = await requireHead(ctx, owner._id);
     if (
       !Number.isSafeInteger(sequence) ||

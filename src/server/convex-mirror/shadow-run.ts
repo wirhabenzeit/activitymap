@@ -30,6 +30,15 @@ export function configuredShadowOwners(): string[] | null {
 
 /** One mirror run for a shadow owner (scheduled job and write trigger). */
 export async function runShadowMirror(userId: string, deadline: number) {
+  // Postgres to Convex only while Postgres holds the library: during a
+  // handoff this copy still has to reach the head, but once Convex writes
+  // the direction is reversed (and Convex refuses these writes).
+  const [owner] = await db
+    .select({ writer: users.writer })
+    .from(users)
+    .where(eq(users.id, userId));
+  if (owner?.writer === 'convex')
+    return { skipped: 'Convex writes for this owner' } as const;
   const actor = await shadowActor(userId);
   const writer = convexWriteBridge(actor);
   if (!writer) throw new Error('ACTIVITYMAP_CONVEX_SITE is not configured');

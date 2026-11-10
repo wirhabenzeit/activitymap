@@ -21,7 +21,13 @@ import {
   placeMatchValidator,
   streamMetadataValidator,
 } from './activityValidators';
-import { idKey, requireHead, requireOwner, scopeFields } from './owners';
+import { type Writer, writerValidator } from './ownerScope';
+import {
+  idKey,
+  requireHead,
+  requireWritableOwner,
+  scopeFields,
+} from './owners';
 import { removeActivityPhotos } from './photos';
 import { manifestValidator, summaryValidator } from './recordingValidators';
 import { applyStats, contribution } from './stats';
@@ -31,6 +37,8 @@ const fence = {
   id: v.string(),
   generation: v.string(),
   sourceRevision: v.number(),
+  /** Who is writing; Postgres when absent (owners.requireWritableOwner). */
+  writer: v.optional(writerValidator),
 };
 
 export function activityFor(
@@ -77,7 +85,7 @@ export async function applySourceRecord(
   ctx: MutationCtx,
   args: ObjectType<typeof applySourceArgs>,
 ) {
-  const owner = await requireOwner(ctx, args.scope);
+  const owner = await requireWritableOwner(ctx, args.scope, args.writer);
   const key = idKey(args.id);
   if (owner.generation !== args.generation) return false;
   if (!Number.isSafeInteger(args.sourceRevision) || args.sourceRevision < 1)
@@ -235,9 +243,10 @@ async function publicationScope(
     id: string;
     generation: string;
     sourceRevision: number;
+    writer?: Writer;
   },
 ) {
-  const owner = await requireOwner(ctx, args.scope);
+  const owner = await requireWritableOwner(ctx, args.scope, args.writer);
   if (owner.generation !== args.generation) return null;
   const row = await activityFor(ctx, owner._id, idKey(args.id));
   if (

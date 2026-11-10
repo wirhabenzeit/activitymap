@@ -6,6 +6,7 @@ import { db as defaultDb } from '~/server/db';
 import {
   type StravaWebhookEventRow,
   stravaWebhookEvents,
+  users,
 } from '~/server/db/schema';
 import {
   type BackoffDecision,
@@ -20,7 +21,8 @@ const ACTIVE_STATUSES = ['pending', 'failed'] as const;
 /**
  * Activity events of an owner Postgres does not ingest for stay recorded and
  * unprocessed (docs/convex-writer-cutover.md, handoff): in `handoff` until
- * the owner has a writer again, under `convex` for that store to take.
+ * the owner has a writer again, under `convex` until they are sent on to
+ * that store (`createWebhookDispatchRepository`).
  * Athlete events (deauthorization) are always processed here, because
  * accounts and tokens stay in Postgres. An event for an athlete without a
  * user is processed as before.
@@ -276,6 +278,109 @@ export function createWebhookEventsRepository(
         countsByStatus,
         oldestPendingEventTime: oldestPending?.oldest ?? null,
       };
+    },
+  };
+}
+
+/** How long a refused or failed dispatch waits before it is sent again. */
+export const CONVEX_DISPATCH_RETRY_MS = 5 * 60 * 1000;
+
+/** Activity events of an owner Convex writes for: sent on, not processed. */
+const dispatchedToConvex = sql`(${stravaWebhookEvents.objectType} = 'activity' AND EXISTS (
+  SELECT 1 FROM "user" u WHERE u.athlete_id = ${stravaWebhookEvents.ownerId}
+    AND u.writer = 'convex'
+))`;
+
+export type ConvexDispatchClaim = {
+  event: StravaWebhookEventRow;
+  /** The owner Convex writes for. */
+  userId: string;
+};
+
+/**
+ * The inbox as seen by the dispatcher to Convex
+ * (`~/server/strava/webhook-dispatch.ts`): the events the drain leaves
+ * alone because Convex writes for their owner. Claims use the same lease as
+ * the drain, so a row is taken by one or the other, never both.
+ */
+export interface WebhookDispatchRepository {
+  /** Due events for owners Convex writes for, oldest first. */
+  selectCandidates(limit: number, now: Date): Promise<{ id: string }[]>;
+  /** Claims one event if it is due and its owner is still written by Convex. */
+  claim(id: string, now: Date): Promise<ConvexDispatchClaim | null>;
+  /** Marks a claimed event done once Convex holds it. */
+  complete(lease: WebhookEventLease, now: Date): Promise<boolean>;
+  /**
+   * Returns a claimed event to the inbox to be sent again later. Unlike a
+   * processing failure this never dead-letters: the event has not reached
+   * the store that should work on it.
+   */
+  defer(lease: WebhookEventLease, error: unknown, now: Date): Promise<boolean>;
+}
+
+export function createWebhookDispatchRepository(
+  database: DrizzleDb = defaultDb,
+): WebhookDispatchRepository {
+  const due = (now: Date) =>
+    and(
+      inArray(stravaWebhookEvents.status, ACTIVE_STATUSES),
+      lte(stravaWebhookEvents.nextAttemptAt, now),
+      dispatchedToConvex,
+    );
+  const held = (lease: WebhookEventLease) =>
+    and(
+      eq(stravaWebhookEvents.id, lease.id),
+      eq(stravaWebhookEvents.status, 'processing'),
+      eq(stravaWebhookEvents.updatedAt, lease.updatedAt),
+    );
+  return {
+    async selectCandidates(limit, now) {
+      return database
+        .select({ id: stravaWebhookEvents.id })
+        .from(stravaWebhookEvents)
+        .where(due(now))
+        .orderBy(asc(stravaWebhookEvents.eventTime))
+        .limit(limit);
+    },
+
+    async claim(id, now) {
+      const [event] = await database
+        .update(stravaWebhookEvents)
+        .set({ status: 'processing', updatedAt: now })
+        .where(and(eq(stravaWebhookEvents.id, id), due(now)))
+        .returning();
+      if (!event) return null;
+      const [owner] = await database
+        .select({ id: users.id })
+        .from(users)
+        .where(eq(users.athlete_id, event.ownerId));
+      if (owner) return { event, userId: owner.id };
+      // The account went away between the two statements.
+      await this.defer(event, new Error('No owner for the event'), now);
+      return null;
+    },
+
+    async complete(lease, now) {
+      const [updated] = await database
+        .update(stravaWebhookEvents)
+        .set({ status: 'succeeded', lastError: null, updatedAt: now })
+        .where(held(lease))
+        .returning({ id: stravaWebhookEvents.id });
+      return Boolean(updated);
+    },
+
+    async defer(lease, error, now) {
+      const [updated] = await database
+        .update(stravaWebhookEvents)
+        .set({
+          status: 'failed',
+          nextAttemptAt: new Date(now.getTime() + CONVEX_DISPATCH_RETRY_MS),
+          lastError: error instanceof Error ? error.message : String(error),
+          updatedAt: now,
+        })
+        .where(held(lease))
+        .returning({ id: stravaWebhookEvents.id });
+      return Boolean(updated);
     },
   };
 }

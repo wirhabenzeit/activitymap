@@ -19,6 +19,7 @@ import {
 } from '../../src/server/convex-mirror/mirror';
 import type { PlaceRow } from '../../src/server/places/catalogue-rows';
 import type { RawActivityStreams } from '../../src/server/strava/streams';
+import { sendEventToConvex } from '../../src/server/sync/convex-events';
 import { convexWriteBridge } from '../../src/server/sync/convex-writer';
 import { api, internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
@@ -43,6 +44,7 @@ const modules = {
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
   './places.ts': () => import('../convex/places'),
+  './providerEvents.ts': () => import('../convex/providerEvents'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
   './sync.ts': () => import('../convex/sync'),
 };
@@ -976,5 +978,146 @@ void test('the place catalogue is copied in order, resumably, and accepted only 
       })
     ).complete,
     true,
+  );
+});
+
+void test('Convex refuses Postgres writes once the owner is handed off', async (t) => {
+  const { convex, writer, upload, read, feed } = setup(t);
+  const { db, source } = fakePostgres();
+  db.upsert('101', 'First');
+  db.record('101', '1');
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: catalogueFor(db.version()),
+    matchingVersion: db.version(),
+  });
+  let clock = Date.now();
+  const run = () =>
+    mirrorOwner({ source, writer, upload, now: () => (clock += 1000) });
+  await run();
+  const before = await feed();
+  const actorIds = { userId: scope.userId, athleteId: scope.athleteId };
+  const hand = (next: 'postgres' | 'handoff' | 'convex', expected: number) =>
+    convex.mutation(internal.owners.setWriter, {
+      ...actorIds,
+      writer: next,
+      expectedEpoch: expected,
+    });
+
+  // The epoch is compared and set: a second handoff from the same epoch
+  // changes nothing.
+  assert.equal(await hand('convex', 0), 1);
+  assert.equal(await hand('postgres', 0), null);
+
+  // A mirror run stops before writing, and reads still work.
+  db.upsert('101', 'Renamed in Postgres');
+  db.upsert('102', 'New in Postgres');
+  await assert.rejects(run(), /not written by Postgres/);
+  // A writer that picked its work before the handoff is refused by each
+  // write, in the transaction that would have applied it.
+  const stale = { scope, generation: 'shadow-generation-01' };
+  await assert.rejects(
+    convex.mutation(internal.importer.applySources, {
+      ...stale,
+      sourceRevision: clock + 5000,
+      items: [previewFixtureActivity('102', '42', 'Late', Date.now())],
+      recordings: [],
+    }),
+    /written by another store/,
+  );
+  await assert.rejects(
+    convex.mutation(internal.importer.deleteSources, {
+      ...stale,
+      sourceRevision: clock + 5000,
+      ids: ['101'],
+    }),
+    /written by another store/,
+  );
+  await assert.rejects(
+    convex.mutation(internal.importer.applyPhotoSets, {
+      ...stale,
+      sourceRevision: clock + 5000,
+      items: [{ activityId: '101', photos: [] }],
+    }),
+    /written by another store/,
+  );
+  await assert.rejects(
+    convex.mutation(internal.importer.checkpoint, {
+      scope,
+      sequence: 99,
+      revision: clock + 5000,
+    }),
+    /written by another store/,
+  );
+  assert.equal(await feed(), before, 'nothing was published');
+  assert.deepEqual(
+    (await read()).items.map((item) => [item.id, item.name]),
+    [['101', 'First']],
+  );
+
+  // Handed back, the mirror catches up from where it stopped.
+  assert.equal(await hand('postgres', 1), 2);
+  await run();
+  assert.deepEqual(
+    (await read()).items.map((item) => [item.id, item.name]),
+    [
+      ['101', 'Renamed in Postgres'],
+      ['102', 'New in Postgres'],
+    ],
+  );
+});
+
+void test('provider events are recorded once, and only for an owner Convex writes', async (t) => {
+  const { convex, fetcher } = setup(t);
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: 'c'.repeat(64),
+    matchingVersion: 'd'.repeat(64),
+  });
+  const event = {
+    event: 'inbox-event-0001',
+    activityId: '101',
+    aspect: 'create' as const,
+    eventTime: 1_700_000_000_000,
+  };
+  const send = (item = event) => sendEventToConvex(actor, item, fetcher);
+  const stored = () =>
+    convex.run((ctx) => ctx.db.query('providerEvents').collect());
+
+  // While Postgres writes, or during a handoff, the sender keeps the event.
+  await assert.rejects(send(), /rejected recordEvents/);
+  await convex.mutation(internal.owners.setWriter, {
+    userId: scope.userId,
+    athleteId: scope.athleteId,
+    writer: 'handoff',
+    expectedEpoch: 0,
+  });
+  await assert.rejects(send(), /rejected recordEvents/);
+  assert.deepEqual(await stored(), []);
+
+  await convex.mutation(internal.owners.setWriter, {
+    userId: scope.userId,
+    athleteId: scope.athleteId,
+    writer: 'convex',
+    expectedEpoch: 1,
+  });
+  await send();
+  // Sent again after a lost response: still one record.
+  await send();
+  await send({ ...event, event: 'inbox-event-0002', aspect: 'delete' });
+  assert.deepEqual(
+    (await stored()).map((row) => [row.event, row.activity, row.aspect]),
+    [
+      ['inbox-event-0001', '101'.padStart(20, '0'), 'create'],
+      ['inbox-event-0002', '101'.padStart(20, '0'), 'delete'],
+    ],
+  );
+  await assert.rejects(
+    send({ ...event, event: 'not a valid id' }),
+    /rejected recordEvents/,
   );
 });

@@ -3,7 +3,12 @@ import { v } from 'convex/values';
 import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
 import { publishChange } from './activityWrites';
-import { ownerFor, requireHead, requireOwner, scopeFields } from './owners';
+import {
+  ownerFor,
+  requireHead,
+  requireWritableOwner,
+  scopeFields,
+} from './owners';
 
 /** Hide old matches immediately, then durably publish their invalidations. */
 export const select = internalMutation({
@@ -13,7 +18,8 @@ export const select = internalMutation({
     matchingVersion: v.string(),
   },
   handler: async (ctx, { scope, catalogue, matchingVersion }) => {
-    const owner = await requireOwner(ctx, scope);
+    // Selected by the Postgres mirror, for the catalogue Postgres matched with.
+    const owner = await requireWritableOwner(ctx, scope);
     if (
       !/^[0-9a-f]{64}$/.test(catalogue) ||
       !/^[0-9a-f]{64}$/.test(matchingVersion)

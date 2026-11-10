@@ -248,6 +248,12 @@ router.route({
         case 'completeCatalogue':
           result = await ctx.runMutation(internal.places.complete, args);
           break;
+        case 'recordEvents':
+          result = await ctx.runMutation(internal.providerEvents.record, {
+            scope,
+            ...args,
+          });
+          break;
         case 'checkpoint':
           result = await ctx.runMutation(internal.importer.checkpoint, {
             scope,
