@@ -1,7 +1,7 @@
 import {
   DEFAULT_ERASURE_BATCH_SIZE,
-  MAX_ERASURE_BATCH_SIZE,
   type ErasureRunResult,
+  MAX_ERASURE_BATCH_SIZE,
 } from '~/server/strava/erasure';
 
 export interface ErasureCronHandlerDependencies {

@@ -8,7 +8,7 @@ export { shadowOwners } from '~/server/convex-mirror/shadow-owners';
  * result counts as a failure, so the scheduler's history shows it.
  */
 export function createConvexShadowCronHandler<T>(deps: {
-  owners: () => string[] | null;
+  owners: () => string[] | null | Promise<string[] | null>;
   secret: () => string | undefined;
   run: (userId: string, deadline: number) => Promise<T>;
   /** Whether a completed run still fails the job (for example drift). */
@@ -31,7 +31,7 @@ export function createConvexShadowCronHandler<T>(deps: {
 }) {
   const now = deps.now ?? Date.now;
   return async (request: Request) => {
-    const owners = deps.owners();
+    const owners = await deps.owners();
     if (!owners)
       return Response.json(
         { error: 'Convex shadow writes are not configured' },

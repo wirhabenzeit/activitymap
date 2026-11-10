@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { auth } from '~/lib/auth';
-import { getUserInternal, UserNotFoundError } from '~/server/db/internal';
+import { UserNotFoundError, getUserInternal } from '~/server/db/internal';
 import type { User } from '~/server/db/schema';
 
 /**
@@ -17,6 +17,12 @@ export type Actor = {
   userId: string;
   athleteId: number;
   authentication: 'cookie' | 'bearer';
+  /** Set when Convex writes the account's library. Convex then decides
+   * which activities the account has; Postgres no longer knows. */
+  convexWrites?: true;
+  /** The account's routing epoch in Convex, when Convex writes its library
+   * and the epoch is recorded: its reads are served from Convex under it. */
+  convexEpoch?: string;
 };
 
 export class UnauthenticatedError extends Error {
@@ -26,7 +32,8 @@ export class UnauthenticatedError extends Error {
   }
 }
 
-type BetterAuthSession = { user?: { id?: string | null } | null } | null | undefined;
+type BetterAuthSession =
+  { user?: { id?: string | null } | null } | null | undefined;
 
 /**
  * Injectable dependencies for `resolveActor`/`requireActor` (issue #127).
@@ -41,7 +48,12 @@ type BetterAuthSession = { user?: { id?: string | null } | null } | null | undef
  */
 export type ActorDependencies = {
   getSession?: (headers: Headers) => Promise<BetterAuthSession>;
-  getUser?: (userId: string) => Promise<Pick<User, 'athlete_id'> | null>;
+  getUser?: (
+    userId: string,
+  ) => Promise<
+    | (Pick<User, 'athlete_id'> & Partial<Pick<User, 'writer' | 'convexEpoch'>>)
+    | null
+  >;
 };
 
 /**
@@ -62,7 +74,8 @@ export async function resolveActor(
   headers: Headers,
   deps: ActorDependencies = {},
 ): Promise<Actor | null> {
-  const getSession = deps.getSession ?? ((h) => auth.api.getSession({ headers: h }));
+  const getSession =
+    deps.getSession ?? ((h) => auth.api.getSession({ headers: h }));
   const getUser = deps.getUser ?? getUserInternal;
 
   const session = await getSession(headers);
@@ -74,9 +87,13 @@ export async function resolveActor(
   }
 
   let athleteId: number | null = null;
+  let convexWrites = false;
+  let convexEpoch: string | null = null;
   try {
     const user = await getUser(session.user.id);
     athleteId = user?.athlete_id ?? null;
+    convexWrites = user?.writer === 'convex';
+    if (convexWrites) convexEpoch = user?.convexEpoch ?? null;
   } catch (error) {
     if (error instanceof UserNotFoundError) {
       // No local user row for this session - treat as unauthenticated
@@ -99,7 +116,13 @@ export async function resolveActor(
     ? 'bearer'
     : 'cookie';
 
-  return { userId: session.user.id, athleteId, authentication };
+  return {
+    userId: session.user.id,
+    athleteId,
+    authentication,
+    ...(convexWrites && { convexWrites }),
+    ...(convexEpoch && { convexEpoch }),
+  };
 }
 
 /**

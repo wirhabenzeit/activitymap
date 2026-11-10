@@ -100,6 +100,11 @@ export const users = pgTable(
     // which increments the epoch in the same statement.
     writer: text('writer', { enum: WRITERS }).notNull().default('postgres'),
     writerEpoch: integer('writer_epoch').notNull().default(0),
+    // The account's routing epoch in Convex, recorded when it is provisioned
+    // there. Null means the account has no library in Convex. While Postgres
+    // writes, an account with an epoch is being copied; once Convex writes,
+    // its reads are served from Convex under this epoch.
+    convexEpoch: text('convex_epoch'),
     // Better Auth additions
     createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
     updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),

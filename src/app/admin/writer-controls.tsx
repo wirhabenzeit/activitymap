@@ -3,9 +3,12 @@
 import { useState, useTransition } from 'react';
 
 import {
+  allLibraryStatus,
   moveMyLibraryToConvex,
   moveMyLibraryToPostgres,
+  moveReadyLibrariesToConvex,
   myLibraryWriter,
+  prepareAllLibrariesForConvex,
 } from '~/server/convex-mirror/actions';
 import type { HandoffReport } from '~/server/convex-mirror/handoff';
 
@@ -22,10 +25,16 @@ const describe = (report: HandoffReport) =>
     ...report.steps,
   ].join('\n');
 
+const lines = (rows: { name: string; result: string }[]) =>
+  rows.length > 0
+    ? rows.map((row) => `${row.name}: ${row.result}`).join('\n')
+    : 'No account to act on.';
+
 /**
- * Operator controls for which store writes the signed-in admin's own
- * library. The server actions call `requireAdmin()` themselves; this page
- * being admin-only is not the control.
+ * Operator controls for which store writes a library: the signed-in admin's
+ * own, and every connected account. The server actions call
+ * `requireAdmin()` themselves; this page being admin-only is not the
+ * control.
  */
 export function WriterControls() {
   const [pending, startTransition] = useTransition();
@@ -80,6 +89,54 @@ export function WriterControls() {
           }
         >
           Move back to Postgres
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          className={button}
+          disabled={pending}
+          onClick={() =>
+            run(async () =>
+              lines(
+                (await allLibraryStatus()).map((row) => ({
+                  name: row.name,
+                  result:
+                    row.writer === 'convex'
+                      ? 'written by Convex'
+                      : `written by ${row.writer}, copy to Convex: ${row.copy}`,
+                })),
+              ),
+            )
+          }
+        >
+          All accounts
+        </button>
+        <button
+          type="button"
+          className={button}
+          disabled={pending}
+          onClick={() =>
+            run(
+              async () => lines(await prepareAllLibrariesForConvex()),
+              'Start copying every account to Convex? Nothing changes for the accounts until they are moved.',
+            )
+          }
+        >
+          Prepare all
+        </button>
+        <button
+          type="button"
+          className={button}
+          disabled={pending}
+          onClick={() =>
+            run(
+              async () => lines(await moveReadyLibrariesToConvex()),
+              'Move every account whose copy has finished to Convex? Each one stops and stays with Postgres if the two stores differ.',
+            )
+          }
+        >
+          Move ready accounts
         </button>
       </div>
       <p role="status" className="whitespace-pre-line text-muted-foreground">

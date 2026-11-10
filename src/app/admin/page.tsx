@@ -304,7 +304,7 @@ export default async function AdminPage({
               <WebhookInbox data={data} />
               <Section
                 title="Library writer"
-                description="Which store receives Strava events and writes your own library. Moving to Convex copies what is left, compares the two stores and stops if they differ."
+                description="Which store receives Strava events and writes a library. The first row acts on your own account, the second on every connected account: prepare starts the copy to Convex, and a move copies what is left, compares the two stores and stops if they differ."
               >
                 <WriterControls />
               </Section>

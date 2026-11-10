@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
+import { and, eq, isNotNull, ne } from 'drizzle-orm';
 
 import { externalEffectsEnabled } from '~/server/config/external-effects';
 import { db } from '~/server/db';
@@ -26,6 +26,23 @@ export function configuredShadowOwners(): string[] | null {
   return externalEffectsEnabled()
     ? shadowOwners(process.env.ACTIVITYMAP_CONVEX_SHADOW_OWNERS)
     : null;
+}
+
+/** Every account the mirror copies: the configured shadow owners, and the
+ * accounts that have a library in Convex while Postgres still writes it
+ * (an account being moved). Null when there are none or shadow writes are
+ * off. */
+export async function mirroredOwners(): Promise<string[] | null> {
+  if (!externalEffectsEnabled()) return null;
+  const moving = await db
+    .select({ id: users.id })
+    .from(users)
+    .where(and(isNotNull(users.convexEpoch), ne(users.writer, 'convex')));
+  const owners = new Set([
+    ...(configuredShadowOwners() ?? []),
+    ...moving.map((user) => user.id),
+  ]);
+  return owners.size > 0 ? [...owners] : null;
 }
 
 /** One mirror run for a shadow owner (scheduled job and write trigger). */
@@ -74,7 +91,7 @@ const onError = (error: unknown, userId: string) =>
 /** Mirror a shadow owner after a write to Postgres. Never rejects; a no-op
  * for everyone else. Call it from `after()`, once the write has committed. */
 export const mirrorShadowOwnerAfterWrite = createShadowMirrorTrigger({
-  owners: configuredShadowOwners,
+  owners: mirroredOwners,
   run: runShadowMirror,
   onError,
 });
@@ -83,7 +100,7 @@ export const mirrorShadowOwnerAfterWrite = createShadowMirrorTrigger({
  * when shadow writes are configured. */
 export async function mirrorShadowAthleteAfterWrite(athleteId: number) {
   try {
-    if (!configuredShadowOwners()?.length) return;
+    if (!(await mirroredOwners())?.length) return;
     const [user] = await db
       .select({ id: users.id })
       .from(users)

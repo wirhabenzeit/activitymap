@@ -1,10 +1,11 @@
-import { logger } from '~/server/logging/logger';
+import { withJobLog } from '~/server/application/job-log';
 import {
   EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   externalEffectsEnabled,
 } from '~/server/config/external-effects';
+import { logger } from '~/server/logging/logger';
 import { eraseDueRevokedAthletes } from '~/server/strava/erasure';
-import { withJobLog } from '~/server/application/job-log';
+
 import { createErasureCronHandler } from './handler';
 
 /**

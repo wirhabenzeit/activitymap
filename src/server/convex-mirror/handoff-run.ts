@@ -1,7 +1,9 @@
 import 'server-only';
 
+import { eq } from 'drizzle-orm';
+
 import { db } from '~/server/db';
-import type { Writer } from '~/server/db/schema';
+import { type Writer, users } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
 import { dispatchWebhookInboxToConvex } from '~/server/strava/webhook-dispatch';
 import { convexWriteBridge } from '~/server/sync/convex-writer';
@@ -72,9 +74,23 @@ async function logged(
   return report;
 }
 
-/** Make Convex the writer of an account's library. */
-export const moveLibraryToConvex = (userId: string) =>
-  logged('to Convex', userId, handOffToConvex);
+/** Make Convex the writer of an account's library. Its reads follow: they
+ * are served from Convex under the epoch recorded here. */
+export async function moveLibraryToConvex(userId: string) {
+  const report = await logged('to Convex', userId, handOffToConvex);
+  if (report.writer === 'convex') {
+    const bridge = convexWriteBridge(await shadowActor(userId));
+    const state = await bridge?.write<{ epoch: string } | null>({
+      kind: 'state',
+    });
+    if (state)
+      await db
+        .update(users)
+        .set({ convexEpoch: state.epoch })
+        .where(eq(users.id, userId));
+  }
+  return report;
+}
 
 /** Make Postgres the writer again; it catches up from Strava. */
 export const moveLibraryToPostgres = (userId: string) =>

@@ -13,22 +13,33 @@ type StreamReads = Pick<ActivityStreamsRepository, 'read' | 'readSummaries'>;
  * activity at once, while the copy learns of them through the mirror, or not
  * at all. The check runs after the copy is read, so nothing captured before
  * it is sent.
+ *
+ * Once Convex writes the account's library it is no copy any more: Postgres
+ * does not learn of new activities, and Convex serves only the account's
+ * own. Postgres then still decides whether the account may read at all
+ * (it holds the provider account), and no longer which activities.
  */
 export function authorizedStreams(
   copy: StreamReads,
   authority: Pick<ActivityStreamsRepository, 'readable'>,
 ): StreamReads {
+  const allowed = async (actor: Actor, activityIds: string[]) => {
+    if (!actor.convexWrites) return authority.readable(actor, activityIds);
+    // Throws when the provider account is not eligible.
+    await authority.readable(actor, []);
+    return new Set(activityIds);
+  };
   return {
     async read(actor: Actor, activityId: string) {
       const row = await copy.read(actor, activityId);
-      if (!(await authority.readable(actor, [activityId])).has(activityId))
+      if (!(await allowed(actor, [activityId])).has(activityId))
         throw new ActivityStreamsUnavailableError();
       return row;
     },
     async readSummaries(actor: Actor, activityIds: string[]) {
       const reads = await copy.readSummaries(actor, activityIds);
-      const allowed = await authority.readable(actor, activityIds);
-      return reads.filter((read) => allowed.has(read.activityId));
+      const ids = await allowed(actor, activityIds);
+      return reads.filter((read) => ids.has(read.activityId));
     },
   };
 }

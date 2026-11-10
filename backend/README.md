@@ -367,8 +367,27 @@ transaction as the receipt.
 ## Moving an account
 
 `src/server/convex-mirror/handoff.ts` moves one account's library between the
-two stores. An admin runs it for their own account from the admin page
-(Webhooks, "Library writer").
+two stores. An admin runs it from the admin page (Webhooks, "Library
+writer"): for their own account, or for every connected account in two
+steps (`src/server/convex-mirror/accounts.ts`).
+
+- **Prepare all** gives each account Postgres still writes a library in
+  Convex (the write bridge operation `provision`, for a new owner only) and
+  records its routing epoch in `users.convex_epoch`. From then on the mirror
+  copies the account, a time slice per run, until Convex holds the whole
+  library. Nothing changes for the account.
+- **Move ready accounts** runs the handoff below for each prepared account
+  whose copy has finished. An account that stops stays with Postgres and
+  does not hold up the others.
+- **All accounts** lists who writes each account and how far its copy is.
+
+Routing follows the account row, not settings. The mirror copies an account
+that has an epoch while Postgres writes it. Once Convex writes it, its v1
+reads and the web client's live queries come from Convex under that epoch,
+and Convex decides which activities it has; Postgres is still asked whether
+the provider account may read at all. The three owner lists
+(`ACTIVITYMAP_CONVEX_SHADOW_OWNERS`, `_READ_OWNERS`, `_LIVE_OWNERS`) keep
+working for accounts that are read from Convex while Postgres writes.
 
 **To Convex**
 
@@ -395,8 +414,8 @@ that stopped half way.
 
 What an account needs before it can move:
 
-- its reads are served from Convex ([Read owners in production](#read-owners-in-production))
-  and it is mirrored ([Shadow writes](#shadow-writes));
+- it has a library in Convex that the mirror has copied ("Prepare all", or
+  a listed shadow owner);
 - the provider gateway key is set in the app and in the Convex environment;
 - the place catalogue rowset its matching version names has been copied.
 

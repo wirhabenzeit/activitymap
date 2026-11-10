@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import {
-  createCleanupRateLimitsCronHandler,
   DEFAULT_RATE_LIMIT_BUCKET_RETENTION_MS,
+  createCleanupRateLimitsCronHandler,
 } from './handler.ts';
 
 function request(secret = 'correct'): Request {

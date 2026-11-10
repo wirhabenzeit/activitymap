@@ -15,7 +15,7 @@
  * the next run replays the recent change window (mirror.ts).
  */
 export function createShadowMirrorTrigger(deps: {
-  owners: () => string[] | null;
+  owners: () => string[] | null | Promise<string[] | null>;
   run: (userId: string, deadline: number) => Promise<unknown>;
   now?: () => number;
   budgetMs?: number;
@@ -23,12 +23,12 @@ export function createShadowMirrorTrigger(deps: {
 }): (userId: string) => Promise<void> {
   const now = deps.now ?? Date.now;
   const running = new Map<string, { again: boolean; done: Promise<void> }>();
-  return (userId) => {
+  return async (userId) => {
     try {
-      if (!deps.owners()?.includes(userId)) return Promise.resolve();
+      if (!(await deps.owners())?.includes(userId)) return;
     } catch (error) {
       deps.onError?.(error, userId);
-      return Promise.resolve();
+      return;
     }
     const current = running.get(userId);
     if (current) {

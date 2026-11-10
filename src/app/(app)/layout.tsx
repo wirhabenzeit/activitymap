@@ -16,7 +16,7 @@ import { Toaster } from '~/components/ui/toaster';
 import { BrowsingProvider } from '~/hooks/use-browsing-library';
 import { auth } from '~/lib/auth';
 import { QueryProvider } from '~/providers/query-provider';
-import { convexLiveUrl } from '~/server/convex-live-owners';
+import { convexLiveUrlFor } from '~/server/convex-live-owners';
 import { toCurrentUserDTO } from '~/server/db/dto';
 import { getAccountInternal, getUserInternal } from '~/server/db/internal';
 import { previewSelection } from '~/server/preview/selection';
@@ -64,7 +64,7 @@ export default async function AppShellLayout({
       ? null
       : preview
         ? previewLiveUrl
-        : convexLiveUrl(user.id);
+        : convexLiveUrlFor(user);
     initialAuth.currentUser = user
       ? {
           ...toCurrentUserDTO(user, account),

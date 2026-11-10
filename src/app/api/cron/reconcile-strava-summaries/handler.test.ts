@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import {
   DEFAULT_PAGES_PER_ATHLETE,
   DEFAULT_RECONCILIATION_BATCH_SIZE,
 } from '~/server/strava/summary-reconciliation.ts';
+
 import { createSummaryReconciliationCronHandler } from './handler.ts';
 
 const SUCCESS = {
@@ -24,11 +26,14 @@ const SUCCESS = {
 };
 
 function request(secret = 'correct', body?: unknown): Request {
-  return new Request('https://example.test/api/cron/reconcile-strava-summaries', {
-    method: 'POST',
-    headers: { 'x-cron-secret': secret, 'content-type': 'application/json' },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-  });
+  return new Request(
+    'https://example.test/api/cron/reconcile-strava-summaries',
+    {
+      method: 'POST',
+      headers: { 'x-cron-secret': secret, 'content-type': 'application/json' },
+      ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+    },
+  );
 }
 
 void test('summary reconciliation cron fails closed outside Production', async () => {
@@ -93,9 +98,7 @@ void test('summary reconciliation cron uses a bounded default batch', async () =
 });
 
 void test('summary reconciliation cron accepts explicit throughput bounds', async () => {
-  let received:
-    | { batchSize: number; pagesPerAthlete: number }
-    | undefined;
+  let received: { batchSize: number; pagesPerAthlete: number } | undefined;
   const POST = createSummaryReconciliationCronHandler({
     externalEffectsEnabled: () => true,
     externalEffectsDisabledMessage: 'disabled',

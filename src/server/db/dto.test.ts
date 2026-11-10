@@ -64,6 +64,7 @@ function buildUser(overrides: Partial<User> = {}): User {
     image: null,
     writer: 'postgres',
     writerEpoch: 0,
+    convexEpoch: null,
     athlete_id: 12345,
     oldest_activity_reached: false,
     lastSummaryReconciledAt: null,
