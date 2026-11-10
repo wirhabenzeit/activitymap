@@ -218,6 +218,13 @@
       "when": 1794175092758,
       "tag": "0030_auth-jwks",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1794315831434,
+      "tag": "0031_writer-fence",
+      "breakpoints": true
     }
   ]
 }

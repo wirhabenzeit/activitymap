@@ -7,11 +7,12 @@ import {
   accounts,
   activityDeletions,
   photoDeletions,
-  stravaWebhookEvents,
   sessions,
+  stravaWebhookEvents,
   users,
   verification,
 } from '~/server/db/schema';
+import { bypassWriterFence } from '~/server/db/writer-fence';
 
 type DrizzleDb = typeof defaultDb;
 type Transaction = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
@@ -22,6 +23,8 @@ async function eraseUserData(
   user: { id: string; athleteId: number | null; email: string | null },
   accountIds: string[],
 ): Promise<boolean> {
+  // Erasure removes an owner's rows whoever writes for them.
+  await tx.execute(bypassWriterFence);
   const athleteIds = [
     ...new Set(
       [

@@ -70,26 +70,47 @@ export const summaryReconciliationPhaseEnum = pgEnum(
   ['scanning', 'confirming'],
 );
 
-export const users = pgTable('user', {
-  id: text('id').notNull().primaryKey(),
-  name: text('name'),
-  email: text('email'),
-  emailVerified: boolean('emailVerified').default(false), // Changed to boolean for Better Auth
-  image: text('image'),
-  athlete_id: bigint('athlete_id', { mode: 'number' }).unique(),
-  oldest_activity_reached: boolean('oldest_activity_reached')
-    .notNull()
-    .default(false),
-  // Advanced only after a complete, bounded Strava summary scan and its
-  // missing-activity confirmation pass have both committed. A partial or
-  // failed scan must never make the dataset appear current (issue #123).
-  lastSummaryReconciledAt: timestamp('last_summary_reconciled_at', {
-    mode: 'date',
-  }),
-  // Better Auth additions
-  createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
-  updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
-});
+/** Who writes an owner's library; see `users.writer`. */
+export const WRITERS = ['postgres', 'handoff', 'convex'] as const;
+export type Writer = (typeof WRITERS)[number];
+
+export const users = pgTable(
+  'user',
+  {
+    id: text('id').notNull().primaryKey(),
+    name: text('name'),
+    email: text('email'),
+    emailVerified: boolean('emailVerified').default(false), // Changed to boolean for Better Auth
+    image: text('image'),
+    athlete_id: bigint('athlete_id', { mode: 'number' }).unique(),
+    oldest_activity_reached: boolean('oldest_activity_reached')
+      .notNull()
+      .default(false),
+    // Advanced only after a complete, bounded Strava summary scan and its
+    // missing-activity confirmation pass have both committed. A partial or
+    // failed scan must never make the dataset appear current (issue #123).
+    lastSummaryReconciledAt: timestamp('last_summary_reconciled_at', {
+      mode: 'date',
+    }),
+    // Which store ingests and writes this owner's library
+    // (docs/convex-writer-cutover.md, decision 3). `handoff` is the pause while
+    // the owner moves: neither store writes. Database triggers refuse writes
+    // to the owner's activities, streams, photos and place results unless this
+    // is `postgres` (src/server/db/writer-fence.ts). Changed only by a handoff,
+    // which increments the epoch in the same statement.
+    writer: text('writer', { enum: WRITERS }).notNull().default('postgres'),
+    writerEpoch: integer('writer_epoch').notNull().default(0),
+    // Better Auth additions
+    createdAt: timestamp('createdAt', { mode: 'date' }).defaultNow(),
+    updatedAt: timestamp('updatedAt', { mode: 'date' }).defaultNow(),
+  },
+  (table) => [
+    check(
+      'user_writer_check',
+      sql`${table.writer} IN ('postgres', 'handoff', 'convex')`,
+    ),
+  ],
+);
 
 export const accounts = pgTable(
   'account',

@@ -276,6 +276,38 @@ anything at the provider, since every operation is a read, but it is not
 free of effects: it spends shared request budget, and it can refresh the
 owner's token and store the new one.
 
+## Writer field
+
+Which store ingests and writes an owner's library is recorded per owner
+(`docs/convex-writer-cutover.md`, decision 3). In Postgres it is
+`user.writer` (`postgres`, `handoff` or `convex`) with `user.writer_epoch`,
+which a handoff increments in the same statement as a compare-and-set
+(`src/server/db/writer-fence.ts`). Every account is `postgres` until a handoff
+says otherwise.
+
+Postgres enforces it with triggers (migration 0031): an insert, update or
+delete on an owner's activities, activity streams, photos, place results or
+place checks is refused with SQLSTATE `AMW01` unless the writer is
+`postgres`. The check is part of the writing transaction, so it covers every
+code path:
+
+- Each write takes a share lock on the owner's user row. A handoff updates
+  that row, so it waits until the transactions that have written for the
+  owner are finished.
+- A transaction that first writes after the handoff committed is refused, by
+  the fence or, if its snapshot is older, as a serialization failure.
+
+Two kinds of write pass on purpose, by setting `activitymap.writer_fence` to
+`bypass` for their own transaction: account erasure, and (step 7) the replica
+writes that copy Convex's state back. Jobs are still expected to skip owners
+they do not write for; the fence makes a mistake there harmless, not free: a
+refused write is an error in that job.
+
+One cost: the share lock is taken after the row being written is locked,
+while erasure locks the user row first. The two can deadlock; Postgres ends
+one of them with an error and the job retries. `pnpm db:test-writer-fence`
+proves the behaviour against a real database.
+
 ## Shadow writes
 
 While Postgres remains the writer, `src/server/convex-mirror/mirror.ts` copies
