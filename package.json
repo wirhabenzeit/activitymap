@@ -22,6 +22,7 @@
     "db:test-erasure": "tsx --conditions=react-server scripts/database/test-erasure-executor.ts",
     "db:test-legacy-sync-selection": "tsx --conditions=react-server scripts/database/test-legacy-activity-sync-selection.ts",
     "db:test-summary-reconciliation": "tsx --conditions=react-server scripts/database/test-summary-reconciliation.ts",
+    "db:test-writer-fence": "tsx --conditions=react-server scripts/database/test-writer-fence.ts",
     "db:test-activity-streams": "tsx --conditions=react-server scripts/database/test-activity-streams.ts",
     "db:test-activity-places": "tsx --conditions=react-server scripts/database/test-activity-places.ts",
     "db:test-place-catalogue": "tsx --conditions=react-server scripts/database/test-place-catalogue-import.ts",

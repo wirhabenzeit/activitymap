@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+
 import { test } from 'node:test';
+
+import type { InitialAuth } from '~/store/auth';
 
 import { toCurrentUserDTO } from './dto';
 import type { Account, User } from './schema';
-import type { InitialAuth } from '~/store/auth';
 
 const SENSITIVE = 'super-secret-strava-credential';
 
@@ -60,6 +62,8 @@ function buildUser(overrides: Partial<User> = {}): User {
     email: 'jane@example.com',
     emailVerified: true,
     image: null,
+    writer: 'postgres',
+    writerEpoch: 0,
     athlete_id: 12345,
     oldest_activity_reached: false,
     lastSummaryReconciledAt: null,
