@@ -1,6 +1,6 @@
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { logger } from '~/server/logging/logger';
-import { convexPreviewFor } from '~/server/preview/convex';
+import { convexPreviewFor, convexReadOwnerFor } from '~/server/preview/convex';
 import { createActivityStreamsRepository } from '~/server/repositories/activity-streams';
 import { streamActivityIdSchema } from '~/server/strava/streams';
 
@@ -15,10 +15,17 @@ export async function GET(
   return withAuthenticatedApiV1(
     async (request, context) => {
       const { id } = await params;
+      const actor = await context.actor();
       return createActivityStreamsHandler({
         resolveActor: context.actor,
         repository: createActivityStreamsRepository(),
-        storedOnly: convexPreviewFor(await context.actor())?.streams,
+        storedOnly: convexPreviewFor(actor)?.streams,
+        preferred: convexReadOwnerFor(actor)?.streams,
+        onPreferredError: (error, requestId) =>
+          logger.warn('Convex stream read failed; using Postgres', {
+            error,
+            requestId,
+          }),
         view: 'compact',
         onError: (error, requestId) =>
           logger.error('Activity stream summary request failed', {

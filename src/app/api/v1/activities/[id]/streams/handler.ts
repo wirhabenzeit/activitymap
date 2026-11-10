@@ -27,6 +27,12 @@ export function createActivityStreamsHandler(deps: {
   resolveActor: (request: Request) => Promise<Actor | null>;
   repository: ActivityStreamsRepository;
   storedOnly?: Pick<ActivityStreamsRepository, 'read' | 'readSummaries'>;
+  /** A second copy of stored streams (Convex, for a production read owner).
+   * It answers when it holds current data for the activity and no refresh is
+   * asked for; a missing or stale recording, or a failed read, takes the
+   * usual path through `repository`, which can fetch from the provider. */
+  preferred?: Pick<ActivityStreamsRepository, 'read' | 'readSummaries'>;
+  onPreferredError?: (error: unknown, requestId: string) => void;
   fetch?: typeof fetchActivityStreams;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
@@ -69,6 +75,53 @@ export function createActivityStreamsHandler(deps: {
         );
       }
       const now = deps.now ?? (() => new Date());
+      type Stored = NonNullable<typeof deps.storedOnly>;
+      const summaryResponse = (
+        read: Awaited<ReturnType<Stored['readSummaries']>>[number],
+        init: ResponseInit,
+      ) =>
+        Response.json(
+          responseEnvelope(
+            deps.view === 'compact'
+              ? activityCompactStreamSummaryDTOSchema
+              : activityStreamSummaryDTOSchema,
+          ).parse(
+            makeEnvelope(
+              deps.view === 'compact'
+                ? toCompactStreamSummaryDTO(read)
+                : toActivityStreamSummaryDTO(read),
+              now(),
+            ),
+          ),
+          init,
+        );
+      const rawResponse = (
+        row: Awaited<ReturnType<Stored['read']>>,
+        init: ResponseInit,
+      ) =>
+        Response.json(
+          responseEnvelope(activityStreamsDTOSchema).parse(
+            makeEnvelope(toActivityStreamsDTO(id, row), now()),
+          ),
+          init,
+        );
+      if (deps.preferred && refresh === 'false') {
+        try {
+          if (deps.view === 'summary' || deps.view === 'compact') {
+            const [read] = await deps.preferred.readSummaries(actor, [id]);
+            if (read?.row?.summary && !read.row.invalidatedAt)
+              return summaryResponse(read, { status: 200, headers });
+          } else {
+            const row = await deps.preferred.read(actor, id);
+            if (row?.payload && !row.invalidatedAt)
+              return rawResponse(row, { status: 200, headers });
+          }
+        } catch (error) {
+          // Unknown to the copy, or the copy is unreachable: Postgres decides.
+          if (!(error instanceof ActivityStreamsUnavailableError))
+            deps.onPreferredError?.(error, requestId);
+        }
+      }
       let status = 200;
       if (deps.storedOnly && refresh === 'true') {
         return fail(
@@ -117,32 +170,10 @@ export function createActivityStreamsHandler(deps: {
           [id],
         );
         if (!read) throw new ActivityStreamsUnavailableError();
-        return Response.json(
-          responseEnvelope(
-            deps.view === 'compact'
-              ? activityCompactStreamSummaryDTOSchema
-              : activityStreamSummaryDTOSchema,
-          ).parse(
-            makeEnvelope(
-              deps.view === 'compact'
-                ? toCompactStreamSummaryDTO(read)
-                : toActivityStreamSummaryDTO(read),
-              now(),
-            ),
-          ),
-          { status, headers: responseHeaders },
-        );
+        return summaryResponse(read, { status, headers: responseHeaders });
       }
       const row = await (deps.storedOnly ?? deps.repository).read(actor, id);
-      return Response.json(
-        responseEnvelope(activityStreamsDTOSchema).parse(
-          makeEnvelope(toActivityStreamsDTO(id, row), now()),
-        ),
-        {
-          status,
-          headers: responseHeaders,
-        },
-      );
+      return rawResponse(row, { status, headers: responseHeaders });
     } catch (error) {
       if (error instanceof ActivityStreamsUnavailableError)
         return fail(

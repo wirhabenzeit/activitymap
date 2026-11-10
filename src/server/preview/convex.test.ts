@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import fixtures from '../../../shared/sync-integrity-fixtures.v1.json';
-import { convexPreviewFor } from './convex';
+import { convexPreviewFor, convexReadsFor } from './convex';
 
 void test('bootstrap performs one scoped bridge call and validates returned ownership', async () => {
   const settings = {
@@ -96,5 +96,82 @@ void test('bootstrap performs one scoped bridge call and validates returned owne
       if (value === undefined) Reflect.deleteProperty(process.env, key);
       else process.env[key] = value;
     }
+  }
+});
+
+void test('a production read owner reads the application backend; nobody else does', async () => {
+  const settings: Record<string, string | undefined> = {
+    NODE_ENV: 'production',
+    VERCEL_ENV: 'production',
+    ACTIVITYMAP_CLIENT_BACKEND: undefined,
+    ACTIVITYMAP_CONVEX_PREVIEW_OWNERS: undefined,
+    ACTIVITYMAP_CONVEX_SITE: 'https://backend.example.com',
+    ACTIVITYMAP_CONVEX_KEY_ID: 'k1',
+    ACTIVITYMAP_CONVEX_SIGNING_KEY: 'a'.repeat(64),
+    ACTIVITYMAP_CONVEX_READ_OWNERS: JSON.stringify({
+      owner: 'read-epoch-0123456789',
+    }),
+  };
+  const previous = Object.fromEntries(
+    Object.keys(settings).map((key) => [key, process.env[key]]),
+  );
+  const restore = (values: Record<string, string | undefined>) => {
+    for (const [key, value] of Object.entries(values)) {
+      if (value === undefined) Reflect.deleteProperty(process.env, key);
+      else process.env[key] = value;
+    }
+  };
+  restore(settings);
+  try {
+    const actor = {
+      userId: 'owner',
+      athleteId: 42,
+      authentication: 'bearer' as const,
+    };
+    const sent: { url: string; epoch: string; kind: string }[] = [];
+    const fetcher: typeof fetch = async (input, init) => {
+      const body = JSON.parse(init!.body as string) as {
+        epoch: string;
+        operation: { kind: string };
+      };
+      sent.push({
+        url:
+          typeof input === 'string'
+            ? input
+            : input instanceof URL
+              ? input.href
+              : input.url,
+        epoch: body.epoch,
+        kind: body.operation.kind,
+      });
+      return Response.json([]);
+    };
+    // Not a preview owner, so writes are not refused for this account.
+    assert.equal(convexPreviewFor(actor), null);
+    const reads = convexReadsFor(actor, fetcher);
+    assert(reads);
+    assert.deepEqual(
+      await reads.photosRepo.findPageByAthlete(42, { limit: 10 }),
+      [],
+    );
+    assert.deepEqual(sent, [
+      {
+        url: 'https://backend.example.com/internal/sync/v1',
+        epoch: 'read-epoch-0123456789',
+        kind: 'photos',
+      },
+    ]);
+    assert.equal(convexReadsFor({ ...actor, userId: 'someone-else' }), null);
+    assert.equal(convexReadsFor(null), null);
+    // Cursors issued for these reads belong to this backend and epoch.
+    process.env.ACTIVITYMAP_CONVEX_READ_OWNERS = JSON.stringify({
+      owner: 'next-epoch-0123456789',
+    });
+    assert.notEqual(
+      convexReadsFor(actor, fetcher)!.cursorBackend,
+      reads.cursorBackend,
+    );
+  } finally {
+    restore(previous);
   }
 });

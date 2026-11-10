@@ -4,7 +4,7 @@ import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { warmSignupActivitiesForActor } from '~/server/application/signup-warmup';
 import { logger } from '~/server/logging/logger';
-import { convexPreviewFor } from '~/server/preview/convex';
+import { convexReadsFor } from '~/server/preview/convex';
 import { previewDataUnavailable } from '~/server/preview/selection';
 import { activitiesRepository } from '~/server/repositories/activities';
 
@@ -42,7 +42,7 @@ export const POST = withAuthenticatedApiV1(
 
 export const GET = withAuthenticatedApiV1(
   async (request, context) => {
-    const preview = convexPreviewFor(await context.actor());
+    const preview = convexReadsFor(await context.actor());
     return createListHandler({
       resolveActor: context.actor,
       itemSchema: activityDTOSchema,

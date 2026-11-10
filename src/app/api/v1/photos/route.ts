@@ -1,7 +1,7 @@
 import { photoDTOSchema, toPhotoDTO } from '~/contracts/v1/photo';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { logger } from '~/server/logging/logger';
-import { convexPreviewFor } from '~/server/preview/convex';
+import { convexReadsFor } from '~/server/preview/convex';
 import { photosRepository } from '~/server/repositories/photos';
 
 import { createListHandler } from '../list-handler';
@@ -10,7 +10,7 @@ const ROUTE = 'GET /api/v1/photos';
 
 export const GET = withAuthenticatedApiV1(
   async (request, context) => {
-    const preview = convexPreviewFor(await context.actor());
+    const preview = convexReadsFor(await context.actor());
     return createListHandler({
       resolveActor: context.actor,
       itemSchema: photoDTOSchema,
