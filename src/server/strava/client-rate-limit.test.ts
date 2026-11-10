@@ -148,3 +148,61 @@ void test('deleteSubscription accepts the empty 204 Strava returns', async (t) =
 
   assert.deepEqual(calls, ['DELETE /api/v3/push_subscriptions/42']);
 });
+
+void test('a failed read keeps the provider status and Retry-After, as seconds or a date', async (t) => {
+  const originalEnv = { ...process.env };
+  Object.assign(process.env, {
+    AUTH_STRAVA_ID: 'fixture',
+    AUTH_STRAVA_SECRET: 'fixture',
+    ACTIVITYMAP_EXTERNAL_EFFECTS: 'enabled',
+  });
+  t.after(() => {
+    process.env = originalEnv;
+  });
+  let retryAfter: string | null = '123';
+  const requested: string[] = [];
+  t.mock.method(globalThis, 'fetch', async (url: string) => {
+    requested.push(url);
+    return Response.json(
+      { message: 'Rate Limit Exceeded' },
+      {
+        status: 429,
+        headers: retryAfter === null ? {} : { 'retry-after': retryAfter },
+      },
+    );
+  });
+  const client = StravaClient.withAccessToken('fixture-access', {
+    requestBudget: {
+      reserve: async (read) => ({ read, startedAt: new Date() }),
+      observe: async () => {
+        return;
+      },
+    },
+  });
+  const failure = async (read: () => Promise<unknown>) => {
+    const error = await read().then(
+      () => assert.fail('must reject'),
+      (reason: unknown) => reason,
+    );
+    assert(error instanceof StravaApiError);
+    assert.equal(error.status, 429);
+    return error.retryAfterSeconds;
+  };
+
+  // A string ID that no number can hold reaches the provider unchanged.
+  assert.equal(
+    await failure(() => client.getActivity('9007199254740993')),
+    123,
+  );
+  assert.match(requested.at(-1)!, /\/activities\/9007199254740993$/);
+  assert.equal(await failure(() => client.getActivityStreams('7')), 123);
+
+  retryAfter = new Date(Date.now() + 90_000).toUTCString();
+  const fromDate = await failure(() => client.getActivities({ page: 1 }));
+  assert(fromDate !== undefined && fromDate > 85 && fromDate <= 90);
+
+  for (const unreadable of ['soon', '-5', null]) {
+    retryAfter = unreadable;
+    assert.equal(await failure(() => client.getActivity(7)), undefined);
+  }
+});
