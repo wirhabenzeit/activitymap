@@ -327,10 +327,13 @@ page or result budget is retried as its first activity alone, and an activity
 that still fails is listed on the run.
 
 When the walk ends, the run compares every activity's shadow result with the
-result the mirror copied from Postgres, ignoring `resultRevision`, and keeps
+result the mirror copied from Postgres, ignoring `matchingVersion` and
+`resultRevision` (both are added by whoever serves a result), and keeps
 the counts (`same`, `different`, only one side, neither) and up to 20
-differing examples (status and place count only) under `comparison`. A run
-that stopped with an error continues with `shadowMatching:resume`.
+differing examples (status, place count and the names of the differing
+fields) under `comparison`. A run that stopped with an error continues with
+`shadowMatching:resume`; `shadowMatching:recompare` repeats the comparison of
+a finished run.
 
 ### Production parity check
 
