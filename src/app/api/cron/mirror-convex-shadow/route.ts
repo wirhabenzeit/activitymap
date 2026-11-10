@@ -1,5 +1,6 @@
 import {
   configuredShadowOwners,
+  runCatalogueMirror,
   runShadowMirror,
 } from '~/server/convex-mirror/shadow-run';
 import { logger } from '~/server/logging/logger';
@@ -15,4 +16,10 @@ export const POST = createConvexShadowCronHandler({
   run: runShadowMirror,
   onError: (error, userId) =>
     logger.error('Convex shadow write failed', { error, userId }),
+  // The place catalogue is copied in what remains of each run's budget.
+  shared: {
+    name: 'catalogue',
+    run: runCatalogueMirror,
+    onError: (error) => logger.error('Convex catalogue copy failed', { error }),
+  },
 });

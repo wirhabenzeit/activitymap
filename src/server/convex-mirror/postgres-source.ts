@@ -293,12 +293,19 @@ export function postgresParitySource(actor: Actor): ParityPostgres {
 
 /** Upload a recording file to a Convex upload URL, retrying network errors
  * (an upload URL is only consumed by a successful upload). */
-export async function uploadRecording(url: string, file: Uint8Array) {
+export const uploadRecording = (url: string, file: Uint8Array) =>
+  uploadFile(url, file, 'application/gzip');
+
+export async function uploadFile(
+  url: string,
+  file: Uint8Array,
+  contentType = 'application/json',
+) {
   for (let attempt = 1; ; attempt++) {
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/gzip' },
+        headers: { 'Content-Type': contentType },
         body: new Uint8Array(file),
         signal: AbortSignal.timeout(60_000),
       });

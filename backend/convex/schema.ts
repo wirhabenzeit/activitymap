@@ -6,6 +6,7 @@ import {
   activityProjectionValidator,
   photoValidator,
 } from './activityValidators';
+import { placeValidator } from './placeValidators';
 import { manifestValidator, summaryValidator } from './recordingValidators';
 import { countsValidator } from './statsShape';
 
@@ -106,6 +107,31 @@ export default defineSchema({
     activity: v.string(),
     revision: v.number(),
   }).index('by_owner_activity', ['owner', 'activity']),
+  /** Imported place rowsets, one per catalogue snapshot and revision
+   * (convex/places.ts). `after` and `digest` describe the rows imported so
+   * far; nothing reads a rowset until it is complete. */
+  placeCatalogues: defineTable({
+    dataset: v.string(),
+    snapshotId: v.string(),
+    revision: v.string(),
+    count: v.number(),
+    /** A stored file with the catalogue manifest and coverage. */
+    metadata: v.id('_storage'),
+    imported: v.number(),
+    after: v.string(),
+    digest: v.string(),
+    complete: v.boolean(),
+  }).index('by_dataset', ['dataset']),
+  /** The places of a rowset by quarter-degree tile. `key` is the Postgres
+   * place ID. */
+  places: defineTable({
+    dataset: v.string(),
+    key: v.string(),
+    tile: v.string(),
+    place: placeValidator,
+  })
+    .index('by_dataset_tile', ['dataset', 'tile', 'key'])
+    .index('by_dataset_key', ['dataset', 'key']),
   changes: defineTable({
     owner: v.id('owners'),
     sequence: v.number(),

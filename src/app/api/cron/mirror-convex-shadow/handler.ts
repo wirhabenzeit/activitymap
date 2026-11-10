@@ -20,6 +20,14 @@ export function createConvexShadowCronHandler<T>(deps: {
   now?: () => number;
   budgetMs?: number;
   onError?: (error: unknown, userId: string) => void;
+  /** Work that belongs to no owner (the place catalogue copy). Runs after
+   * the owners with what is left of the budget, on behalf of the first
+   * owner; its result is reported under `name` and a throw fails the job. */
+  shared?: {
+    name: string;
+    run: (userId: string, deadline: number) => Promise<unknown>;
+    onError?: (error: unknown) => void;
+  };
 }) {
   const now = deps.now ?? Date.now;
   return async (request: Request) => {
@@ -56,8 +64,20 @@ export function createConvexShadowCronHandler<T>(deps: {
         results[userId] = { error: deps.errorMessage ?? 'Shadow write failed' };
       }
     }
+    let shared: Record<string, unknown> | undefined;
+    if (deps.shared && owners[0] !== undefined && now() <= deadline) {
+      try {
+        shared = {
+          [deps.shared.name]: await deps.shared.run(owners[0], deadline),
+        };
+      } catch (error) {
+        failed = true;
+        deps.shared.onError?.(error);
+        shared = { [deps.shared.name]: { error: 'Failed' } };
+      }
+    }
     return Response.json(
-      { results },
+      { results, ...shared },
       { status: failed ? 500 : 200, headers: { 'cache-control': 'no-store' } },
     );
   };

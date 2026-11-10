@@ -7,12 +7,17 @@ import test, { after, mock } from 'node:test';
 import type { ActivityPlacesResponse } from '../../src/contracts/activity-places';
 import type { PhotoDTO } from '../../src/contracts/v1/photo';
 import {
+  type CatalogueSource,
+  mirrorCatalogue,
+} from '../../src/server/convex-mirror/catalogue';
+import {
   type MirrorActivity,
   type MirrorRecording,
   type MirrorSource,
   catalogueFor,
   mirrorOwner,
 } from '../../src/server/convex-mirror/mirror';
+import type { PlaceRow } from '../../src/server/places/catalogue-rows';
 import type { RawActivityStreams } from '../../src/server/strava/streams';
 import { convexWriteBridge } from '../../src/server/sync/convex-writer';
 import { api, internal } from '../convex/_generated/api';
@@ -37,6 +42,7 @@ const modules = {
   './library.ts': () => import('../convex/library'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
+  './places.ts': () => import('../convex/places'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
   './sync.ts': () => import('../convex/sync'),
 };
@@ -791,5 +797,184 @@ void test('a stale photo set or deletion cannot undo a newer one', async (t) => 
       operation: { kind: 'photoIds', ids: ['p-1'] },
     }),
     [],
+  );
+});
+
+void test('the place catalogue is copied in order, resumably, and accepted only when whole', async (t) => {
+  const { convex, writer, upload } = setup(t);
+  // Upload URLs are issued only for a current owner assignment.
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: 'c'.repeat(64),
+    matchingVersion: 'd'.repeat(64),
+  });
+  const row = (index: number): PlaceRow => ({
+    id: `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`,
+    displayName: `Peak ${index}`,
+    kinds: ['peak'],
+    subtypes: [],
+    // Two quarter-degree tiles.
+    location: { longitude: 8 + (index % 2) * 0.3, latitude: 46.1 },
+    ...(index % 3 === 0 ? {} : { elevationM: 2000 + index }),
+  });
+  const rows = Array.from({ length: 7 }, (_, index) => row(index + 1));
+  let revision = '4';
+  const reads: string[] = [];
+  const source: CatalogueSource = {
+    current: async () => ({
+      snapshotId: 'osm-places-v1:test',
+      revision,
+      count: rows.length,
+      metadata: { manifest: { name: 'test' }, coverage: null },
+    }),
+    places: async (_snapshot, afterId, limit) => {
+      reads.push(afterId);
+      return rows.filter((item) => item.id > afterId).slice(0, limit);
+    },
+  };
+  let clock = 0;
+  const run = (deadline = Infinity) =>
+    mirrorCatalogue({
+      source,
+      writer,
+      upload,
+      deadline,
+      now: () => clock++,
+      batchSize: 3,
+    });
+  const stored = (dataset: string) =>
+    convex.run((ctx) =>
+      ctx.db
+        .query('places')
+        .withIndex('by_dataset_key', (q) => q.eq('dataset', dataset))
+        .collect(),
+    );
+
+  // The first run stops at its deadline after one batch.
+  const first = await run(0);
+  assert.equal(first.complete, false);
+  assert.equal(first.stopped, 'deadline');
+  assert.equal(first.imported, 3);
+  // The next run continues after the last imported place and finishes.
+  const second = await run();
+  assert.deepEqual(reads, ['', rows[2]!.id, rows[5]!.id]);
+  assert.equal(second.complete, true);
+  assert.equal(second.sent, 4);
+  assert.equal(second.dataset, first.dataset);
+  const copied = await stored(first.dataset);
+  assert.deepEqual(
+    copied.map((item) => item.place),
+    rows,
+  );
+  assert.deepEqual([...new Set(copied.map((item) => item.tile))].sort(), [
+    '752,544',
+    '753,544',
+  ]);
+  const metadata = await convex.run(async (ctx) => {
+    const catalogue = await ctx.db.query('placeCatalogues').first();
+    return (await ctx.storage.get(catalogue!.metadata))!.text();
+  });
+  assert.deepEqual(JSON.parse(metadata), {
+    manifest: { name: 'test' },
+    coverage: null,
+  });
+
+  // A complete rowset is never read or written again.
+  reads.length = 0;
+  const again = await run();
+  assert.equal(again.complete, true);
+  assert.equal(again.sent, 0);
+  assert.deepEqual(reads, []);
+  assert.equal((await stored(first.dataset)).length, 7);
+
+  // A changed catalogue is another rowset; one that changes during its copy
+  // is abandoned rather than accepted.
+  revision = '5';
+  const changing: CatalogueSource = {
+    ...source,
+    places: async (snapshot, afterId, limit) => {
+      const page = await source.places(snapshot, afterId, limit);
+      if (page.length < limit) revision = '6';
+      return page;
+    },
+  };
+  const abandoned = await mirrorCatalogue({
+    source: changing,
+    writer,
+    upload,
+    batchSize: 3,
+  });
+  assert.notEqual(abandoned.dataset, first.dataset);
+  assert.equal(abandoned.complete, false);
+  assert.equal(abandoned.stopped, 'catalogue changed');
+
+  // Convex itself refuses rows out of order, more rows than announced, a
+  // dataset started under another identity and an early completion.
+  const dataset = 'e'.repeat(64);
+  const file = await convex.run((ctx) => ctx.storage.store(new Blob(['{}'])));
+  const begin = (count: number) =>
+    convex.mutation(internal.places.begin, {
+      dataset,
+      snapshotId: 'osm-places-v1:other',
+      revision: '1',
+      count,
+      metadata: file,
+    });
+  await begin(2);
+  await assert.rejects(begin(3), /identity differs/);
+  await assert.rejects(
+    convex.mutation(internal.places.importBatch, {
+      dataset,
+      after: '',
+      places: [rows[1]!, rows[0]!],
+    }),
+    /unordered/,
+  );
+  await assert.rejects(
+    convex.mutation(internal.places.importBatch, {
+      dataset,
+      after: '',
+      places: rows.slice(0, 3),
+    }),
+    /More rows than announced/,
+  );
+  const partial = await convex.mutation(internal.places.importBatch, {
+    dataset,
+    after: '',
+    places: rows.slice(0, 1),
+  });
+  await assert.rejects(
+    convex.mutation(internal.places.complete, {
+      dataset,
+      digest: partial.digest,
+    }),
+    /incomplete or differs/,
+  );
+  // A repeated batch for a position already passed changes nothing.
+  const repeat = await convex.mutation(internal.places.importBatch, {
+    dataset,
+    after: '',
+    places: rows.slice(0, 1),
+  });
+  assert.deepEqual(repeat, partial);
+  const whole = await convex.mutation(internal.places.importBatch, {
+    dataset,
+    after: rows[0]!.id,
+    places: rows.slice(1, 2),
+  });
+  await assert.rejects(
+    convex.mutation(internal.places.complete, { dataset, digest: 'wrong' }),
+    /incomplete or differs/,
+  );
+  assert.equal(
+    (
+      await convex.mutation(internal.places.complete, {
+        dataset,
+        digest: whole.digest,
+      })
+    ).complete,
+    true,
   );
 });

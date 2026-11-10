@@ -277,6 +277,34 @@ budget and can overlap the scheduled one; fenced writes make that safe, and
 the scheduled run remains the safety net for everything else (hourly
 ingestion, stream and match jobs, and any trigger that failed).
 
+### Place catalogue copy
+
+Matching here needs the places Postgres matches against (step 3 of
+`docs/convex-writer-cutover.md`). The mirror job copies them in whatever
+remains of each run's time budget (`src/server/convex-mirror/catalogue.ts`),
+through the write bridge operations `catalogueState`, `beginCatalogue`,
+`importPlaces` and `completeCatalogue` (`convex/places.ts`).
+
+A rowset is the active serving snapshot at one catalogue revision: its rows
+that are neither retired nor hidden, the same selection as
+`loadBatchPlaceCatalogue`. Place IDs are the Postgres place IDs, so results
+computed here name the same places as results copied from Postgres. Rows are
+stored in `places` by quarter-degree tile; the catalogue manifest and coverage
+are one stored file referenced from `placeCatalogues`.
+
+The copy runs in ascending place-ID order, 500 rows a call, and continues from
+the last imported ID after a deadline or an error. Both sides keep a digest
+over the rows, and a rowset is marked complete only when its row count and
+digest agree; nothing may read it before. A catalogue change in Postgres
+starts a new rowset, and one that changes during its copy is abandoned.
+Abandoned and superseded rowsets are not removed yet.
+
+The mirror response reports progress under `catalogue`, and the log line is
+`Convex catalogue copy`. The eight-country catalogue has about 176,000 such
+rows, which takes on the order of ten scheduled runs. Deploy this package
+before the app version that copies: an older deployment rejects the new
+operations and the mirror job then answers 500.
+
 ### Production parity check
 
 `pnpm convex:verify-owner` compares a whole library but reads only the local
