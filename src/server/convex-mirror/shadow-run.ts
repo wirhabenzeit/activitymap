@@ -8,10 +8,13 @@ import { users } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
 import { convexWriteBridge } from '~/server/sync/convex-writer';
 
+import { mirrorCatalogue } from './catalogue';
+import { postgresCatalogueSource } from './catalogue-source';
 import { mirrorOwner } from './mirror';
 import {
   postgresMirrorSource,
   shadowActor,
+  uploadFile,
   uploadRecording,
 } from './postgres-source';
 import { shadowOwners } from './shadow-owners';
@@ -37,6 +40,22 @@ export async function runShadowMirror(userId: string, deadline: number) {
     deadline,
   });
   logger.info('Convex shadow write', { userId, ...result });
+  return result;
+}
+
+/** Continue copying the place catalogue to Convex. The catalogue belongs to
+ * no owner; `userId` only names whose bridge scope signs the requests. */
+export async function runCatalogueMirror(userId: string, deadline: number) {
+  const writer = convexWriteBridge(await shadowActor(userId));
+  if (!writer) throw new Error('ACTIVITYMAP_CONVEX_SITE is not configured');
+  const result = await mirrorCatalogue({
+    source: postgresCatalogueSource(),
+    writer,
+    upload: uploadFile,
+    deadline,
+  });
+  if (result.sent > 0 || !result.complete)
+    logger.info('Convex catalogue copy', result);
   return result;
 }
 

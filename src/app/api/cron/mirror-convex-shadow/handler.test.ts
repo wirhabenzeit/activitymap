@@ -71,3 +71,59 @@ void test('owners run in turn; one failure neither stops nor hides the others', 
     d: { skipped: 'time budget exhausted' },
   });
 });
+
+void test('shared work runs once after the owners, within the same budget', async () => {
+  let clock = 0;
+  const order: string[] = [];
+  const errors: unknown[] = [];
+  const make = (shared: () => Promise<unknown>, slow = false) =>
+    createConvexShadowCronHandler({
+      owners: () => ['a', 'b'],
+      secret: () => 'secret',
+      now: () => clock,
+      budgetMs: 100,
+      run: async (userId) => {
+        order.push(userId);
+        if (slow) clock = 150;
+        return { userId };
+      },
+      shared: {
+        name: 'catalogue',
+        run: async (userId, deadline) => {
+          order.push(`shared:${userId}:${deadline}`);
+          return shared();
+        },
+        onError: (error) => errors.push(error),
+      },
+    });
+
+  const ok = await make(async () => ({ imported: 3 }))(request('secret'));
+  assert.equal(ok.status, 200);
+  assert.deepEqual(order, ['a', 'b', 'shared:a:100']);
+  assert.deepEqual(((await ok.json()) as { catalogue: unknown }).catalogue, {
+    imported: 3,
+  });
+
+  // A failure fails the job without hiding the owners' results.
+  order.length = 0;
+  const failing = await make(async () => {
+    throw new Error('boom');
+  })(request('secret'));
+  assert.equal(failing.status, 500);
+  const body = (await failing.json()) as {
+    results: Record<string, unknown>;
+    catalogue: unknown;
+  };
+  assert.deepEqual(Object.keys(body.results), ['a', 'b']);
+  assert.deepEqual(body.catalogue, { error: 'Failed' });
+  assert.equal(errors.length, 1);
+
+  // No budget left: the shared work waits for the next run.
+  order.length = 0;
+  const late = await make(
+    async () => assert.fail('must not run'),
+    true,
+  )(request('secret'));
+  assert.equal(late.status, 200);
+  assert.deepEqual(order, ['a']);
+});

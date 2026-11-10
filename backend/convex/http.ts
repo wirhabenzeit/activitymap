@@ -235,6 +235,19 @@ router.route({
             ...args,
           });
           break;
+        // The place catalogue belongs to no owner: the signature authorizes.
+        case 'catalogueState':
+          result = await ctx.runQuery(internal.places.state, args);
+          break;
+        case 'beginCatalogue':
+          result = await ctx.runMutation(internal.places.begin, args);
+          break;
+        case 'importPlaces':
+          result = await ctx.runMutation(internal.places.importBatch, args);
+          break;
+        case 'completeCatalogue':
+          result = await ctx.runMutation(internal.places.complete, args);
+          break;
         case 'checkpoint':
           result = await ctx.runMutation(internal.importer.checkpoint, {
             scope,
