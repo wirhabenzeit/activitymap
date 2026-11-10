@@ -19,7 +19,8 @@ import { ownerFor } from './owners';
  * Start a run for a shadow owner with
  * `convex run shadowMatching:start '{"userId":"<userId>"}'` and read it with
  * `shadowMatching:status`. A run that stopped with an error continues with
- * `shadowMatching:resume`.
+ * `shadowMatching:resume`, and `shadowMatching:recompare` repeats a finished
+ * run's comparison.
  */
 
 /** Activities read ahead per step; the worker takes a prefix of them. */
@@ -84,6 +85,20 @@ export const resume = internalMutation({
       await ctx.scheduler.runAfter(0, internal.shadowMatching.compareStep, {
         run,
       });
+  },
+});
+
+/** Compare a finished run's results again from the start (after a change
+ * to the comparison, or once the mirror has copied newer results). */
+export const recompare = internalMutation({
+  args: { run: v.id('shadowMatchRuns') },
+  handler: async (ctx, { run }) => {
+    const row = await ctx.db.get('shadowMatchRuns', run);
+    if (!row?.done) throw new Error('The run has not finished matching');
+    await ctx.db.patch('shadowMatchRuns', run, { comparison: undefined });
+    await ctx.scheduler.runAfter(0, internal.shadowMatching.compareStep, {
+      run,
+    });
   },
 });
 
@@ -230,14 +245,29 @@ export const fail = internalMutation({
   },
 });
 
-/** What a result says, without the per-backend revision token. */
-function comparable(result: Doc<'shadowMatches'>['result']) {
+type Result = Doc<'shadowMatches'>['result'];
+
+/** What the matcher decided. `matchingVersion` and `resultRevision` are not
+ * part of that: whoever serves a result adds them (Postgres in
+ * `responseFor`, this backend in `projectActivity`), so a copied result
+ * carries them and a freshly computed one does not. */
+function decided(result: Result) {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { resultRevision, ...rest } = result;
-  return JSON.stringify(rest);
+  const { matchingVersion, resultRevision, ...rest } = result;
+  return rest;
 }
-const describe = (result: Doc<'shadowMatches'>['result']) =>
-  `${result.status}, ${result.places.length} places`;
+
+/** The fields in which two results differ, for the run's examples. Place
+ * lists are summarized by count: names and coordinates stay out of it. */
+function differingFields(copied: Result, shadow: Result) {
+  const left = decided(copied) as Record<string, unknown>;
+  const right = decided(shadow) as Record<string, unknown>;
+  return [...new Set([...Object.keys(left), ...Object.keys(right)])]
+    .filter((key) => JSON.stringify(left[key]) !== JSON.stringify(right[key]))
+    .sort();
+}
+const describe = (result: Result, fields: string[]) =>
+  `${result.status}, ${result.places.length} places; differs in ${fields.join(', ')}`;
 
 /** Compare one page of the library and schedule the next. Only activities
  * whose copied result belongs to the owner's current catalogue and whose
@@ -280,14 +310,15 @@ export const compareStep = internalMutation({
           ? stored.result
           : undefined;
       if (copied && shadow) {
-        if (comparable(copied) === comparable(shadow)) totals.same++;
+        const fields = differingFields(copied, shadow);
+        if (fields.length === 0) totals.same++;
         else {
           totals.different++;
           if (totals.examples.length < 20)
             totals.examples.push({
               key: activity.key,
-              postgres: describe(copied),
-              shadow: describe(shadow),
+              postgres: describe(copied, fields),
+              shadow: describe(shadow, fields),
             });
         }
       } else if (copied) totals.onlyPostgres++;

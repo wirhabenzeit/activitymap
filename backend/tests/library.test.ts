@@ -694,7 +694,13 @@ void test('the shadow matcher computes the results Postgres would and compares t
       generation,
       sourceRevision: 10,
       catalogue: catalogueIdentity,
-      items: copied,
+      // As the mirror copies them: Postgres serves each result with the
+      // matching version and its own result revision added.
+      items: copied.map((result) => ({
+        ...result,
+        matchingVersion: version,
+        resultRevision: '41',
+      })),
     }),
     3,
   );
@@ -733,13 +739,22 @@ void test('the shadow matcher computes the results Postgres would and compares t
   assert.equal(comparison.same, 2);
   assert.equal(comparison.different, 1);
   assert.equal(comparison.neither, 1);
-  assert.deepEqual(comparison.examples, [
-    {
-      key: comparison.examples[0]!.key,
-      postgres: 'partial, 0 places',
-      shadow: 'complete, 0 places',
-    },
-  ]);
+  assert.equal(comparison.examples.length, 1);
+  assert.equal(
+    comparison.examples[0]!.postgres,
+    'partial, 0 places; differs in status',
+  );
+  assert.equal(
+    comparison.examples[0]!.shadow,
+    'complete, 0 places; differs in status',
+  );
+
+  // A finished run can be compared again from the start.
+  await convex.mutation(internal.shadowMatching.recompare, { run });
+  assert.equal((await status()).comparison, undefined);
+  for (let step = 0; step < 10 && !(await status()).comparison?.done; step++)
+    await convex.mutation(internal.shadowMatching.compareStep, { run });
+  assert.equal((await status()).comparison?.same, 2);
 
   // Shadow results never reach clients: 1001 still serves the copied one.
   const viewer = convex.withIdentity(identity);
