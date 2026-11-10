@@ -443,6 +443,45 @@ try {
     'a lease completes once',
   );
   assert.equal(await dispatch.claim('fence-activity', later), null);
+
+  // A dispatcher that dies between claim and delivery: stale-lease recovery
+  // returns the event without counting an attempt, even at nine attempts,
+  // where one more counted attempt would dead-letter it. A drain lease of
+  // the same age is still counted.
+  await db
+    .update(stravaWebhookEvents)
+    .set({ status: 'pending', attemptCount: 9, nextAttemptAt: eventTime })
+    .where(inArray(stravaWebhookEvents.id, eventIds));
+  const crashedAt = new Date();
+  assert.ok(await dispatch.claim('fence-activity', crashedAt));
+  assert.ok(await events.claim('fence-other', crashedAt));
+  const recoveredAt = new Date(crashedAt.getTime() + 60_000);
+  assert.ok(
+    (await events.resetStaleProcessing(
+      new Date(crashedAt.getTime() + 1),
+      recoveredAt,
+    )) >= 2,
+  );
+  const afterCrash = new Map(
+    (
+      await db
+        .select()
+        .from(stravaWebhookEvents)
+        .where(inArray(stravaWebhookEvents.id, eventIds))
+    ).map((row) => [row.id, row]),
+  );
+  assert.equal(afterCrash.get('fence-activity')?.status, 'failed');
+  assert.equal(afterCrash.get('fence-activity')?.attemptCount, 9);
+  assert.equal(afterCrash.get('fence-other')?.status, 'dead_letter');
+  assert.deepEqual(
+    (await dispatch.selectCandidates(500, recoveredAt))
+      .map((candidate) => candidate.id)
+      .filter((id) => eventIds.includes(id)),
+    ['fence-activity'],
+  );
+  const resent = await dispatch.claim('fence-activity', recoveredAt);
+  assert.ok(resent, 'the interrupted event is sent again');
+  assert.equal(await dispatch.complete(resent.event, recoveredAt), true);
   await db
     .delete(stravaWebhookEvents)
     .where(inArray(stravaWebhookEvents.id, eventIds));

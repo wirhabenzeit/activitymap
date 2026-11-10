@@ -147,7 +147,12 @@ export const provision = internalMutation({
       epoch: args.epoch,
     });
     const head = await requireHead(ctx, prior._id);
-    if (args.backend === 'convex' && head.catalogueAfter !== undefined)
+    // Not during a writer handoff: setWriter resumes it afterwards.
+    if (
+      args.backend === 'convex' &&
+      head.catalogueAfter !== undefined &&
+      writerOf(prior) !== 'handoff'
+    )
       await ctx.scheduler.runAfter(0, internal.catalogue.next, {
         scope: {
           userId: args.userId,
@@ -155,6 +160,7 @@ export const provision = internalMutation({
           epoch: args.epoch,
         },
         catalogue: args.catalogue,
+        writer: writerOf(prior),
       });
     return prior._id;
   },
@@ -181,6 +187,20 @@ export const setWriter = internalMutation({
     if ((owner.writerEpoch ?? 0) !== expectedEpoch) return null;
     const writerEpoch = expectedEpoch + 1;
     await ctx.db.patch('owners', owner._id, { writer, writerEpoch });
+    // An unfinished catalogue invalidation stopped with the previous writer
+    // (catalogue.next). The store that writes next finishes it; during a
+    // handoff it waits.
+    const head = await requireHead(ctx, owner._id);
+    if (
+      writer !== 'handoff' &&
+      owner.backend === 'convex' &&
+      head.catalogueAfter !== undefined
+    )
+      await ctx.scheduler.runAfter(0, internal.catalogue.next, {
+        scope: { userId, athleteId, epoch: owner.epoch },
+        catalogue: owner.catalogue,
+        writer,
+      });
     return writerEpoch;
   },
 });

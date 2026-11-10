@@ -224,6 +224,7 @@ export function createWebhookEventsRepository(
           id: stravaWebhookEvents.id,
           attemptCount: stravaWebhookEvents.attemptCount,
           updatedAt: stravaWebhookEvents.updatedAt,
+          lastError: stravaWebhookEvents.lastError,
         })
         .from(stravaWebhookEvents)
         .where(
@@ -235,6 +236,30 @@ export function createWebhookEventsRepository(
 
       let resetCount = 0;
       for (const row of stale) {
+        if (row.lastError === CONVEX_DISPATCH_LEASE) {
+          // An interrupted dispatch: the event may never have reached
+          // Convex, and no processing was attempted here. Back to the
+          // inbox, due now, without counting an attempt, so it can never
+          // be dead-lettered this way. Convex records a repeat once.
+          const [released] = await database
+            .update(stravaWebhookEvents)
+            .set({
+              status: 'failed',
+              nextAttemptAt: now,
+              lastError: 'Dispatch to Convex was interrupted',
+              updatedAt: now,
+            })
+            .where(
+              and(
+                eq(stravaWebhookEvents.id, row.id),
+                eq(stravaWebhookEvents.status, 'processing'),
+                eq(stravaWebhookEvents.updatedAt, row.updatedAt),
+              ),
+            )
+            .returning({ id: stravaWebhookEvents.id });
+          if (released) resetCount++;
+          continue;
+        }
         const decision = await applyFailure(
           row,
           new Error(
@@ -281,6 +306,15 @@ export function createWebhookEventsRepository(
     },
   };
 }
+
+/**
+ * Marks a `processing` row as held by the dispatcher, not the drain. It is
+ * written to `last_error` by the dispatch claim and replaced whenever that
+ * lease ends (completed, deferred or recovered), so it is only ever present
+ * on a row the dispatcher holds. Stale-lease recovery uses it to tell the
+ * two kinds of lease apart without a column of its own.
+ */
+export const CONVEX_DISPATCH_LEASE = 'lease:dispatch-to-convex';
 
 /** How long a refused or failed dispatch waits before it is sent again. */
 export const CONVEX_DISPATCH_RETRY_MS = 5 * 60 * 1000;
@@ -346,7 +380,11 @@ export function createWebhookDispatchRepository(
     async claim(id, now) {
       const [event] = await database
         .update(stravaWebhookEvents)
-        .set({ status: 'processing', updatedAt: now })
+        .set({
+          status: 'processing',
+          lastError: CONVEX_DISPATCH_LEASE,
+          updatedAt: now,
+        })
         .where(and(eq(stravaWebhookEvents.id, id), due(now)))
         .returning();
       if (!event) return null;
