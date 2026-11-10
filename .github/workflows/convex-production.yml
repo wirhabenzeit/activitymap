@@ -1,0 +1,55 @@
+name: Production Convex deploy
+
+# Deploys backend/ to the production Convex deployment on every push to main.
+# Not limited to backend/**: the backend imports contracts and matching code
+# from src/, and a deploy with nothing new changes nothing.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-convex-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-24.04
+    environment: Production
+    env:
+      # A production deploy key from the Convex dashboard, stored as a secret
+      # of the Production environment. It names its deployment before the bar.
+      CONVEX_DEPLOY_KEY: ${{ secrets.CONVEX_DEPLOY_KEY }}
+      EXPECTED_DEPLOYMENT: prod:artful-mosquito-425
+    steps:
+      - name: Check the deploy key's target
+        run: |
+          if [ -z "$CONVEX_DEPLOY_KEY" ]; then
+            echo "::error::CONVEX_DEPLOY_KEY is not set for the Production environment"
+            exit 1
+          fi
+          if [ "${CONVEX_DEPLOY_KEY%%|*}" != "$EXPECTED_DEPLOYMENT" ]; then
+            echo "::error::CONVEX_DEPLOY_KEY is not a key for $EXPECTED_DEPLOYMENT"
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: |
+            pnpm-lock.yaml
+            backend/pnpm-lock.yaml
+      # The backend bundles files from src/, which resolve the app's packages.
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --dir backend install --frozen-lockfile
+      - name: Deploy
+        working-directory: backend
+        run: >-
+          pnpm exec convex deploy --typecheck enable -y
+          --message "${GITHUB_SHA::8} (${GITHUB_EVENT_NAME})"

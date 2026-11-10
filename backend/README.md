@@ -750,6 +750,20 @@ invalidation batches. Superseded/revoked jobs stop; a fresh Convex routing epoch
 resumes pending work. This publishes invalidations, not rematching jobs; the
 matching worker must publish results against the new catalogue fence.
 
+## Deploying
+
+Every push to `main` deploys this package to the production Convex
+deployment (`.github/workflows/convex-production.yml`); the workflow can also
+be started by hand. It runs in the `Production` GitHub environment and needs
+one secret there: `CONVEX_DEPLOY_KEY`, a production deploy key from the
+Convex dashboard (Settings, Deploy keys). The workflow refuses a key for any
+other deployment.
+
+The app on Vercel and this package deploy independently, a minute or so
+apart, in no fixed order. Keep changes to the bridges and the schema
+additive: add an operation or a field in one change, and remove what it
+replaces only after both sides run the new code.
+
 ## Schema migration
 
 The head-table/index changes and required `activities.streamSourceRevision`
