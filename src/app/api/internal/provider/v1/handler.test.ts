@@ -23,7 +23,8 @@ function gateway(
   const errors: unknown[] = [];
   const failures: GatewayFailure[] = [];
   const handler = createProviderGatewayHandler({
-    config: () => ({ keys: { k1: secret }, owners: ['user-a'] }),
+    config: () => ({ keys: { k1: secret } }),
+    serves: async (userId) => userId === 'user-a',
     athleteFor: async (userId) => (userId === 'user-a' ? 42 : 7),
     read: async (target, operation) => {
       reads.push({ target, operation });

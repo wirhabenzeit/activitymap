@@ -4,6 +4,7 @@ import { eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
+import { postgresWriterStore } from '../../src/server/convex-mirror/handoff-postgres';
 import { resolveMigrationTarget } from '../../src/server/db/migration-tooling';
 import {
   activities,
@@ -485,6 +486,56 @@ try {
   await db
     .delete(stravaWebhookEvents)
     .where(inArray(stravaWebhookEvents.id, eventIds));
+  await hand(owner.id, 'handoff');
+
+  // 6d. The handoff's Postgres steps: a compare-and-set on the epoch, and
+  // reconciliation made due for an account handed back.
+  const store = postgresWriterStore(
+    db as unknown as Parameters<typeof postgresWriterStore>[0],
+    owner.id,
+  );
+  const before = (await store.state())!;
+  assert.equal(before.writer, 'handoff');
+  assert.equal(
+    await store.setWriter('convex', before.epoch - 1),
+    null,
+    'a stale epoch changes nothing',
+  );
+  assert.deepEqual(await store.state(), before);
+  assert.equal(await store.setWriter('convex', before.epoch), before.epoch + 1);
+  await fenced(
+    () =>
+      db
+        .update(activities)
+        .set({ name: 'written after the handoff' })
+        .where(eq(activities.athlete, owner.athlete)),
+    'an activity update for an account Convex writes',
+  );
+  assert.equal(
+    await store.setWriter('postgres', before.epoch + 1),
+    before.epoch + 2,
+  );
+  await db
+    .update(users)
+    .set({ lastSummaryReconciledAt: new Date() })
+    .where(eq(users.id, owner.id));
+  await store.reconcileNow();
+  assert.equal(
+    (
+      await db
+        .select({ at: users.lastSummaryReconciledAt })
+        .from(users)
+        .where(eq(users.id, owner.id))
+    )[0]?.at,
+    null,
+  );
+  assert.equal(
+    await postgresWriterStore(
+      db as unknown as Parameters<typeof postgresWriterStore>[0],
+      'no-such-user',
+    ).state(),
+    null,
+  );
   await hand(owner.id, 'handoff');
 
   // 7. Erasing an account removes a fenced owner's rows too.

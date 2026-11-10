@@ -254,6 +254,15 @@ router.route({
             ...args,
           });
           break;
+        // The handoff (src/server/convex-mirror/handoff.ts): a compare-and-set
+        // on the owner's writer epoch.
+        case 'setWriter':
+          result = await ctx.runMutation(internal.owners.setWriter, {
+            userId,
+            athleteId,
+            ...args,
+          });
+          break;
         case 'activityKnown':
           result = await ctx.runQuery(internal.ingestion.known, {
             scope,

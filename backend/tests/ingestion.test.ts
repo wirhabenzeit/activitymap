@@ -111,7 +111,8 @@ function fakeProvider() {
     during: null as null | (() => Promise<unknown>),
   };
   const handler = createProviderGatewayHandler({
-    config: () => ({ keys: { k1: secret }, owners: [actor.userId] }),
+    config: () => ({ keys: { k1: secret } }),
+    serves: async (userId) => userId === actor.userId,
     athleteFor: async () => 42,
     failureFor: (error) => (error instanceof Refused ? error.failure : null),
     read: async (_owner, operation: GatewayOperation) => {
