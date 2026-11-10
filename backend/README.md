@@ -186,6 +186,46 @@ shadow owner, so the mirror keeps this deployment current, and its counts need
 one `stats:rebuild`. Library changes reach the browser after the next mirror
 run. Remove the account from the list to return it to the REST sync.
 
+### Read owners in production
+
+A live owner's browser loads its library from here, but the app's v1 routes
+still answer from Postgres, and so does the iOS app. A read owner moves those
+reads as well, while Postgres stays the writer (step 2 of
+`docs/convex-writer-cutover.md`):
+
+```sh
+ACTIVITYMAP_CONVEX_READ_OWNERS='{"<userId>":"<epoch>"}'
+```
+
+The value maps application user IDs to the owner's current Convex epoch
+(`src/server/convex-read-owners.ts`); the read bridge settings
+(`ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_KEY_ID`,
+`ACTIVITYMAP_CONVEX_SIGNING_KEY`) must be present. For such an account these
+routes read through the signed bridge: sync bootstrap and changes, the
+activity and photo lists, stream summaries and the activity places route.
+Unlike a preview owner, the account keeps every write: edits, refreshes,
+imports, sharing and deletion run on Postgres and reach Convex through the
+mirror.
+
+- **Cursors.** A sync cursor belongs to one backend and epoch. The first
+  request after the switch, in either direction, answers that a new bootstrap
+  is required, and the client downloads the library once.
+- **Streams of one activity.** Convex answers when it holds a current
+  recording. Otherwise, and for an explicit refresh or when the bridge fails,
+  the request takes the Postgres path, which can still fetch from Strava.
+- **Stream access.** Postgres decides who may read streams. Every stream or
+  summary read from Convex is released only after Postgres confirms that the
+  account is still eligible and owns the activity
+  (`src/server/preview/authorized-streams.ts`), so a deauthorized account or
+  a deleted activity gets nothing from the copy, whatever the mirror has
+  done.
+- **Ingestion status** stays on Postgres: it describes the jobs of the store
+  that writes.
+- **Failure.** The list and sync routes do not fall back, because a cursor
+  cannot move between backends mid-download. If the bridge is unreachable or
+  the epoch is no longer current they fail, and removing the account from the
+  setting returns it to Postgres.
+
 ## Shadow writes
 
 While Postgres remains the writer, `src/server/convex-mirror/mirror.ts` copies

@@ -15,6 +15,7 @@ import { type PhotoDTO, photoDTOSchema } from '~/contracts/v1/photo';
 import { compactStreamSummarySchema } from '~/lib/streams/compact-summary';
 import { ActivityPlacesUnavailableError } from '~/server/application/match-activity-places';
 import type { Actor } from '~/server/auth/actor';
+import { convexReadEpoch } from '~/server/convex-read-owners';
 import type { Activity, Photo } from '~/server/db/schema';
 import { MATCHING_RECIPE } from '~/server/places/matching-version';
 import {
@@ -231,7 +232,7 @@ function appTransport(
   const bridge = convexSyncBridge(actor, fetcher);
   if (!bridge)
     throw new Error(
-      'ACTIVITYMAP_CONVEX_SITE is required for app preview owners',
+      'ACTIVITYMAP_CONVEX_SITE is required for app preview and read owners',
     );
   return {
     cursorBackend: scopeHash([
@@ -260,6 +261,28 @@ export function convexPreviewFor(
       ? labTransport(actor, config, fetcher)
       : appTransport(actor, config.epoch, fetcher),
   );
+}
+
+/** The adapter for a production read owner (`convex-read-owners.ts`), else
+ * null. Preview owners are never read owners: their selection decides. */
+export function convexReadOwnerFor(
+  actor: Actor | null,
+  fetcher: typeof fetch = fetch,
+) {
+  if (!actor || previewSelection(actor)) return null;
+  const epoch = convexReadEpoch(actor.userId);
+  return epoch
+    ? convexAdapter(actor, appTransport(actor, epoch, fetcher))
+    : null;
+}
+
+/** Where an actor's v1 reads come from when it is not Postgres: a preview
+ * owner's backend, or Convex for a production read owner. */
+export function convexReadsFor(
+  actor: Actor | null,
+  fetcher: typeof fetch = fetch,
+) {
+  return convexPreviewFor(actor, fetcher) ?? convexReadOwnerFor(actor, fetcher);
 }
 
 /** The adapter over `backend/` for an owner's current Convex epoch, outside

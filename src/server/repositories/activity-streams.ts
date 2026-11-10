@@ -1,42 +1,43 @@
 import 'server-only';
-import {
-  STREAM_FETCH_LEASE_MS,
-  STREAM_RETRY_MS,
-} from '~/server/strava/stream-policy';
 
 import { createHash, randomUUID } from 'node:crypto';
+
 import { and, eq, getTableColumns, sql } from 'drizzle-orm';
+
+import {
+  type StoredStreamSummary,
+  encodeStreamSummary,
+  summaryAlgorithmVersion,
+} from '~/lib/streams/compact-summary';
 import type { Actor } from '~/server/auth/actor';
 import { db } from '~/server/db';
-import {
-  accounts,
-  activities,
-  activityStreams,
-  users,
-  type Account,
-} from '~/server/db/schema';
 import {
   buildAccountTokenColumnUpdate,
   resolveAccountTokens,
 } from '~/server/db/account-token-normalization';
+import {
+  type Account,
+  accounts,
+  activities,
+  activityStreams,
+  users,
+} from '~/server/db/schema';
 import type { StravaTokens } from '~/server/strava/client';
 import {
-  ACTIVITY_STREAM_TYPES,
-  rawActivityStreamsSchema,
-  streamActivityIdSchema,
-  type StreamFetchFailure,
-} from '~/server/strava/streams';
+  STREAM_FETCH_LEASE_MS,
+  STREAM_RETRY_MS,
+} from '~/server/strava/stream-policy';
 import {
   STREAM_SUMMARY_VERSION,
-  summarizeStreams,
   type StreamSummary,
+  summarizeStreams,
 } from '~/server/strava/stream-summary';
-
 import {
-  encodeStreamSummary,
-  summaryAlgorithmVersion,
-  type StoredStreamSummary,
-} from '~/lib/streams/compact-summary';
+  ACTIVITY_STREAM_TYPES,
+  type StreamFetchFailure,
+  rawActivityStreamsSchema,
+  streamActivityIdSchema,
+} from '~/server/strava/streams';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 type StoredStreams = typeof activityStreams.$inferSelect;
@@ -196,6 +197,34 @@ export function createActivityStreamsRepository(database: typeof db = db) {
           .from(activityStreams)
           .where(eq(activityStreams.activityId, BigInt(activityId)));
         return row ? snapshot(row) : null;
+      });
+    },
+
+    /**
+     * The activities among `activityIds` whose streams the actor may read
+     * now: its own, while its provider account is eligible. Throws when the
+     * account is not (revoked, scheduled for erasure, or without credentials),
+     * as the reads here do. For serving a copy of the streams held elsewhere.
+     */
+    async readable(actor: Actor, activityIds: string[]): Promise<Set<string>> {
+      activityIds.forEach((id) => streamActivityIdSchema.parse(id));
+      return database.transaction(async (tx) => {
+        if (!(await lockEligibleAccount(tx, actor)))
+          throw new ActivityStreamsUnavailableError();
+        if (activityIds.length === 0) return new Set<string>();
+        const rows = await tx
+          .select({ id: sql<string>`${activities.id}::text` })
+          .from(activities)
+          .where(
+            and(
+              eq(activities.athlete, actor.athleteId),
+              sql`${activities.id} = any(array[${sql.join(
+                activityIds.map((id) => sql`${id}::bigint`),
+                sql`, `,
+              )}])`,
+            ),
+          );
+        return new Set(rows.map((row) => row.id));
       });
     },
 

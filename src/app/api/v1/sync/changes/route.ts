@@ -1,7 +1,7 @@
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { compressSyncResponse } from '~/server/api/sync-compression';
 import { logger } from '~/server/logging/logger';
-import { convexPreviewFor } from '~/server/preview/convex';
+import { convexReadsFor } from '~/server/preview/convex';
 import { activitiesRepository } from '~/server/repositories/activities';
 import { changesRepository } from '~/server/repositories/changes';
 import { photosRepository } from '~/server/repositories/photos';
@@ -14,7 +14,7 @@ const ROUTE = 'GET /api/v1/sync/changes';
 
 const handle = withAuthenticatedApiV1(
   async (request, context) => {
-    const preview = convexPreviewFor(await context.actor());
+    const preview = convexReadsFor(await context.actor());
     return createSyncChangesHandler({
       resolveActor: context.actor,
       activitiesRepo: preview?.activitiesRepo ?? activitiesRepository,
