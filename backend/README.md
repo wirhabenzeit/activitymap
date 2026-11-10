@@ -226,6 +226,44 @@ mirror.
   the epoch is no longer current they fail, and removing the account from the
   setting returns it to Postgres.
 
+## Provider gateway
+
+A Convex worker that needs provider data asks the app for it
+(`docs/convex-writer-cutover.md`, decision 1): the app keeps the Strava
+tokens and the request budget that all accounts share, and this package never
+holds a provider credential.
+
+`POST /api/internal/provider/v1` takes one owner and one read, signed with
+HMAC-SHA256 over `activitymap-provider-v1`, the key ID, a millisecond
+timestamp and the exact body, valid for 30 seconds
+(`src/server/provider-gateway/contract.ts`). The reads are one activity, its
+streams, its photos, or a page of the owner's activity summaries. The app
+resolves the owner's account, refreshes an expired token and stores the new
+one, reserves from the shared budget for every request (the refresh
+included), and answers with the provider payload.
+
+A read that fails in a way the caller can act on is answered 200 with a typed
+failure: `rate_limited` (with the seconds to wait), `credentials_rejected`
+(the owner must reconnect), `not_found`, `forbidden` (the grant does not cover
+the activity) or `upstream_error` (with whether a retry can help). A bad
+signature is 401, an owner the gateway may not read for is 403, and anything
+unexpected is a 500 without detail.
+
+The gateway is off until both settings are present in the app and automated
+external effects are enabled:
+
+```sh
+ACTIVITYMAP_PROVIDER_GATEWAY_KEYS='{"<keyId>":"<64 hex characters>"}'
+ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS='["<userId>"]'
+```
+
+The owner list is a stand-in: once owners carry a writer field (step 6), the
+gateway serves exactly the owners Convex writes for. Nothing calls the route
+yet; `src/server/provider-gateway/client.ts` is the caller the ingestion jobs
+(step 5) will use. Requests carry no nonce: a captured request can be repeated
+within its 30 seconds, which costs budget but changes nothing, since every
+operation is a read.
+
 ## Shadow writes
 
 While Postgres remains the writer, `src/server/convex-mirror/mirror.ts` copies
