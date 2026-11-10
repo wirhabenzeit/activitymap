@@ -305,6 +305,33 @@ rows, which takes on the order of ten scheduled runs. Deploy this package
 before the app version that copies: an older deployment rejects the new
 operations and the mirror job then answers 500.
 
+### Shadow matching
+
+With a complete catalogue rowset, matching can run here without any client
+seeing the results (`convex/shadowMatching.ts`):
+
+```sh
+pnpm exec convex run shadowMatching:start '{"userId":"<userId>"}'
+pnpm exec convex run shadowMatching:status '{"userId":"<userId>"}'
+```
+
+A run walks the owner's library in activity-key order. Each step is a Node
+action (`convex/shadowMatchingWorker.ts`) that takes a small group of
+recordings (at most 12 activities, 25,000 GPS samples and 4 MiB of raw
+recording), reads their files, prepares the tracks with the application's own
+code, reads candidate places by tile and runs the matcher the Postgres worker
+uses. The worker refuses a rowset or recipe other than the one the owner's
+copied results were computed with. Results go to `shadowMatches`; a result
+whose recording changed meanwhile is dropped. A group that exceeds the tile,
+page or result budget is retried as its first activity alone, and an activity
+that still fails is listed on the run.
+
+When the walk ends, the run compares every activity's shadow result with the
+result the mirror copied from Postgres, ignoring `resultRevision`, and keeps
+the counts (`same`, `different`, only one side, neither) and up to 20
+differing examples (status and place count only) under `comparison`. A run
+that stopped with an error continues with `shadowMatching:resume`.
+
 ### Production parity check
 
 `pnpm convex:verify-owner` compares a whole library but reads only the local

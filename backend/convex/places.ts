@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from 'convex/server';
 import { v } from 'convex/values';
 
 import {
@@ -150,5 +151,35 @@ export const complete = internalMutation({
       await ctx.db.patch('placeCatalogues', row._id, { complete: true });
     }
     return progress({ ...row, complete: true });
+  },
+});
+
+/** One page of a complete rowset's tile, shaped for `readMatchingTiles`. */
+export const tilePage = internalQuery({
+  args: {
+    dataset,
+    tile: v.string(),
+    paginationOpts: paginationOptsValidator,
+  },
+  handler: async (ctx, args) => {
+    if (args.paginationOpts.numItems > 256) throw new Error('Tile page limit');
+    const catalogue = await catalogueFor(ctx, args.dataset);
+    if (!catalogue?.complete) throw new Error('Catalogue rowset unavailable');
+    const result = await ctx.db
+      .query('places')
+      .withIndex('by_dataset_tile', (q) =>
+        q.eq('dataset', args.dataset).eq('tile', args.tile),
+      )
+      .paginate(args.paginationOpts);
+    return {
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+      page: result.page.map((row) => ({
+        key: row.key,
+        longitude: row.place.location.longitude,
+        latitude: row.place.location.latitude,
+        metadata: row.place,
+      })),
+    };
   },
 });
