@@ -21,10 +21,15 @@ import {
   updateActivityForActor,
 } from '~/server/application/activities';
 import {
+  refreshActivityThroughConvex,
+  updateActivityThroughConvex,
+} from '~/server/application/convex-activity-commands';
+import {
   SIGNUP_WARMUP_TIME_MS,
   warmSignupActivitiesForActor,
 } from '~/server/application/signup-warmup';
 import type { Actor } from '~/server/auth/actor';
+import type { Writer } from '~/server/db/schema';
 import { requestIdFor } from '~/server/http/request-id';
 
 type UpdateResult = Awaited<ReturnType<typeof updateActivityForActor>>;
@@ -37,12 +42,32 @@ type MutationHandlerDependencies = {
     input: UpdateActivityRequest & { id: number },
   ) => Promise<UpdateResult>;
   refresh?: (actor: Actor, activityId: number) => Promise<RefreshResult>;
+  /** Which store writes the actor's library; Postgres when not given. */
+  writerFor?: (actor: Actor) => Promise<Writer>;
+  /** The same commands for an account whose library Convex writes. */
+  updateThroughConvex?: typeof updateActivityThroughConvex;
+  refreshThroughConvex?: typeof refreshActivityThroughConvex;
   fetchSummaries?: (actor: Actor) => Promise<number>;
   afterResponse?: (work: () => Promise<void>) => void;
   warmSignup?: typeof warmSignupActivitiesForActor;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
 };
+
+/** Who writes the actor's library. During a handoff nobody does, and a
+ * command would change Strava without anywhere to record the result. */
+async function writerFor(deps: MutationHandlerDependencies, actor: Actor) {
+  const writer = (await deps.writerFor?.(actor)) ?? 'postgres';
+  if (writer === 'handoff')
+    throw new ActivityMutationError(
+      'local_state_conflict',
+      'The library is being moved. Try again in a few minutes.',
+      503,
+      true,
+      60,
+    );
+  return writer;
+}
 
 function mutationFailure(error: ActivityMutationError, requestId: string) {
   return failure(requestId, error.status, error.code, error.message, {
@@ -147,16 +172,19 @@ export function createUpdateActivityHandler(deps: MutationHandlerDependencies) {
           'The activity ID is invalid.',
         );
       const body = updateActivityRequestSchema.parse(await request.json());
-      const activity = await (deps.update ?? updateActivityForActor)(actor, {
-        id,
-        ...body,
-      });
+      const input = { id, ...body };
+      const activity =
+        (await writerFor(deps, actor)) === 'convex'
+          ? await (deps.updateThroughConvex ?? updateActivityThroughConvex)(
+              actor,
+              input,
+            )
+          : toActivityDTO(
+              await (deps.update ?? updateActivityForActor)(actor, input),
+            );
       return Response.json(
         responseEnvelope(activityDTOSchema).parse(
-          makeEnvelope(
-            toActivityDTO(activity),
-            (deps.now ?? (() => new Date()))(),
-          ),
+          makeEnvelope(activity, (deps.now ?? (() => new Date()))()),
         ),
         { headers: privateHeaders },
       );
@@ -209,10 +237,25 @@ export function createRefreshActivityHandler(
           'validation_failed',
           'The activity ID is invalid.',
         );
-      const result = await (deps.refresh ?? refreshActivityForActor)(actor, id);
+      let result;
+      if ((await writerFor(deps, actor)) === 'convex')
+        result = await (
+          deps.refreshThroughConvex ?? refreshActivityThroughConvex
+        )(actor, id);
+      else {
+        const stored = await (deps.refresh ?? refreshActivityForActor)(
+          actor,
+          id,
+        );
+        result = {
+          ...stored,
+          activity: toActivityDTO(stored.activity),
+          photos: stored.photos.map(toPhotoDTO),
+        };
+      }
       const data = activityRefreshResultSchema.parse({
-        activity: toActivityDTO(result.activity),
-        photos: result.photos.map(toPhotoDTO),
+        activity: result.activity,
+        photos: result.photos,
         photos_status: result.photosStatus,
         photos_error: result.photosError
           ? {

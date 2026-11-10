@@ -188,7 +188,7 @@ async function requireOwnedActivity(
   return existing;
 }
 
-function mutationFailure(error: unknown): ActivityMutationError {
+export function mutationFailure(error: unknown): ActivityMutationError {
   if (error instanceof ActivityMutationError) return error;
   if (error instanceof AccountCredentialsUnavailableError)
     return new ActivityMutationError(
@@ -305,7 +305,7 @@ function mutationFailure(error: unknown): ActivityMutationError {
   );
 }
 
-async function resolveConnectedAccount(
+export async function resolveConnectedAccount(
   actor: Actor,
   resolveAccount: AccountResolver,
 ) {

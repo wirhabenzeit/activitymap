@@ -18,8 +18,16 @@ import {
   applySourceRecord,
   publishMatchRecord,
 } from './activityWrites';
-import { ownerFor, requireHead, writerOf } from './owners';
-import { applyPhotoSet } from './photos';
+import { project } from './liveProjection';
+import { scopeFields } from './ownerScope';
+import {
+  idKey,
+  ownerFor,
+  requireHead,
+  requireWritableOwner,
+  writerOf,
+} from './owners';
+import { applyPhotoSet, photosOfActivities } from './photos';
 
 /**
  * Convex ingestion for an owner Convex writes for
@@ -318,6 +326,33 @@ async function held(ctx: QueryCtx, id: Id<'ingestionJobs'>, claim: number) {
   return { job, owner: await ctx.db.get('owners', job.owner) };
 }
 
+/** A new source revision for the job's activity: the larger of the current
+ * time in milliseconds and one more than every revision already used for
+ * it, so revisions keep one order across a handoff from the mirror. */
+async function nextRevision(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  job: Pick<Doc<'ingestionJobs'>, 'activity' | 'revision'>,
+) {
+  const [row, set, head] = await Promise.all([
+    activityFor(ctx, owner._id, job.activity),
+    ctx.db
+      .query('photoSets')
+      .withIndex('by_owner_activity', (q) =>
+        q.eq('owner', owner._id).eq('activity', job.activity),
+      )
+      .unique(),
+    requireHead(ctx, owner._id),
+  ]);
+  return Math.max(
+    Date.now(),
+    job.revision + 1,
+    (row?.sourceRevision ?? 0) + 1,
+    (set?.revision ?? 0) + 1,
+    (head.mirror?.revision ?? 0) + 1,
+  );
+}
+
 /** Take a due job. Null when it is not due, another run holds it, or Convex
  * does not ingest for its owner. */
 export const claim = internalMutation({
@@ -361,23 +396,7 @@ export const claim = internalMutation({
       // Nothing left to record or match (deleted, or done meanwhile): look
       // at the source again instead.
     }
-    const [row, set, head] = await Promise.all([
-      activityFor(ctx, owner._id, job.activity),
-      ctx.db
-        .query('photoSets')
-        .withIndex('by_owner_activity', (q) =>
-          q.eq('owner', owner._id).eq('activity', job.activity),
-        )
-        .unique(),
-      requireHead(ctx, owner._id),
-    ]);
-    const revision = Math.max(
-      now,
-      job.revision + 1,
-      (row?.sourceRevision ?? 0) + 1,
-      (set?.revision ?? 0) + 1,
-      (head.mirror?.revision ?? 0) + 1,
-    );
+    const revision = await nextRevision(ctx, owner, job);
     await ctx.db.patch('ingestionJobs', job._id, {
       phase: 'source',
       claims: number,
@@ -625,6 +644,115 @@ export const resume = internalMutation({
         owner,
         after: jobs.at(-1)!.activity,
       });
+  },
+});
+
+/** Whether the activity is in the library of an owner Convex writes for.
+ * A command checks this before it changes anything at the provider. */
+export const known = internalQuery({
+  args: { scope: v.object(scopeFields), id: v.string() },
+  handler: async (ctx, { scope, id }): Promise<boolean> => {
+    const owner = await requireWritableOwner(ctx, scope, 'convex');
+    const row = await activityFor(ctx, owner._id, idKey(id));
+    return !!row?.dto && !row.deleted && row.generation === owner.generation;
+  },
+});
+
+/**
+ * Write what a command (an edit or a refresh in the app) just learned from
+ * the provider about an activity already in the library: its current state
+ * with, when the command read them, its photos, or its deletion
+ * (`dto: null`). The app made the provider call; this is the same write a
+ * job's source phase makes, with a new revision, so a run that read the
+ * activity earlier loses to it. Returns what clients now see, or null when
+ * the activity is not in the library.
+ *
+ * When the activity now needs a recording or a match, its job is queued for
+ * that phase; a job that is running is asked to run again afterwards.
+ */
+export const apply = internalMutation({
+  args: {
+    scope: v.object(scopeFields),
+    id: v.string(),
+    dto: v.union(activityMetadataValidator, v.null()),
+    /** The activity's current photo set; absent when it was not read. */
+    photos: v.optional(v.array(photoValidator)),
+  },
+  handler: async (ctx, args) => {
+    const owner = await requireWritableOwner(ctx, args.scope, 'convex');
+    const activity = idKey(args.id);
+    const prior = await activityFor(ctx, owner._id, activity);
+    if (!prior?.dto || prior.deleted || prior.generation !== owner.generation)
+      return null;
+    const byActivity = () =>
+      ctx.db
+        .query('ingestionJobs')
+        .withIndex('by_owner_activity', (q) =>
+          q.eq('owner', owner._id).eq('activity', activity),
+        )
+        .unique();
+    const job =
+      (await byActivity()) ??
+      (await ctx.db.get(
+        'ingestionJobs',
+        await ctx.db.insert('ingestionJobs', {
+          owner: owner._id,
+          activity,
+          status: 'idle',
+          phase: 'source',
+          requested: 0,
+          attempt: 0,
+          revision: 0,
+          claims: 0,
+        }),
+      ))!;
+    const revision = await nextRevision(ctx, owner, job);
+    await ctx.db.patch('ingestionJobs', job._id, { revision });
+    const fence = {
+      scope: args.scope,
+      generation: owner.generation,
+      sourceRevision: revision,
+      writer: 'convex' as const,
+    };
+    await applySourceRecord(ctx, {
+      ...fence,
+      id: args.id,
+      dto:
+        args.dto && !args.photos
+          ? // The photos were not read: what is known about them stands.
+            { ...args.dto, photos_state: prior.dto.photos_state }
+          : args.dto,
+    });
+    if (!args.dto) return { activity: null, photos: [] };
+    if (args.photos)
+      await applyPhotoSet(ctx, {
+        ...fence,
+        activityId: args.id,
+        photos: args.photos,
+      });
+    const now = Date.now();
+    if (await nextTarget(ctx, owner, activity)) {
+      if (job.lease && job.lease.expiresAt > now)
+        await ctx.db.patch('ingestionJobs', job._id, {
+          requested: job.requested + 1,
+        });
+      else if (job.status !== 'queued') {
+        // Straight to the phase that is missing: the source is current.
+        await ctx.db.patch('ingestionJobs', job._id, {
+          status: 'queued',
+          phase: 'recording',
+          attempt: 0,
+          dueAt: now,
+          error: undefined,
+        });
+        await schedule(ctx, job._id, now);
+      }
+    }
+    const row = await activityFor(ctx, owner._id, activity);
+    return {
+      activity: row && project(row, owner),
+      photos: await photosOfActivities(ctx, owner, [args.id]),
+    };
   },
 });
 

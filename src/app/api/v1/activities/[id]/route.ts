@@ -5,6 +5,7 @@ import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { mirrorShadowOwnerAfterWrite } from '~/server/convex-mirror/shadow-run';
 import { logger } from '~/server/logging/logger';
 import { previewDataUnavailable } from '~/server/preview/selection';
+import { writerOf } from '~/server/repositories/writers';
 
 import { createUpdateActivityHandler } from './mutation-handler';
 
@@ -25,6 +26,7 @@ export async function PATCH(
       const { id } = await params;
       const response = await createUpdateActivityHandler({
         resolveActor: context.actor,
+        writerFor: (actor) => writerOf(actor.userId),
         onError: (error, requestId) =>
           logger.error('Activity update request failed', { error, requestId }),
       })(request, parseMutationActivityId(id));

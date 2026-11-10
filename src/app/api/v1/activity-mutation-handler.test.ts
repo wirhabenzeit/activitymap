@@ -514,3 +514,91 @@ void test('explicit mutation IDs keep authorization before validation and do not
   );
   assert.equal(calls, 1);
 });
+
+void test('an account Convex writes for takes the Convex commands, and a handoff refuses both', async () => {
+  const calls: string[] = [];
+  const dto = {
+    ...(
+      (await (
+        await createUpdateActivityHandler({
+          resolveActor: async () => actor,
+          update: async () => activity({}),
+        })(request('/api/v1/activities/7', { name: 'x' }), 7)
+      ).json()) as { data: Record<string, unknown> }
+    ).data,
+    name: 'From Convex',
+  };
+  const deps = (writer: 'postgres' | 'handoff' | 'convex') => ({
+    resolveActor: async () => actor,
+    writerFor: async () => writer,
+    update: async () => {
+      calls.push('postgres update');
+      return activity({});
+    },
+    refresh: async () => {
+      calls.push('postgres refresh');
+      return {
+        activity: activity({}),
+        photos: [],
+        photosStatus: 'complete' as const,
+        photosError: null,
+      };
+    },
+    updateThroughConvex: (async () => {
+      calls.push('convex update');
+      return dto;
+    }) as never,
+    refreshThroughConvex: (async () => {
+      calls.push('convex refresh');
+      return {
+        activity: dto,
+        photos: [],
+        photosStatus: 'complete' as const,
+        photosError: null,
+      };
+    }) as never,
+  });
+  const patch = (writer: Parameters<typeof deps>[0]) =>
+    createUpdateActivityHandler(deps(writer))(
+      request('/api/v1/activities/7', { name: 'x' }),
+      7,
+    );
+  const refresh = (writer: Parameters<typeof deps>[0]) =>
+    createRefreshActivityHandler(deps(writer))(
+      new Request('https://example.test/api/v1/activities/7/refresh', {
+        method: 'POST',
+      }),
+      7,
+    );
+
+  const edited = await patch('convex');
+  assert.equal(edited.status, 200);
+  assert.equal(
+    ((await edited.json()) as { data: { name: string } }).data.name,
+    'From Convex',
+  );
+  const refreshed = await refresh('convex');
+  assert.equal(refreshed.status, 200);
+  assert.equal(
+    ((await refreshed.json()) as { data: { activity: { name: string } } }).data
+      .activity.name,
+    'From Convex',
+  );
+  assert.deepEqual(calls, ['convex update', 'convex refresh']);
+
+  for (const response of [await patch('handoff'), await refresh('handoff')]) {
+    assert.equal(response.status, 503);
+    const body = (await response.json()) as {
+      error: { code: string; retryable: boolean };
+    };
+    assert.deepEqual(
+      [body.error.code, body.error.retryable],
+      ['local_state_conflict', true],
+    );
+  }
+  assert.equal(calls.length, 2);
+
+  await patch('postgres');
+  await refresh('postgres');
+  assert.deepEqual(calls.slice(2), ['postgres update', 'postgres refresh']);
+});

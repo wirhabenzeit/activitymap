@@ -431,6 +431,30 @@ and the owner must be in `ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS`.
 `convex run ingestion:status '{"userId":"<userId>"}'` lists an owner's jobs
 that are waiting, blocked or failed.
 
+### Edit and refresh
+
+For an account Convex writes for, the v1 edit and refresh routes still make
+the Strava call in the app, with the account's credential and the shared
+request budget. The result goes to Convex in one signed write
+(`applyActivity` on the write bridge, `ingestion.apply`) and the response is
+what Convex then serves; nothing of the account's activities is read from or
+written to Postgres (`src/server/application/convex-activity-commands.ts`).
+
+- A command acts only on an activity that is in the library, and that is
+  checked (`activityKnown`) before anything is changed at Strava.
+- The write gets a new source revision like a job's, so a job run that read
+  the activity earlier cannot overwrite it.
+- An edit does not read photos, so what is stored about them stands. A
+  refresh replaces the photo set only when it read all of it.
+- "Not found" from Strava is written as the deletion.
+- When the activity then needs a recording or a match, its job is queued
+  for that phase without reading the activity again.
+- While the account is in `handoff`, both routes answer 503 and ask to try
+  again: nobody could record the result.
+
+The legacy server actions for edit, refresh and delete only know the
+Postgres path and refuse such an account before calling Strava.
+
 ### Reconciliation
 
 Events can be missed, so each owner Convex writes for also has a sweep
@@ -468,6 +492,9 @@ compares with.
 
 Needed before an owner is handed to Convex:
 
+- **Import.** The import command and its progress still belong to
+  Postgres. For an account Convex writes for, the reconciliation sweep is
+  what finds activities that are missing.
 - **Rematching after a catalogue change.** A job matches the recording it
   publishes. Nothing yet selects a new catalogue for an owner Convex writes
   for, or matches the whole library again after one; the mirror did that
