@@ -275,7 +275,8 @@ up to `full.after` are compared. Before the first copy nothing is compared.
 The result is logged per owner (`Convex shadow parity`, or
 `Convex shadow parity drift` at error level with counts and an example per
 differing field; route, coordinate and description values, photo captions,
-locations and image URLs are replaced by their length). Drift or a failed check answers 500. The response carries the
+locations and image URLs are replaced by their length, also inside a parent
+object that is shown). Drift or a failed check answers 500. The response carries the
 counts and field names only.
 
 Besides the writer settings, the check needs the read bridge's

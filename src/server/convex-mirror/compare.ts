@@ -17,25 +17,42 @@ export type Difference = { count: number; example: string };
 
 const EXAMPLE_CHARS = 160;
 
-/** Photo text, locations and image URLs stay out of reports and logs. */
-const PRIVATE_FIELDS = [
-  'photo.caption',
-  'photo.activity_name',
-  'photo.location',
-  'photo.urls',
-];
-const isPrivate = (field: string) =>
-  isPersonalDataKey(field.split('.').at(-1) ?? '') ||
-  PRIVATE_FIELDS.some(
-    (prefix) => field === prefix || field.startsWith(`${prefix}.`),
+/** Besides the logger's personal-data keys: recorded coordinates, and photo
+ * text, locations and image URLs. None of these may reach a report or log. */
+const PRIVATE_KEYS = new Set([
+  'latlng',
+  'caption',
+  'activity_name',
+  'location',
+  'urls',
+]);
+const isPrivateKey = (key: string) =>
+  isPersonalDataKey(key) || PRIVATE_KEYS.has(key.toLowerCase());
+const size = (value: unknown) => `<${JSON.stringify(value).length} chars>`;
+
+/** `value` with everything under a private key replaced by its length, at
+ * any depth, so a parent object can be shown without its private parts. */
+function withoutPrivateValues(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(withoutPrivateValues);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, item]) => [
+      key,
+      item === null || item === undefined
+        ? item
+        : isPrivateKey(key)
+          ? size(item)
+          : withoutPrivateValues(item),
+    ]),
   );
+}
 
 function preview(field: string, value: unknown) {
   if (value === undefined) return 'undefined';
-  const text = JSON.stringify(value);
-  // Never copy routes, coordinates or descriptions into a report or log.
-  if (isPrivate(field)) return `<${text.length} chars>`;
-  return text.slice(0, EXAMPLE_CHARS);
+  if (value === null) return 'null';
+  // The field itself, or anything it is nested in, is private.
+  if (field.split('.').some(isPrivateKey)) return size(value);
+  return JSON.stringify(withoutPrivateValues(value)).slice(0, EXAMPLE_CHARS);
 }
 
 export function createComparison(expected = EXPECTED_DIFFERENCES) {
