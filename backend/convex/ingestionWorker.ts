@@ -1,6 +1,6 @@
 'use node';
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 
 import { v } from 'convex/values';
 
@@ -13,13 +13,16 @@ import {
   ForeignProviderActivity,
   InvalidProviderPayload,
   activitySource,
+  activitySummary,
   hasPhotos,
   photoSources,
 } from '../ingestion/provider';
 import { encodeWhole, validateRecording } from '../recording/codec';
 import { internal } from './_generated/api';
+import type { Id } from './_generated/dataModel';
 import { type ActionCtx, internalAction } from './_generated/server';
 import type { IngestionStep } from './ingestion';
+import { SWEEP_PAGE_SIZE, type SweepStep } from './ingestionSweep';
 import { prepareRecording } from './recordingWorker';
 
 /**
@@ -63,6 +66,9 @@ type Failure =
   | { kind: 'rate_limited'; retryAfterSeconds: number }
   | { kind: 'blocked' | 'retry' | 'permanent'; reason: string };
 
+/** How long one sweep run reads pages before it lets another run go on. */
+const SWEEP_RUN_MS = 4 * 60_000;
+
 function failureOf(error: unknown): Failure {
   if (error instanceof ProviderFailure) {
     const { failure } = error;
@@ -95,7 +101,10 @@ function failureOf(error: unknown): Failure {
   };
 }
 
-async function read(step: IngestionStep, operation: GatewayOperation) {
+async function read(
+  step: Pick<IngestionStep, 'scope'>,
+  operation: GatewayOperation,
+) {
   const { userId, athleteId } = step.scope;
   return gateway().call({ userId, athleteId }, operation);
 }
@@ -187,6 +196,85 @@ export const run = internalAction({
           job,
           claim,
           failure: failureOf(error),
+        });
+        return;
+      }
+    }
+  },
+});
+
+/** One page of the owner's activity list, as reconciliation records it. */
+async function listPage(step: SweepStep) {
+  const result = await read(
+    { scope: { userId: step.userId, athleteId: step.athleteId, epoch: '' } },
+    {
+      kind: 'activities',
+      page: step.page,
+      perPage: SWEEP_PAGE_SIZE,
+      before: step.before,
+    },
+  );
+  if (!result.ok) throw new ProviderFailure(result.error);
+  if (!Array.isArray(result.data) || result.data.length > SWEEP_PAGE_SIZE)
+    throw new InvalidProviderPayload('activity list');
+  return result.data.map((entry) => {
+    const summary = activitySummary(entry, step.athleteId);
+    return {
+      ...summary,
+      fingerprint: createHash('sha256')
+        .update(JSON.stringify(summary.fields))
+        .digest('hex'),
+    };
+  });
+}
+
+/** One run of an owner's reconciliation sweep (convex/ingestionSweep.ts). */
+export const sweep = internalAction({
+  args: { owner: v.id('owners') },
+  handler: async (ctx, args): Promise<void> => {
+    const owner: Id<'owners'> = args.owner;
+    const started = Date.now();
+    let step: SweepStep | null = await ctx.runMutation(
+      internal.ingestionSweep.claim,
+      { owner },
+    );
+    while (step) {
+      const { claim } = step;
+      try {
+        if (step.phase === 'confirming') {
+          await ctx.runMutation(internal.ingestionSweep.confirm, {
+            owner,
+            claim,
+          });
+          return;
+        }
+        if (Date.now() - started > SWEEP_RUN_MS) {
+          await ctx.runMutation(internal.ingestionSweep.fail, {
+            owner,
+            claim,
+            failure: { kind: 'yield' },
+          });
+          return;
+        }
+        step = await ctx.runMutation(internal.ingestionSweep.applyPage, {
+          owner,
+          claim,
+          page: step.page,
+          items: await listPage(step),
+        });
+      } catch (error) {
+        const failure = failureOf(error);
+        await ctx.runMutation(internal.ingestionSweep.fail, {
+          owner,
+          claim,
+          // A list is never given up: the next attempt may work.
+          failure:
+            failure.kind === 'rate_limited'
+              ? failure
+              : {
+                  kind: failure.kind === 'blocked' ? 'blocked' : 'retry',
+                  reason: failure.reason,
+                },
         });
         return;
       }

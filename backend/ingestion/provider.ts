@@ -95,3 +95,41 @@ export function photoSources(
     throw new InvalidProviderPayload('photos');
   }
 }
+
+const summaryShape = z.looseObject({
+  id: z.number().int().positive(),
+  athlete: z.looseObject({ id: z.number().int().positive() }),
+  map: z.looseObject({}),
+  start_date: z.string(),
+  start_date_local: z.string(),
+});
+
+/** One entry of the provider's activity list: the fields reconciliation
+ * compares, converted like a stored activity. */
+export function activitySummary(payload: unknown, athleteId: string) {
+  const shape = summaryShape.safeParse(payload);
+  if (!shape.success) throw new InvalidProviderPayload('activity list');
+  if (String(shape.data.athlete.id) !== athleteId)
+    throw new ForeignProviderActivity();
+  try {
+    const row = transformStravaActivity(payload as StravaActivity, false);
+    return {
+      id: String(row.id),
+      fields: {
+        name: row.name,
+        sport_type: row.sport_type as string,
+        distance: row.distance ?? null,
+        moving_time: row.moving_time ?? null,
+        elapsed_time: row.elapsed_time ?? null,
+        total_elevation_gain: row.total_elevation_gain ?? null,
+        start_date: row.start_date.toISOString(),
+        private: row.private ?? null,
+        map_summary_polyline: row.map_summary_polyline ?? null,
+        photo_count: row.photo_count ?? null,
+        total_photo_count: row.total_photo_count ?? null,
+      },
+    };
+  } catch {
+    throw new InvalidProviderPayload('activity list');
+  }
+}

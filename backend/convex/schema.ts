@@ -76,7 +76,9 @@ export default defineSchema({
     ),
     eventTime: v.number(),
     receivedAt: v.number(),
-  }).index('by_owner_event', ['owner', 'event']),
+  })
+    .index('by_owner_event', ['owner', 'event'])
+    .index('by_received', ['receivedAt']),
   /** Convex ingestion (convex/ingestion.ts): one job per owner and activity.
    * `requested` counts the times the activity was asked for; a run that
    * ends with a different count than it started with runs again. */
@@ -112,9 +114,38 @@ export default defineSchema({
     ),
     /** Why the last run did not finish. */
     error: v.optional(v.string()),
+    /** Reconciliation (convex/ingestionSweep.ts): a fingerprint of the last
+     * provider summary seen for the activity, and the sweep that saw it. */
+    summary: v.optional(v.string()),
+    seen: v.optional(v.number()),
   })
     .index('by_owner_activity', ['owner', 'activity'])
     .index('by_owner_status', ['owner', 'status', 'activity']),
+  /** Reconciliation of an owner's library with the provider's activity
+   * list (convex/ingestionSweep.ts): one row per owner. */
+  ingestionSweeps: defineTable({
+    owner: v.id('owners'),
+    /** How many sweeps have started. */
+    number: v.number(),
+    phase: v.union(
+      v.literal('idle'),
+      /** Reading the provider's list, page by page. */
+      v.literal('scanning'),
+      /** Asking for the activities the list did not contain. */
+      v.literal('confirming'),
+    ),
+    dueAt: v.number(),
+    /** The sweep lists activities that started before this (epoch seconds). */
+    scanBefore: v.number(),
+    page: v.number(),
+    /** Confirming: the last activity key looked at. */
+    after: v.string(),
+    attempt: v.number(),
+    claims: v.number(),
+    lease: v.optional(v.object({ claim: v.number(), expiresAt: v.number() })),
+    error: v.optional(v.string()),
+    completedAt: v.optional(v.number()),
+  }).index('by_owner', ['owner']),
   ownerEpochs: defineTable({ owner: v.id('owners'), epoch: v.string() }).index(
     'by_owner_epoch',
     ['owner', 'epoch'],

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 
 import { convexTest } from 'convex-test';
-import test, { after, afterEach, beforeEach, mock } from 'node:test';
+import test, { afterEach, beforeEach, mock } from 'node:test';
 
 import { createProviderGatewayHandler } from '../../src/app/api/internal/provider/v1/handler';
 import type {
@@ -11,6 +11,11 @@ import type {
 import type { RawActivityStreams } from '../../src/server/strava/streams';
 import { internal } from '../convex/_generated/api';
 import { LEASE_MS, MAX_ATTEMPTS } from '../convex/ingestion';
+import {
+  CONFIRM_INTERVAL_MS,
+  CONFIRM_LIMIT,
+  SWEEP_INTERVAL_MS,
+} from '../convex/ingestionSweep';
 import schema from '../convex/schema';
 
 /**
@@ -19,14 +24,16 @@ import schema from '../convex/schema';
  * Strava behind them.
  */
 
-mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
-after(() => mock.timers.reset());
+// Every test gets its own clock: a backend left over from an earlier test
+// still has work scheduled days ahead, which must not run in a later one.
+const startedAt = Date.now();
 
 const modules = {
   './_generated/api.js': () => import('../convex/_generated/api.js'),
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './catalogue.ts': () => import('../convex/catalogue'),
   './ingestion.ts': () => import('../convex/ingestion'),
+  './ingestionSweep.ts': () => import('../convex/ingestionSweep'),
   './ingestionWorker.ts': () => import('../convex/ingestionWorker'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
@@ -126,10 +133,14 @@ function fakeProvider() {
   const activities = new Map<string, ReturnType<typeof detail>>();
   const photos = new Map<string, ReturnType<typeof photo>[]>();
   const withoutStreams = new Set<string>();
+  let hidden = false;
   const reads: string[] = [];
+  /** Reads of the activity list, kept apart from reads of one activity. */
+  const lists: string[] = [];
   const failures: { failure: GatewayFailure; kind?: string }[] = [];
   const provider = {
     reads,
+    lists,
     set(activity: ReturnType<typeof detail>, withPhotos: string[] = []) {
       const id = String(activity.id);
       activities.set(id, {
@@ -142,6 +153,11 @@ function fakeProvider() {
       );
     },
     remove: (id: string) => activities.delete(id),
+    /** Make the activity list come back empty until restored. */
+    hide() {
+      hidden = true;
+      return { restore: () => (hidden = false) };
+    },
     noStreams: (id: string) => withoutStreams.add(id),
     /** Answer the next read (of this kind, if given) with a failure. */
     fail: (failure: GatewayFailure, kind?: GatewayOperation['kind']) =>
@@ -156,13 +172,22 @@ function fakeProvider() {
     failureFor: (error) => (error instanceof Refused ? error.failure : null),
     read: async (_owner, operation: GatewayOperation) => {
       const id = 'id' in operation ? operation.id : '';
-      reads.push(`${operation.kind} ${id}`);
+      if (operation.kind === 'activities') lists.push(`page ${operation.page}`);
+      else reads.push(`${operation.kind} ${id}`);
       const answer = () => {
         const index = failures.findIndex(
           (entry) => !entry.kind || entry.kind === operation.kind,
         );
         if (index >= 0)
           throw new Refused(failures.splice(index, 1)[0]!.failure);
+        if (operation.kind === 'activities') {
+          if (hidden) return [];
+          const before = (operation.before ?? Infinity) * 1000;
+          const start = (operation.page - 1) * operation.perPage;
+          return [...activities.values()]
+            .filter((entry) => Date.parse(entry.start_date) < before)
+            .slice(start, start + operation.perPage);
+        }
         const activity = activities.get(id);
         if (!activity) throw new Refused({ kind: 'not_found' });
         switch (operation.kind) {
@@ -198,11 +223,15 @@ function fakeProvider() {
 }
 
 beforeEach(() => {
+  mock.timers.enable({ apis: ['setTimeout', 'Date'], now: startedAt });
   process.env.ACTIVITYMAP_APP_ORIGIN = 'https://app.test';
   process.env.ACTIVITYMAP_PROVIDER_GATEWAY_KEY_ID = 'k1';
   process.env.ACTIVITYMAP_PROVIDER_GATEWAY_SECRET = secret;
 });
-afterEach(() => mock.restoreAll());
+afterEach(() => {
+  mock.restoreAll();
+  mock.timers.reset();
+});
 
 type Convex = ReturnType<typeof convexTest<typeof schema>>;
 
@@ -260,6 +289,7 @@ function event(
 
 const state = (convex: Convex) =>
   convex.run(async (ctx) => {
+    const sweep = await ctx.db.query('ingestionSweeps').first();
     const [activities, photos, recordings, changes, jobs] = await Promise.all([
       ctx.db.query('activities').collect(),
       ctx.db.query('photos').collect(),
@@ -267,7 +297,7 @@ const state = (convex: Convex) =>
       ctx.db.query('changes').collect(),
       ctx.db.query('ingestionJobs').collect(),
     ]);
-    return { activities, photos, recordings, changes, jobs };
+    return { activities, photos, recordings, changes, jobs, sweep };
   });
 
 void test('an event brings in the activity, its photos and its recording', async () => {
@@ -698,5 +728,210 @@ void test('nothing is read or written without gateway settings', async () => {
   assert.deepEqual(
     [jobs[0]!.status, jobs[0]!.attempt, jobs[0]!.error],
     ['queued', 1, 'The provider gateway is not configured'],
+  );
+});
+
+const manual = (id: number, name: string) => detail(id, name, { manual: true });
+
+void test('a sweep finds an activity, a change and a deletion that no event reported', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  // The first sweep ran when Convex became the writer, on an empty list.
+  assert.deepEqual(provider.lists, ['page 1']);
+  for (const activity of [
+    manual(1, 'Unchanged'),
+    manual(3, 'Old name'),
+    manual(4, 'Goes away'),
+  ]) {
+    provider.set(activity);
+    await event(convex, String(activity.id));
+  }
+  await settle(convex);
+  assert.equal(provider.reads.length, 3);
+
+  provider.set(manual(2, 'Missed'));
+  provider.set(manual(3, 'New name'));
+  provider.remove('4');
+  await advance(convex, SWEEP_INTERVAL_MS);
+
+  let { activities, sweep } = await state(convex);
+  assert.deepEqual(provider.lists.slice(1), ['page 1', 'page 2']);
+  // The unchanged activity is not read again.
+  assert.deepEqual(provider.reads.slice(3).sort(), [
+    'activity 2',
+    'activity 3',
+    'activity 4',
+  ]);
+  assert.deepEqual(
+    activities
+      .map(
+        (row) =>
+          `${Number(row.key)} ${row.deleted ? 'deleted' : row.dto?.name}`,
+      )
+      .sort(),
+    ['1 Unchanged', '2 Missed', '3 New name', '4 deleted'],
+  );
+  assert.deepEqual(
+    [sweep!.phase, sweep!.number, sweep!.lease, sweep!.dueAt - Date.now()],
+    ['idle', 2, undefined, SWEEP_INTERVAL_MS],
+  );
+
+  // Nothing changed: the next sweep reads the list and nothing else.
+  await advance(convex, SWEEP_INTERVAL_MS);
+  assert.equal(provider.reads.length, 6);
+  assert.equal(provider.lists.length, 5);
+
+  // A later change is found by its fingerprint.
+  provider.set(manual(1, 'Renamed'));
+  await advance(convex, SWEEP_INTERVAL_MS);
+  assert.deepEqual(provider.reads.slice(6), ['activity 1']);
+  ({ activities, sweep } = await state(convex));
+  assert.equal(
+    activities.find((row) => Number(row.key) === 1)!.dto?.name,
+    'Renamed',
+  );
+  assert.equal(sweep!.number, 4);
+});
+
+void test('activities missing from the list are confirmed a bounded number at a time', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  const count = CONFIRM_LIMIT + 5;
+  for (let id = 1; id <= count; id++) {
+    provider.set(manual(id, `Ride ${id}`));
+    await event(convex, String(id));
+  }
+  await settle(convex);
+  assert.equal(provider.reads.length, count);
+
+  // The list comes back empty, although only some activities are gone.
+  const gone = new Set([3, 22]);
+  const hidden = provider.hide();
+  for (const id of gone) provider.remove(String(id));
+  await advance(convex, SWEEP_INTERVAL_MS);
+  assert.equal(provider.reads.length, count + CONFIRM_LIMIT);
+  assert.equal((await state(convex)).sweep!.phase, 'confirming');
+
+  await advance(convex, CONFIRM_INTERVAL_MS - 1000);
+  assert.equal(provider.reads.length, count + CONFIRM_LIMIT);
+  await advance(convex, 1000);
+  assert.equal(provider.reads.length, 2 * count);
+
+  const { activities, sweep } = await state(convex);
+  assert.equal(sweep!.phase, 'idle');
+  // Only what the provider confirmed as gone is deleted.
+  assert.deepEqual(
+    activities.filter((row) => row.deleted).map((row) => Number(row.key)),
+    [...gone],
+  );
+  hidden.restore();
+});
+
+void test('a sweep waits out a rate limit and never trusts a list of another athlete', async () => {
+  const provider = fakeProvider();
+  provider.fail({ kind: 'rate_limited', retryAfterSeconds: 300 }, 'activities');
+  const convex = await owner();
+  let { sweep } = await state(convex);
+  assert.deepEqual(
+    [sweep!.phase, sweep!.error, sweep!.attempt, sweep!.dueAt - Date.now()],
+    ['scanning', 'rate_limited', 0, 300_000],
+  );
+  await advance(convex, 300_000);
+  ({ sweep } = await state(convex));
+  assert.deepEqual([sweep!.phase, sweep!.error], ['idle', undefined]);
+
+  provider.set(detail(7, 'Not mine', { athlete: { id: 43 }, manual: true }));
+  await advance(convex, SWEEP_INTERVAL_MS);
+  const after = await state(convex);
+  assert.deepEqual(provider.reads, []);
+  assert.equal(after.jobs.length, 0);
+  assert.deepEqual(
+    [after.sweep!.phase, after.sweep!.error, after.sweep!.attempt],
+    ['scanning', 'foreign_activity', 1],
+  );
+});
+
+void test('a sweep stops with its writer and goes on when Convex writes again', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  provider.set(manual(7, 'Missed'));
+  provider.during = () =>
+    convex.mutation(internal.owners.setWriter, {
+      ...actor,
+      writer: 'handoff',
+      expectedEpoch: 1,
+    });
+
+  await advance(convex, SWEEP_INTERVAL_MS);
+  let { jobs, sweep } = await state(convex);
+  // The page was read, but nothing was recorded from it.
+  assert.deepEqual(provider.lists, ['page 1', 'page 1']);
+  assert.equal(jobs.length, 0);
+  assert.deepEqual(
+    [sweep!.phase, sweep!.error, sweep!.lease, sweep!.page],
+    ['scanning', 'fenced', undefined, 1],
+  );
+  await advance(convex, SWEEP_INTERVAL_MS);
+  assert.equal(provider.lists.length, 2);
+
+  await convex.mutation(internal.owners.setWriter, {
+    ...actor,
+    writer: 'convex',
+    expectedEpoch: 2,
+  });
+  await settle(convex);
+  ({ jobs, sweep } = await state(convex));
+  assert.deepEqual(provider.reads, ['activity 7']);
+  assert.equal(sweep!.phase, 'idle');
+  assert.equal(jobs[0]!.status, 'idle');
+});
+
+void test('a lost sweep run is retried and its late page is ignored', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  provider.set(manual(7, 'Missed'));
+  const ownerId = (await state(convex)).sweep!.owner;
+  mock.timers.tick(SWEEP_INTERVAL_MS);
+  const lost = await convex.mutation(internal.ingestionSweep.claim, {
+    owner: ownerId,
+  });
+  assert.equal(lost?.phase, 'scanning');
+  await settle(convex);
+  assert.equal(provider.lists.length, 1);
+
+  await advance(convex, LEASE_MS);
+  assert.equal((await state(convex)).sweep!.error, 'lease_expired');
+  await advance(convex, 60_000);
+  assert.equal((await state(convex)).sweep!.phase, 'idle');
+  assert.deepEqual(provider.reads, ['activity 7']);
+
+  const late = await convex.mutation(internal.ingestionSweep.applyPage, {
+    owner: ownerId,
+    claim: lost!.claim,
+    page: 1,
+    items: [],
+  });
+  assert.equal(late, null);
+  assert.equal((await state(convex)).sweep!.phase, 'idle');
+});
+
+void test('old event receipts are removed', async () => {
+  fakeProvider();
+  const convex = await owner();
+  await event(convex, '7');
+  await advance(convex, 29 * 86_400_000);
+  await event(convex, '8');
+  await advance(convex, 2 * 86_400_000);
+
+  assert.equal(
+    await convex.mutation(internal.maintenance.expireProviderEvents, {}),
+    1,
+  );
+  const left = await convex.run((ctx) =>
+    ctx.db.query('providerEvents').collect(),
+  );
+  assert.deepEqual(
+    left.map((row) => Number(row.activity)),
+    [8],
   );
 });

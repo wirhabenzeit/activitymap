@@ -424,14 +424,48 @@ and the owner must be in `ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS`.
 `convex run ingestion:status '{"userId":"<userId>"}'` lists an owner's jobs
 that are waiting, blocked or failed.
 
-Not built yet, and needed before an owner is handed to Convex:
+### Reconciliation
 
-- **Reconciliation.** Nothing lists the owner's activities to find a missed
-  event, so an event that never arrives is not noticed.
+Events can be missed, so each owner Convex writes for also has a sweep
+(`convex/ingestionSweep.ts`). It is due when Convex becomes the owner's
+writer and then six days after the last one finished. A sweep writes no
+activity itself; it asks the activity's job, which reads the activity in
+full.
+
+- **Scanning.** The worker reads the provider's list of the owner's
+  activities, 100 a page, and records a fingerprint of each summary on the
+  activity's job. An activity is asked for when it is unknown here, when its
+  fingerprint differs from the one the previous sweep recorded, or when its
+  job is blocked or failed. The first time a known activity is seen, the
+  summary is compared with the stored activity instead. An unchanged library
+  costs only the list reads. An empty page ends the scan.
+- **Confirming.** An activity that the list did not contain is not treated
+  as deleted. The sweep asks for each such activity, and the job's detail
+  read decides. At most 20 are asked for per hour, so a wrong list cannot
+  spend the request budget on the whole library at once. Activities that
+  started after the sweep began are left alone.
+
+A list entry of another athlete stops the page before anything is recorded.
+A rate limit waits for the gateway's time, rejected credentials are tried
+again a day later, and any other failure is retried with the same delays as
+a job, without giving up. The sweep stops with its writer like a job does,
+and `convex run ingestionSweep:status '{"userId":"<userId>"}'` shows it.
+
+### Retention
+
+A daily job removes `providerEvents` receipts after 30 days. Jobs are kept:
+there is one per activity, and it holds the fingerprint the next sweep
+compares with.
+
+### Not built yet
+
+Needed before an owner is handed to Convex:
+
 - **Place matching.** A recording published here has no match until the
   matcher that runs in shadow ([Shadow matching](#shadow-matching)) is made
   part of the job.
-- **Retention.** `providerEvents` rows and finished jobs are kept forever.
+- **A live run.** Nothing here has run against a deployed backend and the
+  real gateway.
 
 ## Shadow writes
 

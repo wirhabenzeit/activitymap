@@ -201,11 +201,16 @@ export const setWriter = internalMutation({
         catalogue: owner.catalogue,
         writer,
       });
-    // Jobs that were refused while another store wrote start again.
-    if (writer === 'convex')
+    // Jobs that were refused while another store wrote start again, and so
+    // does reconciliation.
+    if (writer === 'convex') {
       await ctx.scheduler.runAfter(0, internal.ingestion.resume, {
         owner: owner._id,
       });
+      await ctx.scheduler.runAfter(0, internal.ingestionSweep.start, {
+        owner: owner._id,
+      });
+    }
     return writerEpoch;
   },
 });
