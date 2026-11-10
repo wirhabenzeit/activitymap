@@ -3,7 +3,7 @@ import 'server-only';
 import { and, eq, isNotNull, notExists, sql } from 'drizzle-orm';
 
 import { db as defaultDb } from '~/server/db';
-import { accounts, users, type User } from '~/server/db/schema';
+import { type User, accounts, users } from '~/server/db/schema';
 
 type DrizzleDb = typeof defaultDb;
 
@@ -39,6 +39,8 @@ export function createLegacyActivitySyncRepository(
         .where(
           and(
             isNotNull(users.athlete_id),
+            // Only owners Postgres ingests for (writer-fence.ts).
+            eq(users.writer, 'postgres'),
             notExists(
               database
                 .select({ one: sql`1` })

@@ -18,6 +18,8 @@ import {
 
 import { db as defaultDb } from '~/server/db';
 import {
+  type Activity,
+  type StravaSummaryReconciliation,
   accounts,
   activities,
   activityDeletions,
@@ -25,8 +27,6 @@ import {
   photos,
   stravaSummaryReconciliations,
   users,
-  type Activity,
-  type StravaSummaryReconciliation,
 } from '~/server/db/schema';
 import { createChangesRepository } from '~/server/repositories/changes';
 import { transformStravaActivity } from '~/server/strava/transforms';
@@ -348,6 +348,8 @@ export function createSummaryReconciliationRepository(
         .where(
           and(
             isNotNull(users.athlete_id),
+            // Only owners Postgres ingests for (writer-fence.ts).
+            eq(users.writer, 'postgres'),
             isNull(accounts.revokedAt),
             or(
               isNotNull(accounts.accessToken),
@@ -398,6 +400,8 @@ export function createSummaryReconciliationRepository(
           and(
             // Same eligibility as listDue.
             isNotNull(users.athlete_id),
+            // Only owners Postgres ingests for (writer-fence.ts).
+            eq(users.writer, 'postgres'),
             isNull(accounts.revokedAt),
             or(
               isNotNull(accounts.accessToken),

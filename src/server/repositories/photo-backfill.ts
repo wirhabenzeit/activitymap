@@ -1,30 +1,34 @@
 import 'server-only';
+
 import { createHash, randomUUID } from 'node:crypto';
+
 import { and, asc, eq, sql } from 'drizzle-orm';
+
 import { db } from '~/server/db';
 import {
-  accounts,
-  activities,
-  users,
-  photos,
-  photoDeletions,
-  photoFetchAttempts as attempts,
-  photoBackfillRuns as runs,
-  photoBackfillAccounts as blocks,
-  type Account,
-  type Photo,
-} from '~/server/db/schema';
-import {
-  resolveAccountTokens,
   buildAccountTokenColumnUpdate,
+  resolveAccountTokens,
 } from '~/server/db/account-token-normalization';
 import {
-  createChangesRepository,
-  type Transaction,
-  type NewSyncChange,
-} from './changes';
-import { detailRetryAt } from '~/server/strava/ingestion-policy';
+  type Account,
+  type Photo,
+  accounts,
+  activities,
+  photoFetchAttempts as attempts,
+  photoBackfillAccounts as blocks,
+  photoDeletions,
+  photos,
+  photoBackfillRuns as runs,
+  users,
+} from '~/server/db/schema';
 import type { StravaTokens } from '~/server/strava/client';
+import { detailRetryAt } from '~/server/strava/ingestion-policy';
+
+import {
+  type NewSyncChange,
+  type Transaction,
+  createChangesRepository,
+} from './changes';
 
 export const PHOTO_ACTIVITY_LIMIT = 20;
 export const PHOTO_REQUEST_LIMIT = 48; // Two sizes per activity, plus OAuth headroom.
@@ -66,13 +70,15 @@ export const photoRefreshPending = sql`${activities.photosState} is distinct fro
   or exists (select 1 from ${photos} where ${photos.activity_id}=${activities.id} and ${photos.athlete_id}=${activities.athlete})
   or ${activities.photosState} = 'refresh_required'
 )`;
+// Connected, and Postgres ingests for the owner (src/server/db/writer-fence.ts).
 const connected = sql`${accounts.id} = (
   select a.id from account a where a."userId" = ${users.id}
     and a."providerId" = 'strava' and a."accountId" = ${activities.athlete}::text
   order by a.id limit 1
 )
   and ${accounts.revokedAt} is null and ${accounts.scheduledErasureAt} is null
-  and (coalesce(${accounts.accessToken},${accounts.access_token},'') <> '' or coalesce(${accounts.refreshToken},${accounts.refresh_token},'') <> '')`;
+  and (coalesce(${accounts.accessToken},${accounts.access_token},'') <> '' or coalesce(${accounts.refreshToken},${accounts.refresh_token},'') <> '')
+  and ${users.writer} = 'postgres'`;
 
 export function createPhotoBackfillRepository(
   database: typeof db = db,

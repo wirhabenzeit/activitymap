@@ -3,16 +3,32 @@ import 'server-only';
 import { and, asc, eq, inArray, lt, lte, min, sql } from 'drizzle-orm';
 
 import { db as defaultDb } from '~/server/db';
-import { stravaWebhookEvents, type StravaWebhookEventRow } from '~/server/db/schema';
 import {
+  type StravaWebhookEventRow,
+  stravaWebhookEvents,
+} from '~/server/db/schema';
+import {
+  type BackoffDecision,
   classifyWebhookError,
   computeRetryDecision,
-  type BackoffDecision,
 } from '~/server/strava/webhook-retry';
 
 type DrizzleDb = typeof defaultDb;
 
 const ACTIVE_STATUSES = ['pending', 'failed'] as const;
+
+/**
+ * Activity events of an owner Postgres does not ingest for stay recorded and
+ * unprocessed (docs/convex-writer-cutover.md, handoff): in `handoff` until
+ * the owner has a writer again, under `convex` for that store to take.
+ * Athlete events (deauthorization) are always processed here, because
+ * accounts and tokens stay in Postgres. An event for an athlete without a
+ * user is processed as before.
+ */
+const processedHere = sql`(${stravaWebhookEvents.objectType} <> 'activity' OR NOT EXISTS (
+  SELECT 1 FROM "user" u WHERE u.athlete_id = ${stravaWebhookEvents.ownerId}
+    AND u.writer <> 'postgres'
+))`;
 
 export type DrainCandidate = Pick<
   StravaWebhookEventRow,
@@ -134,29 +150,32 @@ export function createWebhookEventsRepository(
 
   return {
     async selectDrainCandidates(limit, now) {
-      return database
-        .select({
-          id: stravaWebhookEvents.id,
-          objectType: stravaWebhookEvents.objectType,
-          aspectType: stravaWebhookEvents.aspectType,
-          nextAttemptAt: stravaWebhookEvents.nextAttemptAt,
-        })
-        .from(stravaWebhookEvents)
-        .where(
-          and(
-            inArray(stravaWebhookEvents.status, ACTIVE_STATUSES),
-            lte(stravaWebhookEvents.nextAttemptAt, now),
-          ),
-        )
-        // Deletion/deauthorization events rank ahead of routine
-        // create/update events (see `webhookDrainPriorityRank`'s doc
-        // comment, kept in sync with this CASE expression), then oldest
-        // `nextAttemptAt` first within the same rank.
-        .orderBy(
-          sql`CASE WHEN ${stravaWebhookEvents.aspectType} = 'delete' OR ${stravaWebhookEvents.objectType} = 'athlete' THEN 0 ELSE 1 END`,
-          asc(stravaWebhookEvents.nextAttemptAt),
-        )
-        .limit(limit);
+      return (
+        database
+          .select({
+            id: stravaWebhookEvents.id,
+            objectType: stravaWebhookEvents.objectType,
+            aspectType: stravaWebhookEvents.aspectType,
+            nextAttemptAt: stravaWebhookEvents.nextAttemptAt,
+          })
+          .from(stravaWebhookEvents)
+          .where(
+            and(
+              inArray(stravaWebhookEvents.status, ACTIVE_STATUSES),
+              lte(stravaWebhookEvents.nextAttemptAt, now),
+              processedHere,
+            ),
+          )
+          // Deletion/deauthorization events rank ahead of routine
+          // create/update events (see `webhookDrainPriorityRank`'s doc
+          // comment, kept in sync with this CASE expression), then oldest
+          // `nextAttemptAt` first within the same rank.
+          .orderBy(
+            sql`CASE WHEN ${stravaWebhookEvents.aspectType} = 'delete' OR ${stravaWebhookEvents.objectType} = 'athlete' THEN 0 ELSE 1 END`,
+            asc(stravaWebhookEvents.nextAttemptAt),
+          )
+          .limit(limit)
+      );
     },
 
     async claim(id, now) {
@@ -168,6 +187,7 @@ export function createWebhookEventsRepository(
             eq(stravaWebhookEvents.id, id),
             inArray(stravaWebhookEvents.status, ACTIVE_STATUSES),
             lte(stravaWebhookEvents.nextAttemptAt, now),
+            processedHere,
           ),
         )
         .returning();
@@ -243,7 +263,9 @@ export function createWebhookEventsRepository(
         .from(stravaWebhookEvents)
         .groupBy(stravaWebhookEvents.status);
 
-      const countsByStatus = Object.fromEntries(rows.map((r) => [r.status, r.count]));
+      const countsByStatus = Object.fromEntries(
+        rows.map((r) => [r.status, r.count]),
+      );
 
       const [oldestPending] = await database
         .select({ oldest: min(stravaWebhookEvents.eventTime) })

@@ -145,6 +145,21 @@ const run = (limit = 500) =>
   });
 async function evaluation() {
   const catalogue = await repository.catalogue();
+  // The matcher takes no work for an owner Postgres does not ingest for.
+  await database
+    .update(schema.users)
+    .set({ writer: 'handoff' })
+    .where(eq(schema.users.id, actor.userId));
+  assert.equal(
+    (await repository.candidates(catalogue, 500)).filter(
+      (item) => item.userId === actor.userId,
+    ).length,
+    0,
+  );
+  await database
+    .update(schema.users)
+    .set({ writer: 'postgres' })
+    .where(eq(schema.users.id, actor.userId));
   const candidate = (await repository.candidates(catalogue, 1))[0];
   assert(candidate);
   const input = await repository.readInput(candidate);

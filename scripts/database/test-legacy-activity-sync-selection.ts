@@ -92,6 +92,26 @@ async function run(): Promise<void> {
   await cleanup();
   await seed();
 
+  // Owners Postgres does not ingest for are left out, whichever store has
+  // them (src/server/db/writer-fence.ts).
+  for (const writer of ['handoff', 'convex'] as const) {
+    await testDb
+      .update(users)
+      .set({ writer })
+      .where(inArray(users.id, USER_IDS));
+    assert.deepEqual(
+      (await repository.listEligibleUsers()).filter((candidate) =>
+        USER_IDS.includes(candidate.id),
+      ),
+      [],
+      `no fixture user is eligible under ${writer}`,
+    );
+  }
+  await testDb
+    .update(users)
+    .set({ writer: 'postgres' })
+    .where(inArray(users.id, USER_IDS));
+
   const candidates = await repository.listEligibleUsers();
   const fixtureCandidateIds = candidates
     .map((candidate) => candidate.id)

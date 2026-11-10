@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
-import { mock } from 'node:test';
+
 import { eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
+import { mock } from 'node:test';
 import postgres from 'postgres';
+
+import { backfillActivityStreams } from '../../src/server/application/stream-backfill';
 import {
   resolveMigrationTarget,
   verifyConnectedTarget,
@@ -11,22 +14,21 @@ import {
   accounts,
   activities,
   activityStreams,
-  users,
   stravaRequestBudgets,
-  streamBackfillRuns,
   streamBackfillAccounts,
   streamBackfillAttempts,
+  streamBackfillRuns,
+  users,
 } from '../../src/server/db/schema';
 import { createActivityStreamsRepository } from '../../src/server/repositories/activity-streams';
-import { createStreamBackfillRepository } from '../../src/server/repositories/stream-backfill';
 import { createStravaRequestBudget } from '../../src/server/repositories/strava-budget';
-import { backfillActivityStreams } from '../../src/server/application/stream-backfill';
-import { RAW_STREAMS_FIXTURE } from '../../src/server/strava/streams.fixture';
+import { createStreamBackfillRepository } from '../../src/server/repositories/stream-backfill';
+import { StravaBudgetExceededError } from '../../src/server/strava/request-budget';
 import {
   STREAM_BACKFILL_HOUR_MS as HOUR,
   StreamBackfillStopped,
 } from '../../src/server/strava/stream-backfill-policy';
-import { StravaBudgetExceededError } from '../../src/server/strava/request-budget';
+import { RAW_STREAMS_FIXTURE } from '../../src/server/strava/streams.fixture';
 
 const target = resolveMigrationTarget(process.env);
 if (
@@ -314,6 +316,16 @@ async function runProof() {
   await seed(1, 1);
   nextHour();
   const abandoned = await beginRun();
+  // Nothing is claimed for owners Postgres does not ingest for.
+  await testDb
+    .update(users)
+    .set({ writer: 'handoff' })
+    .where(inArray(users.id, userIds));
+  assert.equal(await repository.claimNext(abandoned), null);
+  await testDb
+    .update(users)
+    .set({ writer: 'postgres' })
+    .where(inArray(users.id, userIds));
   const candidate = await repository.claimNext(abandoned);
   assert.ok(candidate);
   const pending = await streams.begin(
