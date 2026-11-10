@@ -1,6 +1,7 @@
 import { v } from 'convex/values';
 
 import { internalMutation } from './_generated/server';
+import { requestIngestion } from './ingestion';
 import { scopeFields } from './ownerScope';
 import { idKey, requireWritableOwner } from './owners';
 
@@ -13,8 +14,10 @@ const BATCH_LIMIT = 64;
  * held durably by one store or the other. Refused unless Convex is the
  * owner's writer, which leaves the event with the app to send again.
  *
- * Nothing consumes these rows yet: Convex ingestion (step 5 of
- * docs/convex-writer-cutover.md) works from them.
+ * Each new event asks Convex ingestion (convex/ingestion.ts) to bring its
+ * activity up to date, in the same transaction as the receipt. The aspect is
+ * kept for the record only: the provider is asked what the activity is now,
+ * whatever the event said.
  */
 export const record = internalMutation({
   args: {
@@ -61,6 +64,7 @@ export const record = internalMutation({
         eventTime,
         receivedAt: Date.now(),
       });
+      await requestIngestion(ctx, owner._id, activity);
       recorded++;
     }
     return recorded;
