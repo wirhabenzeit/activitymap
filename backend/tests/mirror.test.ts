@@ -545,6 +545,14 @@ void test('photos follow their activities, their own changes and deletions', asy
     }),
     [(await stored())[1]],
   );
+  // Whole photo sets by activity, as the parity check reads them.
+  assert.deepEqual(
+    await convex.query(internal.sync.read, {
+      ...scope,
+      operation: { kind: 'activityPhotos', ids: ['102', '101', '999'] },
+    }),
+    (await stored()).reverse(),
+  );
   // The checkpoint passed the photo changes, so the next run has nothing.
   clock += 16 * 60_000;
   mock.timers.tick(16 * 60_000);

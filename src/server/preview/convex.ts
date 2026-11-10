@@ -205,6 +205,7 @@ export function appOperation(operation: Operation): Operation {
         after: id(operation.after as string | number | null),
       };
     case 'activityIds':
+    case 'activityPhotos':
     case 'photoIds':
     case 'summaries':
       return {
@@ -253,11 +254,28 @@ export function convexPreviewFor(
 ) {
   const config = previewSelection(actor);
   if (!actor || !config) return null;
-  const { userId, athleteId } = actor;
-  const { cursorBackend, send, pageSize, summaryBatch } =
+  return convexAdapter(
+    actor,
     'key' in config
       ? labTransport(actor, config, fetcher)
-      : appTransport(actor, config.epoch, fetcher);
+      : appTransport(actor, config.epoch, fetcher),
+  );
+}
+
+/** The adapter over `backend/` for an owner's current Convex epoch, outside
+ * preview selection. For server jobs such as the shadow parity check; the
+ * v1 routes select their backend through `convexPreviewFor`. */
+export function convexAppAdapter(
+  actor: Actor,
+  epoch: string,
+  fetcher: typeof fetch = fetch,
+) {
+  return convexAdapter(actor, appTransport(actor, epoch, fetcher));
+}
+
+function convexAdapter(actor: Actor, transport: Transport) {
+  const { userId, athleteId } = actor;
+  const { cursorBackend, send, pageSize, summaryBatch } = transport;
   const query = async <T>(
     operation: { kind: string; [field: string]: unknown },
     schema: z.ZodType<T>,
@@ -395,6 +413,33 @@ export function convexPreviewFor(
               }
             : { resource: 'photos', items: result.items },
       };
+    },
+    /** Activities among `ids` as bootstrap serves them, place matches
+     * included. Missing and deleted activities are absent. */
+    async activitiesByIds(ids: string[]): Promise<ActivityDTO[]> {
+      const rows = await loadActivityIds(
+        ids.map(Number).filter(Number.isSafeInteger),
+      );
+      captureActivities(rows);
+      const version = await getVersion();
+      return rows.map((row) => ({
+        ...row,
+        placeMatches: matchFor(row, version),
+      }));
+    },
+    /** The photos of the activities among `ids` (application backend only). */
+    async photosByActivities(ids: string[]): Promise<PhotoDTO[]> {
+      const rows = await byIds(
+        ids,
+        (batch) =>
+          query(
+            { kind: 'activityPhotos', ids: batch },
+            z.array(photoDTOSchema),
+          ),
+        16,
+      );
+      capturePhotos(rows);
+      return rows;
     },
     activitiesRepo: {
       async findPageByAthlete(

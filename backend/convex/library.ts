@@ -11,6 +11,7 @@ import {
 import { activityFor } from './activityWrites';
 import { project } from './liveProjection';
 import { idKey, requireHead } from './owners';
+import { photoPage } from './photos';
 import { summariesFor } from './sync';
 import { requireViewer, viewer } from './viewer';
 
@@ -103,7 +104,8 @@ const MAX_CHANGES_PER_READ = 256;
  * activity and the IDs of deleted ones. One read covers up to 256 change
  * entries and at most 32 distinct activities, whose documents it reads.
  * `sequence` is the position to continue from; `more` means another read
- * is ready at once.
+ * is ready at once. `photos` says that photos changed in this read; the
+ * client reads the photo list again.
  *
  * `after: null`, a sequence below the retention floor or one this owner never
  * reached returns `reload` with the head sequence: the client loads the
@@ -138,8 +140,8 @@ export const changes = query({
     const touchedIds = new Set<string>();
     const rows: typeof read = [];
     for (const row of read) {
-      // Photo changes move the position only: live clients read the photo
-      // list separately (src/lib/sync/live-photos.ts).
+      // Photo changes move the position and set `photos`: live clients then
+      // read the photo list again (`library.photos`).
       if (row.entityType === 'photo') {
         rows.push(row);
         continue;
@@ -165,8 +167,26 @@ export const changes = query({
       more: rows.length < read.length || read.length === MAX_CHANGES_PER_READ,
       version,
       matchingVersion: owner.matchingVersion,
+      photos: rows.some((row) => row.entityType === 'photo'),
       upserts: current.flatMap(({ card }) => (card ? [card] : [])),
       deletes: current.flatMap(({ id, card }) => (card ? [] : [id])),
+    };
+  },
+});
+
+const PHOTOS_PER_PAGE = 500;
+
+/** The owner's photos (v1 photo DTOs) in photo-ID order, up to 500 a page.
+ * Continue with `next` as `after` until it is null. Not meant to be
+ * subscribed to: `changes` reports when the list has changed. */
+export const photos = query({
+  args: { after: v.union(v.string(), v.null()) },
+  handler: async (ctx, { after }) => {
+    const owner = await requireViewer(ctx);
+    const items = await photoPage(ctx, owner, after, PHOTOS_PER_PAGE);
+    return {
+      items,
+      next: items.length === PHOTOS_PER_PAGE ? items.at(-1)!.unique_id : null,
     };
   },
 });

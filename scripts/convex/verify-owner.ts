@@ -7,6 +7,7 @@
  *
  * Exits non-zero on any difference. Prints a per-field difference summary.
  */
+import { createComparison } from '../../src/server/convex-mirror/compare';
 import {
   convexRun,
   loadBridgeEnv,
@@ -128,59 +129,18 @@ async function library(handler: (request: Request) => Promise<Response>) {
   return { items, ms: Math.round(performance.now() - started) };
 }
 
-// Opaque per-backend tokens: Postgres uses result UUIDs, Convex the change
-// sequence. Clients only compare them within one backend, and moving an owner
-// between backends forces a new bootstrap.
-const EXPECTED = new Set(['activity.placeMatches.resultRevision']);
-const differences = new Map<string, { count: number; example: string }>();
-const expected = new Map<string, number>();
-function note(field: string, id: string, left: unknown, right: unknown) {
-  if (EXPECTED.has(field)) {
-    expected.set(field, (expected.get(field) ?? 0) + 1);
-    return;
-  }
-  const entry = differences.get(field) ?? {
-    count: 0,
-    example: `${id}: ${JSON.stringify(left)?.slice(0, 160)} != ${JSON.stringify(right)?.slice(0, 160)}`,
-  };
-  entry.count++;
-  differences.set(field, entry);
-}
-function compare(prefix: string, id: string, left: unknown, right: unknown) {
-  if (JSON.stringify(left) === JSON.stringify(right)) return;
-  if (
-    left &&
-    right &&
-    typeof left === 'object' &&
-    typeof right === 'object' &&
-    !Array.isArray(left)
-  ) {
-    const keys = new Set([...Object.keys(left), ...Object.keys(right)]);
-    for (const key of keys)
-      compare(
-        `${prefix}.${key}`,
-        id,
-        (left as Record<string, unknown>)[key],
-        (right as Record<string, unknown>)[key],
-      );
-    return;
-  }
-  note(prefix, id, left, right);
-}
+const comparison = createComparison();
 
 const [postgres, convex] = [
   await library(handlers.postgres),
   await library(handlers.convex),
 ];
-const convexById = new Map(convex.items.map((item) => [item.id, item]));
-for (const item of postgres.items) {
-  const other = convexById.get(item.id);
-  if (!other) note('<missing in convex>', item.id, item.id, null);
-  else compare('activity', item.id, item, other);
-}
-const postgresIds = new Set(postgres.items.map((item) => item.id));
-for (const id of convexById.keys())
-  if (!postgresIds.has(id)) note('<extra in convex>', id, null, id);
+comparison.compareItems(
+  'activity',
+  postgres.items,
+  convex.items,
+  (item) => item.id,
+);
 
 // Chart summaries for the first activities, through the v1 handler.
 const ids = postgres.items.slice(0, summaryLimit).map((item) => item.id);
@@ -202,13 +162,14 @@ for (const [side, repository] of [
     summaries[side].push(...data.summaries);
   }
 }
-const key = (item: Item) => String(item.activity_id);
-const convexSummaries = new Map(
-  summaries.convex.map((item) => [key(item), item]),
+comparison.compareItems(
+  'summary',
+  summaries.postgres,
+  summaries.convex,
+  (item) => String(item.activity_id),
 );
-for (const item of summaries.postgres)
-  compare('summary', key(item), item, convexSummaries.get(key(item)));
 
+const differences = comparison.differences();
 const report = {
   activities: { postgres: postgres.items.length, convex: convex.items.length },
   bootstrapMs: { postgres: postgres.ms, convex: convex.ms },
@@ -216,10 +177,8 @@ const report = {
     postgres: summaries.postgres.length,
     convex: summaries.convex.length,
   },
-  expectedDifferences: Object.fromEntries(expected),
-  differences: Object.fromEntries(
-    [...differences].sort((a, b) => b[1].count - a[1].count),
-  ),
+  expectedDifferences: comparison.expected(),
+  differences,
 };
 console.log(JSON.stringify(report, null, 2));
-process.exit(differences.size === 0 ? 0 : 1);
+process.exit(Object.keys(differences).length === 0 ? 0 : 1);

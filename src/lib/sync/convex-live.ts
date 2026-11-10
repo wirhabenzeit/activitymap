@@ -4,6 +4,7 @@ import { ConvexClient } from 'convex/browser';
 import { makeFunctionReference } from 'convex/server';
 
 import type { ActivityDTO } from '~/contracts/v1/activity';
+import type { PhotoDTO } from '~/contracts/v1/photo';
 
 /**
  * Live library reads from the Convex application backend for `live` preview
@@ -20,6 +21,11 @@ import type { ActivityDTO } from '~/contracts/v1/activity';
  * Only activities that changed in Convex are written, so a local edit that
  * has not reached Convex yet (it arrives through the shadow mirror) is not
  * reverted by unrelated changes.
+ *
+ * Photos are not part of the cards. The feed only says that photos changed
+ * (`photos`); the caller then reads the photo list (`LiveLibrary.photos`)
+ * and reconciles the store (`live-photos.ts`). A reload passes over feed
+ * entries without reading them, so it reports a photo change as well.
  */
 
 type Card = Omit<ActivityDTO, 'map_polyline'>;
@@ -35,6 +41,8 @@ export type ChangesResult =
   | (Position & {
       reload: false;
       more: boolean;
+      /** Photos changed in this read. */
+      photos?: boolean;
       upserts: Card[];
       deletes: string[];
     });
@@ -54,6 +62,11 @@ const activityQuery = makeFunctionReference<
   { id: string },
   ActivityDTO | null
 >('library:activity');
+const photosQuery = makeFunctionReference<
+  'query',
+  { after: string | null },
+  { items: PhotoDTO[]; next: string | null }
+>('library:photos');
 
 export const LIVE_PAGE_SIZE = 256;
 
@@ -82,6 +95,9 @@ export type LiveLibraryEvents = {
   onComplete?: () => void;
   /** A batch that added or changed activities was committed. */
   onChange?: () => void;
+  /** The photo list may have changed: a committed batch included photo
+   * changes, or the library was loaded again after the first catch-up. */
+  onPhotoChange?: () => void;
   /** Authentication or a query failed; the caller falls back to REST. */
   onError: (error: Error) => void;
 };
@@ -95,7 +111,11 @@ export type LiveClient = {
     onError: (error: Error) => void,
   ) => () => void;
   query: <
-    Query extends typeof listQuery | typeof changesQuery | typeof activityQuery,
+    Query extends
+      | typeof listQuery
+      | typeof changesQuery
+      | typeof activityQuery
+      | typeof photosQuery,
   >(
     query: Query,
     args: Query['_args'],
@@ -128,6 +148,19 @@ export class LiveLibrary {
   /** The full activity, including the detailed polyline. */
   async activity(id: string): Promise<ActivityDTO | null> {
     return await this.client.query(activityQuery, { id });
+  }
+
+  /** The owner's whole photo list as Convex holds it now. */
+  async photos(): Promise<PhotoDTO[]> {
+    const all: PhotoDTO[] = [];
+    let after: string | null = null;
+    do {
+      const page: { items: PhotoDTO[]; next: string | null } =
+        await this.client.query(photosQuery, { after });
+      all.push(...page.items);
+      after = page.next;
+    } while (after !== null && !this.disposed);
+    return all;
   }
 
   /** Continue from a stored position, or load the library when there is none
@@ -179,6 +212,9 @@ export class LiveLibrary {
       matchingVersion: start.matchingVersion,
     });
     this.version = start.version;
+    // A reload after the first catch-up skipped the feed entries in between,
+    // photo changes among them. (The first load reports through onComplete.)
+    if (this.completed) this.events.onPhotoChange?.();
     this.follow(start.sequence);
   }
 
@@ -229,6 +265,7 @@ export class LiveLibrary {
         matchingVersion: result.matchingVersion,
       });
       if (result.upserts.length > 0) this.events.onChange?.();
+      if (result.photos) this.events.onPhotoChange?.();
     }
     if (!result.more) this.markComplete();
     this.follow(result.sequence);

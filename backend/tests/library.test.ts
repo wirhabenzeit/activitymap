@@ -401,3 +401,161 @@ void test('changes reads large libraries in batches within transaction limits', 
   assert.equal(after, count);
   assert.equal(reads, 3, 'at most 32 activities per read');
 });
+
+void test('stored photos are counted, listed and announced in the feed', async () => {
+  const convex = await setup(4);
+  const viewer = convex.withIdentity(identity);
+  const photo = (id: string, activityId: string) => ({
+    unique_id: id,
+    activity_id: activityId,
+    athlete_id: scope.athleteId,
+    activity_name: null,
+    caption: null,
+    type: 1,
+    source: 1,
+    urls: { '600': `https://photos.invalid/${id}` },
+    sizes: { '600': [600, 400] as [number, number] },
+    default_photo: false,
+    location: null,
+    uploaded_at: null,
+    created_at: null,
+    post_id: null,
+    status: null,
+    resource_state: 2,
+  });
+  const apply = (id: string, index: number, extra: object, revision: number) =>
+    convex.mutation(internal.activityWrites.applySource, {
+      scope,
+      id,
+      generation,
+      sourceRevision: revision,
+      dto: activity(id, index, extra),
+    });
+  const sets = (
+    revision: number,
+    items: { activityId: string; photos: ReturnType<typeof photo>[] }[],
+  ) =>
+    convex.mutation(internal.importer.applyPhotoSets, {
+      scope,
+      generation,
+      sourceRevision: revision,
+      items,
+    });
+  const counts = async () => {
+    const status = await viewer.query(api.library.status, {});
+    assert(status.ready, 'counts are available');
+    const { photoCount, activitiesWithPhotos, activitiesWithStoredPhotos } =
+      status.counts;
+    return { photoCount, activitiesWithPhotos, activitiesWithStoredPhotos };
+  };
+  const paged = async () => {
+    const page = (await convex.query(internal.sync.read, {
+      ...scope,
+      operation: { kind: 'status', after: null },
+    })) as { counts: Awaited<ReturnType<typeof counts>> };
+    const { photoCount, activitiesWithPhotos, activitiesWithStoredPhotos } =
+      page.counts;
+    return { photoCount, activitiesWithPhotos, activitiesWithStoredPhotos };
+  };
+
+  // 1000 and 1001 report photos; 1002 holds one the provider does not count.
+  await apply('1000', 0, { total_photo_count: 2 }, 11);
+  await apply('1001', 1, { total_photo_count: 1 }, 11);
+  const start = (await viewer.query(api.library.changes, { after: null }))
+    .sequence;
+  await sets(20, [
+    { activityId: '1000', photos: [photo('a', '1000'), photo('b', '1000')] },
+    { activityId: '1002', photos: [photo('c', '1002')] },
+  ]);
+  const expected = {
+    photoCount: 3,
+    activitiesWithPhotos: 2,
+    activitiesWithStoredPhotos: 1,
+  };
+  assert.deepEqual(await counts(), expected);
+  assert.deepEqual(await paged(), expected);
+
+  // The feed announces the photo changes without activity cards.
+  const feed = await viewer.query(api.library.changes, { after: start });
+  assert(!feed.reload);
+  assert.equal(feed.photos, true);
+  assert.deepEqual(feed.upserts, []);
+  const quiet = await viewer.query(api.library.changes, {
+    after: feed.sequence,
+  });
+  assert(!quiet.reload);
+  assert.equal(quiet.photos, false);
+
+  const listed = await viewer.query(api.library.photos, { after: null });
+  assert.deepEqual(
+    listed.items.map((item) => item.unique_id),
+    ['a', 'b', 'c'],
+  );
+  assert.equal(listed.next, null);
+  await assert.rejects(
+    convex.query(api.library.photos, { after: null }),
+    /./,
+    'the photo list needs a signed-in owner',
+  );
+  assert.deepEqual(
+    (
+      (await convex.query(internal.sync.read, {
+        ...scope,
+        operation: { kind: 'activityPhotos', ids: ['1002', '1000', '1003'] },
+      })) as { unique_id: string }[]
+    ).map((item) => item.unique_id),
+    ['c', 'a', 'b'],
+  );
+
+  // A photo moves to another activity, one is removed, one activity with
+  // photos is deleted and another starts reporting its photo.
+  await sets(21, [
+    { activityId: '1001', photos: [photo('b', '1001')] },
+    { activityId: '1000', photos: [] },
+  ]);
+  assert.deepEqual(await counts(), {
+    photoCount: 2,
+    activitiesWithPhotos: 2,
+    activitiesWithStoredPhotos: 1,
+  });
+  await convex.mutation(internal.importer.deletePhotos, {
+    scope,
+    generation,
+    sourceRevision: 22,
+    ids: ['b'],
+  });
+  await apply('1002', 2, { total_photo_count: 1 }, 22);
+  assert.deepEqual(await counts(), {
+    photoCount: 1,
+    activitiesWithPhotos: 3,
+    activitiesWithStoredPhotos: 1,
+  });
+  await convex.mutation(internal.importer.deleteSources, {
+    scope,
+    generation,
+    sourceRevision: 23,
+    ids: ['1002'],
+  });
+  const kept = {
+    photoCount: 0,
+    activitiesWithPhotos: 2,
+    activitiesWithStoredPhotos: 0,
+  };
+  assert.deepEqual(await counts(), kept);
+
+  // A recount agrees with the counts kept through the writes.
+  await sets(24, [{ activityId: '1001', photos: [photo('d', '1001')] }]);
+  const before = await counts();
+  assert.deepEqual(before, {
+    ...kept,
+    photoCount: 1,
+    activitiesWithStoredPhotos: 1,
+  });
+  await convex.mutation(internal.stats.rebuild, { userId: scope.userId });
+  const owner = await convex.run(
+    async (ctx) => (await ctx.db.query('owners').first())!._id,
+  );
+  await convex.mutation(internal.stats.rebuildStep, { owner });
+  assert.deepEqual(await counts(), before);
+  assert.deepEqual(await paged(), before);
+});

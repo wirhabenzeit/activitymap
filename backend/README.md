@@ -156,7 +156,10 @@ and recording publication update in the same transaction (skipping writes
 that change no count), plus the oldest and newest activity from the
 `by_owner_live_start` index. New owners start with zero counts. For owners that
 existed before `ownerStats`, run a recount once; writes keep counts consistent
-while it runs, and `status` reports `ready: false` until it finishes:
+while it runs, and `status` reports `ready: false` until it finishes. The
+photo counts (`photoCount`, `activitiesWithStoredPhotos`) are kept by the
+photo writes in the same way; an owner whose photos were stored before these
+counts existed needs one recount too:
 
 ```sh
 pnpm exec convex run stats:rebuild '{"userId":"<userId>"}'
@@ -174,9 +177,11 @@ ACTIVITYMAP_CONVEX_LIVE_OWNERS='["<userId>"]'
 ```
 
 Only the library download changes for such an account
-(`src/server/convex-live-owners.ts`): edits, charts, status and photos keep
-their Postgres routes, and the client reads the photo list from the REST
-bootstrap because photos are not stored here. The account must also be a
+(`src/server/convex-live-owners.ts`): edits, charts and status keep their
+Postgres routes. Photos come from here as well: `library.changes` sets
+`photos` when a read passed photo changes, and the client then reads the
+whole list through `library.photos` (500 a page) and reconciles its store
+(`src/lib/sync/live-photos.ts`). The account must also be a
 shadow owner, so the mirror keeps this deployment current, and its counts need
 one `stats:rebuild`. Library changes reach the browser after the next mirror
 run. Remove the account from the list to return it to the REST sync.
@@ -215,14 +220,15 @@ their own position in the checkpoint (`mirror.photoSequence`), separate from
 the activity position. A library copied
 before photos were mirrored is caught up by a resumable pass over all
 activities, tracked in the checkpoint (`mirror.photos`, `null` when done).
-Deploy this package before the app version that mirrors photos: an older
-deployment rejects the new write operations.
+Deploy this package before the app version that mirrors photos or reads them
+live: an older deployment rejects the new write operations and has no
+`library.photos`.
 
 `POST /api/cron/mirror-convex-shadow` runs the mirror for the users listed in
 `ACTIVITYMAP_CONVEX_SHADOW_OWNERS` (a JSON array of application user IDs). It is
 off unless that list is set and `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`, and it
 requires `CRON_SECRET` plus the writer settings above in the app's
-environment. The scheduler in `cloudflare/cron` calls it every ten minutes.
+environment. The Cloudflare cron worker calls it every ten minutes.
 
 Shadow owners are also mirrored right after a write: once a Strava webhook
 event has been processed and once an activity edit has been answered
@@ -230,6 +236,55 @@ event has been processed and once an activity edit has been answered
 budget and can overlap the scheduled one; fenced writes make that safe, and
 the scheduled run remains the safety net for everything else (hourly
 ingestion, stream and match jobs, and any trigger that failed).
+
+### Production parity check
+
+`pnpm convex:verify-owner` compares a whole library but reads only the local
+database. In production, `POST /api/cron/convex-shadow-parity` checks the same
+shadow owners once an hour (Cloudflare cron `5 * * * *`), with the same switch
+as the shadow writes. For each owner it compares a bounded sample:
+
+- a window of the owner's activity IDs that rotates every hour, 200 at a time,
+  so a 4,600-activity library is covered in about a day, plus
+- up to 200 activities changed in the last 24 hours, including deletions.
+
+For the sample it builds what the v1 handlers serve from Postgres (bootstrap
+items with place matches, and stream summaries) and reads the same through
+the signed read bridge (`activityIds` and `summaries` in `convex/sync.ts`,
+mapped by the preview adapter). The comparison is shared with the local
+verifier (`src/server/convex-mirror/compare.ts`);
+`placeMatches.resultRevision` is an expected difference.
+
+Photos are compared as the whole photo set of each sampled activity (the
+`activityPhotos` read), so a photo Convex should have deleted is found as
+well as a missing or differing one. A set is skipped while one of its photos,
+on either side, has a `sync_change` above the mirror's photo position
+(`mirror.photoSequence`, or `mirror.sequence` before the first photo change)
+or less than 15 minutes old. During the one-time photo catch-up only
+activities up to `mirror.photos` are compared.
+
+The mirror's checkpoint (`importer:mirrorState`, the write bridge's `state`
+operation) decides what must already match. An activity is skipped as in
+flight when its latest `sync_change` is above `mirror.sequence` or less than
+15 minutes old (the mirror's replay window for late commits). The change log
+is read after both backends, so a change that reached either side is visible
+to the check. While a full copy is running (`mirror.full`), the report says
+`copy: "in-progress"`, the checkpoint is `full.through`, and only activities
+up to `full.after` are compared. Before the first copy nothing is compared.
+
+The result is logged per owner (`Convex shadow parity`, or
+`Convex shadow parity drift` at error level with counts and an example per
+differing field; route, coordinate and description values, photo captions,
+locations and image URLs are replaced by their length, also inside a parent
+object that is shown). Drift or a failed check answers 500. The response carries the
+counts and field names only.
+
+Besides the writer settings, the check needs the read bridge's
+`ACTIVITYMAP_CONVEX_KEY_ID` and `ACTIVITYMAP_CONVEX_SIGNING_KEY` in the app's
+environment and the matching key in `ACTIVITYMAP_BRIDGE_SIGNING_KEYS` on the
+Convex deployment. Postgres stream summaries are read through the same
+repository as the v1 route, which may store a summary recomputed for a newer
+summary algorithm, exactly as a client request would.
 
 Coordinated provider cutover, Convex authentication and reactive web
 subscriptions remain implementation-plan work.

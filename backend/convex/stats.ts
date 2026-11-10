@@ -10,6 +10,7 @@ import {
 import { READ_BUDGET_BYTES } from './activityProjection';
 import { currentRecording, project } from './liveProjection';
 import { ownerFor } from './owners';
+import { storedPhotoCount } from './photos';
 import { COUNT_FIELDS, type Counts, zeroCounts } from './statsShape';
 
 /**
@@ -19,7 +20,8 @@ import { COUNT_FIELDS, type Counts, zeroCounts } from './statsShape';
  */
 
 /** What one activity row adds to its owner's counts (null: not in the
- * current library). Mirrors the bridge's paged status operation. */
+ * current library), its stored photos included. Mirrors the bridge's paged
+ * status operation. */
 export async function contribution(
   ctx: QueryCtx,
   owner: Doc<'owners'>,
@@ -40,6 +42,11 @@ export async function contribution(
       counts.refreshRequiredPhotos = 1;
     else counts.unknownPhotos = 1;
   }
+  // Every stored photo counts; an activity counts as stored only while the
+  // provider reports photos for it, as the Postgres status does.
+  counts.photoCount = await storedPhotoCount(ctx, owner, row.key);
+  if (counts.activitiesWithPhotos && counts.photoCount > 0)
+    counts.activitiesWithStoredPhotos = 1;
   const recording = await currentRecording(ctx, row, item);
   if (recording) {
     if (Object.values(recording.manifest.counts).some((count) => count! > 0))

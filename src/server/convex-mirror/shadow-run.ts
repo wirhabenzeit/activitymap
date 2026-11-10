@@ -9,7 +9,11 @@ import { logger } from '~/server/logging/logger';
 import { convexWriteBridge } from '~/server/sync/convex-writer';
 
 import { mirrorOwner } from './mirror';
-import { postgresMirrorSource, uploadRecording } from './postgres-source';
+import {
+  postgresMirrorSource,
+  shadowActor,
+  uploadRecording,
+} from './postgres-source';
 import { shadowOwners } from './shadow-owners';
 import { createShadowMirrorTrigger } from './trigger';
 
@@ -23,16 +27,7 @@ export function configuredShadowOwners(): string[] | null {
 
 /** One mirror run for a shadow owner (scheduled job and write trigger). */
 export async function runShadowMirror(userId: string, deadline: number) {
-  const [user] = await db
-    .select({ athleteId: users.athlete_id })
-    .from(users)
-    .where(eq(users.id, userId));
-  if (!user?.athleteId) throw new Error('Shadow owner has no athlete');
-  const actor = {
-    userId,
-    athleteId: user.athleteId,
-    authentication: 'cookie' as const,
-  };
+  const actor = await shadowActor(userId);
   const writer = convexWriteBridge(actor);
   if (!writer) throw new Error('ACTIVITYMAP_CONVEX_SITE is not configured');
   const result = await mirrorOwner({

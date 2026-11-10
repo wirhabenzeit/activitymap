@@ -82,7 +82,7 @@ function isSensitiveKey(key: string): boolean {
   return SENSITIVE_KEYS.some((candidate) => normalized.includes(candidate));
 }
 
-function isPersonalDataKey(key: string): boolean {
+export function isPersonalDataKey(key: string): boolean {
   return PERSONAL_DATA_KEYS.has(key.toLowerCase());
 }
 
@@ -103,9 +103,15 @@ export function redactString(value: string): string {
         valueQuote: string,
       ) => `${key}${closeKeyQuote}${sep}${valueQuote}${REDACTED}${valueQuote}`,
     )
-    .replace(CONNECTION_STRING_CREDENTIAL_PATTERN, (_match, scheme: string) => `${scheme}${REDACTED}@`)
+    .replace(
+      CONNECTION_STRING_CREDENTIAL_PATTERN,
+      (_match, scheme: string) => `${scheme}${REDACTED}@`,
+    )
     .replace(BEARER_TOKEN_PATTERN, `Bearer ${REDACTED}`)
-    .replace(SHARE_LINK_PATH_PATTERN, (_match, prefix: string) => `${prefix}${REDACTED}`);
+    .replace(
+      SHARE_LINK_PATH_PATTERN,
+      (_match, prefix: string) => `${prefix}${REDACTED}`,
+    );
 }
 
 /**
@@ -142,7 +148,11 @@ export function redact(value: unknown, seen = new WeakSet<object>()): unknown {
 
   const result: Record<string, unknown> = {};
   for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
-    if (val !== null && val !== undefined && (isSensitiveKey(key) || isPersonalDataKey(key))) {
+    if (
+      val !== null &&
+      val !== undefined &&
+      (isSensitiveKey(key) || isPersonalDataKey(key))
+    ) {
       result[key] = REDACTED;
     } else {
       result[key] = redact(val, seen);
