@@ -1,5 +1,5 @@
 import {
-  configuredShadowOwners,
+  mirroredOwners,
   runCatalogueMirror,
   runShadowMirror,
 } from '~/server/convex-mirror/shadow-run';
@@ -11,7 +11,7 @@ export const maxDuration = 60;
 export const POST = createConvexShadowCronHandler({
   // Off unless owners are listed explicitly and automated external effects
   // are enabled for this deployment.
-  owners: configuredShadowOwners,
+  owners: mirroredOwners,
   secret: () => process.env.CRON_SECRET,
   run: runShadowMirror,
   onError: (error, userId) =>

@@ -399,3 +399,45 @@ void test('the handoff changes the Convex writer through the bridge, by epoch', 
   assert.equal(await set('postgres', 2), 3);
   assert.equal((await state()).writer, 'postgres');
 });
+
+void test('the bridge gives an account a library in Convex once, and never reassigns it', async (t) => {
+  const { convex } = await setup(t, 'postgres');
+  const other = { ...actor, userId: 'newcomer', athleteId: 77 };
+  const bridge = convexWriteBridge(other, (url, init) =>
+    convex.fetch(new URL(String(url)).pathname, init),
+  )!;
+  assert.equal(await bridge.write({ kind: 'state' }), null);
+  const assignment = {
+    kind: 'provision',
+    epoch: 'newcomer-epoch-0001',
+    generation: 'newcomer-generation-1',
+    catalogue: 'c'.repeat(64),
+    matchingVersion: 'd'.repeat(64),
+  };
+
+  await bridge.write(assignment);
+
+  const state = await bridge.write<Record<string, unknown>>({ kind: 'state' });
+  assert.deepEqual(
+    [state.backend, state.epoch, state.writer, state.revoked, state.mirror],
+    ['convex', 'newcomer-epoch-0001', 'postgres', false, null],
+  );
+  // The same assignment again changes nothing; another epoch is refused,
+  // even when the caller names the current one.
+  await bridge.write(assignment);
+  await assert.rejects(
+    bridge.write({
+      ...assignment,
+      epoch: 'newcomer-epoch-0002',
+      expectedEpoch: 'newcomer-epoch-0001',
+    }),
+  );
+  assert.equal(
+    (await bridge.write<{ epoch: string }>({ kind: 'state' })).epoch,
+    'newcomer-epoch-0001',
+  );
+  assert.equal(
+    (await convex.run((ctx) => ctx.db.query('owners').collect())).length,
+    2,
+  );
+});

@@ -75,3 +75,35 @@ void test('a revoked account gets nothing from the copy', async () => {
     ActivityStreamsUnavailableError,
   );
 });
+
+void test('for an account Convex writes, Convex decides which activities and Postgres only whether the account may read', async () => {
+  const asked: string[][] = [];
+  const convexActor: Actor = { ...actor, convexWrites: true };
+  // Postgres knows none of these: they were recorded after the move.
+  const { streams } = harness(async (ids) => {
+    asked.push(ids);
+    return new Set();
+  });
+  assert.deepEqual(
+    (await streams.readSummaries(convexActor, ['7', '8'])).map(
+      (read) => read.activityId,
+    ),
+    ['7', '8'],
+  );
+  assert.equal((await streams.read(convexActor, '7'))?.activityId, '7');
+  // Postgres was asked about the account only, never about activities.
+  assert.deepEqual(asked, [[], []]);
+
+  // An account that may not read gets nothing, whoever writes it.
+  const refused = harness(async () => {
+    throw new ActivityStreamsUnavailableError();
+  });
+  await assert.rejects(
+    refused.streams.readSummaries(convexActor, ['7']),
+    ActivityStreamsUnavailableError,
+  );
+  await assert.rejects(
+    refused.streams.read(convexActor, '7'),
+    ActivityStreamsUnavailableError,
+  );
+});

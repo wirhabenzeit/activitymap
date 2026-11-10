@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import { DEFAULT_ERASURE_BATCH_SIZE } from '~/server/strava/erasure.ts';
+
 import { createErasureCronHandler } from './handler.ts';
 
 const SUCCESS = {

@@ -1,12 +1,13 @@
-import { syncActivities as runSyncActivities } from '~/server/strava/sync';
+import { type NextRequest, NextResponse } from 'next/server';
+
 import { withJobHeartbeat } from '~/server/application/job-heartbeat';
 import { withJobLog } from '~/server/application/job-log';
-import { type NextRequest, NextResponse } from 'next/server';
-import { logger } from '~/server/logging/logger';
 import {
   EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   externalEffectsEnabled,
 } from '~/server/config/external-effects';
+import { logger } from '~/server/logging/logger';
+import { syncActivities as runSyncActivities } from '~/server/strava/sync';
 
 const syncActivities = withJobLog(
   'sync-activities',

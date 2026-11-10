@@ -225,6 +225,13 @@
       "when": 1794315831434,
       "tag": "0031_writer-fence",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1794354251567,
+      "tag": "0032_convex-epoch",
+      "breakpoints": true
     }
   ]
 }

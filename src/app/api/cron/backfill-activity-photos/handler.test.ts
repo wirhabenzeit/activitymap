@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
+
 import { createPhotoBackfillCronHandler } from './handler';
+
 void test('photo cron enforces production, authorization, and rollout gates before any work', async () => {
   for (const [production, enabled, secret, status] of [
     [false, true, 'secret', 503],

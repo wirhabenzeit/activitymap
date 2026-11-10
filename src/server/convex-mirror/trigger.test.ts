@@ -41,6 +41,8 @@ void test('requests during a run start exactly one more run after it', async () 
   const first = trigger('user-a');
   const second = trigger('user-a');
   const third = trigger('user-a');
+  // The owner list may come from the database, so a run starts a tick later.
+  await new Promise((resolve) => setImmediate(resolve));
   assert.equal(started, 1, 'no second run while the first is in flight');
   gates[0]!.resolve();
   await new Promise((resolve) => setTimeout(resolve, 5));

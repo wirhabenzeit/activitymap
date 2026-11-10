@@ -254,6 +254,20 @@ router.route({
             ...args,
           });
           break;
+        // A new library for an account that is about to be copied
+        // (src/server/convex-mirror/accounts.ts). An owner that exists is
+        // never reassigned here: that needs its current epoch.
+        case 'provision':
+          result = await ctx.runMutation(internal.owners.provision, {
+            userId,
+            athleteId,
+            backend: 'convex',
+            epoch: args.epoch,
+            generation: args.generation,
+            catalogue: args.catalogue,
+            matchingVersion: args.matchingVersion,
+          });
+          break;
         // The handoff (src/server/convex-mirror/handoff.ts): a compare-and-set
         // on the owner's writer epoch.
         case 'setWriter':

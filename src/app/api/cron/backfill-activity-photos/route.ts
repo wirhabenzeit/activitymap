@@ -1,12 +1,13 @@
-import { backfillActivityPhotos } from '~/server/application/photo-backfill';
 import {
   recordJobDisabled,
   withJobHeartbeat,
 } from '~/server/application/job-heartbeat';
 import { recordJobLogDisabled, withJobLog } from '~/server/application/job-log';
+import { backfillActivityPhotos } from '~/server/application/photo-backfill';
 import { externalEffectsEnabled } from '~/server/config/external-effects';
 import { photoBackfillEnabled } from '~/server/config/photo-backfill';
 import { logger } from '~/server/logging/logger';
+
 import { createPhotoBackfillCronHandler } from './handler';
 
 export const maxDuration = 60;

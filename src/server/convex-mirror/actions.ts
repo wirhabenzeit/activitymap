@@ -4,12 +4,18 @@ import { requireAdmin } from '~/server/auth/admin';
 import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
 import { writerOf } from '~/server/repositories/writers';
 
+import {
+  libraryMoveStatus,
+  moveReadyLibraries,
+  prepareAllLibraries,
+} from './accounts';
 import { moveLibraryToConvex, moveLibraryToPostgres } from './handoff-run';
 
 /**
  * Operator controls for which store writes a library
- * (src/server/convex-mirror/handoff.ts). Each action calls `requireAdmin()`
- * itself and acts on the signed-in admin's own account only.
+ * (src/server/convex-mirror/handoff.ts and accounts.ts). Each action calls
+ * `requireAdmin()` itself. The first three act on the signed-in admin's own
+ * account; the rest on every connected account.
  */
 
 /** Which store writes the admin's own library. */
@@ -30,4 +36,25 @@ export async function moveMyLibraryToPostgres() {
   const admin = await requireAdmin();
   requireExternalEffectsEnabled();
   return moveLibraryToPostgres(admin.id);
+}
+
+/** Every connected account: who writes it, and how far its copy is. */
+export async function allLibraryStatus() {
+  await requireAdmin();
+  return libraryMoveStatus();
+}
+
+/** Give every account Postgres still writes a library in Convex and start
+ * copying it. Changes nothing the accounts can see. */
+export async function prepareAllLibrariesForConvex() {
+  await requireAdmin();
+  requireExternalEffectsEnabled();
+  return prepareAllLibraries();
+}
+
+/** Move every prepared account whose copy has finished to Convex. */
+export async function moveReadyLibrariesToConvex() {
+  await requireAdmin();
+  requireExternalEffectsEnabled();
+  return moveReadyLibraries();
 }

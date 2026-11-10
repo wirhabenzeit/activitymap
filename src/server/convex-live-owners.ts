@@ -40,3 +40,20 @@ export function convexLiveUrl(
   }
   return parsed.data.includes(userId) ? url : null;
 }
+
+/** The deployment an account's browser subscribes to: any account Convex
+ * writes for, and the accounts listed as live owners. */
+export function convexLiveUrlFor(
+  user: { id: string; writer?: string | null; convexEpoch?: string | null },
+  environment: Record<string, string | undefined> = process.env,
+): string | null {
+  const url = environment.ACTIVITYMAP_CONVEX_URL?.trim();
+  if (
+    user.writer === 'convex' &&
+    user.convexEpoch &&
+    url &&
+    /^https:\/\/[a-z0-9.-]+$/.test(url)
+  )
+    return url;
+  return convexLiveUrl(user.id, environment);
+}

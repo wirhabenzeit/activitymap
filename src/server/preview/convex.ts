@@ -270,7 +270,9 @@ export function convexReadOwnerFor(
   fetcher: typeof fetch = fetch,
 ) {
   if (!actor || previewSelection(actor)) return null;
-  const epoch = convexReadEpoch(actor.userId);
+  // An account Convex writes for is read from Convex; the setting covers
+  // accounts that are read from Convex while Postgres still writes.
+  const epoch = actor.convexEpoch ?? convexReadEpoch(actor.userId);
   return epoch
     ? convexAdapter(actor, appTransport(actor, epoch, fetcher))
     : null;

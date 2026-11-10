@@ -21,7 +21,7 @@ export function paritySummary(report: ParityReport) {
  * protected like the shadow writes; answers 500 on drift or a failed check.
  */
 export function createConvexParityCronHandler(deps: {
-  owners: () => string[] | null;
+  owners: () => string[] | null | Promise<string[] | null>;
   secret: () => string | undefined;
   check: (userId: string) => Promise<ParityReport>;
   onReport?: (report: ParityReport, userId: string) => void;

@@ -1,11 +1,12 @@
+import { withJobHeartbeat } from '~/server/application/job-heartbeat';
+import { withJobLog } from '~/server/application/job-log';
 import {
   EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   externalEffectsEnabled,
 } from '~/server/config/external-effects';
 import { logger } from '~/server/logging/logger';
 import { reconcileStravaSummaries } from '~/server/strava/summary-reconciliation';
-import { withJobHeartbeat } from '~/server/application/job-heartbeat';
-import { withJobLog } from '~/server/application/job-log';
+
 import { createSummaryReconciliationCronHandler } from './handler';
 
 // The reconciler intentionally checkpoints work across invocations. A single
