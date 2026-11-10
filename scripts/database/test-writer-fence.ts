@@ -1,16 +1,22 @@
 import assert from 'node:assert/strict';
 
-import { eq, sql } from 'drizzle-orm';
+import { eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 
 import { resolveMigrationTarget } from '../../src/server/db/migration-tooling';
-import { activities, photos, users } from '../../src/server/db/schema';
+import {
+  activities,
+  photos,
+  stravaWebhookEvents,
+  users,
+} from '../../src/server/db/schema';
 import {
   bypassWriterFence,
   isWriterFencedError,
   setWriter,
 } from '../../src/server/db/writer-fence';
+import { createWebhookEventsRepository } from '../../src/server/repositories/webhook-events';
 
 /**
  * Proves the writer fence of migration 0031 against a real database: which
@@ -326,6 +332,62 @@ try {
     )[0]?.name,
     'In flight',
   );
+
+  // 6b. Webhook events of an owner in handoff stay recorded: the drain does
+  // not select the activity event and nobody can claim it. An athlete event
+  // (deauthorization) is processed here whoever writes.
+  const events = createWebhookEventsRepository(
+    db as unknown as Parameters<typeof createWebhookEventsRepository>[0],
+  );
+  const eventTime = new Date('2026-01-02T00:00:00Z');
+  const event = (
+    id: string,
+    objectType: 'activity' | 'athlete',
+    ownerId: number,
+  ) => ({
+    id,
+    subscriptionId: 918300,
+    objectType,
+    objectId: objectType === 'activity' ? activityOf(ownerId) : ownerId,
+    aspectType: objectType === 'activity' ? 'create' : 'update',
+    ownerId,
+    eventTime,
+    payload: {} as never,
+    nextAttemptAt: eventTime,
+  });
+  const eventIds = ['fence-activity', 'fence-athlete', 'fence-other'];
+  await db
+    .delete(stravaWebhookEvents)
+    .where(inArray(stravaWebhookEvents.id, eventIds));
+  await db
+    .insert(stravaWebhookEvents)
+    .values([
+      event('fence-activity', 'activity', owner.athlete),
+      event('fence-athlete', 'athlete', owner.athlete),
+      event('fence-other', 'activity', other.athlete),
+    ]);
+  const drainable = async () =>
+    (await events.selectDrainCandidates(500, new Date()))
+      .map((candidate) => candidate.id)
+      .filter((id) => eventIds.includes(id))
+      .sort();
+  assert.deepEqual(await drainable(), ['fence-athlete', 'fence-other']);
+  assert.equal(await events.claim('fence-activity', new Date()), null);
+  assert.equal(
+    (await events.claim('fence-athlete', new Date()))?.id,
+    'fence-athlete',
+  );
+  // Handed back, the recorded event is there to be processed.
+  await hand(owner.id, 'postgres');
+  assert.deepEqual(await drainable(), ['fence-activity', 'fence-other']);
+  assert.equal(
+    (await events.claim('fence-activity', new Date()))?.id,
+    'fence-activity',
+  );
+  await db
+    .delete(stravaWebhookEvents)
+    .where(inArray(stravaWebhookEvents.id, eventIds));
+  await hand(owner.id, 'handoff');
 
   // 7. Erasing an account removes a fenced owner's rows too.
   assert.equal(

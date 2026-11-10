@@ -1,33 +1,35 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import { eq, inArray, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+
+import { deriveIngestionStatus } from '../../src/server/application/ingestion-status';
 import {
   resolveMigrationTarget,
   verifyConnectedTarget,
 } from '../../src/server/db/migration-tooling';
 import {
-  activities,
   accounts,
-  users,
-  photos,
-  photoFetchAttempts,
+  activities,
   photoBackfillRuns,
   photoDeletions,
+  photoFetchAttempts,
+  photos,
   syncChanges,
+  users,
 } from '../../src/server/db/schema';
+import { createIngestionStatusRepository } from '../../src/server/repositories/ingestion-status';
 import {
-  createPhotoBackfillRepository,
   PHOTO_ACTIVITY_LIMIT,
   PHOTO_REQUEST_LIMIT,
   PhotoBackfillStopped,
+  createPhotoBackfillRepository,
 } from '../../src/server/repositories/photo-backfill';
-import { createIngestionStatusRepository } from '../../src/server/repositories/ingestion-status';
-import { fetchStravaActivities } from '../../src/server/strava/service';
 import { StravaApiError } from '../../src/server/strava/client';
+import { fetchStravaActivities } from '../../src/server/strava/service';
 import type { StravaActivity } from '../../src/server/strava/types';
-import { deriveIngestionStatus } from '../../src/server/application/ingestion-status';
 
 const target = resolveMigrationTarget(process.env);
 if (
@@ -363,6 +365,16 @@ try {
 
   await seed();
   const refreshRun = await begin();
+  // Nothing is claimed for an owner Postgres does not ingest for.
+  await database
+    .update(users)
+    .set({ writer: 'handoff' })
+    .where(eq(users.id, user));
+  assert.equal(await repo.claimNext(refreshRun), null);
+  await database
+    .update(users)
+    .set({ writer: 'postgres' })
+    .where(eq(users.id, user));
   const originalGrant = await next(refreshRun);
   const refreshed = await repo.replaceCredentials(originalGrant, {
     access_token: 'rotated-proof',

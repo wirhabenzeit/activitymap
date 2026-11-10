@@ -18,6 +18,8 @@ import {
 
 import { db as defaultDb } from '~/server/db';
 import {
+  type Activity,
+  type StravaSummaryReconciliation,
   accounts,
   activities,
   activityDeletions,
@@ -25,8 +27,6 @@ import {
   photos,
   stravaSummaryReconciliations,
   users,
-  type Activity,
-  type StravaSummaryReconciliation,
 } from '~/server/db/schema';
 import { createChangesRepository } from '~/server/repositories/changes';
 import { transformStravaActivity } from '~/server/strava/transforms';
@@ -348,6 +348,8 @@ export function createSummaryReconciliationRepository(
         .where(
           and(
             isNotNull(users.athlete_id),
+            // Only owners Postgres ingests for (writer-fence.ts).
+            eq(users.writer, 'postgres'),
             isNull(accounts.revokedAt),
             or(
               isNotNull(accounts.accessToken),
@@ -398,6 +400,8 @@ export function createSummaryReconciliationRepository(
           and(
             // Same eligibility as listDue.
             isNotNull(users.athlete_id),
+            // Only owners Postgres ingests for (writer-fence.ts).
+            eq(users.writer, 'postgres'),
             isNull(accounts.revokedAt),
             or(
               isNotNull(accounts.accessToken),
@@ -417,6 +421,7 @@ export function createSummaryReconciliationRepository(
         const [current] = await tx
           .select({
             lastCompletedAt: users.lastSummaryReconciledAt,
+            writer: users.writer,
             revokedAt: accounts.revokedAt,
             accessToken: accounts.accessToken,
             legacyAccessToken: accounts.access_token,
@@ -440,7 +445,9 @@ export function createSummaryReconciliationRepository(
           .limit(1);
 
         if (
-          !current ||
+          // Missing, or handed off since it was listed: no lease, so no
+          // provider calls whose results the writer fence would refuse.
+          current?.writer !== 'postgres' ||
           current.revokedAt ||
           (!current.accessToken &&
             !current.legacyAccessToken &&

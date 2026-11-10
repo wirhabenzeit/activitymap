@@ -1,25 +1,28 @@
 import 'server-only';
+
 import { randomUUID } from 'node:crypto';
+
 import { and, eq, sql } from 'drizzle-orm';
+
+import type { Actor } from '~/server/auth/actor';
 import { db } from '~/server/db';
 import {
   accounts,
   activities,
   activityStreams,
-  users,
-  streamBackfillRuns as runs,
-  streamBackfillAccounts as fairness,
   streamBackfillAttempts as attempts,
+  streamBackfillAccounts as fairness,
+  streamBackfillRuns as runs,
+  users,
 } from '~/server/db/schema';
-import type { Actor } from '~/server/auth/actor';
-import type { StreamFetchFailure } from '~/server/strava/streams';
 import {
+  type BackfillStopReason,
   STREAM_BACKFILL_HOUR_MS,
   STREAM_BACKFILL_LEASE_MS,
   StreamBackfillStopped,
   streamBackfillRetryAt,
-  type BackfillStopReason,
 } from '~/server/strava/stream-backfill-policy';
+import type { StreamFetchFailure } from '~/server/strava/streams';
 
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 export type BackfillRun = { token: string };
@@ -34,13 +37,15 @@ const sameGeneration = sql`${attempts.generation} is not distinct from ${activit
 // Historical backfill is one successful fetch per generation, including {}.
 // Age alone does not requeue completed history and starve unfetched activities.
 const needsFetch = sql`(${activityStreams.fetchedAt} is null or ${activityStreams.invalidatedAt} is not null)`;
+// Connected, and Postgres ingests for the owner (src/server/db/writer-fence.ts).
 const connected = sql`${accounts.id} = (
   select a.id from account a where a."userId" = ${users.id}
     and a."providerId" = 'strava' and a."accountId" = ${users.athlete_id}::text
   order by a.id limit 1
 ) and ${accounts.revokedAt} is null and ${accounts.scheduledErasureAt} is null
 and (coalesce(${accounts.accessToken}, ${accounts.access_token}, '') <> ''
-  or coalesce(${accounts.refreshToken}, ${accounts.refresh_token}, '') <> '')`;
+  or coalesce(${accounts.refreshToken}, ${accounts.refresh_token}, '') <> '')
+and ${users.writer} = 'postgres'`;
 const unfinished = sql`(${attempts.terminal} is not true or not (${sameGeneration}))`;
 // Non-secret fingerprint of the stored grant. Refresh and reconnect both
 // rewrite the expiry, so a Strava rejection is only retried once it changes.

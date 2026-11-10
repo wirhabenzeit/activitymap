@@ -299,9 +299,19 @@ code path:
 
 Two kinds of write pass on purpose, by setting `activitymap.writer_fence` to
 `bypass` for their own transaction: account erasure, and (step 7) the replica
-writes that copy Convex's state back. Jobs are still expected to skip owners
-they do not write for; the fence makes a mistake there harmless, not free: a
-refused write is an error in that job.
+writes that copy Convex's state back.
+
+The jobs skip owners Postgres does not ingest for, so no provider budget is
+spent on work the fence would refuse: summary reconciliation, the activity
+sync, the stream and photo backfills and the place matcher all select only
+owners whose writer is `postgres`. Stored place results stay readable for
+any owner. Webhook events of such an owner are still recorded, but the drain
+does not select them and the immediate attempt cannot claim them; they wait,
+in `handoff` until the owner has a writer again. Athlete events
+(deauthorization) are always processed in Postgres, where accounts and tokens
+live. Edits, refreshes, imports and on-demand stream fetches are not
+filtered: for an owner Postgres does not write for they are refused by the
+fence until step 8 routes them to Convex.
 
 One cost: the share lock is taken after the row being written is locked,
 while erasure locks the user row first. The two can deadlock; Postgres ends

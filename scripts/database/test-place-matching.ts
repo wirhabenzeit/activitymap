@@ -145,6 +145,21 @@ const run = (limit = 500) =>
   });
 async function evaluation() {
   const catalogue = await repository.catalogue();
+  // The matcher takes no work for an owner Postgres does not ingest for.
+  await database
+    .update(schema.users)
+    .set({ writer: 'handoff' })
+    .where(eq(schema.users.id, actor.userId));
+  assert.equal(
+    (await repository.candidates(catalogue, 500)).filter(
+      (item) => item.userId === actor.userId,
+    ).length,
+    0,
+  );
+  await database
+    .update(schema.users)
+    .set({ writer: 'postgres' })
+    .where(eq(schema.users.id, actor.userId));
   const candidate = (await repository.candidates(catalogue, 1))[0];
   assert(candidate);
   const input = await repository.readInput(candidate);
@@ -732,6 +747,24 @@ try {
   );
   assert.equal((await repository.read(actor, id)).status, 'pending');
   assert.equal((await run()).saved, 1);
+  // A catalogue change while the owner is handed off stays queued, and is
+  // matched once Postgres writes for them again, with no stream change.
+  await database
+    .update(schema.users)
+    .set({ writer: 'handoff' })
+    .where(eq(schema.users.id, actor.userId));
+  await client`UPDATE places SET display_name=display_name WHERE id=(SELECT id FROM places LIMIT 1)`;
+  assert.equal((await run()).selected, 0);
+  assert.equal((await run()).selected, 0);
+  await database
+    .update(schema.users)
+    .set({ writer: 'postgres' })
+    .where(eq(schema.users.id, actor.userId));
+  assert.equal(
+    (await run()).saved,
+    1,
+    'Work skipped during handoff is matched after hand-back',
+  );
   const beforeNoop = await repository.catalogue();
   // Exact no-op publication needs the unchanged synthetic rows, so restore them
   // by publication first, then publish the identical snapshot again.

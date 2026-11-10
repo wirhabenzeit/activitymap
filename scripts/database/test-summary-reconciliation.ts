@@ -7,9 +7,9 @@ import postgres from 'postgres';
 import { resolveMigrationTarget } from '../../src/server/db/migration-tooling.ts';
 import {
   accounts,
-  ingestionOutcomes,
   activities,
   activityDeletions,
+  ingestionOutcomes,
   photoDeletions,
   photos,
   stravaSummaryReconciliations,
@@ -21,10 +21,10 @@ import { createSummaryReconciliationRepository } from '../../src/server/reposito
 import { StravaApiError } from '../../src/server/strava/client.ts';
 import { fetchStravaActivities } from '../../src/server/strava/service.ts';
 import {
-  reconcileStravaSummaries,
   STRAVA_FRESHNESS_LIMIT_MS,
   SUMMARY_RECONCILIATION_INTERVAL_MS,
   type SummaryReconciliationSource,
+  reconcileStravaSummaries,
 } from '../../src/server/strava/summary-reconciliation.ts';
 import type { StravaActivity } from '../../src/server/strava/types.ts';
 
@@ -280,8 +280,38 @@ async function run(): Promise<void> {
   const dueBefore = new Date(
     NOW.getTime() - SUMMARY_RECONCILIATION_INTERVAL_MS,
   );
+  // An owner Postgres does not ingest for is neither due nor claimable.
+  await testDb
+    .update(users)
+    .set({ writer: 'handoff' })
+    .where(eq(users.id, USER_ID));
+  assert.equal(
+    (await repository.listDue(50, dueBefore, NOW)).filter(
+      (due) => due.userId === USER_ID,
+    ).length,
+    0,
+  );
+  await testDb
+    .update(users)
+    .set({ writer: 'postgres' })
+    .where(eq(users.id, USER_ID));
+
   const [candidate] = await repository.listDue(1, dueBefore, NOW);
   assert.ok(candidate);
+  // Handed off between being listed and being claimed: no lease.
+  await testDb
+    .update(users)
+    .set({ writer: 'handoff' })
+    .where(eq(users.id, candidate.userId));
+  assert.equal(
+    await repository.claim(candidate, dueBefore, NOW, 600_000),
+    null,
+    'an owner handed off after selection is not claimed',
+  );
+  await testDb
+    .update(users)
+    .set({ writer: 'postgres' })
+    .where(eq(users.id, candidate.userId));
   const claims = await Promise.all([
     repository.claim(candidate, dueBefore, NOW, 600_000),
     repository.claim(candidate, dueBefore, NOW, 600_000),

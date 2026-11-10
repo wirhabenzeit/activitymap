@@ -37,6 +37,11 @@ import {
 const KEY = 'activity-place-matching';
 const preferredCatalogue = sql`(SELECT snapshot_id FROM place_catalogues WHERE active AND ${isServingRegion(sql`region_id`)} ORDER BY ${servingRegionRank(sql`region_id`)} LIMIT 1)`;
 const connected = sql`EXISTS (SELECT 1 FROM account c WHERE c."userId"=u.id AND c."providerId"='strava' AND c."accountId"=u.athlete_id::text AND c.revoked_at IS NULL AND c.scheduled_erasure_at IS NULL AND (COALESCE(c."accessToken",c.access_token,'')<>'' OR COALESCE(c."refreshToken",c.refresh_token,'')<>''))`;
+/** `connected`, and Postgres is the owner's writer: who the matcher takes
+ * work for. Reads of stored results and the pending queue keep using
+ * `connected`: an owner Convex writes for still sees what the reverse mirror
+ * copied back, and their queued work waits for Postgres to write again. */
+const matchable = sql`${connected} AND u.writer='postgres'`;
 export type MatchingCandidate = {
   activityId: string;
   userId: string;
@@ -231,7 +236,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         WHEN jsonb_typeof(s.payload->'latlng'->'data')='array' THEN jsonb_array_length(s.payload->'latlng'->'data') ELSE 0 END AS samples
       FROM ${matchingRequests(unknown)} JOIN activities a ON a.id=requested.activity_id
       JOIN "user" u ON u.id=requested.user_id JOIN activity_streams s ON s.activity_id=a.id
-      WHERE ${matchesRequest} AND ${current} AND ${connected}
+      WHERE ${matchesRequest} AND ${current} AND ${matchable}
     `)
         ).rows
       : [];
@@ -268,7 +273,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         CASE WHEN NOT (${tooLarge}) THEN jsonb_build_object('latlng',s.payload->'latlng','time',s.payload->'time','distance',s.payload->'distance','altitude',s.payload->'altitude') END AS payload
       FROM ${matchingRequests(selected)} JOIN activities a ON a.id=requested.activity_id
       JOIN "user" u ON u.id=requested.user_id JOIN activity_streams s ON s.activity_id=a.id
-      WHERE ${matchesRequest} AND ${current} AND ${connected}
+      WHERE ${matchesRequest} AND ${current} AND ${matchable}
     `)
     ).rows;
     const identities = new Map(
@@ -376,7 +381,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
           clock_timestamp(),CASE WHEN requested.result IS NULL THEN clock_timestamp()+interval '5 minutes' END,CASE WHEN requested.result IS NULL THEN 'matching_failed' END
         FROM jsonb_to_recordset(${JSON.stringify(records)}::jsonb) AS requested(activity_id bigint,user_id text,athlete_id bigint,generation text,revision bigint,source_version text,result jsonb,result_revision uuid)
         JOIN activities a ON a.id=requested.activity_id JOIN "user" u ON u.id=requested.user_id JOIN activity_streams s ON s.activity_id=a.id
-        WHERE ${matchesRequest} AND ${current} AND ${connected}
+        WHERE ${matchesRequest} AND ${current} AND ${matchable}
         ORDER BY a.id
         ON CONFLICT(activity_id,recipe_hash) DO UPDATE SET user_id=EXCLUDED.user_id,stream_generation=EXCLUDED.stream_generation,stream_revision=EXCLUDED.stream_revision,source_version=EXCLUDED.source_version,catalogue_snapshot_id=EXCLUDED.catalogue_snapshot_id,catalogue_revision=EXCLUDED.catalogue_revision,matcher_version=EXCLUDED.matcher_version,discovery_version=EXCLUDED.discovery_version,parameters_hash=EXCLUDED.parameters_hash,result=EXCLUDED.result,result_revision=EXCLUDED.result_revision,checked_at=EXCLUDED.checked_at,retry_at=EXCLUDED.retry_at,error=EXCLUDED.error
         RETURNING activity_id,retry_at
@@ -534,6 +539,10 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
       if (queued) {
         // One atomic seed after catalogue/recipe changes. When unchanged, the
         // empty changed CTE makes the activity scan a never-executed branch.
+        // Seeding covers every connected owner, whoever writes for them: the
+        // checkpoint is global, so an owner skipped here would never be queued
+        // for this catalogue once Postgres writes for them again. Only taking
+        // work (below) is limited to owners Postgres ingests for.
         await database.execute(sql`
           WITH changed AS (
             INSERT INTO place_matching_queue_state(singleton,recipe_hash,catalogue_snapshot_id,catalogue_revision)
@@ -573,7 +582,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
           JOIN activities a ON a.id=p.activity_id JOIN "user" u ON u.athlete_id=a.athlete
           JOIN activity_streams s ON s.activity_id=a.id
           LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
-          WHERE p.available_at<=statement_timestamp() AND ${connected}
+          WHERE p.available_at<=statement_timestamp() AND ${matchable}
             AND s.fetched_at IS NOT NULL AND s.invalidated_at IS NULL
             AND s.last_attempt_status<>'invalidated' AND s.payload IS NOT NULL
             AND (NOT COALESCE((${sameInput(catalogue)}),false) OR (c.result IS NULL AND (c.retry_at IS NULL OR c.retry_at<=statement_timestamp())))
@@ -592,7 +601,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         SELECT a.id::text AS activity_id,u.id AS user_id,u.athlete_id AS athlete_id,s.generation,s.revision::text,s.source_version,a.map_bbox,a.start_latlng
         FROM ${queued ? sql`todo t JOIN activities a ON a.id=t.id` : sql`activities a`} JOIN "user" u ON u.athlete_id=a.athlete JOIN activity_streams s ON s.activity_id=a.id
         LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
-        WHERE ${connected} AND ${current} ${
+        WHERE ${matchable} AND ${current} ${
           activityIds
             ? sql`AND a.id IN (${sql.join(
                 activityIds.map((id) => sql`${id}::bigint`),
