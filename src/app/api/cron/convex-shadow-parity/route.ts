@@ -1,14 +1,7 @@
-import { toActivityStreamSummaryDTO } from '~/contracts/v1/activity-streams';
-import type { MirrorPosition } from '~/server/convex-mirror/mirror';
-import { checkParity } from '~/server/convex-mirror/parity';
-import {
-  postgresParitySource,
-  shadowActor,
-} from '~/server/convex-mirror/postgres-source';
+import { checkShadowParity } from '~/server/convex-mirror/shadow-parity';
 import { configuredShadowOwners } from '~/server/convex-mirror/shadow-run';
 import { logger } from '~/server/logging/logger';
-import { convexAppAdapter } from '~/server/preview/convex';
-import { convexWriteBridge } from '~/server/sync/convex-writer';
+import { writerOf } from '~/server/repositories/writers';
 
 import { createConvexParityCronHandler } from './handler';
 
@@ -17,34 +10,21 @@ export const POST = createConvexParityCronHandler({
   // Same switch as the shadow writes it checks.
   owners: configuredShadowOwners,
   secret: () => process.env.CRON_SECRET,
-  check: async (userId) => {
-    const actor = await shadowActor(userId);
-    const writer = convexWriteBridge(actor);
-    if (!writer) throw new Error('ACTIVITYMAP_CONVEX_SITE is not configured');
-    // The mirror's checkpoint and the epoch the read bridge requires.
-    const state = await writer.write<{
-      backend: string;
-      epoch: string;
-      revoked: boolean;
-      mirror: MirrorPosition | null;
-    } | null>({ kind: 'state' });
-    if (!state) throw new Error('The owner is not provisioned in Convex');
-    if (state.revoked || state.backend !== 'convex')
-      throw new Error('The Convex owner is not assigned to Convex');
-    const convex = convexAppAdapter(actor, state.epoch);
-    return checkParity({
-      position: state.mirror,
-      postgres: postgresParitySource(actor),
-      convex: {
-        activities: (ids) => convex.activitiesByIds(ids),
-        photos: (ids) => convex.photosByActivities(ids),
-        summaries: async (ids) =>
-          (await convex.streams.readSummaries(actor, ids)).map(
-            toActivityStreamSummaryDTO,
-          ),
-      },
-    });
-  },
+  // Once Convex writes for an account, Postgres is no longer a copy of it
+  // and there is nothing to compare.
+  check: async (userId) =>
+    (await writerOf(userId)) === 'convex'
+      ? {
+          status: 'ok',
+          copy: 'not-started',
+          checkpoint: null,
+          sampled: 0,
+          inFlight: 0,
+          compared: { activities: 0, summaries: 0, photos: 0 },
+          expectedDifferences: {},
+          differences: {},
+        }
+      : checkShadowParity(userId),
   onReport: (report, userId) =>
     report.status === 'drift'
       ? logger.error('Convex shadow parity drift', { userId, ...report })

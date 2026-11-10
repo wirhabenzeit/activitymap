@@ -18,6 +18,7 @@ import { requireAdmin } from '~/server/auth/admin';
 
 import { DashboardNavigation, type StatusCard } from './dashboard-navigation';
 import { WebhookControls } from './webhook-controls';
+import { WriterControls } from './writer-controls';
 
 /**
  * Read-only operations dashboard (issue #328): scheduled job health and run
@@ -301,6 +302,12 @@ export default async function AdminPage({
                 <WebhookControls />
               </Section>
               <WebhookInbox data={data} />
+              <Section
+                title="Library writer"
+                description="Which store receives Strava events and writes your own library. Moving to Convex copies what is left, compares the two stores and stops if they differ."
+              >
+                <WriterControls />
+              </Section>
             </>
           ),
           budget: <StravaBudget data={data} />,

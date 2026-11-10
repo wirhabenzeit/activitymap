@@ -24,6 +24,7 @@ import type {
   StravaPhoto,
 } from '../../src/server/strava/types';
 import { convexActivityCommands } from '../../src/server/sync/convex-commands';
+import { convexWriteBridge } from '../../src/server/sync/convex-writer';
 import { internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
 import { activitySource } from '../ingestion/provider';
@@ -361,4 +362,40 @@ void test('a command queues the job when the activity now needs a recording', as
     [jobs[0]!.status, jobs[0]!.phase, jobs[0]!.requested],
     ['queued', 'recording', 0],
   );
+});
+
+void test('the handoff changes the Convex writer through the bridge, by epoch', async (t) => {
+  const { convex, seed, strava, deps } = await setup(t, 'convex');
+  const bridge = convexWriteBridge(actor, (url, init) =>
+    convex.fetch(new URL(String(url)).pathname, init),
+  )!;
+  const state = () =>
+    bridge.write<{ writer: string; writerEpoch: number }>({ kind: 'state' });
+  const set = (writer: string, expectedEpoch: number) =>
+    bridge.write<number | null>({ kind: 'setWriter', writer, expectedEpoch });
+  assert.deepEqual(
+    [(await state()).writer, (await state()).writerEpoch],
+    ['convex', 1],
+  );
+
+  // An epoch that has moved on changes nothing.
+  assert.equal(await set('postgres', 0), null);
+  assert.equal((await state()).writer, 'convex');
+
+  assert.equal(await set('handoff', 1), 2);
+  assert.deepEqual(
+    [(await state()).writer, (await state()).writerEpoch],
+    ['handoff', 2],
+  );
+  // While nobody writes, a command is refused before it reaches Strava.
+  const original = manual(7, 'Old name');
+  strava.activities.set(7, original);
+  await assert.rejects(seed(original));
+  await failure(
+    updateActivityThroughConvex(actor, { id: 7, name: 'New name' }, deps),
+  );
+  assert.deepEqual(strava.updates, []);
+
+  assert.equal(await set('postgres', 2), 3);
+  assert.equal((await state()).writer, 'postgres');
 });

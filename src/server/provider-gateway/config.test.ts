@@ -7,17 +7,14 @@ import { logger } from '~/server/logging/logger';
 import { providerGatewayConfig } from './config';
 
 const keys = JSON.stringify({ k1: 'a'.repeat(64) });
-const owners = '["user-a"]';
 const on = {
   ACTIVITYMAP_EXTERNAL_EFFECTS: 'enabled',
   ACTIVITYMAP_PROVIDER_GATEWAY_KEYS: keys,
-  ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS: owners,
 };
 
-void test('the gateway needs keys, owners and enabled external effects', () => {
+void test('the gateway needs keys and enabled external effects', () => {
   assert.deepEqual(providerGatewayConfig(on), {
     keys: { k1: 'a'.repeat(64) },
-    owners: ['user-a'],
   });
   for (const missing of Object.keys(on))
     assert.equal(
@@ -37,10 +34,9 @@ void test('invalid settings turn the gateway off and are reported', () => {
     for (const override of [
       { ACTIVITYMAP_PROVIDER_GATEWAY_KEYS: '{"k1":"short"}' },
       { ACTIVITYMAP_PROVIDER_GATEWAY_KEYS: 'not json' },
-      { ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS: '{"user-a":true}' },
     ])
       assert.equal(providerGatewayConfig({ ...on, ...override }), null);
-    assert.equal(error.mock.callCount(), 3);
+    assert.equal(error.mock.callCount(), 2);
   } finally {
     error.mock.restore();
   }

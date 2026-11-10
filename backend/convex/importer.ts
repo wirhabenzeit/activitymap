@@ -74,6 +74,7 @@ export const mirrorState = internalQuery({
     return {
       backend: owner.backend,
       writer: writerOf(owner),
+      writerEpoch: owner.writerEpoch ?? 0,
       epoch: owner.epoch,
       generation: owner.generation,
       revoked: owner.revoked,

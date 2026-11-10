@@ -255,17 +255,17 @@ refresh or a second rejection is `credentials_rejected`. Activity IDs stay decim
 the request to the provider URL, and a provider `Retry-After` (seconds or an
 HTTP date) becomes the `rate_limited` wait.
 
-The gateway is off until both settings are present in the app and automated
+The gateway is off until the setting is present in the app and automated
 external effects are enabled:
 
 ```sh
 ACTIVITYMAP_PROVIDER_GATEWAY_KEYS='{"<keyId>":"<64 hex characters>"}'
-ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS='["<userId>"]'
 ```
 
-The owner list is a stand-in: once owners carry a writer field (step 6), the
-gateway serves exactly the owners Convex writes for. The caller is the
-Convex ingestion worker ([Convex ingestion](#convex-ingestion)), through
+Which accounts it reads for is not a setting: it serves exactly the accounts
+whose library Convex writes (`users.writer`), so a handoff switches it on for
+an account and a hand-back switches it off. The caller is the Convex
+ingestion worker ([Convex ingestion](#convex-ingestion)), through
 `src/server/provider-gateway/client.ts`.
 
 Requests carry no nonce, so a captured request can be replayed while its
@@ -364,6 +364,47 @@ an attempt.
 Each new event asks Convex ingestion for its activity in the same
 transaction as the receipt.
 
+## Moving an account
+
+`src/server/convex-mirror/handoff.ts` moves one account's library between the
+two stores. An admin runs it for their own account from the admin page
+(Webhooks, "Library writer").
+
+**To Convex**
+
+1. Postgres stops writing for the account (`handoff`). The change waits for
+   writes already under way; webhook events stay in the inbox.
+2. The mirror copies what is left and the parity check compares the two
+   stores. If the copy does not finish within 40 seconds or the check finds
+   drift, the account goes back to Postgres and nothing else has changed.
+3. Convex becomes the writer, then Postgres records the same.
+4. The events kept in step 1 are sent to Convex, which also starts a
+   reconciliation sweep for the account.
+
+**Back to Postgres**
+
+Convex stops (`handoff`), Postgres becomes the writer again, Convex records
+the same, and Postgres reconciliation is made due at once. Nothing is copied
+back: Postgres fetches from Strava what changed while Convex wrote, which can
+take hours for a long absence, and the mirror then carries it to Convex.
+
+Every step is a compare-and-set on a writer epoch, and each run starts from
+the two writers as they are. Running either direction again after an
+interruption continues it, and handing back also recovers a move to Convex
+that stopped half way.
+
+What an account needs before it can move:
+
+- its reads are served from Convex ([Read owners in production](#read-owners-in-production))
+  and it is mirrored ([Shadow writes](#shadow-writes));
+- the provider gateway key is set in the app and in the Convex environment;
+- the place catalogue rowset its matching version names has been copied.
+
+What changes for the account afterwards: the mirror and the hourly parity
+check skip it, and features that still read Postgres (share links, export,
+place search, the admin views, the import button) show its library as it was
+at the move.
+
 ## Convex ingestion
 
 For an owner Convex writes for, activities come in through jobs in this
@@ -426,8 +467,7 @@ ACTIVITYMAP_PROVIDER_GATEWAY_KEY_ID='<keyId>'
 ACTIVITYMAP_PROVIDER_GATEWAY_SECRET='<64 hex characters>'
 ```
 
-The key pair must be one of the app's `ACTIVITYMAP_PROVIDER_GATEWAY_KEYS`,
-and the owner must be in `ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS`.
+The key pair must be one of the app's `ACTIVITYMAP_PROVIDER_GATEWAY_KEYS`.
 `convex run ingestion:status '{"userId":"<userId>"}'` lists an owner's jobs
 that are waiting, blocked or failed.
 

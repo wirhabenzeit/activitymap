@@ -13,13 +13,16 @@ const headers = { 'cache-control': 'no-store' };
  * The provider gateway route (`src/server/provider-gateway/contract.ts`).
  *
  * A request is served only when the gateway is configured, the signature is
- * valid and recent, the owner is one the gateway may read for, and the
+ * valid and recent, the owner is one Convex writes for, and the
  * athlete named is that owner's. A provider read that fails in a way the
  * caller can act on is answered 200 with the typed failure; anything else is
  * a 500 without detail.
  */
 export function createProviderGatewayHandler(deps: {
-  config: () => { keys: Record<string, string>; owners: string[] } | null;
+  config: () => { keys: Record<string, string> } | null;
+  /** Whether the gateway reads for this application user: the accounts
+   * whose library Convex writes. */
+  serves: (userId: string) => Promise<boolean>;
   /** The athlete linked to an application user, or null. */
   athleteFor: (userId: string) => Promise<number | null>;
   read: (
@@ -62,7 +65,7 @@ export function createProviderGatewayHandler(deps: {
     const athleteId = Number(parsed.data.athleteId);
     try {
       if (
-        !config.owners.includes(userId) ||
+        !(await deps.serves(userId)) ||
         (await deps.athleteFor(userId)) !== athleteId
       )
         return answer(403);

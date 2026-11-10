@@ -8,14 +8,17 @@ import {
   gatewayFailureFor,
   readFromStrava,
 } from '~/server/provider-gateway/strava';
+import { writerOf } from '~/server/repositories/writers';
 
 import { createProviderGatewayHandler } from './handler';
 
 export const maxDuration = 60;
 export const POST = createProviderGatewayHandler({
-  // Off unless keys and owners are configured and automated external
-  // effects are enabled for this deployment.
+  // Off unless keys are configured and automated external effects are
+  // enabled for this deployment.
   config: providerGatewayConfig,
+  // Exactly the accounts whose library Convex writes.
+  serves: async (userId) => (await writerOf(userId)) === 'convex',
   athleteFor: async (userId) => {
     const [user] = await db
       .select({ athleteId: users.athlete_id })
