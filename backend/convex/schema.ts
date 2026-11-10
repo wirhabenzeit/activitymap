@@ -77,6 +77,44 @@ export default defineSchema({
     eventTime: v.number(),
     receivedAt: v.number(),
   }).index('by_owner_event', ['owner', 'event']),
+  /** Convex ingestion (convex/ingestion.ts): one job per owner and activity.
+   * `requested` counts the times the activity was asked for; a run that
+   * ends with a different count than it started with runs again. */
+  ingestionJobs: defineTable({
+    owner: v.id('owners'),
+    /** The activity key (owners.idKey). */
+    activity: v.string(),
+    status: v.union(
+      /** Waiting for `dueAt`, or running when it holds a lease. */
+      v.literal('queued'),
+      /** Nothing to do. */
+      v.literal('idle'),
+      /** The owner must reconnect; a new request tries once more. */
+      v.literal('blocked'),
+      /** Gave up; a new request starts over. */
+      v.literal('failed'),
+    ),
+    phase: v.union(v.literal('source'), v.literal('recording')),
+    requested: v.number(),
+    /** Failed attempts since the job last made progress. */
+    attempt: v.number(),
+    dueAt: v.optional(v.number()),
+    /** The last source revision a run of this job was given. */
+    revision: v.number(),
+    /** How many runs have claimed the job; a lease names its claim. */
+    claims: v.number(),
+    lease: v.optional(
+      v.object({
+        claim: v.number(),
+        expiresAt: v.number(),
+        requested: v.number(),
+      }),
+    ),
+    /** Why the last run did not finish. */
+    error: v.optional(v.string()),
+  })
+    .index('by_owner_activity', ['owner', 'activity'])
+    .index('by_owner_status', ['owner', 'status', 'activity']),
   ownerEpochs: defineTable({ owner: v.id('owners'), epoch: v.string() }).index(
     'by_owner_epoch',
     ['owner', 'epoch'],

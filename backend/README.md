@@ -264,9 +264,9 @@ ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS='["<userId>"]'
 ```
 
 The owner list is a stand-in: once owners carry a writer field (step 6), the
-gateway serves exactly the owners Convex writes for. Nothing calls the route
-yet; `src/server/provider-gateway/client.ts` is the caller the ingestion jobs
-(step 5) will use.
+gateway serves exactly the owners Convex writes for. The caller is the
+Convex ingestion worker ([Convex ingestion](#convex-ingestion)), through
+`src/server/provider-gateway/client.ts`.
 
 Requests carry no nonce, so a captured request can be replayed while its
 signature is accepted. The timestamp may differ from the app's clock by 30
@@ -334,7 +334,7 @@ handoff. A mirror run also stops up front when it sees the owner is not
 written by Postgres, and the scheduled mirror skips an owner whose Postgres
 writer is `convex`. During a handoff from Postgres the Postgres side is
 `handoff` while Convex is still `postgres`, so the mirror can reach the head.
-Convex ingestion (step 5) will write as `convex`.
+Convex ingestion writes as `convex`.
 
 Scheduled continuations are fenced the same way. A catalogue invalidation
 (`catalogue.next`) works for the writer it was queued under and checks it in
@@ -361,8 +361,77 @@ between claim and delivery: the dispatch claim marks its lease in
 `last_error`, and stale-lease recovery returns a marked row without counting
 an attempt.
 
-Nothing reads `providerEvents` yet. Convex ingestion (step 5) works from it;
-until then no owner should be handed to Convex.
+Each new event asks Convex ingestion for its activity in the same
+transaction as the receipt.
+
+## Convex ingestion
+
+For an owner Convex writes for, activities come in through jobs in this
+package (`docs/convex-writer-cutover.md`, step 5; `convex/ingestion.ts`).
+There is one job per owner and activity. A provider event counts a request
+on the job and schedules a run for the job's due time; nothing polls.
+
+A run is the Node action `convex/ingestionWorker.ts`. It reads through the
+provider gateway and never holds a provider credential:
+
+1. **Claim.** The run takes a five-minute lease and a new source revision:
+   the larger of the current time in milliseconds and one more than every
+   revision already used for the activity, the mirror's included.
+2. **Source.** It reads the activity, and its photos when the activity has
+   any, converts them with the code Postgres ingestion uses
+   (`backend/ingestion/provider.ts`), and writes the activity and its photo
+   set in one transaction. When the provider answers that the activity does
+   not exist, it writes the deletion. The event's own aspect is not trusted.
+3. **Recording.** Only when the activity has no current recording (a new
+   activity, or a change to the fields samples depend on): it reads the
+   streams, stores the file and publishes it through the same fenced path
+   the mirror uses. A manual activity is not asked for streams, and an
+   activity whose streams the provider does not have is finished without a
+   recording.
+4. **Complete.** If the activity was requested again while the run was
+   under way, the job starts over at once.
+
+What keeps this safe:
+
+- **One writer.** A job is claimed only while Convex is the owner's writer,
+  and each library write checks the writer in its own transaction. A run
+  that started before a handoff is refused when it publishes; its job stays
+  queued and is scheduled again by `owners.setWriter` when Convex is the
+  writer once more.
+- **Lost runs.** Every lease schedules its own recovery. A run that has
+  neither finished nor failed when the lease ends is retried, and anything
+  it sends afterwards names a claim that no longer holds the job and is
+  ignored.
+- **Failures.** `rate_limited` waits for the time the gateway names and
+  counts no attempt. `credentials_rejected` blocks the job until the
+  activity is requested again. An activity of another athlete, `forbidden`
+  and a provider error that a retry cannot change mark the job failed at
+  once. Everything else is retried after one minute, doubling up to six
+  hours, and the job is marked failed after ten attempts. A failed job
+  starts over with the next request for its activity.
+
+The worker needs three Convex environment variables, and without them every
+run fails as retryable and writes nothing:
+
+```sh
+ACTIVITYMAP_APP_ORIGIN='https://<the app>'
+ACTIVITYMAP_PROVIDER_GATEWAY_KEY_ID='<keyId>'
+ACTIVITYMAP_PROVIDER_GATEWAY_SECRET='<64 hex characters>'
+```
+
+The key pair must be one of the app's `ACTIVITYMAP_PROVIDER_GATEWAY_KEYS`,
+and the owner must be in `ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS`.
+`convex run ingestion:status '{"userId":"<userId>"}'` lists an owner's jobs
+that are waiting, blocked or failed.
+
+Not built yet, and needed before an owner is handed to Convex:
+
+- **Reconciliation.** Nothing lists the owner's activities to find a missed
+  event, so an event that never arrives is not noticed.
+- **Place matching.** A recording published here has no match until the
+  matcher that runs in shadow ([Shadow matching](#shadow-matching)) is made
+  part of the job.
+- **Retention.** `providerEvents` rows and finished jobs are kept forever.
 
 ## Shadow writes
 
