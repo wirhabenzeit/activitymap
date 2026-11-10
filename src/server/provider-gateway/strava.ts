@@ -24,6 +24,12 @@ type Reads = Pick<
  * One provider read for an owner. The account's token is refreshed when it
  * has expired (and the new one stored), and every request, the refresh
  * included, reserves from the shared budget that all accounts use.
+ *
+ * The provider can reject a token before its recorded expiry. That is not
+ * the end of the connection while the refresh token still works: the token
+ * is refreshed once through the account service, which stores it under the
+ * same guards as any refresh, and the read is made once more. Only when that
+ * refresh or the second read is rejected too does the error stand.
  */
 export async function readFromStrava(
   owner: { userId: string; athleteId: number },
@@ -34,50 +40,71 @@ export async function readFromStrava(
   } = {},
 ): Promise<unknown> {
   const resolve = deps.resolveAccount ?? getAccountInternal;
-  // Resolving can refresh the token, and two requests can refresh at once.
-  // The one that loses the stored-version check has not lost its access:
-  // the other saved valid credentials, so read the account again.
-  let account;
-  for (let attempt = 1; ; attempt++) {
-    try {
-      account = await resolve({ userId: owner.userId });
-      break;
-    } catch (error) {
-      if (
-        !(error instanceof AccountCredentialsUnavailableError) ||
-        error.reason !== 'changed' ||
-        attempt >= CREDENTIAL_CONFLICT_ATTEMPTS
-      )
-        throw error;
-    }
-  }
-  if (
-    !account?.access_token ||
-    account.revokedAt ||
-    account.scheduledErasureAt ||
-    account.accountId !== String(owner.athleteId)
-  )
-    throw new AccountCredentialsUnavailableError('missing_credentials');
-  const client = (
+  const createClient =
     deps.createClient ??
-    ((token: string) => StravaClient.withAccessToken(token))
-  )(account.access_token);
-  switch (operation.kind) {
-    case 'activity':
-      // IDs stay decimal strings: they can exceed the safe integer range.
-      return client.getActivity(operation.id);
-    case 'streams':
-      return client.getActivityStreams(operation.id);
-    case 'photos':
-      return client.getActivityPhotos(operation.id);
-    case 'activities':
-      return client.getActivities({
-        page: operation.page,
-        per_page: operation.perPage,
-        before: operation.before,
-        after: operation.after,
-      });
+    ((token: string) => StravaClient.withAccessToken(token));
+  /** The owner's usable access token, refreshed first when asked to. */
+  const accessToken = async (forceRefresh: boolean) => {
+    // Resolving can refresh the token, and two requests can refresh at
+    // once. The one that loses the stored-version check has not lost its
+    // access: the other saved valid credentials, so read the account again.
+    let account;
+    for (let attempt = 1; ; attempt++) {
+      try {
+        account = await resolve({ userId: owner.userId, forceRefresh });
+        break;
+      } catch (error) {
+        if (
+          !(error instanceof AccountCredentialsUnavailableError) ||
+          error.reason !== 'changed' ||
+          attempt >= CREDENTIAL_CONFLICT_ATTEMPTS
+        )
+          throw error;
+        // The other request refreshed already; its token is the new one.
+        forceRefresh = false;
+      }
+    }
+    if (
+      !account?.access_token ||
+      account.revokedAt ||
+      account.scheduledErasureAt ||
+      account.accountId !== String(owner.athleteId)
+    )
+      throw new AccountCredentialsUnavailableError('missing_credentials');
+    return account.access_token;
+  };
+  const read = (token: string) => {
+    const client = createClient(token);
+    switch (operation.kind) {
+      case 'activity':
+        // IDs stay decimal strings: they can exceed the safe integer range.
+        return client.getActivity(operation.id);
+      case 'streams':
+        return client.getActivityStreams(operation.id);
+      case 'photos':
+        return client.getActivityPhotos(operation.id);
+      case 'activities':
+        return client.getActivities({
+          page: operation.page,
+          per_page: operation.perPage,
+          before: operation.before,
+          after: operation.after,
+        });
+    }
+  };
+  try {
+    return await read(await accessToken(false));
+  } catch (error) {
+    // A missing activity permission is a 401 as well, and no refresh fixes
+    // that.
+    if (
+      !(error instanceof StravaApiError) ||
+      error.status !== 401 ||
+      isStravaActivityPermissionError(error)
+    )
+      throw error;
   }
+  return read(await accessToken(true));
 }
 
 /** The typed failure for an error from `readFromStrava`, or null when it is

@@ -249,7 +249,9 @@ the activity) or `upstream_error` (with whether a retry can help). A bad
 signature is 401, an owner the gateway may not read for is 403, and anything
 unexpected is a 500 without detail. Two requests that refresh the same token
 at once are not a failure: the one that loses reads the account again and
-uses the credentials the other stored. Activity IDs stay decimal strings from
+uses the credentials the other stored. A token the provider rejects before
+its recorded expiry is refreshed once and the read repeated; only a refused
+refresh or a second rejection is `credentials_rejected`. Activity IDs stay decimal strings from
 the request to the provider URL, and a provider `Retry-After` (seconds or an
 HTTP date) becomes the `rate_limited` wait.
 

@@ -150,6 +150,102 @@ void test('a credential conflict is read again, not reported as a lost connectio
   assert.equal(revokedCalls, 1);
 });
 
+void test('a token rejected before its expiry is refreshed once and the read repeated', async () => {
+  const rejected = () => new StravaApiError('Authorization Error', 401);
+  const scenario = (options: {
+    /** Tokens the provider rejects. */
+    reject: string[];
+    refresh?: () => never;
+    error?: () => Error;
+  }) => {
+    const resolved: boolean[] = [];
+    const used: string[] = [];
+    const result = readFromStrava(
+      owner,
+      { kind: 'activity', id: '7' },
+      {
+        resolveAccount: (async (identity: { forceRefresh?: boolean }) => {
+          resolved.push(identity.forceRefresh === true);
+          if (identity.forceRefresh) options.refresh?.();
+          return {
+            access_token: identity.forceRefresh ? 'refreshed' : 'stored',
+            accountId: '42',
+            revokedAt: null,
+            scheduledErasureAt: null,
+          };
+        }) as never,
+        createClient: ((token: string) => ({
+          getActivity: async () => {
+            used.push(token);
+            if (options.reject.includes(token))
+              throw (options.error ?? rejected)();
+            return `read with ${token}`;
+          },
+        })) as never,
+      },
+    );
+    return { result, resolved, used };
+  };
+  const failure = async (result: Promise<unknown>) =>
+    gatewayFailureFor(
+      await result.then(
+        () => assert.fail('must reject'),
+        (reason: unknown) => reason,
+      ),
+    );
+
+  // The stored token is rejected, the refresh token still works.
+  const recovered = scenario({ reject: ['stored'] });
+  assert.equal(await recovered.result, 'read with refreshed');
+  assert.deepEqual(recovered.resolved, [false, true]);
+  assert.deepEqual(recovered.used, ['stored', 'refreshed']);
+
+  // The refreshed token is rejected too: once is the limit.
+  const twice = scenario({ reject: ['stored', 'refreshed'] });
+  assert.deepEqual(await failure(twice.result), {
+    kind: 'credentials_rejected',
+  });
+  assert.deepEqual(twice.used, ['stored', 'refreshed']);
+
+  // The refresh itself is refused: the connection really is gone.
+  const revoked = scenario({
+    reject: ['stored'],
+    refresh: () => {
+      throw new AccountCredentialsUnavailableError('revoked');
+    },
+  });
+  assert.deepEqual(await failure(revoked.result), {
+    kind: 'credentials_rejected',
+  });
+  assert.deepEqual(revoked.used, ['stored']);
+
+  // A missing activity permission is not a rejected token: no refresh.
+  const permission = scenario({
+    reject: ['stored'],
+    error: () =>
+      new StravaApiError('Authorization Error', 401, [
+        {
+          resource: 'AccessToken',
+          field: 'activity:read_permission',
+          code: 'missing',
+        },
+      ]),
+  });
+  assert.deepEqual(await failure(permission.result), { kind: 'forbidden' });
+  assert.deepEqual(permission.resolved, [false]);
+
+  // Other failures are not retried either.
+  const limited = scenario({
+    reject: ['stored'],
+    error: () => new StravaApiError('Too many', 429, undefined, 60),
+  });
+  assert.deepEqual(await failure(limited.result), {
+    kind: 'rate_limited',
+    retryAfterSeconds: 60,
+  });
+  assert.deepEqual(limited.resolved, [false]);
+});
+
 void test('errors map to failures the caller can act on', () => {
   assert.deepEqual(gatewayFailureFor(new StravaBudgetExceededError(90.2)), {
     kind: 'rate_limited',
