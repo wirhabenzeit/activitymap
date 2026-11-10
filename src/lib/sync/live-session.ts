@@ -2,6 +2,7 @@
 
 import type { QueryClient } from '@tanstack/react-query';
 
+import type { PhotoDTO } from '~/contracts/v1/photo';
 import { authClient } from '~/lib/auth-client';
 
 import { type LiveClient, LiveLibrary, createLiveClient } from './convex-live';
@@ -101,9 +102,13 @@ export function startLiveSession(options: {
   refresh: () => Promise<void>;
   isCurrent: () => boolean;
   onSyncing: () => void;
-  onComplete: (signal: AbortSignal) => void;
+  /** The library is current. `photos` reads the owner's photo list from
+   * Convex for as long as the session runs. */
+  onComplete: (signal: AbortSignal, photos: () => Promise<PhotoDTO[]>) => void;
   /** Activities were added or changed after the first catch-up. */
   onChange?: (signal: AbortSignal) => void;
+  /** Photos changed after the first catch-up. */
+  onPhotoChange?: (signal: AbortSignal) => void;
   /** Activities committed to the store, with their stream metadata, so
    * chart data loaded for an earlier recording can be dropped. */
   onActivityChanges?: (
@@ -169,7 +174,10 @@ export function startLiveSession(options: {
           () => {
             if (stopped || !options.isCurrent()) return;
             completed = true;
-            options.onComplete(session.signal);
+            const current = live;
+            options.onComplete(session.signal, () =>
+              current ? current.photos() : Promise.resolve([]),
+            );
           },
           (error: unknown) =>
             fail(error instanceof Error ? error : new Error(String(error))),
@@ -178,6 +186,10 @@ export function startLiveSession(options: {
       onChange: () => {
         if (completed && !stopped && options.isCurrent())
           options.onChange?.(session.signal);
+      },
+      onPhotoChange: () => {
+        if (completed && !stopped && options.isCurrent())
+          options.onPhotoChange?.(session.signal);
       },
       onError: fail,
     },

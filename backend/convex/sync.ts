@@ -8,7 +8,12 @@ import { MAX_PAGE_BYTES } from './activityProjection';
 import { activityFor } from './activityWrites';
 import { currentRecording, liveRows, project } from './liveProjection';
 import { idKey, requireHead, requireOwner, scopeFields } from './owners';
-import { photoPage, photosByIds, photosOfActivities } from './photos';
+import {
+  photoPage,
+  photosByIds,
+  photosOfActivities,
+  storedPhotoCount,
+} from './photos';
 
 const id = v.string();
 const cursor = v.union(id, v.null());
@@ -262,6 +267,13 @@ export const read = internalQuery({
               counts.refreshRequiredPhotos++;
             else counts.unknownPhotos++;
           }
+          const photos = await storedPhotoCount(ctx, owner, row.key);
+          counts.photoCount += photos;
+          if (
+            photos > 0 &&
+            (item.total_photo_count ?? item.photo_count ?? 0) > 0
+          )
+            counts.activitiesWithStoredPhotos++;
           const recording = await currentRecording(ctx, row, item);
           if (recording) {
             if (Object.values(recording.manifest.counts).some((n) => n! > 0))

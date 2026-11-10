@@ -3,6 +3,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 
+import type { PhotoDTO } from '~/contracts/v1/photo';
 import {
   ACCOUNT_DELETED_STORAGE_KEY,
   clearDeletedAccountData,
@@ -372,14 +373,17 @@ export function OfflineSyncProvider() {
       const summariesVisible = () => {
         if (document.visibilityState === 'visible') summaries();
       };
-      // Convex holds no photos: read the photo list from REST once the
-      // library is current, and again when activities change. A request made
-      // during a run starts one more run after it.
+      // Photos are not part of the library feed: read the photo list from
+      // Convex once the library is current, and again when the feed reports
+      // photo changes. A request made during a run starts one more run after
+      // it.
+      let listPhotos: (() => Promise<PhotoDTO[]>) | null = null;
       let photosRunning = false;
       let photosRequested = false;
       const photos = () => {
         const signal = liveSignal;
-        if (!signal || signal.aborted) return;
+        const list = listPhotos;
+        if (!signal || signal.aborted || !list) return;
         if (photosRunning) {
           photosRequested = true;
           return;
@@ -389,6 +393,7 @@ export function OfflineSyncProvider() {
         void syncLivePhotos({
           scope,
           signal,
+          list,
           commit: (write) => requestLibrarySync(queryClient, scope, write),
         })
           .catch((error: unknown) => {
@@ -416,6 +421,7 @@ export function OfflineSyncProvider() {
       window.addEventListener('activitymap:retry-browser-sync', followUps);
       const stopTriggers = () => {
         liveSignal = null;
+        listPhotos = null;
         window.clearInterval(interval);
         document.removeEventListener('visibilitychange', summariesVisible);
         window.removeEventListener('online', followUps);
@@ -436,16 +442,18 @@ export function OfflineSyncProvider() {
             error: null,
             retryAt: null,
           }),
-        onComplete: (signal) => {
+        onComplete: (signal, photoList) => {
           updateBrowserSyncStatus(activeUserId, {
             phase: 'ready',
             lastSuccess: new Date().toISOString(),
             error: null,
           });
           liveSignal = signal;
+          listPhotos = photoList;
           followUps();
         },
-        onChange: followUps,
+        onChange: summaries,
+        onPhotoChange: photos,
         onActivityChanges: (changes) =>
           reconcileSummaries(activeUserId, changes, () => {
             if (!mounted)

@@ -48,6 +48,7 @@ const changed = (
 function fakeClient(
   changes: (after: number | null) => ChangesResult,
   pages: Record<string, ListPage> = {},
+  photoPages: Record<string, { items: unknown[]; next: string | null }> = {},
 ) {
   const subscriptions: Subscription[] = [];
   const reads: string[] = [];
@@ -72,6 +73,11 @@ function fakeClient(
           .cursor;
         reads.push(`list ${cursor}`);
         return pages[cursor ?? 'start'];
+      }
+      if (name === 'library:photos') {
+        const after = args.after as string | null;
+        reads.push(`photos ${after}`);
+        return photoPages[after ?? 'start'];
       }
       throw new Error(`unexpected ${name}`);
     }) as LiveClient['query'],
@@ -114,6 +120,7 @@ function events() {
       onReady: () => seen.push('ready'),
       onComplete: () => seen.push('complete'),
       onChange: () => seen.push('change'),
+      onPhotoChange: () => seen.push('photos'),
       onError: (error: Error) => seen.push(`error ${error.message}`),
     },
   };
@@ -222,4 +229,34 @@ void test('a failed subscription reports once so the caller can fall back', asyn
   subscription.onError(new Error('again'));
   await library.settled();
   assert.deepEqual(seen, ['ready', 'complete', 'error not_authorized']);
+});
+
+void test('photo changes are announced and the photo list is read in pages', async () => {
+  const photoOnly = { ...changed(9), photos: true } as ChangesResult;
+  const { client, reads, following } = fakeClient(
+    () => changed(7),
+    {},
+    {
+      start: { items: [{ unique_id: 'a' }, { unique_id: 'b' }], next: 'b' },
+      b: { items: [{ unique_id: 'c' }], next: null },
+    },
+  );
+  const { store, log } = fakeStore({ sequence: 7, version: 'v1' });
+  const { seen, events: handlers } = events();
+  const library = new LiveLibrary(client, store, handlers, 2);
+  await library.settled();
+  assert.deepEqual(seen, ['ready', 'complete']);
+
+  // A read with photo changes only moves the position and reports them.
+  following().callback(photoOnly);
+  await library.settled();
+  assert.deepEqual(log, ['@9/v1']);
+  assert.deepEqual(seen, ['ready', 'complete', 'photos']);
+  assert.equal(following().after, 9);
+
+  assert.deepEqual(
+    (await library.photos()).map((item) => item.unique_id),
+    ['a', 'b', 'c'],
+  );
+  assert.deepEqual(reads.slice(-2), ['photos null', 'photos b']);
 });

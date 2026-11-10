@@ -156,7 +156,10 @@ and recording publication update in the same transaction (skipping writes
 that change no count), plus the oldest and newest activity from the
 `by_owner_live_start` index. New owners start with zero counts. For owners that
 existed before `ownerStats`, run a recount once; writes keep counts consistent
-while it runs, and `status` reports `ready: false` until it finishes:
+while it runs, and `status` reports `ready: false` until it finishes. The
+photo counts (`photoCount`, `activitiesWithStoredPhotos`) are kept by the
+photo writes in the same way; an owner whose photos were stored before these
+counts existed needs one recount too:
 
 ```sh
 pnpm exec convex run stats:rebuild '{"userId":"<userId>"}'
@@ -174,9 +177,11 @@ ACTIVITYMAP_CONVEX_LIVE_OWNERS='["<userId>"]'
 ```
 
 Only the library download changes for such an account
-(`src/server/convex-live-owners.ts`): edits, charts, status and photos keep
-their Postgres routes, and the client reads the photo list from the REST
-bootstrap because photos are not stored here. The account must also be a
+(`src/server/convex-live-owners.ts`): edits, charts and status keep their
+Postgres routes. Photos come from here as well: `library.changes` sets
+`photos` when a read passed photo changes, and the client then reads the
+whole list through `library.photos` (500 a page) and reconciles its store
+(`src/lib/sync/live-photos.ts`). The account must also be a
 shadow owner, so the mirror keeps this deployment current, and its counts need
 one `stats:rebuild`. Library changes reach the browser after the next mirror
 run. Remove the account from the list to return it to the REST sync.
@@ -215,8 +220,9 @@ their own position in the checkpoint (`mirror.photoSequence`), separate from
 the activity position. A library copied
 before photos were mirrored is caught up by a resumable pass over all
 activities, tracked in the checkpoint (`mirror.photos`, `null` when done).
-Deploy this package before the app version that mirrors photos: an older
-deployment rejects the new write operations.
+Deploy this package before the app version that mirrors photos or reads them
+live: an older deployment rejects the new write operations and has no
+`library.photos`.
 
 `POST /api/cron/mirror-convex-shadow` runs the mirror for the users listed in
 `ACTIVITYMAP_CONVEX_SHADOW_OWNERS` (a JSON array of application user IDs). It is

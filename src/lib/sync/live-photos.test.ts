@@ -5,7 +5,6 @@ import test from 'node:test';
 import type { PhotoDTO } from '~/contracts/v1/photo';
 
 import { syncLivePhotos } from './live-photos';
-import type { drainSyncBootstrap } from './v1-client';
 
 const scope = 'auth:user-a';
 const photo = (id: string, caption = '') =>
@@ -14,12 +13,7 @@ const photo = (id: string, caption = '') =>
 function harness(held: PhotoDTO[], pages: PhotoDTO[][]) {
   const rows = new Map(held.map((item) => [item.unique_id, item]));
   const log: string[] = [];
-  const drain = (async (resource, onPage) => {
-    assert.equal(resource, 'photos');
-    for (const items of pages)
-      await onPage({ resource: 'photos', items } as never);
-    return { snapshotCursor: null };
-  }) as typeof drainSyncBootstrap;
+  const list = async () => pages.flat();
   const store = {
     getCachedPhotoDTOs: async () => [...rows.values()],
     upsertPhotoDTOs: async (_scope: string, items: PhotoDTO[]) => {
@@ -33,14 +27,14 @@ function harness(held: PhotoDTO[], pages: PhotoDTO[][]) {
       for (const id of ids) rows.delete(id);
     },
   };
-  return { rows, log, drain, store };
+  return { rows, log, list, store };
 }
 
 const commit = (write: (signal: AbortSignal) => Promise<void>) =>
   write(new AbortController().signal);
 
 void test('the store is reconciled with the listed photos', async () => {
-  const { rows, log, drain, store } = harness(
+  const { rows, log, list, store } = harness(
     [photo('a'), photo('b', 'old'), photo('gone')],
     [[photo('a'), photo('b', 'new')], [photo('c')]],
   );
@@ -48,7 +42,7 @@ void test('the store is reconciled with the listed photos', async () => {
     scope,
     signal: new AbortController().signal,
     commit,
-    drain,
+    list,
     store,
   });
   assert.equal(changed, true);
@@ -59,12 +53,12 @@ void test('the store is reconciled with the listed photos', async () => {
 });
 
 void test('an unchanged photo list writes nothing', async () => {
-  const { log, drain, store } = harness([photo('a')], [[photo('a')]]);
+  const { log, list, store } = harness([photo('a')], [[photo('a')]]);
   const changed = await syncLivePhotos({
     scope,
     signal: new AbortController().signal,
     commit,
-    drain,
+    list,
     store,
   });
   assert.equal(changed, false);
@@ -80,7 +74,7 @@ void test('a fenced writer or a failed download leaves the store untouched', asy
       scope,
       signal: new AbortController().signal,
       commit: (write) => write(retired.signal),
-      drain: fenced.drain,
+      list: fenced.list,
       store: fenced.store,
     }),
     { name: 'AbortError' },
@@ -94,7 +88,7 @@ void test('a fenced writer or a failed download leaves the store untouched', asy
       scope,
       signal: new AbortController().signal,
       commit,
-      drain: async () => {
+      list: async () => {
         throw new Error('offline');
       },
       store: failing.store,

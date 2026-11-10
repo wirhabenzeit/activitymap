@@ -4,6 +4,7 @@ import type { Doc } from './_generated/dataModel';
 import type { MutationCtx, QueryCtx } from './_generated/server';
 import { activityFor, publishChange } from './activityWrites';
 import { idKey, requireOwner } from './owners';
+import { applyStats, contribution } from './stats';
 
 /**
  * Photos are provider metadata (captions, sizes and CDN URLs), stored one
@@ -19,6 +20,9 @@ import { idKey, requireOwner } from './owners';
  * Each activity's set has a source revision (`photoSets`), recorded for empty
  * sets too. A writer with an older or equal revision is ignored as a whole,
  * so a stale set can neither replace nor delete what a newer one wrote.
+ *
+ * Stored photos are part of their activity's contribution to the owner's
+ * counts (convex/stats.ts), so every write here applies the difference.
  */
 
 export const MAX_PHOTOS_PER_ACTIVITY = 200;
@@ -41,6 +45,16 @@ function photosOf(
     .take(MAX_PHOTOS_PER_ACTIVITY + 1);
 }
 
+/** How many current photos Convex holds for one activity. */
+export async function storedPhotoCount(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  activity: string,
+) {
+  const stored = await photosOf(ctx, owner._id, activity);
+  return stored.filter((doc) => doc.generation === owner.generation).length;
+}
+
 /** The owner's current photos of the activities among `activityIds`. */
 export async function photosOfActivities(
   ctx: QueryCtx,
@@ -53,6 +67,24 @@ export async function photosOfActivities(
   return sets
     .flat()
     .flatMap((doc) => (doc.generation === owner.generation ? [doc.dto] : []));
+}
+
+/** Delete one photo document and keep its activity's counts current. */
+async function removePhoto(
+  ctx: MutationCtx,
+  owner: Doc<'owners'>,
+  doc: Doc<'photos'>,
+) {
+  const row = await activityFor(ctx, owner._id, doc.activity);
+  const before = await contribution(ctx, owner, row);
+  await ctx.db.delete('photos', doc._id);
+  await applyStats(
+    ctx,
+    owner._id,
+    doc.activity,
+    before,
+    await contribution(ctx, owner, row),
+  );
 }
 
 function setFor(ctx: QueryCtx, owner: Doc<'owners'>['_id'], activity: string) {
@@ -130,6 +162,7 @@ export async function applyPhotoSet(
     });
 
   let changed = 0;
+  const countedBefore = await contribution(ctx, owner, row);
   const stored = await photosOf(ctx, owner._id, activity);
   for (const doc of stored) {
     const dto = next.get(doc.key);
@@ -156,7 +189,7 @@ export async function applyPhotoSet(
       .query('photos')
       .withIndex('by_owner_key', (q) => q.eq('owner', owner._id).eq('key', key))
       .unique();
-    if (elsewhere) await ctx.db.delete('photos', elsewhere._id);
+    if (elsewhere) await removePhoto(ctx, owner, elsewhere);
     await ctx.db.insert('photos', {
       owner: owner._id,
       key,
@@ -168,6 +201,14 @@ export async function applyPhotoSet(
     await publishChange(ctx, owner, key, 'upsert', 'photo');
     changed++;
   }
+  if (changed > 0)
+    await applyStats(
+      ctx,
+      owner._id,
+      activity,
+      countedBefore,
+      await contribution(ctx, owner, row),
+    );
   return changed;
 }
 
@@ -197,7 +238,7 @@ export async function deletePhotoRecords(
     // A newer set of its activity has already decided about this photo.
     const fence = await setFor(ctx, owner._id, doc.activity);
     if (fence && args.sourceRevision <= fence.revision) continue;
-    await ctx.db.delete('photos', doc._id);
+    await removePhoto(ctx, owner, doc);
     await publishChange(ctx, owner, doc.key, 'delete', 'photo');
     deleted++;
   }
@@ -205,7 +246,8 @@ export async function deletePhotoRecords(
 }
 
 /** Remove a deleted activity's photos. Clients drop them with the activity,
- * so no change entries are published. */
+ * so no change entries are published, and the caller takes the activity's
+ * whole contribution out of the counts. */
 export async function removeActivityPhotos(
   ctx: MutationCtx,
   owner: Doc<'owners'>['_id'],
