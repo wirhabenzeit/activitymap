@@ -8,6 +8,7 @@ import { MAX_PAGE_BYTES } from './activityProjection';
 import { activityFor } from './activityWrites';
 import { currentRecording, liveRows, project } from './liveProjection';
 import { idKey, requireHead, requireOwner, scopeFields } from './owners';
+import { photoPage, photosByIds } from './photos';
 
 const id = v.string();
 const cursor = v.union(id, v.null());
@@ -23,8 +24,7 @@ const operation = v.union(
   }),
   v.object({ kind: v.literal('activityIds'), ids: v.array(id) }),
   v.object({ kind: v.literal('summaries'), ids: v.array(id) }),
-  // List pages for the v1 activity/photo endpoints. Photos are not persisted
-  // by this package yet, so photo reads are explicitly empty.
+  // List pages for the v1 activity/photo endpoints.
   v.object({ kind: v.literal('activities'), after: cursor, limit: v.number() }),
   v.object({ kind: v.literal('photos'), after: cursor, limit: v.number() }),
   v.object({ kind: v.literal('photoIds'), ids: v.array(id) }),
@@ -83,6 +83,8 @@ async function bootstrapPage(
 }
 
 const LIST_PAGE_LIMIT = 32;
+// Photo documents are a few KiB of metadata each.
+const PHOTO_PAGE_LIMIT = 500;
 const STATUS_PAGE_LIMIT = 96;
 
 /** Chart summaries and stream metadata for the owner's activities among
@@ -136,8 +138,10 @@ export const read = internalQuery({
         return head;
       case 'bootstrap': {
         const response = { head, resource: op.resource };
-        if (op.resource === 'photos')
-          return { ...response, items: [], more: false };
+        if (op.resource === 'photos') {
+          const items = await photoPage(ctx, owner, op.after, op.limit);
+          return { ...response, items, more: items.length === op.limit };
+        }
         const { items, more } = await bootstrapPage(ctx, owner, op);
         return { ...response, items, more };
       }
@@ -198,9 +202,16 @@ export const read = internalQuery({
           return item ? [item] : [];
         });
       }
-      case 'photos':
-      case 'photoIds':
-        return [];
+      case 'photos': {
+        if (op.limit > PHOTO_PAGE_LIMIT)
+          throw new Error('Invalid list page size');
+        return photoPage(ctx, owner, op.after, op.limit);
+      }
+      case 'photoIds': {
+        if (op.ids.length > PHOTO_PAGE_LIMIT)
+          throw new Error('Too many photo IDs');
+        return photosByIds(ctx, owner, op.ids);
+      }
       case 'status': {
         const rows = await liveRows(
           ctx,
@@ -298,10 +309,14 @@ export const bootstrapJson = internalQuery({
     });
     if (!Number.isInteger(op.limit) || op.limit < 1 || op.limit > 500)
       throw new Error('Invalid sync page limit');
-    const page =
-      op.resource === 'photos'
-        ? { json: [], more: false }
-        : await bootstrapPage(ctx, owner, op);
+    let page: { json: string[]; more: boolean };
+    if (op.resource === 'photos') {
+      const items = await photoPage(ctx, owner, op.after, op.limit);
+      page = {
+        json: items.map((item) => JSON.stringify(item)),
+        more: items.length === op.limit,
+      };
+    } else page = await bootstrapPage(ctx, owner, op);
     return `{"head":${head},"resource":"${op.resource}","items":[${page.json.join(',')}],"more":${page.more}}`;
   },
 });

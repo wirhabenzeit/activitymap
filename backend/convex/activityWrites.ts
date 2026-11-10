@@ -22,6 +22,7 @@ import {
   streamMetadataValidator,
 } from './activityValidators';
 import { idKey, requireHead, requireOwner, scopeFields } from './owners';
+import { removeActivityPhotos } from './photos';
 import { manifestValidator, summaryValidator } from './recordingValidators';
 import { applyStats, contribution } from './stats';
 
@@ -48,6 +49,7 @@ export async function publishChange(
   owner: Doc<'owners'>,
   entityId: string,
   operation: 'upsert' | 'delete',
+  entityType: 'activity' | 'photo' = 'activity',
 ) {
   const head = await requireHead(ctx, owner._id);
   const sequence = head.sequence + 1;
@@ -59,7 +61,7 @@ export async function publishChange(
     sequence,
     entityId,
     operation,
-    entityType: 'activity',
+    entityType,
     changedAt: Date.now(),
   });
 }
@@ -133,6 +135,7 @@ export async function applySourceRecord(
     else await ctx.db.insert('activities', next);
     if (prior && !prior.deleted)
       await publishChange(ctx, owner, args.id, 'delete');
+    await removeActivityPhotos(ctx, owner._id, key);
     await applyStats(ctx, owner._id, key, countedBefore, null);
     return true;
   }
