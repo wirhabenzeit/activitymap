@@ -37,9 +37,10 @@ import {
 const KEY = 'activity-place-matching';
 const preferredCatalogue = sql`(SELECT snapshot_id FROM place_catalogues WHERE active AND ${isServingRegion(sql`region_id`)} ORDER BY ${servingRegionRank(sql`region_id`)} LIMIT 1)`;
 const connected = sql`EXISTS (SELECT 1 FROM account c WHERE c."userId"=u.id AND c."providerId"='strava' AND c."accountId"=u.athlete_id::text AND c.revoked_at IS NULL AND c.scheduled_erasure_at IS NULL AND (COALESCE(c."accessToken",c.access_token,'')<>'' OR COALESCE(c."refreshToken",c.refresh_token,'')<>''))`;
-/** `connected`, and Postgres is the owner's writer: who the matcher works
- * for. Reads of stored results keep using `connected`, so an owner Convex
- * writes for still sees what the reverse mirror copied back. */
+/** `connected`, and Postgres is the owner's writer: who the matcher takes
+ * work for. Reads of stored results and the pending queue keep using
+ * `connected`: an owner Convex writes for still sees what the reverse mirror
+ * copied back, and their queued work waits for Postgres to write again. */
 const matchable = sql`${connected} AND u.writer='postgres'`;
 export type MatchingCandidate = {
   activityId: string;
@@ -538,6 +539,10 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
       if (queued) {
         // One atomic seed after catalogue/recipe changes. When unchanged, the
         // empty changed CTE makes the activity scan a never-executed branch.
+        // Seeding covers every connected owner, whoever writes for them: the
+        // checkpoint is global, so an owner skipped here would never be queued
+        // for this catalogue once Postgres writes for them again. Only taking
+        // work (below) is limited to owners Postgres ingests for.
         await database.execute(sql`
           WITH changed AS (
             INSERT INTO place_matching_queue_state(singleton,recipe_hash,catalogue_snapshot_id,catalogue_revision)
@@ -553,7 +558,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
           FROM activities a JOIN "user" u ON u.athlete_id=a.athlete
           JOIN activity_streams s ON s.activity_id=a.id
           LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
-          WHERE EXISTS(SELECT 1 FROM changed) AND ${matchable}
+          WHERE EXISTS(SELECT 1 FROM changed) AND ${connected}
             AND s.fetched_at IS NOT NULL AND s.invalidated_at IS NULL
             AND s.last_attempt_status<>'invalidated' AND s.payload IS NOT NULL
             AND (NOT COALESCE((${sameInput(catalogue)}),false) OR c.result IS NULL)
@@ -596,7 +601,7 @@ export function createPlaceMatchingRepository(database: typeof db = db) {
         SELECT a.id::text AS activity_id,u.id AS user_id,u.athlete_id AS athlete_id,s.generation,s.revision::text,s.source_version,a.map_bbox,a.start_latlng
         FROM ${queued ? sql`todo t JOIN activities a ON a.id=t.id` : sql`activities a`} JOIN "user" u ON u.athlete_id=a.athlete JOIN activity_streams s ON s.activity_id=a.id
         LEFT JOIN activity_place_checks c ON c.activity_id=a.id AND c.recipe_hash=${MATCHING_RECIPE_HASH}
-        WHERE ${connected} AND ${current} ${
+        WHERE ${matchable} AND ${current} ${
           activityIds
             ? sql`AND a.id IN (${sql.join(
                 activityIds.map((id) => sql`${id}::bigint`),

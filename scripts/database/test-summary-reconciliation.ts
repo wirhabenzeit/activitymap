@@ -298,6 +298,20 @@ async function run(): Promise<void> {
 
   const [candidate] = await repository.listDue(1, dueBefore, NOW);
   assert.ok(candidate);
+  // Handed off between being listed and being claimed: no lease.
+  await testDb
+    .update(users)
+    .set({ writer: 'handoff' })
+    .where(eq(users.id, candidate.userId));
+  assert.equal(
+    await repository.claim(candidate, dueBefore, NOW, 600_000),
+    null,
+    'an owner handed off after selection is not claimed',
+  );
+  await testDb
+    .update(users)
+    .set({ writer: 'postgres' })
+    .where(eq(users.id, candidate.userId));
   const claims = await Promise.all([
     repository.claim(candidate, dueBefore, NOW, 600_000),
     repository.claim(candidate, dueBefore, NOW, 600_000),

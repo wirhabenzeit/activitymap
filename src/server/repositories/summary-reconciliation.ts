@@ -421,6 +421,7 @@ export function createSummaryReconciliationRepository(
         const [current] = await tx
           .select({
             lastCompletedAt: users.lastSummaryReconciledAt,
+            writer: users.writer,
             revokedAt: accounts.revokedAt,
             accessToken: accounts.accessToken,
             legacyAccessToken: accounts.access_token,
@@ -444,7 +445,9 @@ export function createSummaryReconciliationRepository(
           .limit(1);
 
         if (
-          !current ||
+          // Missing, or handed off since it was listed: no lease, so no
+          // provider calls whose results the writer fence would refuse.
+          current?.writer !== 'postgres' ||
           current.revokedAt ||
           (!current.accessToken &&
             !current.legacyAccessToken &&

@@ -747,6 +747,24 @@ try {
   );
   assert.equal((await repository.read(actor, id)).status, 'pending');
   assert.equal((await run()).saved, 1);
+  // A catalogue change while the owner is handed off stays queued, and is
+  // matched once Postgres writes for them again, with no stream change.
+  await database
+    .update(schema.users)
+    .set({ writer: 'handoff' })
+    .where(eq(schema.users.id, actor.userId));
+  await client`UPDATE places SET display_name=display_name WHERE id=(SELECT id FROM places LIMIT 1)`;
+  assert.equal((await run()).selected, 0);
+  assert.equal((await run()).selected, 0);
+  await database
+    .update(schema.users)
+    .set({ writer: 'postgres' })
+    .where(eq(schema.users.id, actor.userId));
+  assert.equal(
+    (await run()).saved,
+    1,
+    'Work skipped during handoff is matched after hand-back',
+  );
   const beforeNoop = await repository.catalogue();
   // Exact no-op publication needs the unchanged synthetic rows, so restore them
   // by publication first, then publish the identical snapshot again.
