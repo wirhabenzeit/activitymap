@@ -1,9 +1,22 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import { convexTest } from 'convex-test';
 import test, { after, mock } from 'node:test';
 
+import { activityPlacesResponseSchema } from '../../src/contracts/activity-places';
 import { activityDTOSchema } from '../../src/contracts/v1/activity';
+import { createBatchActivityPlaceMatcher } from '../../src/server/application/batch-activity-places';
+import {
+  type PlaceRow,
+  datasetFor,
+} from '../../src/server/places/catalogue-rows';
+import { createSyntheticCatalogue } from '../../src/server/places/catalogue.fixture';
+import {
+  SERVER_MATCHER_POLICY,
+  matchingVersion as versionFor,
+} from '../../src/server/places/matching-version';
+import type { CandidatePlace } from '../../src/server/places/run-types';
 import type { RawActivityStreams } from '../../src/server/strava/streams';
 import { api, internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
@@ -22,6 +35,9 @@ const modules = {
   './library.ts': () => import('../convex/library'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
+  './places.ts': () => import('../convex/places'),
+  './shadowMatching.ts': () => import('../convex/shadowMatching'),
+  './shadowMatchingWorker.ts': () => import('../convex/shadowMatchingWorker'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
   './stats.ts': () => import('../convex/stats'),
   './sync.ts': () => import('../convex/sync'),
@@ -558,4 +574,187 @@ void test('stored photos are counted, listed and announced in the feed', async (
   await convex.mutation(internal.stats.rebuildStep, { owner });
   assert.deepEqual(await counts(), before);
   assert.deepEqual(await paged(), before);
+});
+
+void test('the shadow matcher computes the results Postgres would and compares them', async () => {
+  const convex = await setup(4);
+  const synthetic = createSyntheticCatalogue();
+  const snapshotId = synthetic.manifest.catalogue_snapshot_id;
+  const revision = '7';
+  const version = versionFor({ snapshotId, revision });
+  const catalogueIdentity = createHash('sha256')
+    .update(JSON.stringify({ postgresMatchingVersion: version }))
+    .digest('hex');
+  await convex.mutation(internal.catalogue.select, {
+    scope,
+    catalogue: catalogueIdentity,
+    matchingVersion: version,
+  });
+
+  // The copied catalogue: one peak inside the synthetic coverage.
+  const peak: PlaceRow = {
+    id: '11111111-1111-4111-8111-111111111111',
+    displayName: 'Synthetic',
+    kinds: ['peak'],
+    subtypes: ['peak'],
+    location: { longitude: 8.123456789, latitude: 46.987654321 },
+    elevationM: 100,
+  };
+  const dataset = await datasetFor(snapshotId, revision);
+  const metadata = await convex.run((ctx) =>
+    ctx.storage.store(
+      new Blob([
+        JSON.stringify({
+          manifest: synthetic.manifest,
+          coverage: synthetic.coverage,
+        }),
+      ]),
+    ),
+  );
+  await convex.mutation(internal.places.begin, {
+    dataset,
+    snapshotId,
+    revision,
+    count: 1,
+    metadata,
+  });
+  const imported = await convex.mutation(internal.places.importBatch, {
+    dataset,
+    after: '',
+    places: [peak],
+  });
+
+  // 1000 passes the peak, 1001 is elsewhere in coverage, 1002 has no GPS and
+  // 1003 has no recording.
+  const stream = (data: unknown[]) => ({
+    data,
+    original_size: data.length,
+    resolution: 'high',
+    series_type: 'time',
+  });
+  const track = (latitude: number, longitude: number) =>
+    ({
+      latlng: stream(
+        [-0.0001, 0, 0.0001].map((dx) => [latitude, longitude + dx]),
+      ),
+      time: stream([0, 10, 20]),
+      distance: stream([0, 10, 20]),
+      altitude: stream([100, 100, 100]),
+    }) as RawActivityStreams;
+  const recorded: Record<string, RawActivityStreams> = {
+    '1000': track(peak.location.latitude, peak.location.longitude),
+    '1001': track(46.5, 8.5),
+    '1002': streams,
+  };
+  for (const [id, payload] of Object.entries(recorded))
+    await record(convex, [id], payload);
+
+  // What Postgres would have stored: the same matcher over the catalogue.
+  const reference = createBatchActivityPlaceMatcher({
+    snapshot: {
+      catalogue: synthetic,
+      places: [peak as CandidatePlace],
+      revision,
+    },
+    policy: SERVER_MATCHER_POLICY,
+  });
+  const expected = [];
+  for (const [id, payload] of Object.entries(recorded))
+    expected.push(
+      activityPlacesResponseSchema.parse(
+        await reference.match({
+          userId: scope.userId,
+          activityId: id,
+          input: {
+            payload: payload.latlng ? payload : { ...payload, latlng: null },
+            generation: 'pg-generation',
+            revision: '1',
+          },
+        } as Parameters<typeof reference.match>[0]),
+      ),
+    );
+  assert.deepEqual(
+    expected.map((result) => [result.status, result.places.length]),
+    [
+      ['complete', 1],
+      ['complete', 0],
+      // An absent GPS channel reaches the matcher as null, as in Postgres.
+      ['partial', 0],
+    ],
+  );
+  // 1001's copied result is tampered with, to prove a difference is found.
+  const copied = expected.map((result) =>
+    result.activityId === '1001'
+      ? { ...result, status: 'partial' as const }
+      : result,
+  );
+  assert.equal(
+    await convex.mutation(internal.importer.publishMatches, {
+      scope,
+      generation,
+      sourceRevision: 10,
+      catalogue: catalogueIdentity,
+      items: copied,
+    }),
+    3,
+  );
+
+  // An incomplete rowset cannot be matched against.
+  await assert.rejects(
+    convex.mutation(internal.shadowMatching.start, { userId: scope.userId }),
+    /No complete place catalogue/,
+  );
+  await convex.mutation(internal.places.complete, {
+    dataset,
+    digest: imported.digest,
+  });
+  const run = await convex.mutation(internal.shadowMatching.start, {
+    userId: scope.userId,
+  });
+  const status = async () =>
+    (
+      await convex.query(internal.shadowMatching.status, {
+        userId: scope.userId,
+      })
+    )[0]!;
+  for (let step = 0; step < 10 && !(await status()).done; step++)
+    await convex.action(internal.shadowMatchingWorker.run, { run });
+  const finished = await status();
+  assert.equal(finished.error, undefined);
+  assert.equal(finished.done, true);
+  assert.equal(finished.matched, 3);
+  assert.equal(finished.skipped, 1);
+  assert.deepEqual(finished.failed, []);
+
+  for (let step = 0; step < 10 && !(await status()).comparison?.done; step++)
+    await convex.mutation(internal.shadowMatching.compareStep, { run });
+  const { comparison } = await status();
+  assert(comparison?.done);
+  assert.equal(comparison.same, 2);
+  assert.equal(comparison.different, 1);
+  assert.equal(comparison.neither, 1);
+  assert.deepEqual(comparison.examples, [
+    {
+      key: comparison.examples[0]!.key,
+      postgres: 'partial, 0 places',
+      shadow: 'complete, 0 places',
+    },
+  ]);
+
+  // Shadow results never reach clients: 1001 still serves the copied one.
+  const viewer = convex.withIdentity(identity);
+  const served = await viewer.query(api.library.activity, { id: '1001' });
+  assert.equal(served?.placeMatches?.status, 'partial');
+
+  // A run against a rowset the owner's results were not computed with stops.
+  await convex.mutation(internal.catalogue.select, {
+    scope,
+    catalogue: 'a'.repeat(64),
+    matchingVersion: 'b'.repeat(64),
+  });
+  const mismatched = await convex.mutation(internal.shadowMatching.start, {
+    userId: scope.userId,
+  });
+  await convex.action(internal.shadowMatchingWorker.run, { run: mismatched });
+  assert.match((await status()).error ?? '', /differs from the owner/);
 });
