@@ -27,13 +27,25 @@ jobs:
       EXPECTED_DEPLOYMENT: prod:artful-mosquito-425
     steps:
       - name: Check the deploy key's target
+        # Says what the key is for without printing the token: the part
+        # before the bar names the deployment and is not secret.
         run: |
           if [ -z "$CONVEX_DEPLOY_KEY" ]; then
             echo "::error::CONVEX_DEPLOY_KEY is not set for the Production environment"
             exit 1
           fi
-          if [ "${CONVEX_DEPLOY_KEY%%|*}" != "$EXPECTED_DEPLOYMENT" ]; then
-            echo "::error::CONVEX_DEPLOY_KEY is not a key for $EXPECTED_DEPLOYMENT"
+          target="${CONVEX_DEPLOY_KEY%%|*}"
+          if [ "$target" = "$CONVEX_DEPLOY_KEY" ]; then
+            echo "::error::CONVEX_DEPLOY_KEY has no bar (${#CONVEX_DEPLOY_KEY} characters): expected $EXPECTED_DEPLOYMENT|<token>"
+            exit 1
+          fi
+          # Only a deployment or project name is ever echoed.
+          if ! printf '%s' "$target" | grep -Eq '^([a-z]+:)?[a-z]+-[a-z]+-[0-9]+$|^[a-z]+:[a-z0-9-]+:[a-z0-9-]+$'; then
+            echo "::error::CONVEX_DEPLOY_KEY does not start like a deploy key (${#target} characters before the bar; check for quotes or spaces)"
+            exit 1
+          fi
+          if [ "$target" != "$EXPECTED_DEPLOYMENT" ]; then
+            echo "::error::CONVEX_DEPLOY_KEY is a key for '$target', not for $EXPECTED_DEPLOYMENT"
             exit 1
           fi
       - uses: actions/checkout@v7
