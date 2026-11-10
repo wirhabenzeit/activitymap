@@ -24,6 +24,7 @@ import {
   SWEEP_INTERVAL_MS,
 } from '../convex/ingestionSweep';
 import schema from '../convex/schema';
+import { stravaDetail as detail, stravaPhoto as photo } from './fixtures';
 
 /**
  * Convex ingestion end to end: provider events, the job model, the Node
@@ -60,75 +61,6 @@ const streams: RawActivityStreams = {
     series_type: 'time',
   },
 };
-
-function detail(id: number, name: string, overrides: object = {}) {
-  return {
-    id,
-    resource_state: 3,
-    athlete: { id: 42 },
-    name,
-    description: null,
-    distance: 1000,
-    moving_time: 600,
-    elapsed_time: 660,
-    total_elevation_gain: 10,
-    elev_high: null,
-    elev_low: null,
-    sport_type: 'Ride',
-    start_date: '2026-11-01T08:00:00Z',
-    start_date_local: '2026-11-01T09:00:00Z',
-    timezone: '(GMT+01:00) Europe/Zurich',
-    start_latlng: null,
-    end_latlng: null,
-    achievement_count: 0,
-    kudos_count: 0,
-    comment_count: 0,
-    athlete_count: 1,
-    photo_count: 0,
-    total_photo_count: 0,
-    map: { id: `a${id}`, polyline: null, summary_polyline: null },
-    trainer: false,
-    commute: false,
-    manual: false,
-    private: false,
-    flagged: false,
-    workout_type: null,
-    upload_id: null,
-    average_speed: 1.6,
-    max_speed: 3,
-    has_kudoed: false,
-    hide_from_home: false,
-    gear_id: null,
-    kilojoules: null,
-    average_watts: null,
-    device_watts: null,
-    max_watts: null,
-    weighted_average_watts: null,
-    calories: null,
-    device_name: null,
-    pr_count: 0,
-    ...overrides,
-  };
-}
-
-function photo(uniqueId: string, activityId: number) {
-  return {
-    unique_id: uniqueId,
-    activity_id: activityId,
-    activity_name: null,
-    resource_state: 2,
-    caption: null,
-    type: 1,
-    source: 1,
-    post_id: null,
-    uploaded_at: null,
-    created_at: null,
-    urls: { '256': 'https://cdn.test/s.jpg', '5000': 'https://cdn.test/l.jpg' },
-    sizes: { '256': [256, 192], '5000': [2048, 1536] },
-    default_photo: false,
-    location: null,
-  };
-}
 
 class Refused extends Error {
   constructor(readonly failure: GatewayFailure) {

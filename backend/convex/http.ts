@@ -254,6 +254,18 @@ router.route({
             ...args,
           });
           break;
+        case 'activityKnown':
+          result = await ctx.runQuery(internal.ingestion.known, {
+            scope,
+            ...args,
+          });
+          break;
+        case 'applyActivity':
+          result = await ctx.runMutation(internal.ingestion.apply, {
+            scope,
+            ...args,
+          });
+          break;
         case 'checkpoint':
           result = await ctx.runMutation(internal.importer.checkpoint, {
             scope,

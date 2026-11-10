@@ -11,10 +11,19 @@ import { db } from '~/server/db';
 import { stravaWebhooks } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
 import { assertPostgresDataActor } from '~/server/preview/selection';
+import { writerOf } from '~/server/repositories/writers';
 
 import { StravaClient } from './client';
 import { type UpdateActivityInput } from './validators';
 import { webhookCallbackSecret, webhookCallbackUrl } from './webhook-callback';
+
+/** These adapters only know the Postgres path. For an account another store
+ * writes for, refuse before anything is changed at Strava; the v1 routes
+ * serve such an account. */
+async function assertPostgresWriter(userId: string) {
+  if ((await writerOf(userId)) !== 'postgres')
+    throw new Error('Operation unavailable for this account');
+}
 
 /**
  * Thin compatibility adapter: resolves the caller's `Actor` from the current
@@ -26,6 +35,7 @@ import { webhookCallbackSecret, webhookCallbackUrl } from './webhook-callback';
 export async function updateActivity(input: UpdateActivityInput) {
   const actor = await requireActor(await headers());
   assertPostgresDataActor(actor);
+  await assertPostgresWriter(actor.userId);
   return activitiesService.updateActivityForActor(actor, input);
 }
 
@@ -40,6 +50,7 @@ export async function updateActivity(input: UpdateActivityInput) {
 export async function refreshActivity(activityId: number) {
   const actor = await requireActor(await headers());
   assertPostgresDataActor(actor);
+  await assertPostgresWriter(actor.userId);
   return activitiesService.refreshActivityForActor(actor, activityId);
 }
 
@@ -52,6 +63,7 @@ export async function deleteActivities(input: number[]): Promise<{
 }> {
   const actor = await requireActor(await headers());
   assertPostgresDataActor(actor);
+  await assertPostgresWriter(actor.userId);
   return activitiesService.deleteActivitiesForActor(actor, input);
 }
 
