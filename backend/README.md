@@ -247,7 +247,11 @@ failure: `rate_limited` (with the seconds to wait), `credentials_rejected`
 (the owner must reconnect), `not_found`, `forbidden` (the grant does not cover
 the activity) or `upstream_error` (with whether a retry can help). A bad
 signature is 401, an owner the gateway may not read for is 403, and anything
-unexpected is a 500 without detail.
+unexpected is a 500 without detail. Two requests that refresh the same token
+at once are not a failure: the one that loses reads the account again and
+uses the credentials the other stored. Activity IDs stay decimal strings from
+the request to the provider URL, and a provider `Retry-After` (seconds or an
+HTTP date) becomes the `rate_limited` wait.
 
 The gateway is off until both settings are present in the app and automated
 external effects are enabled:
@@ -260,9 +264,15 @@ ACTIVITYMAP_PROVIDER_GATEWAY_OWNERS='["<userId>"]'
 The owner list is a stand-in: once owners carry a writer field (step 6), the
 gateway serves exactly the owners Convex writes for. Nothing calls the route
 yet; `src/server/provider-gateway/client.ts` is the caller the ingestion jobs
-(step 5) will use. Requests carry no nonce: a captured request can be repeated
-within its 30 seconds, which costs budget but changes nothing, since every
-operation is a read.
+(step 5) will use.
+
+Requests carry no nonce, so a captured request can be replayed while its
+signature is accepted. The timestamp may differ from the app's clock by 30
+seconds in either direction, so a request stamped ahead can stay acceptable
+for close to 60 seconds after it was first accepted. A replay cannot change
+anything at the provider, since every operation is a read, but it is not
+free of effects: it spends shared request budget, and it can refresh the
+owner's token and store the new one.
 
 ## Shadow writes
 

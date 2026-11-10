@@ -24,12 +24,15 @@ const account = (fields: object = {}) =>
 void test('each operation makes the matching provider read with the account token', async () => {
   const calls: unknown[] = [];
   const createClient = (token: string) => ({
-    getActivity: async (id: number) => (calls.push(['activity', token, id]), 1),
+    getActivity: async (id: number | string) => (
+      calls.push(['activity', token, id]),
+      1
+    ),
     getActivityStreams: async (id: string) => (
       calls.push(['streams', token, id]),
       2
     ),
-    getActivityPhotos: async (id: number) => (
+    getActivityPhotos: async (id: number | string) => (
       calls.push(['photos', token, id]),
       3
     ),
@@ -43,10 +46,11 @@ void test('each operation makes the matching provider read with the account toke
       resolveAccount: account(),
       createClient: createClient as never,
     });
-  assert.equal(await read({ kind: 'activity', id: '7' }), 1);
-  // Stream IDs stay strings: they can exceed the safe integer range.
-  assert.equal(await read({ kind: 'streams', id: '9007199254740993' }), 2);
-  assert.equal(await read({ kind: 'photos', id: '7' }), 3);
+  // IDs stay strings: this one is not representable as a number.
+  const large = '9007199254740993';
+  assert.equal(await read({ kind: 'activity', id: large }), 1);
+  assert.equal(await read({ kind: 'streams', id: large }), 2);
+  assert.equal(await read({ kind: 'photos', id: large }), 3);
   assert.equal(
     await read({
       kind: 'activities',
@@ -57,9 +61,9 @@ void test('each operation makes the matching provider read with the account toke
     4,
   );
   assert.deepEqual(calls, [
-    ['activity', 'token', 7],
+    ['activity', 'token', '9007199254740993'],
     ['streams', 'token', '9007199254740993'],
-    ['photos', 'token', 7],
+    ['photos', 'token', '9007199254740993'],
     [
       'activities',
       'token',
@@ -87,6 +91,63 @@ void test('an unusable account makes no provider request', async () => {
       ),
       AccountCredentialsUnavailableError,
     );
+});
+
+void test('a credential conflict is read again, not reported as a lost connection', async () => {
+  const conflict = () => new AccountCredentialsUnavailableError('changed');
+  const resolveAfter = (conflicts: number) => {
+    let calls = 0;
+    const resolve = (async () => {
+      if (calls++ < conflicts) throw conflict();
+      return {
+        access_token: 'fresh',
+        accountId: '42',
+        revokedAt: null,
+        scheduledErasureAt: null,
+      };
+    }) as never;
+    return { resolve, calls: () => calls };
+  };
+  const read = (resolveAccount: never) =>
+    readFromStrava(
+      owner,
+      { kind: 'activity', id: '7' },
+      {
+        resolveAccount,
+        createClient: ((token: string) => ({
+          getActivity: async () => token,
+        })) as never,
+      },
+    );
+
+  // Another request saved newer credentials: the re-read finds them.
+  const once = resolveAfter(1);
+  assert.equal(await read(once.resolve), 'fresh');
+  assert.equal(once.calls(), 2);
+
+  // Bounded: a conflict that persists is given up, and stays retryable.
+  const always = resolveAfter(Infinity);
+  const error = await read(always.resolve).then(
+    () => assert.fail('must reject'),
+    (reason: unknown) => reason,
+  );
+  assert.equal(always.calls(), 3);
+  assert.deepEqual(gatewayFailureFor(error), {
+    kind: 'upstream_error',
+    status: null,
+    retryable: true,
+  });
+
+  // A revoked connection is not retried.
+  let revokedCalls = 0;
+  await assert.rejects(
+    read((async () => {
+      revokedCalls++;
+      throw new AccountCredentialsUnavailableError('revoked');
+    }) as never),
+    AccountCredentialsUnavailableError,
+  );
+  assert.equal(revokedCalls, 1);
 });
 
 void test('errors map to failures the caller can act on', () => {

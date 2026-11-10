@@ -12,6 +12,9 @@ import { StravaBudgetExceededError } from '~/server/strava/request-budget';
 
 import type { GatewayFailure, GatewayOperation } from './contract';
 
+/** How often an account is read when its credentials change underneath. */
+const CREDENTIAL_CONFLICT_ATTEMPTS = 3;
+
 type Reads = Pick<
   StravaClient,
   'getActivity' | 'getActivityStreams' | 'getActivityPhotos' | 'getActivities'
@@ -30,9 +33,24 @@ export async function readFromStrava(
     createClient?: (accessToken: string) => Reads;
   } = {},
 ): Promise<unknown> {
-  const account = await (deps.resolveAccount ?? getAccountInternal)({
-    userId: owner.userId,
-  });
+  const resolve = deps.resolveAccount ?? getAccountInternal;
+  // Resolving can refresh the token, and two requests can refresh at once.
+  // The one that loses the stored-version check has not lost its access:
+  // the other saved valid credentials, so read the account again.
+  let account;
+  for (let attempt = 1; ; attempt++) {
+    try {
+      account = await resolve({ userId: owner.userId });
+      break;
+    } catch (error) {
+      if (
+        !(error instanceof AccountCredentialsUnavailableError) ||
+        error.reason !== 'changed' ||
+        attempt >= CREDENTIAL_CONFLICT_ATTEMPTS
+      )
+        throw error;
+    }
+  }
   if (
     !account?.access_token ||
     account.revokedAt ||
@@ -46,11 +64,12 @@ export async function readFromStrava(
   )(account.access_token);
   switch (operation.kind) {
     case 'activity':
-      return client.getActivity(Number(operation.id));
+      // IDs stay decimal strings: they can exceed the safe integer range.
+      return client.getActivity(operation.id);
     case 'streams':
       return client.getActivityStreams(operation.id);
     case 'photos':
-      return client.getActivityPhotos(Number(operation.id));
+      return client.getActivityPhotos(operation.id);
     case 'activities':
       return client.getActivities({
         page: operation.page,
@@ -70,7 +89,11 @@ export function gatewayFailureFor(error: unknown): GatewayFailure | null {
       retryAfterSeconds: Math.max(1, Math.ceil(error.retryAfterSeconds)),
     };
   if (error instanceof AccountCredentialsUnavailableError)
-    return { kind: 'credentials_rejected' };
+    // `changed` means the stored credentials moved while they were being
+    // read or refreshed, which says nothing about the owner's access.
+    return error.reason === 'changed'
+      ? { kind: 'upstream_error', status: null, retryable: true }
+      : { kind: 'credentials_rejected' };
   // Before the status checks: the provider answers 401 for a missing
   // activity permission even when the token itself is valid.
   if (isStravaActivityPermissionError(error)) return { kind: 'forbidden' };

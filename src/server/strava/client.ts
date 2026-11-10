@@ -105,6 +105,18 @@ export class StravaApiError extends Error {
   }
 }
 
+/** The `Retry-After` header as whole seconds from now: a number of seconds
+ * or an HTTP date. Undefined when absent or unreadable. */
+export function retryAfterSeconds(headers: Headers): number | undefined {
+  const value = headers.get('retry-after');
+  const delay = value?.trim() ? Number(value) : NaN;
+  if (Number.isFinite(delay)) return delay >= 0 ? Math.ceil(delay) : undefined;
+  const deadline = value ? Date.parse(value) : NaN;
+  return Number.isFinite(deadline)
+    ? Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
+    : undefined;
+}
+
 /** Strava can return 401 for an activity permission, even with a valid token. */
 export function isStravaActivityPermissionError(error: unknown): boolean {
   return (
@@ -342,21 +354,11 @@ export class StravaClient {
       const usage = parseStravaRateLimitUsage(response.headers);
       if (usage) this.rateLimitCallback?.(usage);
       if (!response.ok) {
-        const retryAfter = response.headers.get('retry-after');
-        const numericDelay = retryAfter?.trim() ? Number(retryAfter) : NaN;
-        const deadline = retryAfter ? Date.parse(retryAfter) : NaN;
-        const retryAfterSeconds = Number.isFinite(numericDelay)
-          ? numericDelay >= 0
-            ? Math.ceil(numericDelay)
-            : undefined
-          : Number.isFinite(deadline)
-            ? Math.max(0, Math.ceil((deadline - Date.now()) / 1000))
-            : undefined;
         throw new StravaApiError(
           'Failed to refresh access token',
           response.status,
           undefined,
-          retryAfterSeconds,
+          retryAfterSeconds(response.headers),
         );
       }
       const tokens = stravaTokensSchema.parse(await response.json());
@@ -491,6 +493,7 @@ export class StravaClient {
         errorMessage,
         response.status,
         errorDetails.errors,
+        retryAfterSeconds(response.headers),
       );
       // A token can be rejected before its stored expiry. Only clients with
       // a guarded refresh callback can recover; permission failures cannot be
@@ -525,7 +528,9 @@ export class StravaClient {
     }
   }
 
-  async getActivity(id: number): Promise<StravaActivity> {
+  /** `id` may be a decimal string: activity IDs can exceed the safe
+   * integer range. */
+  async getActivity(id: number | string): Promise<StravaActivity> {
     return this.request<StravaActivity>(`/activities/${id}`);
   }
 
@@ -571,7 +576,7 @@ export class StravaClient {
     });
   }
 
-  async getActivityPhotos(id: number): Promise<StravaPhoto[]> {
+  async getActivityPhotos(id: number | string): Promise<StravaPhoto[]> {
     try {
       const [smallPhotos, largePhotos] = await Promise.all([
         this.request<StravaPhoto[]>(

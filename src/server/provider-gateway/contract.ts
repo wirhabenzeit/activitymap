@@ -15,6 +15,11 @@ import { z } from 'zod';
  */
 
 export const GATEWAY_PATH = '/api/internal/provider/v1';
+/** How far a request's timestamp may be from the app's clock, either way.
+ * Requests carry no nonce: one stamped ahead can be replayed for close to
+ * twice this long. A replay cannot change provider content (every operation
+ * is a read), but it spends shared budget and can refresh and store the
+ * owner's token. */
 export const GATEWAY_SIGNATURE_WINDOW_MS = 30_000;
 
 const activityId = z.string().regex(/^[1-9]\d{0,19}$/);
@@ -91,8 +96,8 @@ export function signGatewayRequest(
     .digest('hex');
 }
 
-/** Whether `signature` was made over exactly this body by a known key,
- * within the signature window. */
+/** Whether `signature` was made over exactly this body by a known key, with
+ * a timestamp within the window on either side of `now`. */
 export function verifyGatewayRequest(input: {
   keys: Record<string, string>;
   keyId: string | null;
