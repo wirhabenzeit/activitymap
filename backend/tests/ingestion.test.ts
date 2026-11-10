@@ -821,7 +821,10 @@ void test('activities missing from the list are confirmed a bounded number at a 
   assert.equal(sweep!.phase, 'idle');
   // Only what the provider confirmed as gone is deleted.
   assert.deepEqual(
-    activities.filter((row) => row.deleted).map((row) => Number(row.key)),
+    activities
+      .filter((row) => row.deleted)
+      .map((row) => Number(row.key))
+      .sort((a, b) => a - b),
     [...gone],
   );
   hidden.restore();
