@@ -15,4 +15,10 @@ crons.interval(
   internal.bridge.expireNonces,
   {},
 );
+crons.interval(
+  'expire provider event receipts',
+  { hours: 24 },
+  internal.maintenance.expireProviderEvents,
+  {},
+);
 export default crons;

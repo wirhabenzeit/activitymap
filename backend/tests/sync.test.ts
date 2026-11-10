@@ -21,6 +21,7 @@ const modules = {
   './catalogue.ts': () => import('../convex/catalogue'),
   './http.ts': () => import('../convex/http'),
   './ingestion.ts': () => import('../convex/ingestion'),
+  './ingestionSweep.ts': () => import('../convex/ingestionSweep'),
   './ingestionWorker.ts': () => import('../convex/ingestionWorker'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
@@ -41,9 +42,14 @@ async function drainScheduled(convex: ReturnType<typeof convexTest>) {
       !jobs.some((job) => job.state.kind === 'failed'),
       'scheduled mutation failed',
     );
+    // Reconciliation for an owner Convex writes for reschedules itself for
+    // as long as the owner exists; it is not what these tests wait for.
     if (
       jobs.every(
-        (job) => job.state.kind === 'success' || job.state.kind === 'canceled',
+        (job) =>
+          job.state.kind === 'success' ||
+          job.state.kind === 'canceled' ||
+          job.name.startsWith('ingestion'),
       )
     )
       return;

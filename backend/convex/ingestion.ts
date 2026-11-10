@@ -62,14 +62,14 @@ export function retryDelayMs(attempt: number) {
   return Math.min(RETRY_CAP_MS, RETRY_BASE_MS * 2 ** Math.max(0, attempt - 1));
 }
 
-const activityIdOf = (key: string) => key.replace(/^0+/, '');
+export const activityIdOf = (key: string) => key.replace(/^0+/, '');
 
 function schedule(ctx: MutationCtx, job: Id<'ingestionJobs'>, at: number) {
   return ctx.scheduler.runAt(at, internal.ingestionWorker.run, { job });
 }
 
 /** Whether Convex ingests for this owner right now. */
-function ingests(owner: Doc<'owners'> | null): owner is Doc<'owners'> {
+export function ingests(owner: Doc<'owners'> | null): owner is Doc<'owners'> {
   return (
     !!owner &&
     !owner.revoked &&
@@ -107,13 +107,13 @@ export async function requestIngestion(
       claims: 0,
     });
     await schedule(ctx, id, now);
-    return;
+    return id;
   }
   const requested = job.requested + 1;
   // A running job notices the new count when it completes.
   if (job.lease && job.lease.expiresAt > now) {
     await ctx.db.patch('ingestionJobs', job._id, { requested });
-    return;
+    return job._id;
   }
   // A job that waits for a retry keeps its time and its attempts: one more
   // event is no reason to ask the provider sooner.
@@ -122,7 +122,7 @@ export async function requestIngestion(
       requested,
       phase: 'source',
     });
-    return;
+    return job._id;
   }
   await ctx.db.patch('ingestionJobs', job._id, {
     requested,
@@ -133,6 +133,7 @@ export async function requestIngestion(
     error: undefined,
   });
   await schedule(ctx, job._id, now);
+  return job._id;
 }
 
 function needsRecording(row: Doc<'activities'> | null) {

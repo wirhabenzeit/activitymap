@@ -56,3 +56,27 @@ export const cleanupRecording = internalMutation({
       await ctx.storage.delete(file);
   },
 });
+
+const EVENT_RETENTION_MS = 30 * 86_400_000;
+
+/** Provider event receipts only keep a repeated delivery from counting
+ * twice, and the app stops sending an event once it is recorded. */
+export const expireProviderEvents = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<number> => {
+    const rows = await ctx.db
+      .query('providerEvents')
+      .withIndex('by_received', (q) =>
+        q.lt('receivedAt', Date.now() - EVENT_RETENTION_MS),
+      )
+      .take(PAGE_SIZE);
+    for (const row of rows) await ctx.db.delete('providerEvents', row._id);
+    if (rows.length === PAGE_SIZE)
+      await ctx.scheduler.runAfter(
+        0,
+        internal.maintenance.expireProviderEvents,
+        {},
+      );
+    return rows.length;
+  },
+});
