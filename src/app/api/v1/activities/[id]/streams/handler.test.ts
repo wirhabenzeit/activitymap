@@ -305,7 +305,7 @@ void test('a copy the authority refuses is not served: the request ends as unava
         async readSummaries() {
           throw new ActivityStreamsUnavailableError();
         },
-      } as never,
+      },
       // What `authorizedStreams` does for a revoked account or a deleted
       // activity, although the copy still holds the recording.
       preferred: {
