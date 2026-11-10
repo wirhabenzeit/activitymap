@@ -107,7 +107,8 @@ export function startLiveSession(options: {
   onComplete: (signal: AbortSignal, photos: () => Promise<PhotoDTO[]>) => void;
   /** Activities were added or changed after the first catch-up. */
   onChange?: (signal: AbortSignal) => void;
-  /** Photos changed after the first catch-up. */
+  /** Photos may have changed after the first catch-up: the feed reported
+   * photo changes, or the library was loaded again. */
   onPhotoChange?: (signal: AbortSignal) => void;
   /** Activities committed to the store, with their stream metadata, so
    * chart data loaded for an earlier recording can be dropped. */

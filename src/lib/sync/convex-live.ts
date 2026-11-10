@@ -24,7 +24,8 @@ import type { PhotoDTO } from '~/contracts/v1/photo';
  *
  * Photos are not part of the cards. The feed only says that photos changed
  * (`photos`); the caller then reads the photo list (`LiveLibrary.photos`)
- * and reconciles the store (`live-photos.ts`).
+ * and reconciles the store (`live-photos.ts`). A reload passes over feed
+ * entries without reading them, so it reports a photo change as well.
  */
 
 type Card = Omit<ActivityDTO, 'map_polyline'>;
@@ -94,7 +95,8 @@ export type LiveLibraryEvents = {
   onComplete?: () => void;
   /** A batch that added or changed activities was committed. */
   onChange?: () => void;
-  /** A committed batch included photo changes. */
+  /** The photo list may have changed: a committed batch included photo
+   * changes, or the library was loaded again after the first catch-up. */
   onPhotoChange?: () => void;
   /** Authentication or a query failed; the caller falls back to REST. */
   onError: (error: Error) => void;
@@ -210,6 +212,9 @@ export class LiveLibrary {
       matchingVersion: start.matchingVersion,
     });
     this.version = start.version;
+    // A reload after the first catch-up skipped the feed entries in between,
+    // photo changes among them. (The first load reports through onComplete.)
+    if (this.completed) this.events.onPhotoChange?.();
     this.follow(start.sequence);
   }
 

@@ -260,3 +260,39 @@ void test('photo changes are announced and the photo list is read in pages', asy
   );
   assert.deepEqual(reads.slice(-2), ['photos null', 'photos b']);
 });
+
+void test('a reload after the first catch-up asks for the photo list again', async () => {
+  const pages = {
+    start: { page: [card('a')], isDone: true, continueCursor: '' },
+  };
+  // First load: the completion covers photos, so no separate report.
+  const fresh = fakeClient(() => reload(4), pages);
+  const first = events();
+  const loading = new LiveLibrary(
+    fresh.client,
+    fakeStore(null).store,
+    first.events,
+    2,
+  );
+  await loading.settled();
+  fresh.following().callback(changed(4));
+  assert.deepEqual(first.seen, ['ready', 'complete']);
+
+  // A session that was current, then fell behind the retained history.
+  const { client, reads, following } = fakeClient(
+    (after) => (after === 7 ? changed(7) : reload(40)),
+    pages,
+  );
+  const { store, log } = fakeStore({ sequence: 7, version: 'v1' });
+  const { seen, events: handlers } = events();
+  const library = new LiveLibrary(client, store, handlers, 2);
+  await library.settled();
+  assert.deepEqual(seen, ['ready', 'complete']);
+
+  following().callback(reload(40));
+  await library.settled();
+  assert.deepEqual(reads.slice(1), ['changes null', 'list null']);
+  assert.equal(log.at(-1), '@40/v1');
+  assert.deepEqual(seen, ['ready', 'complete', 'photos']);
+  assert.equal(following().after, 40);
+});
