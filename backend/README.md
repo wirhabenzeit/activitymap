@@ -213,6 +213,12 @@ mirror.
 - **Streams of one activity.** Convex answers when it holds a current
   recording. Otherwise, and for an explicit refresh or when the bridge fails,
   the request takes the Postgres path, which can still fetch from Strava.
+- **Stream access.** Postgres decides who may read streams. Every stream or
+  summary read from Convex is released only after Postgres confirms that the
+  account is still eligible and owns the activity
+  (`src/server/preview/authorized-streams.ts`), so a deauthorized account or
+  a deleted activity gets nothing from the copy, whatever the mirror has
+  done.
 - **Ingestion status** stays on Postgres: it describes the jobs of the store
   that writes.
 - **Failure.** The list and sync routes do not fall back, because a cursor

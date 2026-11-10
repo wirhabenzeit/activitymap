@@ -27,7 +27,9 @@ export function createActivityStreamsHandler(deps: {
   resolveActor: (request: Request) => Promise<Actor | null>;
   repository: ActivityStreamsRepository;
   storedOnly?: Pick<ActivityStreamsRepository, 'read' | 'readSummaries'>;
-  /** A second copy of stored streams (Convex, for a production read owner).
+  /** A second copy of stored streams (Convex, for a production read owner),
+   * already limited to what `repository` allows the actor to read
+   * (`authorizedStreams`): this handler does not check access for it.
    * It answers when it holds current data for the activity and no refresh is
    * asked for; a missing or stale recording, or a failed read, takes the
    * usual path through `repository`, which can fetch from the provider. */

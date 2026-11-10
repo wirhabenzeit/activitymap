@@ -291,3 +291,36 @@ void test('a preferred copy answers when it holds current data; otherwise the us
   const refreshed = await run(async () => snapshot('convex'), 'refresh=true');
   assert.deepEqual(refreshed.calls, ['fetch', 'postgres']);
 });
+
+void test('a copy the authority refuses is not served: the request ends as unavailable', async () => {
+  const id = '9007199254740993';
+  for (const view of ['raw', 'summary', 'compact'] as const) {
+    const handler = createActivityStreamsHandler({
+      view,
+      repository: {
+        ...repository,
+        async read() {
+          throw new ActivityStreamsUnavailableError();
+        },
+        async readSummaries() {
+          throw new ActivityStreamsUnavailableError();
+        },
+      } as never,
+      // What `authorizedStreams` does for a revoked account or a deleted
+      // activity, although the copy still holds the recording.
+      preferred: {
+        read: async () => {
+          throw new ActivityStreamsUnavailableError();
+        },
+        readSummaries: async () => {
+          throw new ActivityStreamsUnavailableError();
+        },
+      },
+      onPreferredError: () => assert.fail('a refusal is not a failed read'),
+      resolveActor: async () => actor,
+    });
+    const response = await handler(request(), id);
+    assert.equal(response.status, 404);
+    assert.doesNotMatch(await response.text(), /available_types|"streams":/);
+  }
+});
