@@ -17,12 +17,24 @@ export type Difference = { count: number; example: string };
 
 const EXAMPLE_CHARS = 160;
 
+/** Photo text, locations and image URLs stay out of reports and logs. */
+const PRIVATE_FIELDS = [
+  'photo.caption',
+  'photo.activity_name',
+  'photo.location',
+  'photo.urls',
+];
+const isPrivate = (field: string) =>
+  isPersonalDataKey(field.split('.').at(-1) ?? '') ||
+  PRIVATE_FIELDS.some(
+    (prefix) => field === prefix || field.startsWith(`${prefix}.`),
+  );
+
 function preview(field: string, value: unknown) {
   if (value === undefined) return 'undefined';
   const text = JSON.stringify(value);
   // Never copy routes, coordinates or descriptions into a report or log.
-  if (isPersonalDataKey(field.split('.').at(-1) ?? ''))
-    return `<${text.length} chars>`;
+  if (isPrivate(field)) return `<${text.length} chars>`;
   return text.slice(0, EXAMPLE_CHARS);
 }
 

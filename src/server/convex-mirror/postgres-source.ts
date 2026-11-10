@@ -46,6 +46,22 @@ function currentStreams(ids: string[]) {
   );
 }
 
+/** The current photos of the actor's activities among `activityIds`. */
+async function photosOf(actor: Actor, activityIds: string[]) {
+  const ids = activityIds.map(Number).filter(Number.isSafeInteger);
+  if (ids.length === 0) return [];
+  const rows = await db
+    .select()
+    .from(photos)
+    .where(
+      and(
+        eq(photos.athlete_id, actor.athleteId),
+        inArray(photos.activity_id, ids),
+      ),
+    );
+  return rows.map(toPhotoDTO);
+}
+
 export function postgresMirrorSource(actor: Actor): MirrorSource {
   const places = createPlaceMatchingRepository();
   return {
@@ -174,20 +190,7 @@ export function postgresMirrorSource(actor: Actor): MirrorSource {
       }));
     },
 
-    async photos(activityIds) {
-      const ids = activityIds.map(Number).filter(Number.isSafeInteger);
-      if (ids.length === 0) return [];
-      const rows = await db
-        .select()
-        .from(photos)
-        .where(
-          and(
-            eq(photos.athlete_id, actor.athleteId),
-            inArray(photos.activity_id, ids),
-          ),
-        );
-      return rows.map(toPhotoDTO);
-    },
+    photos: (activityIds) => photosOf(actor, activityIds),
   };
 }
 
@@ -196,12 +199,37 @@ export function postgresMirrorSource(actor: Actor): MirrorSource {
 export function postgresParitySource(actor: Actor): ParityPostgres {
   const places = createPlaceMatchingRepository();
   const streams = createActivityStreamsRepository();
-  const activityChanges = (...conditions: Parameters<typeof and>) =>
-    and(
-      eq(syncChanges.athleteId, actor.athleteId),
-      eq(syncChanges.entityType, 'activity'),
-      ...conditions,
+  const changesOf =
+    (entityType: 'activity' | 'photo') =>
+    (...conditions: Parameters<typeof and>) =>
+      and(
+        eq(syncChanges.athleteId, actor.athleteId),
+        eq(syncChanges.entityType, entityType),
+        ...conditions,
+      );
+  const activityChanges = changesOf('activity');
+  const latest = async (entityType: 'activity' | 'photo', ids: string[]) => {
+    if (ids.length === 0)
+      return new Map<string, { sequence: number; changedAt: Date }>();
+    const rows = await db
+      .select({
+        id: syncChanges.entityId,
+        sequence: sql<string>`max(${syncChanges.sequence})::text`,
+        changedAt: sql<string>`(extract(epoch from max(${syncChanges.changedAt})) * 1000)::text`,
+      })
+      .from(syncChanges)
+      .where(changesOf(entityType)(inArray(syncChanges.entityId, ids)))
+      .groupBy(syncChanges.entityId);
+    return new Map(
+      rows.map((row) => [
+        row.id,
+        {
+          sequence: Number(row.sequence),
+          changedAt: new Date(Number(row.changedAt)),
+        },
+      ]),
     );
+  };
   return {
     async activityIds() {
       const rows = await db
@@ -227,27 +255,10 @@ export function postgresParitySource(actor: Actor): ParityPostgres {
       return rows.map((row) => row.id);
     },
 
-    async latestChanges(ids) {
-      if (ids.length === 0) return new Map();
-      const rows = await db
-        .select({
-          id: syncChanges.entityId,
-          sequence: sql<string>`max(${syncChanges.sequence})::text`,
-          changedAt: sql<string>`(extract(epoch from max(${syncChanges.changedAt})) * 1000)::text`,
-        })
-        .from(syncChanges)
-        .where(activityChanges(inArray(syncChanges.entityId, ids)))
-        .groupBy(syncChanges.entityId);
-      return new Map(
-        rows.map((row) => [
-          row.id,
-          {
-            sequence: Number(row.sequence),
-            changedAt: new Date(Number(row.changedAt)),
-          },
-        ]),
-      );
-    },
+    latestChanges: (ids) => latest('activity', ids),
+    latestPhotoChanges: (ids) => latest('photo', ids),
+
+    photos: (activityIds) => photosOf(actor, activityIds),
 
     async activities(ids) {
       const rows = await activitiesRepository.findManyByIds(

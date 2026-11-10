@@ -37,6 +37,7 @@ export const POST = createConvexParityCronHandler({
       postgres: postgresParitySource(actor),
       convex: {
         activities: (ids) => convex.activitiesByIds(ids),
+        photos: (ids) => convex.photosByActivities(ids),
         summaries: async (ids) =>
           (await convex.streams.readSummaries(actor, ids)).map(
             toActivityStreamSummaryDTO,

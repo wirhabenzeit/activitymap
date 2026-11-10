@@ -41,6 +41,20 @@ function photosOf(
     .take(MAX_PHOTOS_PER_ACTIVITY + 1);
 }
 
+/** The owner's current photos of the activities among `activityIds`. */
+export async function photosOfActivities(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  activityIds: string[],
+) {
+  const sets = await Promise.all(
+    activityIds.map((id) => photosOf(ctx, owner._id, idKey(id))),
+  );
+  return sets
+    .flat()
+    .flatMap((doc) => (doc.generation === owner.generation ? [doc.dto] : []));
+}
+
 function setFor(ctx: QueryCtx, owner: Doc<'owners'>['_id'], activity: string) {
   return ctx.db
     .query('photoSets')

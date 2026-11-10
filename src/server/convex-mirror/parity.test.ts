@@ -4,6 +4,7 @@ import test from 'node:test';
 
 import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { ActivityStreamSummaryDTO } from '~/contracts/v1/activity-streams';
+import type { PhotoDTO } from '~/contracts/v1/photo';
 
 import {
   type ParityConvex,
@@ -28,17 +29,47 @@ const summary = (id: string, value = 1) =>
     activity_id: id,
     summary: { value },
   }) as unknown as ActivityStreamSummaryDTO;
+type Shot = { id: string; activity: string; caption?: string };
+const photo = ({ id, activity, caption }: Shot) =>
+  ({
+    unique_id: id,
+    activity_id: activity,
+    caption: caption ?? null,
+  }) as unknown as PhotoDTO;
 
 /** In-memory backends. `reads` records which IDs each side was asked for. */
 function sources({
   postgres,
   convex = postgres.map((item) => ({ ...item, rev: 'cx' })),
   changes = {},
+  photos = [],
+  convexPhotos = photos,
+  photoChanges = {},
 }: {
   postgres: Item[];
   convex?: Item[];
   changes?: Record<string, { sequence: number; ago: number }>;
+  photos?: Shot[];
+  convexPhotos?: Shot[];
+  photoChanges?: Record<string, { sequence: number; ago: number }>;
 }) {
+  const photoReads: string[][] = [];
+  const latest =
+    (log: Record<string, { sequence: number; ago: number }>) =>
+    async (ids: string[]) =>
+      new Map(
+        Object.entries(log)
+          .filter(([id]) => ids.includes(id))
+          .map(([id, change]) => [
+            id,
+            {
+              sequence: change.sequence,
+              changedAt: new Date(NOW - change.ago),
+            },
+          ]),
+      );
+  const shots = (items: Shot[], ids: string[]) =>
+    items.filter((item) => ids.includes(item.activity)).map(photo);
   const reads: string[][] = [];
   const pick = (items: Item[], ids: string[]) =>
     items.filter((item) => ids.includes(item.id));
@@ -51,18 +82,12 @@ function sources({
       Object.entries(changes)
         .filter(([, change]) => NOW - change.ago > since.getTime())
         .map(([id]) => id),
-    latestChanges: async (ids) =>
-      new Map(
-        Object.entries(changes)
-          .filter(([id]) => ids.includes(id))
-          .map(([id, change]) => [
-            id,
-            {
-              sequence: change.sequence,
-              changedAt: new Date(NOW - change.ago),
-            },
-          ]),
-      ),
+    latestChanges: latest(changes),
+    latestPhotoChanges: latest(photoChanges),
+    photos: async (ids) => {
+      photoReads.push(ids);
+      return shots(photos, ids);
+    },
     activities: async (ids) => {
       reads.push(ids);
       return pick(postgres, ids).map(activity);
@@ -73,8 +98,9 @@ function sources({
   const cx: ParityConvex = {
     activities: async (ids) => pick(convex, ids).map(activity),
     summaries: async (ids) => pick(convex, ids).map((item) => summary(item.id)),
+    photos: async (ids) => shots(convexPhotos, ids),
   };
-  return { postgres: pg, convex: cx, reads };
+  return { postgres: pg, convex: cx, reads, photoReads };
 }
 
 const library = (count: number) =>
@@ -106,7 +132,11 @@ void test('identical data passes; result revisions are expected to differ', asyn
   });
   assert.equal(report.status, 'ok');
   assert.equal(report.copy, 'complete');
-  assert.deepEqual(report.compared, { activities: 3, summaries: 3 });
+  assert.deepEqual(report.compared, {
+    activities: 3,
+    summaries: 3,
+    photos: 0,
+  });
   assert.deepEqual(report.differences, {});
   assert.deepEqual(report.expectedDifferences, {
     'activity.placeMatches.resultRevision': 3,
@@ -236,4 +266,122 @@ void test('the sample is a rotating window plus recent changes', async () => {
     windowSize: 3,
   });
   assert.deepEqual(reads, [['103', '104', '105', '109']]);
+});
+
+void test('photo sets are compared, with private values kept out of examples', async () => {
+  const { postgres, convex } = sources({
+    postgres: library(3),
+    photos: [
+      { id: 'a', activity: '100', caption: 'Summit' },
+      { id: 'b', activity: '100' },
+      { id: 'c', activity: '101' },
+    ],
+    convexPhotos: [
+      { id: 'a', activity: '100', caption: 'Old caption' },
+      // b is missing; d was removed in Postgres but not in Convex.
+      { id: 'c', activity: '101' },
+      { id: 'd', activity: '102' },
+    ],
+  });
+  const report = await checkParity({
+    position: { sequence: 10, revision: 1, photos: null },
+    postgres,
+    convex,
+    now: NOW,
+  });
+  assert.equal(report.status, 'drift');
+  assert.equal(report.compared.photos, 3);
+  assert.deepEqual(Object.keys(report.differences).sort(), [
+    '<photo extra in convex>',
+    '<photo missing in convex>',
+    'photo.caption',
+  ]);
+  assert.doesNotMatch(
+    report.differences['photo.caption']!.example,
+    /Summit|Old caption/,
+  );
+});
+
+void test('photo sets with changes in flight are skipped', async () => {
+  const items = library(4);
+  const { postgres, convex } = sources({
+    postgres: items,
+    photos: [
+      { id: 'a', activity: '100' },
+      { id: 'b', activity: '101' },
+      { id: 'c', activity: '102' },
+      { id: 'e', activity: '103', caption: 'New' },
+    ],
+    convexPhotos: [
+      // a's activity changed after the checkpoint: its set is not compared.
+      { id: 'b', activity: '101', caption: 'Stale' },
+      { id: 'c', activity: '102' },
+      // d was deleted in Postgres after the photo position.
+      { id: 'd', activity: '102' },
+      { id: 'e', activity: '103', caption: 'Old' },
+    ],
+    changes: { '100': { sequence: 30, ago: HOUR } },
+    photoChanges: {
+      // Above the photo position.
+      b: { sequence: 25, ago: HOUR },
+      d: { sequence: 26, ago: HOUR },
+      // Below it, but too recent to have settled.
+      e: { sequence: 5, ago: 60_000 },
+    },
+  });
+  const report = await checkParity({
+    position: { sequence: 28, revision: 1, photos: null, photoSequence: 20 },
+    postgres,
+    convex,
+    now: NOW,
+  });
+  assert.equal(report.status, 'ok');
+  assert.equal(report.compared.photos, 0);
+
+  // Once the photo position has passed them, the same state is drift.
+  const later = await checkParity({
+    position: { sequence: 28, revision: 1, photos: null, photoSequence: 26 },
+    postgres,
+    convex,
+    now: NOW,
+  });
+  assert.deepEqual(Object.keys(later.differences).sort(), [
+    '<photo extra in convex>',
+    'photo.caption',
+  ]);
+});
+
+void test('photos are compared only where the catch-up pass has been', async () => {
+  const shots = [
+    { id: 'a', activity: '100' },
+    { id: 'b', activity: '102' },
+  ];
+  const before = sources({
+    postgres: library(3),
+    photos: shots,
+    convexPhotos: [],
+  });
+  const none = await checkParity({
+    position: { sequence: 10, revision: 1 },
+    postgres: before.postgres,
+    convex: before.convex,
+    now: NOW,
+  });
+  assert.equal(none.status, 'ok');
+  assert.deepEqual(before.photoReads, [[]]);
+
+  const during = sources({
+    postgres: library(3),
+    photos: shots,
+    convexPhotos: shots.slice(0, 1),
+  });
+  const partial = await checkParity({
+    position: { sequence: 10, revision: 1, photos: '101' },
+    postgres: during.postgres,
+    convex: during.convex,
+    now: NOW,
+  });
+  assert.equal(partial.status, 'ok');
+  assert.deepEqual(during.photoReads, [['100', '101']]);
+  assert.equal(partial.compared.photos, 1);
 });

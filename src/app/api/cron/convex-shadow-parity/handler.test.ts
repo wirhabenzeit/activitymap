@@ -18,7 +18,7 @@ const report = (fields: Partial<ParityReport> = {}): ParityReport => ({
   checkpoint: 10,
   sampled: 3,
   inFlight: 0,
-  compared: { activities: 3, summaries: 3 },
+  compared: { activities: 3, summaries: 3, photos: 0 },
   expectedDifferences: {},
   differences: {},
   ...fields,

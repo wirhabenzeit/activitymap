@@ -8,7 +8,7 @@ import { MAX_PAGE_BYTES } from './activityProjection';
 import { activityFor } from './activityWrites';
 import { currentRecording, liveRows, project } from './liveProjection';
 import { idKey, requireHead, requireOwner, scopeFields } from './owners';
-import { photoPage, photosByIds } from './photos';
+import { photoPage, photosByIds, photosOfActivities } from './photos';
 
 const id = v.string();
 const cursor = v.union(id, v.null());
@@ -28,6 +28,8 @@ const operation = v.union(
   v.object({ kind: v.literal('activities'), after: cursor, limit: v.number() }),
   v.object({ kind: v.literal('photos'), after: cursor, limit: v.number() }),
   v.object({ kind: v.literal('photoIds'), ids: v.array(id) }),
+  // The photos of whole activities, for the parity check.
+  v.object({ kind: v.literal('activityPhotos'), ids: v.array(id) }),
   v.object({ kind: v.literal('status'), after: cursor }),
   v.object({
     kind: v.literal('changes'),
@@ -211,6 +213,11 @@ export const read = internalQuery({
         if (op.ids.length > PHOTO_PAGE_LIMIT)
           throw new Error('Too many photo IDs');
         return photosByIds(ctx, owner, op.ids);
+      }
+      case 'activityPhotos': {
+        // Up to MAX_PHOTOS_PER_ACTIVITY documents of a few KiB per activity.
+        if (op.ids.length > 16) throw new Error('Too many activity IDs');
+        return photosOfActivities(ctx, owner, op.ids);
       }
       case 'status': {
         const rows = await liveRows(

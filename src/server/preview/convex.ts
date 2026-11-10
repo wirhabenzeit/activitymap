@@ -205,6 +205,7 @@ export function appOperation(operation: Operation): Operation {
         after: id(operation.after as string | number | null),
       };
     case 'activityIds':
+    case 'activityPhotos':
     case 'photoIds':
     case 'summaries':
       return {
@@ -425,6 +426,20 @@ function convexAdapter(actor: Actor, transport: Transport) {
         ...row,
         placeMatches: matchFor(row, version),
       }));
+    },
+    /** The photos of the activities among `ids` (application backend only). */
+    async photosByActivities(ids: string[]): Promise<PhotoDTO[]> {
+      const rows = await byIds(
+        ids,
+        (batch) =>
+          query(
+            { kind: 'activityPhotos', ids: batch },
+            z.array(photoDTOSchema),
+          ),
+        16,
+      );
+      capturePhotos(rows);
+      return rows;
     },
     activitiesRepo: {
       async findPageByAthlete(

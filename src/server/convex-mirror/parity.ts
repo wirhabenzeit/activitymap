@@ -1,5 +1,6 @@
 import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { ActivityStreamSummaryDTO } from '~/contracts/v1/activity-streams';
+import type { PhotoDTO } from '~/contracts/v1/photo';
 
 import { type Difference, createComparison } from './compare';
 import type { MirrorPosition } from './mirror';
@@ -13,6 +14,10 @@ import type { MirrorPosition } from './mirror';
  * clock (so hourly runs cover the whole library over time without stored
  * state) plus every activity changed recently. Activities with changes the
  * mirror has not checkpointed yet are skipped rather than reported as drift.
+ *
+ * Photos are compared as the photo set of each sampled activity, so a photo
+ * Convex should no longer hold is found too. A set is skipped while one of
+ * its photos has a change the mirror's photo position has not passed.
  */
 
 /** What production serves from Postgres, as the v1 handlers build it. */
@@ -32,10 +37,20 @@ export type ParityPostgres = {
   activities(ids: string[]): Promise<ActivityDTO[]>;
   /** Stream summaries for the owned activities among `ids`. */
   summaries(ids: string[]): Promise<ActivityStreamSummaryDTO[]>;
+  /** The photos of the owned activities among `activityIds`. */
+  photos(activityIds: string[]): Promise<PhotoDTO[]>;
+  /** Each photo's latest change among `ids` (photo IDs), as
+   * `latestChanges`. */
+  latestPhotoChanges(
+    ids: string[],
+  ): Promise<Map<string, { sequence: number; changedAt: Date }>>;
 };
 
 /** What the Convex application backend serves for the same reads. */
-export type ParityConvex = Pick<ParityPostgres, 'activities' | 'summaries'>;
+export type ParityConvex = Pick<
+  ParityPostgres,
+  'activities' | 'summaries' | 'photos'
+>;
 
 export type ParityReport = {
   status: 'ok' | 'drift';
@@ -47,7 +62,7 @@ export type ParityReport = {
   sampled: number;
   /** Activities with changes the mirror has not checkpointed yet. */
   inFlight: number;
-  compared: { activities: number; summaries: number };
+  compared: { activities: number; summaries: number; photos: number };
   expectedDifferences: Record<string, number>;
   differences: Record<string, Difference>;
 };
@@ -99,7 +114,7 @@ export async function checkParity({
       checkpoint: null,
       sampled: 0,
       inFlight: 0,
-      compared: { activities: 0, summaries: 0 },
+      compared: { activities: 0, summaries: 0, photos: 0 },
       expectedDifferences: comparison.expected(),
       differences,
       ...fields,
@@ -134,17 +149,51 @@ export async function checkParity({
     postgres: await postgres.summaries(sample),
     convex: await convex.summaries(sample),
   };
-  const changes = await postgres.latestChanges(sample);
-  const settled = new Set(
-    sample.filter((id) => {
-      const change = changes.get(id);
-      return (
-        !change ||
-        (change.sequence <= checkpoint &&
-          change.changedAt.getTime() <= now - settleMs)
-      );
-    }),
+  // Photos reach Convex with a full copy, or through the catch-up pass that
+  // follows a copy made before photos were mirrored.
+  const caughtUp = position.photos;
+  const withPhotos = sample.filter(
+    (id) =>
+      caughtUp === null ||
+      (caughtUp !== undefined && BigInt(id) <= BigInt(caughtUp)),
   );
+  const photos = {
+    postgres: await postgres.photos(withPhotos),
+    convex: await convex.photos(withPhotos),
+  };
+  const changes = await postgres.latestChanges(sample);
+  const isSettled = (
+    change: { sequence: number; changedAt: Date } | undefined,
+    position: number,
+  ) =>
+    !change ||
+    (change.sequence <= position &&
+      change.changedAt.getTime() <= now - settleMs);
+  const settled = new Set(
+    sample.filter((id) => isSettled(changes.get(id), checkpoint)),
+  );
+  // A photo change is in flight for the whole set of its activity, on
+  // whichever side still lists the photo.
+  const photoCheckpoint = full
+    ? full.through
+    : (position.photoSequence ?? position.sequence);
+  const photoChanges = await postgres.latestPhotoChanges([
+    ...new Set(
+      [...photos.postgres, ...photos.convex].map((item) => item.unique_id),
+    ),
+  ]);
+  const photosInFlight = new Set(
+    [...photos.postgres, ...photos.convex]
+      .filter(
+        (item) => !isSettled(photoChanges.get(item.unique_id), photoCheckpoint),
+      )
+      .map((item) => item.activity_id),
+  );
+  const settledPhotos = (items: PhotoDTO[]) =>
+    items.filter(
+      (item) =>
+        settled.has(item.activity_id) && !photosInFlight.has(item.activity_id),
+    );
 
   const activities = {
     postgres: served.postgres.filter((item) => settled.has(item.id)),
@@ -170,6 +219,17 @@ export async function checkParity({
     summaryKey,
   );
 
+  const comparedPhotos = {
+    postgres: settledPhotos(photos.postgres),
+    convex: settledPhotos(photos.convex),
+  };
+  comparison.compareItems(
+    'photo',
+    comparedPhotos.postgres,
+    comparedPhotos.convex,
+    (item) => item.unique_id,
+  );
+
   return report({
     copy,
     checkpoint,
@@ -180,6 +240,7 @@ export async function checkParity({
         [...activities.postgres, ...activities.convex].map((item) => item.id),
       ).size,
       summaries: settledSummaries.postgres.length,
+      photos: comparedPhotos.postgres.length,
     },
   });
 }

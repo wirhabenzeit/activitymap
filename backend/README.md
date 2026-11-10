@@ -249,6 +249,14 @@ mapped by the preview adapter). The comparison is shared with the local
 verifier (`src/server/convex-mirror/compare.ts`);
 `placeMatches.resultRevision` is an expected difference.
 
+Photos are compared as the whole photo set of each sampled activity (the
+`activityPhotos` read), so a photo Convex should have deleted is found as
+well as a missing or differing one. A set is skipped while one of its photos,
+on either side, has a `sync_change` above the mirror's photo position
+(`mirror.photoSequence`, or `mirror.sequence` before the first photo change)
+or less than 15 minutes old. During the one-time photo catch-up only
+activities up to `mirror.photos` are compared.
+
 The mirror's checkpoint (`importer:mirrorState`, the write bridge's `state`
 operation) decides what must already match. An activity is skipped as in
 flight when its latest `sync_change` is above `mirror.sequence` or less than
@@ -260,8 +268,8 @@ up to `full.after` are compared. Before the first copy nothing is compared.
 
 The result is logged per owner (`Convex shadow parity`, or
 `Convex shadow parity drift` at error level with counts and an example per
-differing field; route, coordinate and description values are replaced by
-their length). Drift or a failed check answers 500. The response carries the
+differing field; route, coordinate and description values, photo captions,
+locations and image URLs are replaced by their length). Drift or a failed check answers 500. The response carries the
 counts and field names only.
 
 Besides the writer settings, the check needs the read bridge's
