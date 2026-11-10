@@ -388,7 +388,14 @@ provider gateway and never holds a provider credential:
    the mirror uses. A manual activity is not asked for streams, and an
    activity whose streams the provider does not have is finished without a
    recording.
-4. **Complete.** If the activity was requested again while the run was
+4. **Match.** When the activity has a current recording without a match
+   for the owner's catalogue, the worker matches it against the copied
+   place catalogue with the matcher the shadow runs use
+   (`backend/matching/activity-match.ts`) and publishes the result. A title
+   edit keeps recording and match; a new recording is matched again. If no
+   complete rowset is the one the owner's matching version names, the
+   activity is finished without a match.
+5. **Complete.** If the activity was requested again while the run was
    under way, the job starts over at once.
 
 What keeps this safe:
@@ -461,9 +468,10 @@ compares with.
 
 Needed before an owner is handed to Convex:
 
-- **Place matching.** A recording published here has no match until the
-  matcher that runs in shadow ([Shadow matching](#shadow-matching)) is made
-  part of the job.
+- **Rematching after a catalogue change.** A job matches the recording it
+  publishes. Nothing yet selects a new catalogue for an owner Convex writes
+  for, or matches the whole library again after one; the mirror did that
+  while Postgres wrote.
 - **A live run.** Nothing here has run against a deployed backend and the
   real gateway.
 

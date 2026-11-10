@@ -17,6 +17,12 @@ import {
   hasPhotos,
   photoSources,
 } from '../ingestion/provider';
+import {
+  isMatchingVersion,
+  matchPrepared,
+  prepareActivity,
+  readCatalogue,
+} from '../matching/activity-match';
 import { encodeWhole, validateRecording } from '../recording/codec';
 import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
@@ -173,7 +179,43 @@ async function recording(
       manifest,
     });
   }
-  await ctx.runMutation(internal.ingestion.complete, { job, claim });
+  // On to the match, when there is a recording to match.
+  return ctx.runMutation(internal.ingestion.advance, { job, claim });
+}
+
+/** The places along the activity's recording. */
+async function match(ctx: ActionCtx, step: IngestionStep & { phase: 'match' }) {
+  const { job, claim, id } = step;
+  const catalogue = step.catalogues.find((rowset) =>
+    isMatchingVersion(rowset, step.matchingVersion),
+  );
+  // Without the rowset the owner's matching version names there is nothing
+  // to match against, and the activity is finished without a match.
+  if (!catalogue) {
+    await ctx.runMutation(internal.ingestion.complete, { job, claim });
+    return null;
+  }
+  const prepared = await prepareActivity(ctx, {
+    key: id,
+    id,
+    recording: step.recording,
+  });
+  const [matched] = await matchPrepared(
+    ctx,
+    {
+      userId: step.scope.userId,
+      catalogue,
+      published: await readCatalogue(ctx, catalogue),
+    },
+    [prepared],
+  );
+  await ctx.runMutation(internal.ingestion.matched, {
+    job,
+    claim,
+    recording: step.recording.id,
+    // As Postgres serves it: the result names its matching version.
+    result: { ...matched!.result, matchingVersion: step.matchingVersion },
+  });
   return null;
 }
 
@@ -190,7 +232,9 @@ export const run = internalAction({
         step =
           step.phase === 'source'
             ? await source(ctx, step)
-            : await recording(ctx, step);
+            : step.phase === 'recording'
+              ? await recording(ctx, step)
+              : await match(ctx, step);
       } catch (error) {
         await ctx.runMutation(internal.ingestion.fail, {
           job,

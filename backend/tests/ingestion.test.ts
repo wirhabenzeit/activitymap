@@ -1,9 +1,16 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 
 import { convexTest } from 'convex-test';
 import test, { afterEach, beforeEach, mock } from 'node:test';
 
 import { createProviderGatewayHandler } from '../../src/app/api/internal/provider/v1/handler';
+import {
+  type PlaceRow,
+  datasetFor,
+} from '../../src/server/places/catalogue-rows';
+import { createSyntheticCatalogue } from '../../src/server/places/catalogue.fixture';
+import { matchingVersion as versionFor } from '../../src/server/places/matching-version';
 import type {
   GatewayFailure,
   GatewayOperation,
@@ -37,6 +44,7 @@ const modules = {
   './ingestionWorker.ts': () => import('../convex/ingestionWorker'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
+  './places.ts': () => import('../convex/places'),
   './providerEvents.ts': () => import('../convex/providerEvents'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
 };
@@ -133,6 +141,7 @@ function fakeProvider() {
   const activities = new Map<string, ReturnType<typeof detail>>();
   const photos = new Map<string, ReturnType<typeof photo>[]>();
   const withoutStreams = new Set<string>();
+  const recorded = new Map<string, RawActivityStreams>();
   let hidden = false;
   const reads: string[] = [];
   /** Reads of the activity list, kept apart from reads of one activity. */
@@ -159,6 +168,9 @@ function fakeProvider() {
       return { restore: () => (hidden = false) };
     },
     noStreams: (id: string) => withoutStreams.add(id),
+    /** What the activity's streams read answers, instead of the default. */
+    record: (id: string, payload: RawActivityStreams) =>
+      recorded.set(id, payload),
     /** Answer the next read (of this kind, if given) with a failure. */
     fail: (failure: GatewayFailure, kind?: GatewayOperation['kind']) =>
       failures.push({ failure, kind }),
@@ -198,7 +210,7 @@ function fakeProvider() {
           case 'streams':
             if (withoutStreams.has(id))
               throw new Refused({ kind: 'not_found' });
-            return streams;
+            return recorded.get(id) ?? streams;
           default:
             throw new Error('Unexpected read');
         }
@@ -256,14 +268,15 @@ async function advance(convex: Convex, ms: number) {
 }
 
 /** An owner that reads from Convex and that Convex writes for. */
-async function owner() {
+async function owner(
+  matching = { catalogue: 'a'.repeat(64), matchingVersion: 'b'.repeat(64) },
+) {
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, {
     ...scope,
     backend: 'convex',
     generation: 'test-generation-01',
-    catalogue: 'a'.repeat(64),
-    matchingVersion: 'b'.repeat(64),
+    ...matching,
   });
   await convex.mutation(internal.owners.setWriter, {
     ...actor,
@@ -323,6 +336,8 @@ void test('an event brings in the activity, its photos and its recording', async
   assert.equal(recordings[0]!.revision, '1');
   assert.equal(activity!.projection?.streams?.state, 'current');
   assert.deepEqual(activity!.projection?.streams?.available_types, ['time']);
+  // No place rowset for the owner's matching version: no match.
+  assert.equal(activity!.projection?.match, undefined);
   assert.deepEqual(
     changes.map((row) => `${row.entityType} ${row.operation} ${row.entityId}`),
     [
@@ -821,7 +836,10 @@ void test('activities missing from the list are confirmed a bounded number at a 
   assert.equal(sweep!.phase, 'idle');
   // Only what the provider confirmed as gone is deleted.
   assert.deepEqual(
-    activities.filter((row) => row.deleted).map((row) => Number(row.key)),
+    activities
+      .filter((row) => row.deleted)
+      .map((row) => Number(row.key))
+      .sort((a, b) => a - b),
     [...gone],
   );
   hidden.restore();
@@ -933,5 +951,230 @@ void test('old event receipts are removed', async () => {
   assert.deepEqual(
     left.map((row) => Number(row.activity)),
     [8],
+  );
+});
+
+const peak: PlaceRow = {
+  id: '11111111-1111-4111-8111-111111111111',
+  displayName: 'Synthetic',
+  kinds: ['peak'],
+  subtypes: ['peak'],
+  location: { longitude: 8.123456789, latitude: 46.987654321 },
+  elevationM: 100,
+};
+const sampled = (data: unknown[]) => ({
+  data,
+  original_size: data.length,
+  resolution: 'high',
+  series_type: 'time',
+});
+/** A short track along a line of latitude through a point. */
+const track = (latitude: number, longitude: number) =>
+  ({
+    latlng: sampled(
+      [-0.0001, 0, 0.0001].map((dx) => [latitude, longitude + dx]),
+    ),
+    time: sampled([0, 10, 20]),
+    distance: sampled([0, 10, 20]),
+    altitude: sampled([100, 100, 100]),
+  }) as RawActivityStreams;
+const pastThePeak = track(peak.location.latitude, peak.location.longitude);
+
+/** An owner whose matching version names a copied rowset with one peak.
+ * The rowset is usable once `complete` has run. */
+async function matchingOwner() {
+  const synthetic = createSyntheticCatalogue();
+  const snapshotId = synthetic.manifest.catalogue_snapshot_id;
+  const revision = '7';
+  const version = versionFor({ snapshotId, revision });
+  const identity = createHash('sha256')
+    .update(JSON.stringify({ postgresMatchingVersion: version }))
+    .digest('hex');
+  const convex = await owner({ catalogue: identity, matchingVersion: version });
+  const dataset = await datasetFor(snapshotId, revision);
+  const metadata = await convex.run((ctx) =>
+    ctx.storage.store(
+      new Blob([
+        JSON.stringify({
+          manifest: synthetic.manifest,
+          coverage: synthetic.coverage,
+        }),
+      ]),
+    ),
+  );
+  await convex.mutation(internal.places.begin, {
+    dataset,
+    snapshotId,
+    revision,
+    count: 1,
+    metadata,
+  });
+  const { digest } = await convex.mutation(internal.places.importBatch, {
+    dataset,
+    after: '',
+    places: [peak],
+  });
+  const complete = () =>
+    convex.mutation(internal.places.complete, { dataset, digest });
+  return { convex, identity, version, complete };
+}
+
+void test('a new recording is matched against the owner’s place catalogue', async () => {
+  const provider = fakeProvider();
+  const { convex, identity, version, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  provider.set(detail(8, 'Elsewhere'));
+  provider.record('8', track(46.5, 8.5));
+
+  await event(convex, '7');
+  await event(convex, '8');
+  await settle(convex);
+
+  let { activities, recordings, changes, jobs } = await state(convex);
+  const matchOf = (id: number) =>
+    activities.find((row) => Number(row.key) === id)!.projection?.match;
+  assert.equal(matchOf(7)?.catalogue, identity);
+  assert.deepEqual(
+    [
+      matchOf(7)!.value.status,
+      matchOf(7)!.value.places.length,
+      matchOf(7)!.value.matchingVersion,
+      matchOf(7)!.value.streamRevision,
+    ],
+    ['complete', 1, version, '1'],
+  );
+  assert.equal(
+    matchOf(7)!.value.streamGeneration,
+    recordings.find(
+      (row) =>
+        row._id ===
+        activities.find((activity) => Number(activity.key) === 7)!.recording,
+    )!.generation,
+  );
+  assert.deepEqual(
+    [matchOf(8)!.value.status, matchOf(8)!.value.places.length],
+    ['complete', 0],
+  );
+  // Source, recording and match each tell clients once.
+  assert.equal(changes.filter((row) => row.entityId === '7').length, 3);
+  assert.deepEqual(
+    jobs.map((job) => [job.status, job.phase]),
+    [
+      ['idle', 'source'],
+      ['idle', 'source'],
+    ],
+  );
+
+  // A new title keeps recording and match; nothing is matched again.
+  const before = matchOf(7)!.value.resultRevision;
+  provider.set(detail(7, 'Renamed'));
+  mock.timers.tick(1000);
+  await event(convex, '7', 'update');
+  await settle(convex);
+  ({ activities, recordings, changes, jobs } = await state(convex));
+  assert.equal(matchOf(7)!.value.resultRevision, before);
+
+  // A new recording is matched again, for its own revision.
+  provider.set(detail(7, 'Renamed', { distance: 2000 }));
+  provider.record('7', track(46.5, 8.5));
+  mock.timers.tick(1000);
+  await event(convex, '7', 'update');
+  await settle(convex);
+  ({ activities, recordings, changes, jobs } = await state(convex));
+  assert.deepEqual(
+    [
+      matchOf(7)!.value.streamRevision,
+      matchOf(7)!.value.places.length,
+      matchOf(7)!.catalogue,
+    ],
+    ['2', 0, identity],
+  );
+});
+
+void test('a match is not published after a handoff or by a worker that lost the job', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  // The rowset is not complete yet: recorded, but not matched.
+  await event(convex, '7');
+  await settle(convex);
+  let { activities, recordings, jobs } = await state(convex);
+  assert.equal(activities[0]!.projection?.match, undefined);
+  assert.equal(jobs[0]!.status, 'idle');
+  await complete();
+
+  // A second activity on the same track gives a result to publish.
+  provider.set(detail(9, 'Same track'));
+  provider.record('9', pastThePeak);
+  await event(convex, '9');
+  await settle(convex);
+  ({ activities, recordings, jobs } = await state(convex));
+  const other = activities.find((row) => Number(row.key) === 9)!;
+  const seven = activities.find((row) => Number(row.key) === 7)!;
+  const recording = recordings.find((row) => row._id === seven.recording)!;
+  const { resultRevision: _revision, ...value } =
+    other.projection!.match!.value;
+  const result = {
+    ...value,
+    activityId: '7',
+    streamGeneration: recording.generation,
+    streamRevision: recording.revision,
+  };
+
+  // A worker takes activity 7 as far as its match step.
+  const job = jobs.find((row) => Number(row.activity) === 7)!._id;
+  await event(convex, '7', 'update');
+  const source = await convex.mutation(internal.ingestion.claim, { job });
+  const step = await convex.mutation(internal.ingestion.publishSource, {
+    job,
+    claim: source!.claim,
+    dto: seven.dto!,
+    photos: [],
+  });
+  assert.equal(step?.phase, 'match');
+  await settle(convex);
+
+  // The owner is handed off before the worker publishes.
+  await convex.mutation(internal.owners.setWriter, {
+    ...actor,
+    writer: 'handoff',
+    expectedEpoch: 1,
+  });
+  const publish = () =>
+    convex.mutation(internal.ingestion.matched, {
+      job,
+      claim: source!.claim,
+      recording: recording._id,
+      result,
+    });
+  await assert.rejects(publish(), /written by another store/);
+  const unmatched = async () =>
+    (await state(convex)).activities.find((row) => Number(row.key) === 7)!
+      .projection?.match;
+  assert.equal(await unmatched(), undefined);
+
+  // Convex writes again; the lost run is recovered and the job matches.
+  await convex.mutation(internal.owners.setWriter, {
+    ...actor,
+    writer: 'convex',
+    expectedEpoch: 2,
+  });
+  await advance(convex, LEASE_MS);
+  await advance(convex, 60_000);
+  const matched = await unmatched();
+  assert.equal(matched?.value.places.length, 1);
+
+  // The first worker's result arrives late and changes nothing.
+  await publish();
+  assert.equal(
+    (await unmatched())?.value.resultRevision,
+    matched!.value.resultRevision,
+  );
+  assert.deepEqual(
+    provider.reads.filter((read) => read.startsWith('streams')),
+    ['streams 7', 'streams 9'],
   );
 });

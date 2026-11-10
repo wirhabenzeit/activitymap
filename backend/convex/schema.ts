@@ -96,7 +96,11 @@ export default defineSchema({
       /** Gave up; a new request starts over. */
       v.literal('failed'),
     ),
-    phase: v.union(v.literal('source'), v.literal('recording')),
+    phase: v.union(
+      v.literal('source'),
+      v.literal('recording'),
+      v.literal('match'),
+    ),
     requested: v.number(),
     /** Failed attempts since the job last made progress. */
     attempt: v.number(),

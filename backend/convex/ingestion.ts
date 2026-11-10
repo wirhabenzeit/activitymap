@@ -11,8 +11,13 @@ import {
 import {
   activityMetadataValidator,
   photoValidator,
+  placeMatchValidator,
 } from './activityValidators';
-import { activityFor, applySourceRecord } from './activityWrites';
+import {
+  activityFor,
+  applySourceRecord,
+  publishMatchRecord,
+} from './activityWrites';
 import { ownerFor, requireHead, writerOf } from './owners';
 import { applyPhotoSet } from './photos';
 
@@ -35,8 +40,11 @@ import { applyPhotoSet } from './photos';
  * 3. `recording` phase, only when the activity has no current recording:
  *    the worker reads the streams, stores the file and publishes it through
  *    the same fenced path the mirror uses.
- * 4. `complete` ends the run. If the activity was requested again while it
- *    ran, the job starts over at once.
+ * 4. `match` phase, when the activity has a current recording without a
+ *    match for the owner's catalogue: the worker matches it against the
+ *    copied place catalogue and `matched` publishes the result.
+ * 5. The run ends. If the activity was requested again while it ran, the
+ *    job starts over at once.
  *
  * Every write names the job's claim. A worker whose lease was taken over
  * (it expired and `recover` or a later claim moved on) changes nothing, and
@@ -163,6 +171,7 @@ async function recordingTarget(
     .map(BigInt)
     .reduce((a, b) => (a > b ? a : b), 0n);
   return {
+    phase: 'recording' as const,
     sourceRevision: row.sourceRevision,
     recording: {
       /** Null: the worker names a new generation. */
@@ -172,15 +181,69 @@ async function recordingTarget(
   };
 }
 
+/** What a matching run needs, or null when the activity has no current
+ * recording or already has a match for the owner's catalogue. `catalogues`
+ * are the newest complete rowsets; the worker uses the one the owner's
+ * matching version names. */
+async function matchTarget(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  activity: string,
+) {
+  const row = await activityFor(ctx, owner._id, activity);
+  if (
+    !row?.dto ||
+    row.deleted ||
+    !row.recording ||
+    row.projection?.streams?.state !== 'current' ||
+    row.projection.match?.catalogue === owner.catalogue
+  )
+    return null;
+  const recording = await ctx.db.get('recordings', row.recording);
+  if (!recording) return null;
+  const rowsets = await ctx.db.query('placeCatalogues').order('desc').take(8);
+  return {
+    phase: 'match' as const,
+    sourceRevision: row.sourceRevision,
+    recording: {
+      id: recording._id,
+      file: recording.file,
+      manifest: recording.manifest,
+      generation: recording.generation,
+      revision: recording.revision,
+    },
+    matchingVersion: owner.matchingVersion,
+    catalogues: rowsets
+      .filter((rowset) => rowset.complete)
+      .map(({ dataset, snapshotId, revision, metadata }) => ({
+        dataset,
+        snapshotId,
+        revision,
+        metadata,
+      })),
+  };
+}
+
+/** The phase that follows the source: a recording when the activity has no
+ * current one, then its place match. */
+async function nextTarget(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  activity: string,
+) {
+  return (
+    (await recordingTarget(ctx, owner, activity)) ??
+    (await matchTarget(ctx, owner, activity))
+  );
+}
+
 function stepFor(
   owner: Doc<'owners'>,
   job: Doc<'ingestionJobs'>,
   claim: number,
   rest:
     | { phase: 'source'; sourceRevision: number }
-    | (NonNullable<Awaited<ReturnType<typeof recordingTarget>>> & {
-        phase: 'recording';
-      }),
+    | NonNullable<Awaited<ReturnType<typeof nextTarget>>>,
 ) {
   return {
     job: job._id,
@@ -284,18 +347,19 @@ export const claim = internalMutation({
       job: job._id,
       claim: number,
     });
-    if (job.phase === 'recording') {
-      const target = await recordingTarget(ctx, owner, job.activity);
+    if (job.phase !== 'source') {
+      const target = await nextTarget(ctx, owner, job.activity);
       if (target) {
         await ctx.db.patch('ingestionJobs', job._id, {
+          phase: target.phase,
           claims: number,
           lease,
           attempt,
         });
-        return stepFor(owner, job, number, { phase: 'recording', ...target });
+        return stepFor(owner, job, number, target);
       }
-      // Nothing left to record (deleted or recorded meanwhile): look at the
-      // source again instead.
+      // Nothing left to record or match (deleted, or done meanwhile): look
+      // at the source again instead.
     }
     const [row, set, head] = await Promise.all([
       activityFor(ctx, owner._id, job.activity),
@@ -363,26 +427,87 @@ export const publishSource = internalMutation({
         activityId: id,
         photos: args.photos,
       });
-    const target =
-      args.dto && job.lease!.requested === job.requested
-        ? await recordingTarget(ctx, owner, job.activity)
-        : null;
-    if (!target) {
+    if (!args.dto) {
       await finish(ctx, job);
       return null;
     }
-    const lease = { ...job.lease!, expiresAt: Date.now() + LEASE_MS };
-    await ctx.db.patch('ingestionJobs', job._id, {
-      phase: 'recording',
-      attempt: 0,
-      error: undefined,
-      lease,
+    return proceed(ctx, owner, job, args.claim);
+  },
+});
+
+/** Move a run to its next phase, or end it. An activity that was requested
+ * again meanwhile starts over instead. */
+async function proceed(
+  ctx: MutationCtx,
+  owner: Doc<'owners'>,
+  job: Doc<'ingestionJobs'>,
+  claim: number,
+  /** Which phases may follow. A run asks for a recording once: after the
+   * recording phase only the match is left, whatever became of the file. */
+  target_: typeof nextTarget | typeof matchTarget = nextTarget,
+): Promise<IngestionStep | null> {
+  const target =
+    job.lease!.requested === job.requested
+      ? await target_(ctx, owner, job.activity)
+      : null;
+  if (!target) {
+    await finish(ctx, job);
+    return null;
+  }
+  const lease = { ...job.lease!, expiresAt: Date.now() + LEASE_MS };
+  await ctx.db.patch('ingestionJobs', job._id, {
+    phase: target.phase,
+    attempt: 0,
+    error: undefined,
+    lease,
+  });
+  await ctx.scheduler.runAt(lease.expiresAt, internal.ingestion.recover, {
+    job: job._id,
+    claim,
+  });
+  return stepFor(owner, job, claim, target);
+}
+
+/** After a recording was published: the match step, or the end of the run. */
+export const advance = internalMutation({
+  args: { job: v.id('ingestionJobs'), claim: v.number() },
+  handler: async (ctx, args): Promise<IngestionStep | null> => {
+    const holder = await held(ctx, args.job, args.claim);
+    if (!holder?.owner) return null;
+    return proceed(ctx, holder.owner, holder.job, args.claim, matchTarget);
+  },
+});
+
+/** Publish the match computed for the activity's current recording, and end
+ * the run. A result for a recording that has been replaced is dropped. */
+export const matched = internalMutation({
+  args: {
+    job: v.id('ingestionJobs'),
+    claim: v.number(),
+    recording: v.id('recordings'),
+    result: placeMatchValidator,
+  },
+  handler: async (ctx, args) => {
+    const holder = await held(ctx, args.job, args.claim);
+    if (!holder?.owner) return;
+    const { job, owner } = holder;
+    const row = await activityFor(ctx, owner._id, job.activity);
+    // Refuses an owner Convex does not write for, which fails the run.
+    await publishMatchRecord(ctx, {
+      scope: {
+        userId: owner.userId,
+        athleteId: owner.athleteId,
+        epoch: owner.epoch,
+      },
+      id: activityIdOf(job.activity),
+      generation: owner.generation,
+      sourceRevision: row?.sourceRevision ?? job.revision,
+      writer: 'convex',
+      recording: args.recording,
+      catalogue: owner.catalogue,
+      result: args.result,
     });
-    await ctx.scheduler.runAt(lease.expiresAt, internal.ingestion.recover, {
-      job: job._id,
-      claim: args.claim,
-    });
-    return stepFor(owner, job, args.claim, { phase: 'recording', ...target });
+    await finish(ctx, job);
   },
 });
 
