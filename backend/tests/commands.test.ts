@@ -238,10 +238,11 @@ void test('an edit is sent to Strava and its result is written to Convex', async
   assert.equal(after.changes.length, before.changes.length + 1);
   // The edit did not read photos: what was known about them stands.
   assert.equal(edited.photos_state, 'current');
-  // A manual activity needs nothing further.
+  // The source is current; the job goes on to what is missing (here the
+  // empty recording of an activity typed in by hand).
   assert.deepEqual(
-    after.jobs.map((job) => job.status),
-    ['idle'],
+    after.jobs.map((job) => [job.status, job.phase]),
+    [['queued', 'recording']],
   );
 });
 

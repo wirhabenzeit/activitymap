@@ -47,7 +47,9 @@ import { applyPhotoSet, photosOfActivities } from './photos';
  *    when the provider says the activity is gone.
  * 3. `recording` phase, only when the activity has no current recording:
  *    the worker reads the streams, stores the file and publishes it through
- *    the same fenced path the mirror uses.
+ *    the same fenced path the mirror uses. An activity without samples (one
+ *    typed in by hand, or one the provider has no streams for) gets an empty
+ *    recording, which is how "nothing to fetch" is remembered.
  * 4. `match` phase, when the activity has a current recording without a
  *    match for the owner's catalogue: the worker matches it against the
  *    copied place catalogue and `matched` publishes the result.
@@ -156,9 +158,21 @@ function needsRecording(row: Doc<'activities'> | null) {
   return (
     !!row?.dto &&
     !row.deleted &&
-    // A manual activity has no samples to ask for.
-    row.dto.manual !== true &&
     !(row.recording && row.projection?.streams?.state === 'current')
+  );
+}
+
+/** Whether reconciliation should ask for an activity although its summary
+ * has not changed: it was never read in full, its photos are out of date, or
+ * it has no recording. An activity without samples gets an empty recording,
+ * so this ends once each activity has been read. */
+export function incomplete(row: Doc<'activities'>) {
+  return (
+    !!row.dto &&
+    !row.deleted &&
+    (row.dto.geometry_state !== 'detailed' ||
+      row.dto.photos_state === 'refresh_required' ||
+      needsRecording(row))
   );
 }
 
@@ -181,6 +195,8 @@ async function recordingTarget(
   return {
     phase: 'recording' as const,
     sourceRevision: row.sourceRevision,
+    /** Typed in by hand: there are no samples to ask the provider for. */
+    manual: row.dto?.manual === true,
     recording: {
       /** Null: the worker names a new generation. */
       generation: prior?.generation ?? null,

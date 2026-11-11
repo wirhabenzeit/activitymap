@@ -9,7 +9,14 @@ import {
   internalQuery,
 } from './_generated/server';
 import { activityFor } from './activityWrites';
-import { LEASE_MS, ingests, requestIngestion, retryDelayMs } from './ingestion';
+import {
+  LEASE_MS,
+  incomplete,
+  ingests,
+  requestIngestion,
+  retryDelayMs,
+} from './ingestion';
+import { scopeFields } from './ownerScope';
 import { idKey, ownerFor } from './owners';
 
 /**
@@ -32,8 +39,11 @@ import { idKey, ownerFor } from './owners';
  * - **Confirming.** An activity that the list did not contain is not
  *   thereby deleted. `confirm` walks the library and asks for each activity
  *   the scan did not see; the job's detail read decides whether it is gone.
- *   At most `CONFIRM_LIMIT` are asked for per hour, so a list that is wrong
- *   cannot spend the request budget on the whole library at once.
+ *   The same walk asks for activities that are in the list but incomplete
+ *   here (never read in full, photos out of date, or no recording), which is
+ *   how a library copied from Postgres mid-backfill is finished. At most
+ *   `CONFIRM_LIMIT` are asked for per hour in total, so neither a wrong list
+ *   nor a large backlog can spend the request budget at once.
  *
  * Leases, claims and the writer check work as they do for jobs.
  */
@@ -313,7 +323,13 @@ export const confirm = internalMutation({
       )
         continue;
       const job = await jobFor(ctx, owner._id, row.key);
-      if (job?.seen === sweep.number) continue;
+      // In the list and complete: nothing to ask for. A job that is already
+      // waiting or running will get there by itself.
+      if (
+        job?.seen === sweep.number &&
+        (!incomplete(row) || job.status === 'queued')
+      )
+        continue;
       await ctx.db.patch(
         'ingestionJobs',
         await requestIngestion(ctx, owner._id, row.key),
@@ -411,6 +427,39 @@ export const recover = internalMutation({
   },
 });
 
+/** How long after a finished sweep a request for another is ignored. */
+const REQUEST_COOLDOWN_MS = 5 * 60_000;
+
+/** Start a sweep now instead of at its due time (the import command). A
+ * sweep that is under way, or one that finished minutes ago, is left alone.
+ * Returns whether a sweep was started. */
+export const requestNow = internalMutation({
+  args: { scope: v.object(scopeFields) },
+  handler: async (ctx, { scope }): Promise<boolean> => {
+    const owner = await ownerFor(ctx, scope.userId);
+    if (
+      !ingests(owner) ||
+      owner.athleteId !== scope.athleteId ||
+      owner.epoch !== scope.epoch
+    )
+      throw new Error('Activity owner unavailable');
+    const sweep = await sweepFor(ctx, owner._id);
+    const now = Date.now();
+    if (
+      !sweep ||
+      sweep.phase !== 'idle' ||
+      (sweep.lease && sweep.lease.expiresAt > now) ||
+      sweep.dueAt <= now ||
+      (sweep.completedAt !== undefined &&
+        now - sweep.completedAt < REQUEST_COOLDOWN_MS)
+    )
+      return false;
+    await ctx.db.patch('ingestionSweeps', sweep._id, { dueAt: now });
+    await schedule(ctx, owner._id, now);
+    return true;
+  },
+});
+
 /** The owner's sweep, for an operator:
  * `convex run ingestionSweep:status '{"userId":"<userId>"}'`. */
 export const status = internalQuery({
@@ -423,6 +472,7 @@ export const status = internalQuery({
       number: sweep.number,
       phase: sweep.phase,
       page: sweep.page,
+      scanStartedAt: sweep.phase === 'idle' ? null : sweep.scanBefore * 1000,
       dueAt: sweep.dueAt,
       running: !!sweep.lease && sweep.lease.expiresAt > Date.now(),
       attempt: sweep.attempt,

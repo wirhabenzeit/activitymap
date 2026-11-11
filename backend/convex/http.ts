@@ -254,6 +254,18 @@ router.route({
             ...args,
           });
           break;
+        // The import command for an account Convex writes for: its
+        // reconciliation sweep, now (convex/ingestionSweep.ts).
+        case 'sweepNow':
+          result = await ctx.runMutation(internal.ingestionSweep.requestNow, {
+            scope,
+          });
+          break;
+        case 'sweepStatus':
+          result = await ctx.runQuery(internal.ingestionSweep.status, {
+            userId,
+          });
+          break;
         // Share links of an account Convex writes for (convex/shares.ts).
         case 'createShare':
           result = await ctx.runMutation(internal.shares.create, {

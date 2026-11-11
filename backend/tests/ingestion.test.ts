@@ -49,6 +49,8 @@ const modules = {
   './places.ts': () => import('../convex/places'),
   './providerEvents.ts': () => import('../convex/providerEvents'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
+  './sync.ts': () => import('../convex/sync'),
+  './library.ts': () => import('../convex/library'),
   './shares.ts': () => import('../convex/shares'),
 };
 
@@ -235,6 +237,15 @@ function event(
   });
 }
 
+/** One event after another, each brought to rest. convex-test cannot store
+ * files from several actions at once, which concurrent recordings would. */
+async function ingest(convex: Convex, ...ids: string[]) {
+  for (const id of ids) {
+    await event(convex, id);
+    await settle(convex);
+  }
+}
+
 const state = (convex: Convex) =>
   convex.run(async (ctx) => {
     const sweep = await ctx.db.query('ingestionSweeps').first();
@@ -359,30 +370,36 @@ void test('an activity the provider no longer has is deleted with its photos', a
   assert(tombstone);
 });
 
-void test('activities without samples finish without a recording', async () => {
+void test('activities without samples get an empty recording, so nothing stays pending', async () => {
   const provider = fakeProvider();
   const convex = await owner();
   provider.set(detail(7, 'Typed in by hand', { manual: true }));
   provider.set(detail(8, 'No samples'));
   provider.noStreams('8');
 
-  await event(convex, '7');
-  await event(convex, '8');
-  await settle(convex);
+  await ingest(convex, '7', '8');
 
   const { activities, recordings, jobs } = await state(convex);
   // The manual activity is never asked for samples.
-  assert.deepEqual(provider.reads.sort(), [
-    'activity 7',
-    'activity 8',
-    'streams 8',
-  ]);
+  assert.deepEqual(provider.reads, ['activity 7', 'activity 8', 'streams 8']);
   assert.equal(activities.length, 2);
-  assert.equal(recordings.length, 0);
+  assert.deepEqual(
+    recordings.map((row) => row.manifest.counts),
+    [{}, {}],
+  );
+  for (const activity of activities) {
+    assert.equal(activity.projection?.streams?.state, 'current');
+    assert.deepEqual(activity.projection?.streams?.available_types, []);
+  }
   assert.deepEqual(
     jobs.map((job) => job.status),
     ['idle', 'idle'],
   );
+
+  // The next event finds the recording and asks for nothing more.
+  mock.timers.tick(1000);
+  await ingest(convex, '8');
+  assert.deepEqual(provider.reads.slice(3), ['activity 8']);
 });
 
 void test('a rate limit waits for the time the gateway names and counts no attempt', async () => {
@@ -694,9 +711,8 @@ void test('a sweep finds an activity, a change and a deletion that no event repo
     manual(4, 'Goes away'),
   ]) {
     provider.set(activity);
-    await event(convex, String(activity.id));
+    await ingest(convex, String(activity.id));
   }
-  await settle(convex);
   assert.equal(provider.reads.length, 3);
 
   provider.set(manual(2, 'Missed'));
@@ -749,9 +765,8 @@ void test('activities missing from the list are confirmed a bounded number at a 
   const count = CONFIRM_LIMIT + 5;
   for (let id = 1; id <= count; id++) {
     provider.set(manual(id, `Ride ${id}`));
-    await event(convex, String(id));
+    await ingest(convex, String(id));
   }
-  await settle(convex);
   assert.equal(provider.reads.length, count);
 
   // The list comes back empty, although only some activities are gone.
@@ -963,9 +978,7 @@ void test('a new recording is matched against the owner’s place catalogue', as
   provider.set(detail(8, 'Elsewhere'));
   provider.record('8', track(46.5, 8.5));
 
-  await event(convex, '7');
-  await event(convex, '8');
-  await settle(convex);
+  await ingest(convex, '7', '8');
 
   let { activities, recordings, changes, jobs } = await state(convex);
   const matchOf = (id: number) =>
@@ -1119,9 +1132,7 @@ void test('erasing an account fences it at once and removes everything it had he
   const convex = await owner();
   provider.set(detail(7, 'Morning ride'), ['p1', 'p2']);
   provider.set(detail(8, 'Evening ride'));
-  await event(convex, '7');
-  await event(convex, '8');
-  await settle(convex);
+  await ingest(convex, '7', '8');
   await convex.mutation(internal.shares.create, {
     scope,
     tokenHash: 'h'.repeat(43),
@@ -1230,4 +1241,92 @@ void test('erasing an account fences it at once and removes everything it had he
     matchingVersion: 'b'.repeat(64),
   });
   assert.equal((await counts()).owners, 2);
+});
+
+void test('a sweep finishes activities that were copied incomplete, a bounded number at a time', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  const count = CONFIRM_LIMIT + 2;
+  for (let id = 1; id <= count; id++) {
+    provider.set(manual(id, `Ride ${id}`));
+    await ingest(convex, String(id));
+  }
+  // As the mirror copies an activity Postgres had only as a list entry:
+  // never read in full.
+  await convex.run(async (ctx) => {
+    for (const row of await ctx.db.query('activities').collect())
+      await ctx.db.patch('activities', row._id, {
+        dto: { ...row.dto!, geometry_state: 'summary' },
+      });
+  });
+  const summaryOnly = async () =>
+    (await state(convex)).activities.filter(
+      (row) => row.dto?.geometry_state !== 'detailed',
+    ).length;
+  assert.equal(await summaryOnly(), count);
+  const before = provider.reads.length;
+
+  // The list agrees with what is stored, so the scan asks for nothing; the
+  // walk that follows asks for the incomplete ones.
+  await advance(convex, SWEEP_INTERVAL_MS);
+  assert.equal(provider.reads.length - before, CONFIRM_LIMIT);
+  assert.equal((await state(convex)).sweep!.phase, 'confirming');
+  assert.equal(await summaryOnly(), 2);
+  await advance(convex, CONFIRM_INTERVAL_MS);
+  assert.equal(provider.reads.length - before, count);
+  assert.equal(await summaryOnly(), 0);
+
+  const status = (await convex.query(internal.sync.read, {
+    ...scope,
+    operation: { kind: 'statusSummary' },
+  })) as {
+    counts: Record<string, number>;
+    active: boolean;
+    sweep: { phase: string } | null;
+  };
+  assert.deepEqual(
+    [
+      status.counts.total,
+      status.counts.runnable,
+      status.counts.withoutData,
+      status.active,
+      status.sweep?.phase,
+    ],
+    [count, 0, count, true, 'idle'],
+  );
+
+  // Complete now: the next sweep reads the list and nothing else.
+  await advance(convex, SWEEP_INTERVAL_MS);
+  assert.equal(provider.reads.length - before, count);
+});
+
+void test('the import command starts the sweep now, but not twice in a row', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  provider.set(manual(7, 'Missed'));
+  // The first sweep finished at the handoff; the next is days away.
+  assert.equal(provider.lists.length, 1);
+  const now = () =>
+    convex.mutation(internal.ingestionSweep.requestNow, { scope });
+
+  // Right after a sweep there is nothing new to find.
+  assert.equal(await now(), false);
+  await advance(convex, 10 * 60_000);
+  assert.equal(provider.lists.length, 1);
+
+  assert.equal(await now(), true);
+  // Asked again before it has run: one sweep, not two.
+  assert.equal(await now(), false);
+  await settle(convex);
+  assert.deepEqual(provider.reads, ['activity 7']);
+  assert.equal(provider.lists.length, 3);
+  assert.equal((await state(convex)).sweep!.phase, 'idle');
+
+  // Not for an owner another store writes.
+  await convex.mutation(internal.owners.setWriter, {
+    ...actor,
+    writer: 'handoff',
+    expectedEpoch: 1,
+  });
+  await assert.rejects(now());
 });

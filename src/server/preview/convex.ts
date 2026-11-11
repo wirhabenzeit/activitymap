@@ -638,8 +638,17 @@ function convexAdapter(actor: Actor, transport: Transport) {
     },
     loadStatus: async (candidate: Actor, observedAt: Date) => {
       assertActor(candidate);
+      // One read from the counts Convex keeps; while they are being rebuilt
+      // (or on a backend without the operation) the library is walked.
+      const summary = await query(
+        { kind: 'statusSummary' },
+        statusPageSchema.nullable(),
+      ).catch(() => null);
       return previewIngestionStatus(
-        (after) => query({ kind: 'status', after }, statusPageSchema),
+        (after) =>
+          summary && after === null
+            ? Promise.resolve(summary)
+            : query({ kind: 'status', after }, statusPageSchema),
         observedAt,
       );
     },
