@@ -1,8 +1,10 @@
 import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
-import { internalMutation } from './_generated/server';
+import type { Doc } from './_generated/dataModel';
+import { type MutationCtx, internalMutation } from './_generated/server';
 import { publishChange } from './activityWrites';
+import { ingests, requestMatch } from './ingestion';
 import { writerValidator } from './ownerScope';
 import {
   ownerFor,
@@ -11,41 +13,131 @@ import {
   scopeFields,
   writerOf,
 } from './owners';
+import { latestRowset } from './places';
+
+/** How many activities one step of the walk handles, and how long it waits
+ * before the next: a rematch asks for about eight matches a second. */
+const WALK_PAGE = 16;
+const REMATCH_PAUSE_MS = 2_000;
+const OWNER_PAGE = 32;
+
+const identity = {
+  catalogue: v.string(),
+  matchingVersion: v.string(),
+};
+
+/** Point an owner at a catalogue and start the walk over its library.
+ * False when the owner already has it. */
+async function selectFor(
+  ctx: MutationCtx,
+  owner: Doc<'owners'>,
+  {
+    catalogue,
+    matchingVersion,
+  }: { catalogue: string; matchingVersion: string },
+) {
+  if (
+    !/^[0-9a-f]{64}$/.test(catalogue) ||
+    !/^[0-9a-f]{64}$/.test(matchingVersion)
+  )
+    throw new Error('Invalid catalogue identity');
+  if (
+    owner.catalogue === catalogue &&
+    owner.matchingVersion === matchingVersion
+  )
+    return false;
+  if (
+    owner.catalogue === catalogue ||
+    owner.matchingVersion === matchingVersion
+  )
+    throw new Error('Catalogue and matching version must advance together');
+  const head = await requireHead(ctx, owner._id);
+  await ctx.db.patch('owners', owner._id, { catalogue, matchingVersion });
+  await ctx.db.patch('ownerHeads', head._id, { catalogueAfter: '' });
+  await ctx.scheduler.runAfter(0, internal.catalogue.next, {
+    scope: {
+      userId: owner.userId,
+      athleteId: owner.athleteId,
+      epoch: owner.epoch,
+    },
+    catalogue,
+    writer: writerOf(owner),
+  });
+  return true;
+}
 
 /** Hide old matches immediately, then durably publish their invalidations. */
 export const select = internalMutation({
+  args: { scope: v.object(scopeFields), ...identity },
+  handler: async (ctx, { scope, ...args }) =>
+    // Selected by a copy from Postgres, for the catalogue Postgres matched
+    // with.
+    selectFor(ctx, await requireWritableOwner(ctx, scope), args),
+});
+
+/**
+ * Move every library Convex writes to a catalogue: the newest complete
+ * rowset under the deployed matching recipe, as `catalogueWorker.adopt`
+ * names it. Each library's old matches are hidden at once and every
+ * recording is matched again (`next`). Owners that already have the
+ * catalogue are left alone, so this is safe to repeat. Returns how many
+ * libraries the first page moved.
+ *
+ * Owners are moved a page at a time, so two adoptions can be under way at
+ * once. Only the latest one may change owners: an adoption starts only for
+ * the rowset that is still the newest, records itself in
+ * `catalogueAdoptions`, and each later page stops when another adoption has
+ * been recorded since.
+ */
+export const adopt = internalMutation({
   args: {
-    scope: v.object(scopeFields),
-    catalogue: v.string(),
-    matchingVersion: v.string(),
+    ...identity,
+    /** The rowset the identity was computed for. */
+    snapshotId: v.string(),
+    revision: v.string(),
+    cursor: v.optional(v.string()),
   },
-  handler: async (ctx, { scope, catalogue, matchingVersion }) => {
-    // Selected by the Postgres mirror, for the catalogue Postgres matched with.
-    const owner = await requireWritableOwner(ctx, scope);
-    if (
-      !/^[0-9a-f]{64}$/.test(catalogue) ||
-      !/^[0-9a-f]{64}$/.test(matchingVersion)
+  handler: async (ctx, { cursor, ...args }): Promise<number> => {
+    const { catalogue, matchingVersion } = args;
+    const current = await ctx.db.query('catalogueAdoptions').first();
+    if (cursor === undefined) {
+      const latest = await latestRowset(ctx);
+      if (
+        latest?.snapshotId !== args.snapshotId ||
+        latest.revision !== args.revision
+      )
+        return 0;
+      if (!current)
+        await ctx.db.insert('catalogueAdoptions', {
+          catalogue,
+          matchingVersion,
+        });
+      else
+        await ctx.db.patch('catalogueAdoptions', current._id, {
+          catalogue,
+          matchingVersion,
+        });
+    } else if (
+      current?.catalogue !== catalogue ||
+      current.matchingVersion !== matchingVersion
     )
-      throw new Error('Invalid catalogue identity');
-    if (
-      owner.catalogue === catalogue &&
-      owner.matchingVersion === matchingVersion
-    )
-      return false;
-    if (
-      owner.catalogue === catalogue ||
-      owner.matchingVersion === matchingVersion
-    )
-      throw new Error('Catalogue and matching version must advance together');
-    const head = await requireHead(ctx, owner._id);
-    await ctx.db.patch('owners', owner._id, { catalogue, matchingVersion });
-    await ctx.db.patch('ownerHeads', head._id, { catalogueAfter: '' });
-    await ctx.scheduler.runAfter(0, internal.catalogue.next, {
-      scope,
-      catalogue,
-      writer: 'postgres',
-    });
-    return true;
+      return 0;
+    const page = await ctx.db
+      .query('owners')
+      .paginate({ numItems: OWNER_PAGE, cursor: cursor ?? null });
+    let moved = 0;
+    for (const owner of page.page)
+      if (
+        ingests(owner) &&
+        (await selectFor(ctx, owner, { catalogue, matchingVersion }))
+      )
+        moved++;
+    if (!page.isDone)
+      await ctx.scheduler.runAfter(0, internal.catalogue.adopt, {
+        ...args,
+        cursor: page.continueCursor,
+      });
+    return moved;
   },
 });
 
@@ -57,6 +149,10 @@ export const select = internalMutation({
  * changes, queued continuations become no-ops and the cursor stays where it
  * is: nothing runs during a handoff, and `owners.setWriter` schedules the
  * rest for the store that writes next.
+ *
+ * For a library Convex writes, the walk also asks for each recording to be
+ * matched against the new catalogue (`ingestion.requestMatch`), and pauses
+ * between steps so the matches do not all start at once.
  */
 export const next = internalMutation({
   args: {
@@ -85,7 +181,7 @@ export const next = internalMutation({
     const head = await requireHead(ctx, owner._id);
     const after = head.catalogueAfter;
     if (after === undefined) return { done: true };
-    const limit = 16;
+    const limit = WALK_PAGE;
     const rows = await ctx.db
       .query('activities')
       .withIndex('by_owner_live_key', (q) =>
@@ -96,28 +192,38 @@ export const next = internalMutation({
           .gt('key', after),
       )
       .take(limit);
+    let requested = 0;
     for (const row of rows) {
+      if (!row.dto || row.projection?.match?.catalogue === catalogue) continue;
+      if (row.projection?.match) {
+        await ctx.db.patch('activities', row._id, {
+          projection: { ...row.projection, match: undefined },
+        });
+        await publishChange(ctx, owner, row.dto.id, 'upsert');
+      }
       if (
-        !row.dto ||
-        !row.projection?.match ||
-        row.projection.match.catalogue === catalogue
-      )
-        continue;
-      await ctx.db.patch('activities', row._id, {
-        projection: { ...row.projection, match: undefined },
-      });
-      await publishChange(ctx, owner, row.dto.id, 'upsert');
+        writer === 'convex' &&
+        row.recording &&
+        row.projection?.streams?.state === 'current'
+      ) {
+        await requestMatch(ctx, owner._id, row.key);
+        requested++;
+      }
     }
     const done = rows.length < limit;
     await ctx.db.patch('ownerHeads', head._id, {
       catalogueAfter: done ? undefined : rows.at(-1)!.key,
     });
     if (!done)
-      await ctx.scheduler.runAfter(0, internal.catalogue.next, {
-        scope,
-        catalogue,
-        writer,
-      });
+      await ctx.scheduler.runAfter(
+        requested > 0 ? REMATCH_PAUSE_MS : 0,
+        internal.catalogue.next,
+        {
+          scope,
+          catalogue,
+          writer,
+        },
+      );
     return { done };
   },
 });

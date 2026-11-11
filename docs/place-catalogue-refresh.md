@@ -5,42 +5,17 @@ regional snapshot without database access, then publish that exact artifact with
 a separate command. Both commands can run locally; a future CI job can use the
 same entry points. Nothing runs automatically when the web application starts.
 
-## Release boundary and schema contract
+## Where the catalogue lives
 
-The catalogue foundation can be released independently of activity matching.
-Migration 0025 adds retained snapshot metadata and coverage in `place_catalogues`,
-plus nullable region ownership and retirement time on `places`. Existing OSM
-identity uniqueness, spatial indexing and internal place UUIDs remain the
-identity contract. Legacy rows are preserved and require explicit adoption.
-Retired rows remain available to existing foreign keys, but positive place reads
-exclude them. No new activity cross-reference schema is required for ingestion.
+Preparation and combination have no database access: they turn OpenStreetMap
+extracts into an artifact on disk. Publication sends that artifact to the
+Convex backend (`backend/convex/places.ts`), which matches activities against
+it. Earlier versions published to Postgres; the sections on measured runs and
+rehearsals further down describe that period and are kept as a record.
 
-Preparation and combination have no database access. Publication writes only
-catalogue rows and metadata. The published-catalogue reader exposes the active
-manifest and coverage without loading extraction files; callers must use one
-repeatable-read transaction for metadata and corresponding place queries.
-The focused production release includes catalogue schema, ingestion, publication
-and shared spatial reads. Experimental activity matching, local preview adapters,
-debug controls, title experiments and native UI changes remain on the separate
-`codex/activity-place-inference-design` branch. No scheduler, background matching,
-public endpoint or product UI is introduced. The existing activity-evidence table
-is included only to preserve the already tested migration history; ingestion
-does not populate it.
-
-Deploy migration 0025 before backend code that reads the new fields. Publish the
-catalogue as a separate operator action after reviewing its dry run. An empty
-database accepts the combined catalogue directly; existing frozen data must be
-adopted first, with consolidation needed only when replacing an assigned region.
-Before production release, rehearse migration, publication, exact-repeat
-publication and application reads on an isolated production-derived database.
-Local proofs and the production-derived rehearsal below have passed. The
-controlled production rollout is still pending.
-
-A failed publication rolls back automatically. Successful publication is not
-automatically undone: older source epochs are deliberately rejected. Keep the
-input artifacts and a tested database restore plan for recovery after a committed
-publication. An application rollback can retain the additive schema; do not drop
-catalogue columns or tables as an application rollback step.
+Publication is not automatically undone, and libraries only ever move to the
+newest complete rowset. Keep the input artifacts: going back to an earlier
+catalogue means publishing it again as a new artifact.
 
 ## Prepare an artifact
 
@@ -86,71 +61,64 @@ if you need to rerun the extraction itself.
 
 ## Publish or refresh
 
-Apply the checked-in migration `0025_place-catalogue-refresh` through the normal
-migration runner before using the publisher. Migrations and catalogue publication
-are separate operations. Test the migration and artifact on an isolated database
-before production publication.
+A catalogue is published to the Convex backend, where activities are matched
+against it. Nothing else stores it: there is no Postgres step.
 
-The publisher reads only explicitly supplied `PLACES_*` connection settings.
-It does not load dotenv files or fall back to the application's `DATABASE_URL`.
-For a local database:
-
-```sh
-export PLACES_DATABASE_URL='postgres://postgres:postgres@127.0.0.1:5432/main'
-export PLACES_EXPECTED_HOST='127.0.0.1'
-export PLACES_EXPECTED_DATABASE='main'
-
-pnpm places:publish --artifact output/places/switzerland-YYYY-MM-DD \
-  --region switzerland
-```
-
-Default execution is a dry run. It reports the current and proposed snapshot IDs,
-source timestamp, category counts, coverage changes, additions, updates,
-unchanged places, retirements and reactivations, with bounded named examples.
-The dry run writes no rows. When reviewed, publish with the exact previous
-snapshot ID returned by the report, or `none` for an unpublished region:
+The publisher signs its requests with the write bridge key. It needs
+`ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and
+`ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY` in the operator's environment, and
+the user and athlete ID of an account whose bridge scope signs the requests
+(use an administrator; the catalogue belongs to no account).
 
 ```sh
-pnpm places:publish --artifact output/places/switzerland-YYYY-MM-DD \
-  --region switzerland --apply --expect-current none
+pnpm places:publish --artifact output/places/v1-places-current \
+  --user <user ID> --athlete <athlete ID>
 ```
 
-On refresh, replace `none` with the report's `previousSnapshotId`. If another
-publisher changed the active snapshot meanwhile, publication fails and requires
-a new dry run. More than 20% retirement is flagged in the dry run and requires
-`--allow-large-retirement` on apply, after inspecting source completeness.
+Default execution is a dry run. It reports the proposed snapshot ID, its
+source timestamp, how many places would be sent and how many the filter
+hides, and the catalogue that is current now. It writes nothing. When
+reviewed, publish with the current snapshot ID the report showed, or `none`
+when nothing was published yet:
 
-For production, use a dedicated direct connection with credentials authorized
-for catalogue tables. Set the expected production host/database explicitly.
-Remote connections require `?sslmode=verify-full` (legacy `require` also enables
-certificate verification); other URL driver options are rejected. Neon targets
-also require `PLACES_EXPECTED_BRANCH_ID`, checked against the connected server.
-Credentials belong in the operator environment or CI secrets, never in artifacts.
-The publisher needs catalogue SELECT/INSERT/UPDATE and table-lock permissions;
-its runtime SQL does not write activities, streams, accounts or activity evidence.
+```sh
+pnpm places:publish --artifact output/places/v1-places-current \
+  --user <user ID> --athlete <athlete ID> \
+  --apply --expect-current <current-snapshot-id>
+```
+
+If another catalogue became current meanwhile, publication fails and requires
+a new dry run. A catalogue with fewer than 80% of the current number of
+places is flagged in the dry run and requires `--allow-large-retirement` on
+apply, after inspecting source completeness. Only an artifact of the serving
+region (`v1-places`) is accepted; `--region` names another one explicitly.
 
 ## Refresh behavior
 
-- A repeated identical artifact is a no-op, preserving IDs and timestamps.
-- Existing `(osm_type, osm_id)` identities retain their internal UUID on updates.
-  Nodes and ways with the same numeric ID remain distinct.
-- Missing sources are retired only among rows assigned to the refreshed region.
-  Retired rows stay stored for reference integrity and recover their UUID if they
-  reappear. A representation replaced by a different OSM identity is a new place;
-  there is no automatic name/proximity merging.
-- Snapshot metadata and coverage are retained in `place_catalogues`. A partial
-  unique index permits one active snapshot per region. All upserts, retirements
-  and the active snapshot change commit in one transaction; an interrupted or
-  failed refresh leaves the preceding catalogue intact.
-- Older source snapshots, regressed per-object versions/timestamps and conflicting
-  contents for an existing snapshot identity are rejected.
-- A source already assigned to another region is rejected. Combine overlapping
-  country extracts into one serving catalogue before publication. The explicit
-  consolidation workflow below can replace an existing Swiss region while
-  preserving source identities.
-- Activity evidence is not rewritten or recomputed. Existing snapshot guards
-  invalidate old results after refresh, and retired places are excluded from
-  positive place reads. Background publication remains experimental.
+- A place's ID is derived from its OpenStreetMap object (`placeId` in
+  `src/server/places/catalogue-publish.ts`): a name-based UUID of
+  `<osm_type>/<osm_id>`. The same object has the same ID in every catalogue,
+  so no store has to remember IDs between publications. Nodes and ways with
+  the same number remain distinct. A representation replaced by a different
+  OSM object is a new place; there is no name or proximity merging.
+- The places sent are the artifact's rows that the noise filter does not
+  hide. A place that is missing from a newer catalogue is simply not in it.
+- A rowset is one snapshot under one row format (`PLACE_ROWS_VERSION`). It is
+  sent in ID order, 500 places a call, and accepted only when its row count
+  and digest agree with the publisher's; nothing reads it before. An
+  interrupted publication is finished by running the same command again.
+- A repeated identical artifact sends nothing and moves no library.
+- Once the rowset is complete, every library moves to it
+  (`catalogueWorker.adopt`): its old matches are hidden at once, and each
+  recording is matched again in the background, about eight a second per
+  library, without reading the provider.
+- Libraries follow the newest complete rowset. A rowset that was complete
+  before a newer one cannot become current again; publish a new artifact
+  instead.
+- After a deployment that changes the matching recipe, run
+  `convex run catalogueWorker:adopt` in `backend/` to match every library
+  again under the new recipe.
+- Superseded rowsets are not removed yet.
 
 ## Noise filter: OSM roads and terrain
 
@@ -286,23 +254,6 @@ Attribution: © DLR e.V. and Airbus, Copernicus programme. The Copernicus DEM is
 free to use with this attribution; the map layers that show places carry it
 next to the OSM attribution.
 
-## Adopt an existing frozen local catalogue
-
-Migration 0025 leaves existing places unassigned. Publish their **exact original
-artifact** first, with the desired region and `--expect-current none`. The
-publisher proves every existing source row matches before assigning the region,
-retaining all UUIDs. A newer/different artifact is rejected until this adoption
-has completed. In the existing Swiss development setup the original is
-`output/places/switzerland-2026-10-20`.
-
-`loadPublishedCatalogue` reads the active manifest and coverage for an explicit
-region. `loadServingCatalogue` prefers `v1-places`, then `ch-at-it`, then
-`switzerland` (`SERVING_PLACE_REGIONS`);
-an explicit region argument disables fallback. Both accept the caller's database
-transaction, so a concurrent refresh cannot mix catalogue versions with the
-associated place reads. Integration with selected-activity matching remains on
-the experimental design branch.
-
 ## Verification
 
 ```sh
@@ -425,19 +376,6 @@ still fail preparation. This refines the earlier blanket rule about unsupported
 geometry: unsupported representations are audited exclusions; corrupt input and
 unusable geometry within the supported building model remain errors.
 
-To replace an existing published Swiss-only catalogue, first dry-run the
-consolidation with its current snapshot ID:
-
-```sh
-pnpm places:publish --region ch-at-it --artifact output/places/ch-at-it-current \
-  --replace-region switzerland --expect-replaced <current-swiss-snapshot-id>
-```
-
-After reviewing the report, repeat with `--apply --expect-current none`. This
-operation requires a new target region, verifies the previous snapshot, requires
-the combined inputs to include the old region and its complete coverage, and
-preserves all existing UUIDs, including retired rows. Ownership transfer,
-retirement, old-region deactivation and new metadata publication are atomic.
 A failed consolidation leaves the old catalogue active. Later combined refreshes
 use the ordinary `--expect-current` workflow, without replacement flags.
 
@@ -509,15 +447,7 @@ over several hours. Each extract only contains the roads inside it, so a pass
 on a border can list different roads per country; combining merges them and
 recomputes the filter. Other filter inputs and all OSM fields must still agree.
 
-To replace a published `ch-at-it`, dry-run the consolidation with its snapshot:
-
-```sh
-pnpm places:publish --region v1-places --artifact output/places/v1-places-current \
-  --replace-region ch-at-it --expect-replaced <current-ch-at-it-snapshot-id>
-```
-
-then repeat with `--apply --expect-current none`. A combined catalogue can
-replace another combined one only when it includes every component region.
+Publish the combined artifact as described under [Publish or refresh](#publish-or-refresh).
 
 ### Measured eight-country catalogue
 

@@ -116,6 +116,10 @@ export default defineSchema({
         requested: v.number(),
       }),
     ),
+    /** A match against the owner's current catalogue is owed, and no
+     * provider read with it (ingestion.requestMatch). Set while a run holds
+     * the job, and on a job queued only for that match. */
+    rematch: v.optional(v.boolean()),
     /** Why the last run did not finish. */
     error: v.optional(v.string()),
     /** Reconciliation (convex/ingestionSweep.ts): a fingerprint of the last
@@ -269,8 +273,14 @@ export default defineSchema({
     digest: v.string(),
     complete: v.boolean(),
   }).index('by_dataset', ['dataset']),
-  /** The places of a rowset by quarter-degree tile. `key` is the Postgres
-   * place ID. */
+  /** The catalogue libraries were last told to move to (one row;
+   * catalogue.adopt). A continuation of an earlier adoption stops when it
+   * is no longer the one named here. */
+  catalogueAdoptions: defineTable({
+    catalogue: v.string(),
+    matchingVersion: v.string(),
+  }),
+  /** The places of a rowset by quarter-degree tile. `key` is the place ID. */
   places: defineTable({
     dataset: v.string(),
     key: v.string(),

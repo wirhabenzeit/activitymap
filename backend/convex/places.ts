@@ -15,18 +15,16 @@ import {
 import { placeValidator as place } from './placeValidators';
 
 /**
- * The place catalogue the matcher reads: the rows Postgres matches against
- * (not retired, not hidden) for one catalogue snapshot at one revision,
- * stored by quarter-degree tile. Place IDs are the Postgres place IDs, so
- * results computed here refer to the same places as results copied from
- * Postgres.
+ * The place catalogue the matcher reads: the places of one catalogue
+ * snapshot under one row format, stored by quarter-degree tile. A place's ID
+ * is derived from its OpenStreetMap object by the publisher
+ * (src/server/places/catalogue-publish.ts).
  *
- * A rowset is immutable. It is imported once, in ascending place-ID order, by
- * the catalogue mirror (src/server/convex-mirror/catalogue.ts): `begin`
- * records what is coming, `importBatch` appends rows after the last imported
- * ID and extends a digest over them, and `complete` accepts the rowset only
- * when the row count and the digest match the sender's. Until then nothing
- * reads it. A changed catalogue is a new dataset.
+ * A rowset is immutable. It is imported once, in ascending place-ID order:
+ * `begin` records what is coming, `importBatch` appends rows after the last
+ * imported ID and extends a digest over them, and `complete` accepts the
+ * rowset only when the row count and the digest match the sender's. Until
+ * then nothing reads it. A changed catalogue is a new dataset.
  */
 
 const dataset = v.string();
@@ -58,14 +56,15 @@ export const state = internalQuery({
 
 /** The newest complete rowset, or null: what a library that starts here is
  * matched against. */
-export const latest = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db.query('placeCatalogues').order('desc').take(8);
-    const row = rows.find((candidate) => candidate.complete);
-    return row ? { snapshotId: row.snapshotId, revision: row.revision } : null;
-  },
-});
+export async function latestRowset(ctx: QueryCtx) {
+  const rows = await ctx.db.query('placeCatalogues').order('desc').take(8);
+  const row = rows.find((candidate) => candidate.complete);
+  return row
+    ? { snapshotId: row.snapshotId, revision: row.revision, count: row.count }
+    : null;
+}
+
+export const latest = internalQuery({ args: {}, handler: latestRowset });
 
 /** Start a dataset, or return the progress of one already started. `metadata`
  * is a stored file holding the catalogue manifest and coverage. */

@@ -56,18 +56,14 @@ app's own records (sign-in, Strava tokens, rate limits) live in the Convex
 backend; see [backend/README.md](backend/README.md). The app needs
 `ACTIVITYMAP_CONVEX_SITE` and the bridge keys described there.
 
-Postgres remains only as the workspace for building a place catalogue
-(`pnpm places:prepare`, `places:combine`, `places:publish`). After
-publishing, `pnpm places:copy-to-convex` copies the catalogue to the backend.
-That workspace is set up with:
+A place catalogue is built from OpenStreetMap extracts and published
+straight to the backend (`pnpm places:prepare`, `places:combine`,
+`places:publish`); see
+[Place catalogue preparation and refresh](docs/place-catalogue-refresh.md).
 
-```bash
-docker compose up -d
-pnpm db:migrate
-```
-
-See [Database migrations](docs/database-migrations.md) for its schema
-changes.
+Nothing needs Postgres any more. What is left of it in this repository (the
+schema in `src/server/db`, which still supplies types, and the migration
+tooling in `drizzle/` and `scripts/database`) is to be removed.
 
 ## Behavior references
 

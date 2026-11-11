@@ -272,8 +272,6 @@ jobs:
         run: pnpm db:migrate:check
       - name: Prove activity-place spatial indexes, constraints and erasure
         run: pnpm db:test-activity-places
-      - name: Prove frozen catalogue imports are atomic and repeatable
-        run: pnpm db:test-place-catalogue
       - name: Prove a second migration run is a no-op
         run: pnpm db:migrate
       - name: Verify schema fingerprint
