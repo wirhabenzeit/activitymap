@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 
 import test from 'node:test';
 
-import { createConvexShadowCronHandler, shadowOwners } from './handler';
+import {
+  MAX_CHAINED_RUNS,
+  createConvexShadowCronHandler,
+  shadowOwners,
+  shouldContinue,
+} from './handler';
 
 const request = (secret?: string) =>
   new Request('https://app.test/api/cron/mirror-convex-shadow', {
@@ -126,4 +131,80 @@ void test('shared work runs once after the owners, within the same budget', asyn
   )(request('secret'));
   assert.equal(late.status, 200);
   assert.deepEqual(order, ['a']);
+});
+
+void test('with a shared budget every owner gets a turn, and unused time moves on', async () => {
+  let clock = 0;
+  const deadlines: Record<string, number> = {};
+  const handler = createConvexShadowCronHandler({
+    owners: () => ['a', 'b', 'c', 'd'],
+    secret: () => 'secret',
+    now: () => clock,
+    budgetMs: 40_000,
+    fair: true,
+    run: async (userId, deadline) => {
+      deadlines[userId] = deadline;
+      // `a` has nothing to do; `b` and `c` use their whole share.
+      if (userId !== 'a') clock = deadline;
+      return { userId };
+    },
+  });
+  const response = await handler(request('secret'));
+  assert.equal(response.status, 200);
+  // A quarter each to start with; what `a` left is shared by the other three.
+  assert.deepEqual(deadlines, {
+    a: 10_000,
+    b: 40_000 / 3,
+    c: 40_000 / 3 + (40_000 - 40_000 / 3) / 2,
+    d: 40_000,
+  });
+
+  // Many owners: each still gets a slice worth starting, and the ones the
+  // budget does not reach are reported, not dropped.
+  clock = 0;
+  const many = Array.from({ length: 20 }, (_, index) => `owner-${index}`);
+  const ran: string[] = [];
+  const crowded = createConvexShadowCronHandler({
+    owners: () => many,
+    secret: () => 'secret',
+    now: () => clock,
+    budgetMs: 40_000,
+    fair: true,
+    run: async (userId, deadline) => {
+      ran.push(userId);
+      clock = deadline;
+      return {};
+    },
+  });
+  const body = (await (await crowded(request('secret'))).json()) as {
+    results: Record<string, { skipped?: string }>;
+  };
+  assert(ran.length >= 8 && ran.length < many.length);
+  assert.equal(
+    Object.values(body.results).filter((result) => result.skipped).length,
+    many.length - ran.length,
+  );
+});
+
+void test('a run starts the next one only while a copy is unfinished and moving', () => {
+  const copying = { mode: 'full', activities: 128, complete: false };
+  const current = { mode: 'incremental', activities: 0, complete: true };
+  const waiting = { skipped: 'time budget exhausted' };
+  const moved = { skipped: 'Convex writes for this owner' };
+  const run = (results: Record<string, unknown>, chained = 0) =>
+    shouldContinue({ results }, chained);
+
+  assert.equal(run({ a: copying }), true);
+  assert.equal(run({ a: current, b: copying, c: waiting }), true);
+  // Everything copied: the schedule is enough.
+  assert.equal(run({ a: current, b: moved }), false);
+  assert.equal(run({ a: { ...current, activities: 3 }, b: moved }), false);
+  // Unfinished, but nobody got anywhere: do not spin.
+  assert.equal(run({ a: { ...copying, activities: 0 }, b: waiting }), false);
+  assert.equal(run({ a: { error: 'Shadow write failed' }, b: waiting }), false);
+  // One scheduled trigger chains only until the next one is due.
+  assert.equal(run({ a: copying }, MAX_CHAINED_RUNS - 1), true);
+  assert.equal(run({ a: copying }, MAX_CHAINED_RUNS), false);
+  assert.equal(shouldContinue(null, 0), false);
+  assert.equal(shouldContinue({}, 0), false);
 });

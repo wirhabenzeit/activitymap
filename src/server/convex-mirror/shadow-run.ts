@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { and, eq, isNotNull, ne } from 'drizzle-orm';
+import { and, asc, eq, isNotNull, ne } from 'drizzle-orm';
 
 import { externalEffectsEnabled } from '~/server/config/external-effects';
 import { db } from '~/server/db';
@@ -37,7 +37,9 @@ export async function mirroredOwners(): Promise<string[] | null> {
   const moving = await db
     .select({ id: users.id })
     .from(users)
-    .where(and(isNotNull(users.convexEpoch), ne(users.writer, 'convex')));
+    .where(and(isNotNull(users.convexEpoch), ne(users.writer, 'convex')))
+    // The same order every run, so the shares are spread the same way.
+    .orderBy(asc(users.id));
   const owners = new Set([
     ...(configuredShadowOwners() ?? []),
     ...moving.map((user) => user.id),

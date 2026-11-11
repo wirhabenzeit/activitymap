@@ -32,6 +32,14 @@ invocation in Cloudflare's cron history and as a `Convex shadow parity drift`
 error in the app's logs. Both are off (503) unless
 `ACTIVITYMAP_CONVEX_SHADOW_OWNERS` is set; see `backend/README.md`.
 
+While accounts are being copied to Convex, the mirror shares each run's
+forty seconds between them (every account gets a turn, and an account that
+finishes early leaves its time to the next), and a run that left a copy
+unfinished starts the next run itself instead of waiting for the trigger.
+One trigger chains at most nine runs, which fills the ten minutes until the
+next one, and a run in which no account advanced does not chain. Once every
+copy has finished, the job is back to one run per trigger.
+
 Incoming Strava webhooks still get an immediate processing attempt. The hourly
 drain handles pending events and retries that are due.
 
