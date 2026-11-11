@@ -12,54 +12,22 @@ export interface CronJob {
 }
 
 export const SCHEDULES: Record<string, CronJob[]> = {
-  // Run the jobs together so Postgres can suspend between batches.
+  // Every account's library is written by Convex, which schedules its own
+  // ingestion, so Postgres has no ingestion jobs left. What remains still
+  // lives there: the webhook inbox, rate limits, account erasure, and the
+  // place catalogue that Convex copies. One batch an hour, so Postgres can
+  // suspend in between.
   '0 * * * *': [
+    // Sends on events that could not be handed to Convex when they arrived.
     { name: 'drain-webhook-inbox', path: '/api/cron/drain-webhook-inbox' },
     { name: 'cleanup-rate-limits', path: '/api/cron/cleanup-rate-limits' },
     {
       name: 'erase-revoked-athletes',
       path: '/api/cron/erase-revoked-athletes',
     },
-    {
-      name: 'reconcile-strava-summaries',
-      path: '/api/cron/reconcile-strava-summaries',
-      body: { batchSize: 1, pagesPerAthlete: 3 },
-    },
-    {
-      name: 'backfill-activity-streams',
-      path: '/api/cron/backfill-activity-streams',
-      body: { activityLimit: 40, requestLimit: 60 },
-      requires: 'reconcile-strava-summaries',
-    },
-    {
-      name: 'backfill-activity-photos',
-      path: '/api/cron/backfill-activity-photos',
-    },
-    {
-      name: 'sync-activities',
-      path: '/api/cron/sync-activities',
-      body: {
-        maxIncompleteActivities: 30,
-        maxOldActivities: 30,
-        minActivitiesThreshold: 2,
-      },
-    },
-    // Match after ingestion so this run can use newly stored streams.
-    { name: 'match-activity-places', path: '/api/cron/match-activity-places' },
-  ],
-  // Shadow-write recent changes into Convex. Runs every ten minutes so a first
-  // full copy (about 40s of work per run) finishes within hours; incremental
-  // runs with nothing to copy return quickly. Answers 503 until
-  // ACTIVITYMAP_CONVEX_SHADOW_OWNERS is configured.
-  '*/10 * * * *': [
+    // No account is copied any more; this run carries place catalogue
+    // changes to Convex.
     { name: 'mirror-convex-shadow', path: '/api/cron/mirror-convex-shadow' },
-  ],
-  // Compare a sample of each shadow owner's Postgres data with Convex and
-  // answer 500 on drift. On its own trigger, between shadow-write runs, so a
-  // drift report doesn't mark the hourly batch as failed. Answers 503 until
-  // ACTIVITYMAP_CONVEX_SHADOW_OWNERS is configured.
-  '5 * * * *': [
-    { name: 'convex-shadow-parity', path: '/api/cron/convex-shadow-parity' },
   ],
 };
 
