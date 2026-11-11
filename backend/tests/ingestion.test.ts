@@ -40,6 +40,7 @@ const modules = {
   './_generated/api.js': () => import('../convex/_generated/api.js'),
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './catalogue.ts': () => import('../convex/catalogue'),
+  './erasure.ts': () => import('../convex/erasure'),
   './ingestion.ts': () => import('../convex/ingestion'),
   './ingestionSweep.ts': () => import('../convex/ingestionSweep'),
   './ingestionWorker.ts': () => import('../convex/ingestionWorker'),
@@ -1110,4 +1111,114 @@ void test('a match is not published after a handoff or by a worker that lost the
     provider.reads.filter((read) => read.startsWith('streams')),
     ['streams 7', 'streams 9'],
   );
+});
+
+void test('erasing an account fences it at once and removes everything it had here', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  provider.set(detail(7, 'Morning ride'), ['p1', 'p2']);
+  provider.set(detail(8, 'Evening ride'));
+  await event(convex, '7');
+  await event(convex, '8');
+  await settle(convex);
+  // Another account, which must not be touched.
+  const other = {
+    userId: 'other',
+    athleteId: '43',
+    epoch: 'other-owner-epoch-01',
+  };
+  await convex.mutation(internal.owners.provision, {
+    ...other,
+    backend: 'convex',
+    generation: 'other-generation-01',
+    catalogue: 'a'.repeat(64),
+    matchingVersion: 'b'.repeat(64),
+  });
+  const counts = () =>
+    convex.run(async (ctx) => {
+      const tables = [
+        'owners',
+        'ownerHeads',
+        'ownerStats',
+        'ownerEpochs',
+        'activities',
+        'recordings',
+        'photos',
+        'photoSets',
+        'changes',
+        'ingestionJobs',
+        'ingestionSweeps',
+        'providerEvents',
+      ] as const;
+      const result: Record<string, number> = {
+        files: (await ctx.db.system.query('_storage').collect()).length,
+      };
+      for (const table of tables)
+        result[table] = (await ctx.db.query(table).collect()).length;
+      return result;
+    });
+  const before = await counts();
+  assert.deepEqual(
+    [before.activities, before.recordings, before.files, before.photos],
+    [2, 2, 2, 2],
+  );
+  assert.equal(before.owners, 2);
+
+  // An unknown user has nothing to erase; the wrong athlete is refused.
+  assert.equal(
+    await convex.mutation(internal.erasure.start, {
+      userId: 'nobody',
+      athleteId: '1',
+    }),
+    false,
+  );
+  await assert.rejects(
+    convex.mutation(internal.erasure.start, { ...actor, athleteId: '43' }),
+  );
+  assert.deepEqual(await counts(), before);
+
+  assert.equal(await convex.mutation(internal.erasure.start, actor), true);
+  // Before a single document is deleted, nothing works for the account.
+  await assert.rejects(event(convex, '7', 'update'));
+  await assert.rejects(
+    convex.mutation(internal.ingestion.apply, {
+      scope,
+      id: '7',
+      dto: null,
+    }),
+  );
+  const reads = provider.reads.length;
+
+  await settle(convex);
+  await advance(convex, 7 * 24 * 60 * 60_000);
+
+  const after = await counts();
+  assert.deepEqual(after, {
+    ...Object.fromEntries(Object.keys(before).map((table) => [table, 0])),
+    owners: 1,
+    ownerHeads: 1,
+    ownerStats: 1,
+    ownerEpochs: 1,
+  });
+  assert.equal(
+    await convex.query(internal.erasure.status, { userId: actor.userId }),
+    null,
+  );
+  assert.deepEqual(
+    await convex.query(internal.erasure.status, { userId: 'other' }),
+    { revoked: false },
+  );
+  // No job or sweep of the erased account asked the provider for anything.
+  assert.equal(provider.reads.length, reads);
+
+  // The same person can start again from nothing.
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    epoch: 'test-owner-epoch-02',
+    backend: 'convex',
+    generation: 'test-generation-02',
+    catalogue: 'a'.repeat(64),
+    matchingVersion: 'b'.repeat(64),
+  });
+  assert.equal((await counts()).owners, 2);
 });

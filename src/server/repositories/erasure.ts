@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, asc, eq, gt, inArray, isNotNull, lte, ne, or } from 'drizzle-orm';
 
+import { eraseLibraryInConvex } from '~/server/convex-mirror/erase';
 import { db as defaultDb } from '~/server/db';
 import {
   accounts,
@@ -17,12 +18,23 @@ import { bypassWriterFence } from '~/server/db/writer-fence';
 type DrizzleDb = typeof defaultDb;
 type Transaction = Parameters<Parameters<DrizzleDb['transaction']>[0]>[0];
 
+/** Erases what another store holds for the user. Runs inside the deleting
+ * transaction: when it throws, nothing is deleted here either. */
+export type EraseElsewhere = (user: {
+  id: string;
+  athleteId: number | null;
+}) => Promise<void>;
+
 /** Shared cleanup for scheduled erasure and an explicit account deletion. */
 async function eraseUserData(
   tx: Transaction,
   user: { id: string; athleteId: number | null; email: string | null },
   accountIds: string[],
+  eraseElsewhere: EraseElsewhere,
 ): Promise<boolean> {
+  // First, so that a library elsewhere never outlives the account that
+  // points to it. It is safe to repeat if this transaction then fails.
+  await eraseElsewhere({ id: user.id, athleteId: user.athleteId });
   // Erasure removes an owner's rows whoever writes for them.
   await tx.execute(bypassWriterFence);
   const athleteIds = [
@@ -66,6 +78,7 @@ async function eraseUserData(
 /** Revalidate the caller's session inside the same transaction as deletion. */
 export function createAccountDeletionRepository(
   database: DrizzleDb = defaultDb,
+  eraseElsewhere: EraseElsewhere = eraseLibraryInConvex,
 ) {
   return {
     async deleteForSession(
@@ -108,6 +121,7 @@ export function createAccountDeletionRepository(
           tx,
           user,
           linked.map((account) => account.accountId),
+          eraseElsewhere,
         );
       });
     },
@@ -163,6 +177,7 @@ function athleteIdFrom(
  */
 export function createErasureRepository(
   database: DrizzleDb = defaultDb,
+  eraseElsewhere: EraseElsewhere = eraseLibraryInConvex,
 ): ErasureRepository {
   return {
     async listDue(limit, now) {
@@ -259,7 +274,12 @@ export function createErasureRepository(
           return 'cancelled';
         }
 
-        return (await eraseUserData(tx, lockedUser, [due.accountId]))
+        return (await eraseUserData(
+          tx,
+          lockedUser,
+          [due.accountId],
+          eraseElsewhere,
+        ))
           ? 'erased'
           : 'stale';
       });

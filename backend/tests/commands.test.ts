@@ -41,6 +41,7 @@ const modules = {
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './bridge.ts': () => import('../convex/bridge'),
   './catalogue.ts': () => import('../convex/catalogue'),
+  './erasure.ts': () => import('../convex/erasure'),
   './http.ts': () => import('../convex/http'),
   './importer.ts': () => import('../convex/importer'),
   './ingestion.ts': () => import('../convex/ingestion'),
@@ -440,4 +441,30 @@ void test('the bridge gives an account a library in Convex once, and never reass
     (await convex.run((ctx) => ctx.db.query('owners').collect())).length,
     2,
   );
+});
+
+void test('the app erases an account in Convex through the bridge', async (t) => {
+  const { convex, seed, state } = await setup(t, 'convex');
+  await seed(manual(7, 'To be erased'));
+  const bridge = convexWriteBridge(actor, (url, init) =>
+    convex.fetch(new URL(String(url)).pathname, init),
+  )!;
+
+  assert.equal(await bridge.write({ kind: 'eraseOwner' }), true);
+
+  assert.equal(
+    (await bridge.write<{ revoked: boolean }>({ kind: 'state' })).revoked,
+    true,
+  );
+  // One step removes this small library and then the owner itself.
+  await convex.mutation(internal.erasure.step, {
+    owner: (await convex.run((ctx) => ctx.db.query('owners').first()))!._id,
+  });
+  await convex.mutation(internal.erasure.step, {
+    owner: (await convex.run((ctx) => ctx.db.query('owners').first()))!._id,
+  });
+  assert.equal((await state()).activities.length, 0);
+  assert.equal(await bridge.write({ kind: 'state' }), null);
+  // Asked again, for example after the Postgres side failed: nothing to do.
+  assert.equal(await bridge.write({ kind: 'eraseOwner' }), false);
 });

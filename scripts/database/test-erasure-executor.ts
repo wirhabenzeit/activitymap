@@ -11,25 +11,25 @@ import {
 import {
   accounts,
   activities,
-  activityStreams,
   activityDeletions,
+  activityStreams,
   activitySync,
   mobileLoginCodes,
   photoDeletions,
   photos,
   sessions,
-  shareLinks,
   shareLinkActivities,
+  shareLinks,
   stravaWebhookEvents,
   syncChanges,
   users,
   verification,
 } from '../../src/server/db/schema.ts';
+import { lockActiveStravaAccount } from '../../src/server/repositories/account-lifecycle.ts';
 import {
   createAccountDeletionRepository,
   createErasureRepository,
 } from '../../src/server/repositories/erasure.ts';
-import { lockActiveStravaAccount } from '../../src/server/repositories/account-lifecycle.ts';
 import { fetchStravaActivities } from '../../src/server/strava/service.ts';
 
 const environment = process.env;
@@ -51,11 +51,19 @@ const client = postgres(target.connectionString, {
   prepare: false,
 });
 const testDb = drizzle(client);
+// Stands in for the library another store holds (Convex in production).
+const elsewhere = { erased: [] as string[], fails: false };
+const eraseElsewhere = async (user: { id: string }) => {
+  if (elsewhere.fails) throw new Error('the other store is unreachable');
+  elsewhere.erased.push(user.id);
+};
 const repository = createErasureRepository(
   testDb as unknown as Parameters<typeof createErasureRepository>[0],
+  eraseElsewhere,
 );
 const deletion = createAccountDeletionRepository(
   testDb as unknown as Parameters<typeof createAccountDeletionRepository>[0],
+  eraseElsewhere,
 );
 
 const NOW = new Date('2026-09-20T12:00:00.000Z');
@@ -167,15 +175,13 @@ async function seed(): Promise<void> {
     athlete_id: DUE_ATHLETE_ID,
     type: 0,
   });
-  await testDb
-    .insert(activityStreams)
-    .values({
-      activityId: 9_002_001n,
-      generation: 'erasure-proof-generation',
-      requestedTypes: ['altitude'],
-      lastAttemptAt: NOW,
-      lastAttemptStatus: 'succeeded',
-    });
+  await testDb.insert(activityStreams).values({
+    activityId: 9_002_001n,
+    generation: 'erasure-proof-generation',
+    requestedTypes: ['altitude'],
+    lastAttemptAt: NOW,
+    lastAttemptStatus: 'succeeded',
+  });
   await testDb.insert(shareLinks).values({
     id: 'erasure-proof-share',
     athleteId: DUE_ATHLETE_ID,
@@ -339,6 +345,18 @@ async function main(): Promise<void> {
     assert.ok(due);
     assert.ok(reconnected);
 
+    // While the other store cannot be reached, nothing is deleted here, so
+    // no library is left behind that nothing points to.
+    elsewhere.fails = true;
+    await assert.rejects(repository.erase(due, NOW), /unreachable/);
+    assert.equal(
+      (await testDb.select().from(users).where(eq(users.id, DUE_USER_ID)))
+        .length,
+      1,
+      'a failed erasure elsewhere must leave the account for the next run',
+    );
+    elsewhere.fails = false;
+
     const overlappingResults = await Promise.all([
       repository.erase(due, NOW),
       repository.erase(due, NOW),
@@ -349,6 +367,11 @@ async function main(): Promise<void> {
       'overlapping workers must produce one deletion and one harmless no-op',
     );
     assert.equal(await repository.erase(reconnected, NOW), 'cancelled');
+    assert.deepEqual(
+      elsewhere.erased,
+      [DUE_USER_ID],
+      'the other store is erased once for the erased account, and not for a cancelled one',
+    );
 
     await verifyDueAthleteWasFullyErased();
     await verifyReconnectedAthleteWasPreserved();
@@ -516,15 +539,13 @@ async function main(): Promise<void> {
     await testDb
       .insert(users)
       .values({ id: DUE_USER_ID, athlete_id: DUE_ATHLETE_ID });
-    await testDb
-      .insert(accounts)
-      .values({
-        id: 'erasure-proof-new-account',
-        userId: DUE_USER_ID,
-        providerId: 'strava',
-        accountId: String(DUE_ATHLETE_ID),
-        accessToken: 'new-token',
-      });
+    await testDb.insert(accounts).values({
+      id: 'erasure-proof-new-account',
+      userId: DUE_USER_ID,
+      providerId: 'strava',
+      accountId: String(DUE_ATHLETE_ID),
+      accessToken: 'new-token',
+    });
     finishUpstream();
     assert.deepEqual((await staleImport).activities, []);
     assert.equal(
