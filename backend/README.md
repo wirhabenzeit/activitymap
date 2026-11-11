@@ -761,7 +761,13 @@ Convex writes to it (`catalogue.adopt`). For each library the walk
 `catalogue.next` hides the old matches, tells clients, and queues an
 ingestion job that starts at the match phase for every activity with a
 current recording (`ingestion.requestMatch`), so nothing is read from the
-provider. The walk pauses two seconds between steps of sixteen activities. A
+provider. A job that is running when the walk reaches its activity is marked
+`rematch` and queued for the match when its run ends, also without a provider
+read. The walk pauses two seconds between steps of sixteen activities.
+
+Owners are moved a page at a time. An adoption starts only for the rowset
+that is still the newest and records itself in `catalogueAdoptions`; a later
+page of an adoption that another one has replaced there changes nothing. A
 library that already has the catalogue is left alone, so adopting is safe to
 repeat; run `convex run catalogueWorker:adopt` after a deployment that
 changes the matching recipe.

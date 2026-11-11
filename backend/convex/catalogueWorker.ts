@@ -24,12 +24,14 @@ export const adopt = internalAction({
     const rowset: { snapshotId: string; revision: string } | null =
       await ctx.runQuery(internal.places.latest, {});
     if (!rowset) throw new Error('No complete place catalogue');
+    const { snapshotId, revision } = rowset;
     const version = matchingVersion(rowset);
     const libraries: number = await ctx.runMutation(internal.catalogue.adopt, {
       catalogue: catalogueIdentity(version),
       matchingVersion: version,
+      snapshotId,
+      revision,
     });
-    const { snapshotId, revision } = rowset;
     // `libraries`: how many of the first page of owners were moved.
     return { snapshotId, revision, libraries };
   },

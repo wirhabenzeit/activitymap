@@ -13,6 +13,7 @@ import {
   scopeFields,
   writerOf,
 } from './owners';
+import { latestRowset } from './places';
 
 /** How many activities one step of the walk handles, and how long it waits
  * before the next: a rematch asks for about eight matches a second. */
@@ -80,25 +81,61 @@ export const select = internalMutation({
  * names it. Each library's old matches are hidden at once and every
  * recording is matched again (`next`). Owners that already have the
  * catalogue are left alone, so this is safe to repeat. Returns how many
- * libraries were moved.
+ * libraries the first page moved.
+ *
+ * Owners are moved a page at a time, so two adoptions can be under way at
+ * once. Only the latest one may change owners: an adoption starts only for
+ * the rowset that is still the newest, records itself in
+ * `catalogueAdoptions`, and each later page stops when another adoption has
+ * been recorded since.
  */
 export const adopt = internalMutation({
   args: {
     ...identity,
+    /** The rowset the identity was computed for. */
+    snapshotId: v.string(),
+    revision: v.string(),
     cursor: v.optional(v.string()),
-    moved: v.optional(v.number()),
   },
-  handler: async (ctx, { cursor, moved = 0, ...args }): Promise<number> => {
+  handler: async (ctx, { cursor, ...args }): Promise<number> => {
+    const { catalogue, matchingVersion } = args;
+    const current = await ctx.db.query('catalogueAdoptions').first();
+    if (cursor === undefined) {
+      const latest = await latestRowset(ctx);
+      if (
+        latest?.snapshotId !== args.snapshotId ||
+        latest.revision !== args.revision
+      )
+        return 0;
+      if (!current)
+        await ctx.db.insert('catalogueAdoptions', {
+          catalogue,
+          matchingVersion,
+        });
+      else
+        await ctx.db.patch('catalogueAdoptions', current._id, {
+          catalogue,
+          matchingVersion,
+        });
+    } else if (
+      current?.catalogue !== catalogue ||
+      current.matchingVersion !== matchingVersion
+    )
+      return 0;
     const page = await ctx.db
       .query('owners')
       .paginate({ numItems: OWNER_PAGE, cursor: cursor ?? null });
+    let moved = 0;
     for (const owner of page.page)
-      if (ingests(owner) && (await selectFor(ctx, owner, args))) moved++;
+      if (
+        ingests(owner) &&
+        (await selectFor(ctx, owner, { catalogue, matchingVersion }))
+      )
+        moved++;
     if (!page.isDone)
       await ctx.scheduler.runAfter(0, internal.catalogue.adopt, {
         ...args,
         cursor: page.continueCursor,
-        moved,
       });
     return moved;
   },

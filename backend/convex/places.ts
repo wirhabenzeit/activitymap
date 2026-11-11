@@ -56,16 +56,15 @@ export const state = internalQuery({
 
 /** The newest complete rowset, or null: what a library that starts here is
  * matched against. */
-export const latest = internalQuery({
-  args: {},
-  handler: async (ctx) => {
-    const rows = await ctx.db.query('placeCatalogues').order('desc').take(8);
-    const row = rows.find((candidate) => candidate.complete);
-    return row
-      ? { snapshotId: row.snapshotId, revision: row.revision, count: row.count }
-      : null;
-  },
-});
+export async function latestRowset(ctx: QueryCtx) {
+  const rows = await ctx.db.query('placeCatalogues').order('desc').take(8);
+  const row = rows.find((candidate) => candidate.complete);
+  return row
+    ? { snapshotId: row.snapshotId, revision: row.revision, count: row.count }
+    : null;
+}
+
+export const latest = internalQuery({ args: {}, handler: latestRowset });
 
 /** Start a dataset, or return the progress of one already started. `metadata`
  * is a stored file holding the catalogue manifest and coverage. */

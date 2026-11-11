@@ -58,7 +58,8 @@ import { applyPhotoSet, photosOfActivities } from './photos';
  *
  * When the owner's catalogue changes, `requestMatch` queues a job that starts
  * at the match phase, so every recording is matched again without a provider
- * read.
+ * read. A job that is running at that moment is marked (`rematch`) and
+ * queued for the match when its run ends, however it ends.
  *
  * Every write names the job's claim. A worker whose lease was taken over
  * (it expired and `recover` or a later claim moved on) changes nothing, and
@@ -182,7 +183,8 @@ export async function requestMatch(
       activity,
       status: 'queued',
       phase: 'match',
-      requested: 1,
+      rematch: true,
+      requested: 0,
       attempt: 0,
       dueAt: now,
       revision: 0,
@@ -191,21 +193,28 @@ export async function requestMatch(
     await schedule(ctx, id, now);
     return;
   }
-  // A running job may be matching against the previous catalogue: it starts
-  // over when it ends, and `matched` drops a result of another version.
+  // A running job may be matching against the previous catalogue (`matched`
+  // drops such a result). The match is owed when the run ends; the count of
+  // requests stays as it is, so the run does not start over at the source.
   if (job.lease && job.lease.expiresAt > now) {
-    await ctx.db.patch('ingestionJobs', job._id, {
-      requested: job.requested + 1,
-    });
+    await ctx.db.patch('ingestionJobs', job._id, { rematch: true });
     return;
   }
   // A waiting job matches against the owner's catalogue when it runs.
   if (job.status === 'queued') return;
+  await queueMatch(ctx, job);
+}
+
+/** Queue a job for the match alone. */
+async function queueMatch(ctx: MutationCtx, job: Doc<'ingestionJobs'>) {
+  const now = Date.now();
   await ctx.db.patch('ingestionJobs', job._id, {
     status: 'queued',
     phase: 'match',
+    rematch: true,
     attempt: 0,
     dueAt: now,
+    lease: undefined,
     error: undefined,
   });
   await schedule(ctx, job._id, now);
@@ -347,6 +356,8 @@ async function finish(ctx: MutationCtx, job: Doc<'ingestionJobs'>) {
     await ctx.db.patch('ingestionJobs', job._id, {
       status: 'queued',
       phase: 'source',
+      // A run that starts at the source ends with the match.
+      rematch: undefined,
       attempt: 0,
       dueAt: now,
       lease: undefined,
@@ -355,6 +366,8 @@ async function finish(ctx: MutationCtx, job: Doc<'ingestionJobs'>) {
     await schedule(ctx, job._id, now);
     return;
   }
+  // The catalogue changed while the run was under way.
+  if (job.rematch) return queueMatch(ctx, job);
   await ctx.db.patch('ingestionJobs', job._id, {
     status: 'idle',
     phase: 'source',
@@ -372,6 +385,8 @@ async function retry(
 ) {
   const attempt = job.attempt + 1;
   if (attempt >= MAX_ATTEMPTS) {
+    // The owed match needs no provider and is not given up with the rest.
+    if (job.rematch && job.phase !== 'match') return queueMatch(ctx, job);
     await ctx.db.patch('ingestionJobs', job._id, {
       status: 'failed',
       attempt,
@@ -451,27 +466,47 @@ export const claim = internalMutation({
     };
     // An expired lease that nothing recovered yet was a lost run.
     const attempt = job.attempt + (job.lease ? 1 : 0);
-    await ctx.scheduler.runAt(lease.expiresAt, internal.ingestion.recover, {
-      job: job._id,
-      claim: number,
-    });
     if (job.phase !== 'source') {
       const target = await nextTarget(ctx, owner, job.activity);
       if (target) {
+        await ctx.scheduler.runAt(lease.expiresAt, internal.ingestion.recover, {
+          job: job._id,
+          claim: number,
+        });
         await ctx.db.patch('ingestionJobs', job._id, {
           phase: target.phase,
+          rematch: undefined,
           claims: number,
           lease,
           attempt,
         });
         return stepFor(owner, job, number, target);
       }
+      // A job queued for the match alone has nothing to do (matched
+      // meanwhile, or the recording is gone): it never reads the provider.
+      if (job.rematch) {
+        await ctx.db.patch('ingestionJobs', job._id, {
+          status: 'idle',
+          phase: 'source',
+          rematch: undefined,
+          attempt: 0,
+          dueAt: undefined,
+          lease: undefined,
+          error: undefined,
+        });
+        return null;
+      }
       // Nothing left to record or match (deleted, or done meanwhile): look
       // at the source again instead.
     }
+    await ctx.scheduler.runAt(lease.expiresAt, internal.ingestion.recover, {
+      job: job._id,
+      claim: number,
+    });
     const revision = await nextRevision(ctx, owner, job);
     await ctx.db.patch('ingestionJobs', job._id, {
       phase: 'source',
+      rematch: undefined,
       claims: number,
       lease,
       attempt,
@@ -664,6 +699,11 @@ export const fail = internalMutation({
       }
       case 'blocked':
       case 'permanent':
+        // The owed match needs no provider: it runs all the same.
+        if (job.rematch && job.phase !== 'match') {
+          await queueMatch(ctx, job);
+          return;
+        }
         await ctx.db.patch('ingestionJobs', job._id, {
           status: failure.kind === 'blocked' ? 'blocked' : 'failed',
           dueAt: undefined,

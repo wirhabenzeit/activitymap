@@ -1142,6 +1142,114 @@ void test('a new catalogue moves every library to it and matches every recording
   );
 });
 
+void test('a catalogue change during a run is matched afterwards without another provider read', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+  const renamed = { ...peak, id: '22222222-2222-4222-8222-222222222222' };
+  const next = await rowset(convex, '8', [renamed]);
+  await next.complete();
+
+  // An update is being read from the provider when the catalogue changes
+  // and the walk over the library reaches the activity.
+  provider.set(detail(7, 'Renamed'));
+  const reads = provider.reads.length;
+  let marked: boolean | undefined;
+  provider.during = async () => {
+    await convex.action(internal.catalogueWorker.adopt, {});
+    await convex.mutation(internal.catalogue.next, {
+      scope,
+      catalogue: next.identity,
+      writer: 'convex',
+    });
+    marked = (await state(convex)).jobs[0]!.rematch;
+  };
+  mock.timers.tick(1000);
+  await event(convex, '7', 'update');
+  await settle(convex);
+
+  assert.equal(marked, true);
+  const { activities, jobs } = await state(convex);
+  const match = activities[0]!.projection!.match!;
+  assert.equal(activities[0]!.dto!.name, 'Renamed');
+  assert.equal(match.catalogue, next.identity);
+  assert.deepEqual(
+    match.value.places.map((item) => item.id),
+    [renamed.id],
+  );
+  // The update's own read of the activity, and nothing for the rematch.
+  assert.deepEqual(provider.reads.slice(reads), ['activity 7']);
+  assert.deepEqual(
+    jobs.map((job) => [job.status, job.phase, job.rematch, job.requested]),
+    [['idle', 'source', undefined, 2]],
+  );
+});
+
+void test('an adoption that a newer one overtook moves no library back', async () => {
+  const convex = convexTest(schema, modules);
+  const owners = 33;
+  for (let index = 1; index <= owners; index++) {
+    const who = { userId: `owner-${index}`, athleteId: String(100 + index) };
+    await convex.mutation(internal.owners.provision, {
+      ...who,
+      epoch: `test-owner-epoch-${String(index).padStart(2, '0')}`,
+      backend: 'convex',
+      generation: 'test-generation-01',
+      catalogue: 'a'.repeat(64),
+      matchingVersion: 'b'.repeat(64),
+    });
+    await convex.mutation(internal.owners.setWriter, {
+      ...who,
+      writer: 'convex',
+      expectedEpoch: 0,
+    });
+  }
+  await settle(convex);
+  const on = async () => {
+    const rows = await convex.run((ctx) => ctx.db.query('owners').collect());
+    return [...new Set(rows.map((row) => row.catalogue))];
+  };
+  const adopt = (
+    target: { identity: string; version: string },
+    revision: string,
+    cursor?: string,
+  ) =>
+    convex.mutation(internal.catalogue.adopt, {
+      catalogue: target.identity,
+      matchingVersion: target.version,
+      snapshotId,
+      revision,
+      cursor,
+    });
+
+  // The first adoption moves a page of owners and leaves the rest to a
+  // continuation, which has not run when the next catalogue is adopted.
+  const first = await rowset(convex, '7', [peak]);
+  await first.complete();
+  assert.equal(await adopt(first, '7'), 32);
+  const second = await rowset(convex, '8', [peak]);
+  await second.complete();
+  assert.equal(await adopt(second, '8'), 32);
+  await settle(convex);
+  assert.deepEqual(await on(), [second.identity]);
+
+  // The first adoption's second page, arriving after all of that.
+  const { continueCursor } = await convex.run((ctx) =>
+    ctx.db.query('owners').paginate({ numItems: 32, cursor: null }),
+  );
+  assert.equal(await adopt(first, '7', continueCursor), 0);
+  await settle(convex);
+  assert.deepEqual(await on(), [second.identity]);
+
+  // Nor does an adoption that starts late, for a rowset no longer newest.
+  assert.equal(await adopt(first, '7'), 0);
+  await settle(convex);
+  assert.deepEqual(await on(), [second.identity]);
+});
+
 void test('a match is not published after a handoff or by a worker that lost the job', async () => {
   const provider = fakeProvider();
   const { convex, complete } = await matchingOwner();
