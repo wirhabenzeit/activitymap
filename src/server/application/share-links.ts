@@ -1,26 +1,32 @@
 import 'server-only';
 
+import {
+  type SharedActivityDTO,
+  toSharedActivityDTO,
+} from '~/contracts/share/activity';
+import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
 import type { Actor } from '~/server/auth/actor';
 import type { Activity } from '~/server/db/schema';
 import {
-  activitiesRepository,
   type ActivitiesRepository,
+  activitiesRepository,
 } from '~/server/repositories/activities';
 import {
-  shareLinksRepository,
   type ShareLinkRecord,
   type ShareLinksRepository,
+  shareLinksRepository,
 } from '~/server/repositories/share-links';
 import { generateShareToken, hashShareToken } from '~/server/sharing/tokens';
 import {
-  createShareLinkInputSchema,
   type CreateShareLinkInput,
+  createShareLinkInputSchema,
 } from '~/server/sharing/validators';
-import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
 import {
-  toSharedActivityDTO,
-  type SharedActivityDTO,
-} from '~/contracts/share/activity';
+  type ConvexShareLink,
+  type ConvexShareLinks,
+  convexShareLinks,
+  convexShareView,
+} from '~/server/sync/convex-shares';
 
 /**
  * Application service for private, scoped, expiring share links (issue
@@ -30,6 +36,13 @@ import {
  * (`~/app/api/v1/share-links`'s HTTP handlers for web/native clients, and
  * `~/app/share/[token]/page.tsx`) resolves an `Actor` (or, for the public
  * recipient view, nothing at all) and calls straight into this module.
+ *
+ * Links live where the library is written. For an account Convex writes
+ * for, a new link is created in Convex (`backend/convex/shares.ts`), since
+ * Postgres does not know its newer activities; links it made earlier stay
+ * in Postgres until they expire. Listing shows both, revoking finds either,
+ * and a token is looked up in Postgres first and then in Convex. Whether
+ * the athlete's provider connection is revoked is always asked of Postgres.
  */
 
 export class ForbiddenError extends Error {
@@ -67,6 +80,9 @@ export type ShareLinksServiceDeps = {
   activitiesRepo?: ActivitiesRepository;
   now?: () => Date;
   generateToken?: () => string;
+  /** Share links in Convex, for an account Convex writes for. */
+  convexLinks?: (actor: Actor) => ConvexShareLinks;
+  convexView?: typeof convexShareView;
 };
 
 function resolveDeps(deps: ShareLinksServiceDeps) {
@@ -75,6 +91,8 @@ function resolveDeps(deps: ShareLinksServiceDeps) {
     activitiesRepo: deps.activitiesRepo ?? activitiesRepository,
     now: deps.now ?? (() => new Date()),
     generateToken: deps.generateToken ?? generateShareToken,
+    convexLinks: deps.convexLinks ?? convexShareLinks,
+    convexView: deps.convexView ?? convexShareView,
   };
 }
 
@@ -105,12 +123,37 @@ export async function createShareLinkForActor(
   input: CreateShareLinkInput,
   deps: ShareLinksServiceDeps = {},
 ): Promise<CreatedShareLink> {
-  const { shareLinksRepo, activitiesRepo, now, generateToken } = resolveDeps(deps);
+  const { shareLinksRepo, activitiesRepo, now, generateToken, convexLinks } =
+    resolveDeps(deps);
   const parsed = createShareLinkInputSchema.parse(input);
+
+  if (actor.convexWrites) {
+    const token = generateToken();
+    const link = await convexLinks(actor).create({
+      tokenHash: hashShareToken(token),
+      expiresAt: now().getTime() + parsed.expiresInMs,
+      fields: parsed.fields,
+      activityIds: parsed.activityIds.map(String),
+    });
+    if (!link)
+      throw new ForbiddenError(
+        'Cannot create a share link for activities that do not belong to you.',
+      );
+    return {
+      id: link.id,
+      token,
+      createdAt: new Date(link.createdAt),
+      expiresAt: new Date(link.expiresAt),
+      fields: link.fields,
+      activityIds: link.activityIds.map(Number),
+    };
+  }
 
   const owned = await activitiesRepo.findManyByIds(parsed.activityIds);
   const ownedIds = new Set(
-    owned.filter((activity) => activity.athlete === actor.athleteId).map((a) => a.id),
+    owned
+      .filter((activity) => activity.athlete === actor.athleteId)
+      .map((a) => a.id),
   );
   const notOwned = parsed.activityIds.filter((id) => !ownedIds.has(id));
   if (notOwned.length > 0) {
@@ -153,6 +196,19 @@ export type ShareLinkSummary = {
   status: ShareLinkStatus;
 };
 
+function fromConvex(link: ConvexShareLink): ShareLinkRecord {
+  return {
+    id: link.id,
+    athleteId: 0,
+    tokenHash: '',
+    createdAt: new Date(link.createdAt),
+    expiresAt: new Date(link.expiresAt),
+    revokedAt: link.revokedAt === null ? null : new Date(link.revokedAt),
+    fields: link.fields,
+    activityIds: link.activityIds.map(Number),
+  };
+}
+
 function statusOf(record: ShareLinkRecord, now: Date): ShareLinkStatus {
   if (record.revokedAt) return 'revoked';
   if (record.expiresAt.getTime() <= now.getTime()) return 'expired';
@@ -164,8 +220,13 @@ export async function listShareLinksForActor(
   actor: Actor,
   deps: ShareLinksServiceDeps = {},
 ): Promise<ShareLinkSummary[]> {
-  const { shareLinksRepo, now } = resolveDeps(deps);
-  const records = await shareLinksRepo.listForAthlete(actor.athleteId);
+  const { shareLinksRepo, now, convexLinks } = resolveDeps(deps);
+  const records = [
+    ...(await shareLinksRepo.listForAthlete(actor.athleteId)),
+    ...(actor.convexWrites
+      ? (await convexLinks(actor).list()).map(fromConvex)
+      : []),
+  ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
   const currentTime = now();
   return records.map((record) => ({
     id: record.id,
@@ -189,8 +250,12 @@ export async function revokeShareLinkForActor(
   shareId: string,
   deps: ShareLinksServiceDeps = {},
 ): Promise<void> {
-  const { shareLinksRepo, now } = resolveDeps(deps);
-  const revoked = await shareLinksRepo.revoke(actor.athleteId, shareId, now());
+  const { shareLinksRepo, now, convexLinks } = resolveDeps(deps);
+  let revoked = Boolean(
+    await shareLinksRepo.revoke(actor.athleteId, shareId, now()),
+  );
+  if (!revoked && actor.convexWrites)
+    revoked = await convexLinks(actor).revoke(shareId);
   if (!revoked) {
     throw new ShareLinkNotFoundError();
   }
@@ -218,7 +283,7 @@ export async function getShareView(
   rawToken: string,
   deps: ShareLinksServiceDeps = {},
 ): Promise<SharedView> {
-  const { shareLinksRepo, activitiesRepo, now } = resolveDeps(deps);
+  const { shareLinksRepo, activitiesRepo, now, convexView } = resolveDeps(deps);
 
   if (!rawToken) {
     throw new ShareLinkUnavailableError();
@@ -226,7 +291,19 @@ export async function getShareView(
 
   const record = await shareLinksRepo.findByTokenHash(hashShareToken(rawToken));
   if (!record) {
-    throw new ShareLinkUnavailableError();
+    // Not a Postgres link: Convex answers null for every way it can fail.
+    const shared = await convexView(hashShareToken(rawToken));
+    if (
+      !shared ||
+      (await shareLinksRepo.isAthleteRevoked(Number(shared.athleteId)))
+    )
+      throw new ShareLinkUnavailableError();
+    return {
+      createdAt: new Date(shared.createdAt),
+      expiresAt: new Date(shared.expiresAt),
+      fields: shared.fields,
+      activities: shared.activities,
+    };
   }
   if (record.revokedAt) {
     throw new ShareLinkUnavailableError();
@@ -262,7 +339,11 @@ export async function getShareView(
     expiresAt: record.expiresAt,
     fields: record.fields,
     activities: visible.map((activity) =>
-      toSharedActivityDTO(activity, record.fields, streamSummaries.get(activity.id)),
+      toSharedActivityDTO(
+        activity,
+        record.fields,
+        streamSummaries.get(activity.id),
+      ),
     ),
   };
 }
