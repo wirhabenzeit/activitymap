@@ -49,6 +49,7 @@ const modules = {
   './places.ts': () => import('../convex/places'),
   './providerEvents.ts': () => import('../convex/providerEvents'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
+  './shares.ts': () => import('../convex/shares'),
 };
 
 const actor = { userId: 'owner', athleteId: '42' };
@@ -1121,6 +1122,13 @@ void test('erasing an account fences it at once and removes everything it had he
   await event(convex, '7');
   await event(convex, '8');
   await settle(convex);
+  await convex.mutation(internal.shares.create, {
+    scope,
+    tokenHash: 'h'.repeat(43),
+    expiresAt: Date.now() + 60 * 60_000,
+    fields: { showRouteEnds: false },
+    activityIds: ['7'],
+  });
   // Another account, which must not be touched.
   const other = {
     userId: 'other',
@@ -1149,6 +1157,7 @@ void test('erasing an account fences it at once and removes everything it had he
         'ingestionJobs',
         'ingestionSweeps',
         'providerEvents',
+        'shareLinks',
       ] as const;
       const result: Record<string, number> = {
         files: (await ctx.db.system.query('_storage').collect()).length,
@@ -1162,7 +1171,7 @@ void test('erasing an account fences it at once and removes everything it had he
     [before.activities, before.recordings, before.files, before.photos],
     [2, 2, 2, 2],
   );
-  assert.equal(before.owners, 2);
+  assert.deepEqual([before.owners, before.shareLinks], [2, 1]);
 
   // An unknown user has nothing to erase; the wrong athlete is refused.
   assert.equal(

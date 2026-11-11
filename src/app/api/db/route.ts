@@ -2,9 +2,14 @@ import { stringify } from 'csv-stringify/sync';
 import { type NextRequest } from 'next/server';
 
 import { auth } from '~/lib/auth';
+import { libraryFromConvex } from '~/server/application/library-export';
+import { resolveActor } from '~/server/auth/actor';
 import { resolveRequestSession } from '~/server/auth/request-session';
 import { db } from '~/server/db';
+import { convexReadOwnerFor } from '~/server/preview/convex';
 import { previewSelection } from '~/server/preview/selection';
+
+export const maxDuration = 60;
 
 export async function GET(request: NextRequest) {
   // Authenticate via the secure session cookie or an `Authorization: Bearer`
@@ -26,10 +31,19 @@ export async function GET(request: NextRequest) {
     where: (accounts, { eq }) => eq(accounts.userId, userID),
   });
   if (!account) return new Response('Account not found', { status: 404 });
-  const activities = await db.query.activities.findMany({
-    where: (activities, { eq }) =>
-      eq(activities.athlete, Number(account.providerAccountId)),
-  });
+  // Postgres holds the library only while it writes it.
+  const actor = await resolveActor(request.headers);
+  let activities;
+  if (actor?.convexWrites) {
+    const convex = convexReadOwnerFor(actor);
+    if (!convex)
+      return new Response('The library is unavailable', { status: 503 });
+    activities = await libraryFromConvex(convex, actor);
+  } else
+    activities = await db.query.activities.findMany({
+      where: (activities, { eq }) =>
+        eq(activities.athlete, Number(account.providerAccountId)),
+    });
   const csv = stringify(
     activities.map(
       ({

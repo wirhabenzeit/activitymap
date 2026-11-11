@@ -420,9 +420,9 @@ What an account needs before it can move:
 - the place catalogue rowset its matching version names has been copied.
 
 What changes for the account afterwards: the mirror and the hourly parity
-check skip it, and features that still read Postgres (share links, export,
-place search, the admin views, the import button) show its library as it was
-at the move.
+check skip it, and features that still read Postgres (the sync status page,
+place debugging, the admin views, the import button) show its library as it
+was at the move.
 
 ## Erasing an account
 
@@ -530,6 +530,21 @@ written to Postgres (`src/server/application/convex-activity-commands.ts`).
 
 The legacy server actions for edit, refresh and delete only know the
 Postgres path and refuse such an account before calling Strava.
+
+### Share links and export
+
+Links live where the library is written. For an account Convex writes for,
+a new share link is created in Convex (`convex/shares.ts`): Postgres does not
+know the account's newer activities, and its share table references
+Postgres activities. The app still creates the token and stores only its
+hash. Links the account made before it moved stay in Postgres until they
+expire. The list shows both, revoking finds either, and a token is looked up
+in Postgres first and then in Convex. What a recipient sees is assembled in
+Convex by the same allow-list (`src/contracts/share/activity.ts`). Whether
+the athlete's provider connection is revoked is still asked of Postgres.
+
+The CSV export reads the whole library from Convex for such an account,
+page by page through the read bridge.
 
 ### Reconciliation
 

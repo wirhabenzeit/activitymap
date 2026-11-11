@@ -1,16 +1,19 @@
 import polyline from '@mapbox/polyline';
 import { z } from 'zod';
 
-import type { Activity } from '~/server/db/schema';
 import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
-import { SHARED_ROUTE_END_TRIM_METERS, trimRouteEnds } from '~/lib/sharing/route-trim';
+import {
+  SHARED_ROUTE_END_TRIM_METERS,
+  trimRouteEnds,
+} from '~/lib/sharing/route-trim';
 import {
   COMPACT_SUMMARY_CODEC,
   MAX_SUMMARY_POINTS,
+  type StoredStreamSummary,
   encodeStreamSummary,
   unpackStreamSummary,
-  type StoredStreamSummary,
 } from '~/lib/streams/compact-summary';
+import type { Activity } from '~/server/db/schema';
 
 /**
  * Elevation by distance, in the stream-summary codec
@@ -27,7 +30,9 @@ export const sharedElevationProfileSchema = z.object({
   latlng: z.string().optional(),
 });
 
-export type SharedElevationProfile = z.infer<typeof sharedElevationProfileSchema>;
+export type SharedElevationProfile = z.infer<
+  typeof sharedElevationProfileSchema
+>;
 
 /**
  * The wire shape of one track inside a private share link's recipient view
@@ -83,8 +88,17 @@ function sharedElevationProfile(
   try {
     const summary = unpackStreamSummary(stored);
     const { distance, altitude, latlng } = summary;
-    if (!distance || distance.length < 2 || altitude?.length !== distance.length) return null;
-    if (!distance.every((value, index) => index === 0 || value >= distance[index - 1]!)) {
+    if (
+      !distance ||
+      distance.length < 2 ||
+      altitude?.length !== distance.length
+    )
+      return null;
+    if (
+      !distance.every(
+        (value, index) => index === 0 || value >= distance[index - 1]!,
+      )
+    ) {
       return null;
     }
     const first = distance[0]!;
@@ -110,7 +124,9 @@ function sharedElevationProfile(
         basis: 'distance',
         distance: keep.map((index) => distance[index]!),
         altitude: keep.map((index) => altitude[index]!),
-        ...(positions ? { latlng: keep.map((index) => positions[index]!) } : {}),
+        ...(positions
+          ? { latlng: keep.map((index) => positions[index]!) }
+          : {}),
       }),
     );
   } catch {
@@ -125,7 +141,20 @@ function sharedElevationProfile(
  * instead of silently widening what a recipient sees.
  */
 export function toSharedActivityDTO(
-  activity: Activity,
+  activity: Pick<
+    Activity,
+    | 'name'
+    | 'sport_type'
+    | 'distance'
+    | 'moving_time'
+    | 'total_elevation_gain'
+    | 'average_speed'
+    | 'map_summary_polyline'
+  > & {
+    id: number | string;
+    /** A row's date, or the same instant as a v1 DTO carries it. */
+    start_date_local: Date | string;
+  },
   fields: ShareLinkFieldOptions,
   streamSummary?: StoredStreamSummary | null,
 ): SharedActivityDTO {
@@ -133,7 +162,10 @@ export function toSharedActivityDTO(
     id: String(activity.id),
     name: activity.name,
     sport_type: activity.sport_type,
-    start_date_local: activity.start_date_local.toISOString(),
+    start_date_local:
+      typeof activity.start_date_local === 'string'
+        ? activity.start_date_local
+        : activity.start_date_local.toISOString(),
     distance: activity.distance,
     moving_time: activity.moving_time,
     total_elevation_gain: activity.total_elevation_gain,

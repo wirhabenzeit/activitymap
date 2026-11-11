@@ -254,6 +254,28 @@ router.route({
             ...args,
           });
           break;
+        // Share links of an account Convex writes for (convex/shares.ts).
+        case 'createShare':
+          result = await ctx.runMutation(internal.shares.create, {
+            scope,
+            ...args,
+          });
+          break;
+        case 'listShares':
+          result = await ctx.runQuery(internal.shares.list, { scope });
+          break;
+        case 'revokeShare':
+          result = await ctx.runMutation(internal.shares.revoke, {
+            scope,
+            ...args,
+          });
+          break;
+        // The token is the credential: no owner scope.
+        case 'shareView':
+          result = await ctx.runQuery(internal.shares.view, {
+            tokenHash: args.tokenHash,
+          });
+          break;
         // Account erasure (convex/erasure.ts). The app calls this inside the
         // transaction that deletes the account in Postgres.
         case 'eraseOwner':

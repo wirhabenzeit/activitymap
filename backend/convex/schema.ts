@@ -150,6 +150,19 @@ export default defineSchema({
     error: v.optional(v.string()),
     completedAt: v.optional(v.number()),
   }).index('by_owner', ['owner']),
+  /** Private share links of an owner Convex writes for (convex/shares.ts).
+   * `activities` are activity keys. */
+  shareLinks: defineTable({
+    owner: v.id('owners'),
+    tokenHash: v.string(),
+    createdAt: v.number(),
+    expiresAt: v.number(),
+    revokedAt: v.optional(v.number()),
+    fields: v.object({ showRouteEnds: v.boolean() }),
+    activities: v.array(v.string()),
+  })
+    .index('by_token', ['tokenHash'])
+    .index('by_owner', ['owner']),
   ownerEpochs: defineTable({ owner: v.id('owners'), epoch: v.string() }).index(
     'by_owner_epoch',
     ['owner', 'epoch'],

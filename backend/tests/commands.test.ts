@@ -12,6 +12,16 @@ import {
   refreshActivityThroughConvex,
   updateActivityThroughConvex,
 } from '../../src/server/application/convex-activity-commands';
+import {
+  ForbiddenError,
+  ShareLinkNotFoundError,
+  ShareLinkUnavailableError,
+  type ShareLinksServiceDeps,
+  createShareLinkForActor,
+  getShareView,
+  listShareLinksForActor,
+  revokeShareLinkForActor,
+} from '../../src/server/application/share-links';
 import type { Actor } from '../../src/server/auth/actor';
 import type { Activity, Photo } from '../../src/server/db/schema';
 import { StravaApiError } from '../../src/server/strava/client';
@@ -24,6 +34,10 @@ import type {
   StravaPhoto,
 } from '../../src/server/strava/types';
 import { convexActivityCommands } from '../../src/server/sync/convex-commands';
+import {
+  convexShareLinks,
+  convexShareView,
+} from '../../src/server/sync/convex-shares';
 import { convexWriteBridge } from '../../src/server/sync/convex-writer';
 import { internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
@@ -52,6 +66,7 @@ const modules = {
   './places.ts': () => import('../convex/places'),
   './providerEvents.ts': () => import('../convex/providerEvents'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
+  './shares.ts': () => import('../convex/shares'),
   './sync.ts': () => import('../convex/sync'),
 };
 
@@ -467,4 +482,135 @@ void test('the app erases an account in Convex through the bridge', async (t) =>
   assert.equal(await bridge.write({ kind: 'state' }), null);
   // Asked again, for example after the Postgres side failed: nothing to do.
   assert.equal(await bridge.write({ kind: 'eraseOwner' }), false);
+});
+
+void test('share links of an account Convex writes for are made, shown and revoked in Convex', async (t) => {
+  const { convex, seed } = await setup(t, 'convex');
+  const fetcher: typeof fetch = (url, init) =>
+    convex.fetch(new URL(String(url)).pathname, init);
+  const writer: Actor = { ...actor, convexWrites: true };
+  await seed(
+    manual(7, 'Shared ride', {
+      description: 'must never be shared',
+      private: false,
+      average_heartrate: 150,
+    }),
+  );
+  await seed(manual(8, 'Private ride', { private: true }));
+  // Convex checks expiry against its own clock.
+  let clock = Date.now();
+  let accountRevoked = false;
+  // Postgres holds no link and no activity of this account.
+  const deps: ShareLinksServiceDeps = {
+    shareLinksRepo: {
+      listForAthlete: async () => [],
+      revoke: async () => false,
+      findByTokenHash: async () => null,
+      isAthleteRevoked: async () => accountRevoked,
+    } as unknown as ShareLinksServiceDeps['shareLinksRepo'],
+    activitiesRepo: {
+      findManyByIds: async () =>
+        assert.fail('Postgres was asked for activities'),
+    } as unknown as ShareLinksServiceDeps['activitiesRepo'],
+    now: () => new Date(clock),
+    convexLinks: (owner) => convexShareLinks(owner, fetcher),
+    convexView: (tokenHash) => convexShareView(tokenHash, fetcher),
+  };
+  const hour = 60 * 60_000;
+
+  // An activity outside the library is refused as a whole.
+  await assert.rejects(
+    createShareLinkForActor(
+      writer,
+      { activityIds: [7, 999], expiresInMs: hour },
+      deps,
+    ),
+    ForbiddenError,
+  );
+
+  const link = await createShareLinkForActor(
+    writer,
+    { activityIds: [7, 8], expiresInMs: 2 * hour },
+    deps,
+  );
+  assert.deepEqual(link.activityIds, [7, 8]);
+  assert.deepEqual(link.fields, { showRouteEnds: false });
+  const listed = await listShareLinksForActor(writer, deps);
+  assert.deepEqual(
+    listed.map((item) => [item.id, item.status, item.activityCount]),
+    [[link.id, 'active', 2]],
+  );
+
+  // The recipient sees the allow-list for the visible activity only.
+  const shared = await getShareView(link.token, deps);
+  assert.deepEqual(
+    shared.activities.map((item) => item.id),
+    ['7'],
+  );
+  assert.deepEqual(Object.keys(shared.activities[0]!).sort(), [
+    'average_speed',
+    'distance',
+    'elevation_profile',
+    'id',
+    'moving_time',
+    'name',
+    'route_polyline',
+    'sport_type',
+    'start_date_local',
+    'total_elevation_gain',
+  ]);
+  assert.equal(shared.activities[0]!.name, 'Shared ride');
+  // The stored hash is of the token; the token itself opens nothing else.
+  await assert.rejects(
+    getShareView(`${link.token}x`, deps),
+    ShareLinkUnavailableError,
+  );
+
+  // A revoked provider connection closes the link, as for Postgres links.
+  accountRevoked = true;
+  await assert.rejects(
+    getShareView(link.token, deps),
+    ShareLinkUnavailableError,
+  );
+  accountRevoked = false;
+
+  // Another account can neither see nor revoke it.
+  await assert.rejects(
+    revokeShareLinkForActor(
+      { ...writer, userId: 'someone-else' },
+      link.id,
+      deps,
+    ),
+  );
+  await revokeShareLinkForActor(writer, link.id, deps);
+  await assert.rejects(
+    getShareView(link.token, deps),
+    ShareLinkUnavailableError,
+  );
+  assert.equal(
+    (await listShareLinksForActor(writer, deps))[0]!.status,
+    'revoked',
+  );
+  await assert.rejects(
+    revokeShareLinkForActor(writer, 'not-a-link', deps),
+    ShareLinkNotFoundError,
+  );
+
+  // A link stops working when it expires. Convex reads its own clock, so
+  // the link is made to expire by its stored time.
+  const brief = await createShareLinkForActor(
+    writer,
+    { activityIds: [7], expiresInMs: hour },
+    deps,
+  );
+  assert.equal((await getShareView(brief.token, deps)).activities.length, 1);
+  await convex.run(async (ctx) => {
+    for (const row of await ctx.db.query('shareLinks').collect())
+      await ctx.db.patch('shareLinks', row._id, { expiresAt: Date.now() - 1 });
+  });
+  await assert.rejects(
+    getShareView(brief.token, deps),
+    ShareLinkUnavailableError,
+  );
+  clock += 1;
 });
