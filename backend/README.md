@@ -424,6 +424,23 @@ check skip it, and features that still read Postgres (share links, export,
 place search, the admin views, the import button) show its library as it was
 at the move.
 
+## Erasing an account
+
+An account is erased in both stores together. Postgres decides: the owner
+deleted the account, or provider access was revoked and the retention period
+is over (`src/server/repositories/erasure.ts`). Inside the transaction that
+deletes the account there, the app calls the write bridge operation
+`eraseOwner` (`convex/erasure.ts`, `src/server/convex-mirror/erase.ts`). If
+that call fails, the transaction is rolled back and the erasure is tried
+again, so no library is left here that nothing in Postgres points to.
+
+`erasure.start` revokes the owner, which fences everything at once: no read,
+write, job or sweep works for a revoked owner. `erasure.step` then deletes
+the owner's activities, stored recordings, photos, changes, jobs, sweep and
+event receipts in bounded batches, and the records about the owner last.
+Afterwards the user ID is unknown here and can be provisioned again from
+nothing. A user Convex never knew is answered `false`.
+
 ## Convex ingestion
 
 For an owner Convex writes for, activities come in through jobs in this

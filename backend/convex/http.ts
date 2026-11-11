@@ -254,6 +254,14 @@ router.route({
             ...args,
           });
           break;
+        // Account erasure (convex/erasure.ts). The app calls this inside the
+        // transaction that deletes the account in Postgres.
+        case 'eraseOwner':
+          result = await ctx.runMutation(internal.erasure.start, {
+            userId,
+            athleteId,
+          });
+          break;
         // A new library for an account that is about to be copied
         // (src/server/convex-mirror/accounts.ts). An owner that exists is
         // never reassigned here: that needs its current epoch.
