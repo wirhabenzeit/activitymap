@@ -6,8 +6,15 @@ import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, internalQuery } from './_generated/server';
 import { MAX_PAGE_BYTES } from './activityProjection';
 import { activityFor } from './activityWrites';
+import { boundary } from './library';
 import { currentRecording, liveRows, project } from './liveProjection';
-import { idKey, requireHead, requireOwner, scopeFields } from './owners';
+import {
+  idKey,
+  requireHead,
+  requireOwner,
+  scopeFields,
+  writerOf,
+} from './owners';
 import {
   photoPage,
   photosByIds,
@@ -36,6 +43,7 @@ const operation = v.union(
   // The photos of whole activities, for the parity check.
   v.object({ kind: v.literal('activityPhotos'), ids: v.array(id) }),
   v.object({ kind: v.literal('status'), after: cursor }),
+  v.object({ kind: v.literal('statusSummary') }),
   v.object({
     kind: v.literal('changes'),
     after: v.number(),
@@ -224,6 +232,43 @@ export const read = internalQuery({
         if (op.ids.length > 16) throw new Error('Too many activity IDs');
         return photosOfActivities(ctx, owner, op.ids);
       }
+      case 'statusSummary': {
+        // The status in one read, from the counts kept with every write
+        // (convex/stats.ts). Null while they are being rebuilt; the paged
+        // `status` operation then walks the library instead.
+        const [stats, oldest, newest, sweep] = await Promise.all([
+          ctx.db
+            .query('ownerStats')
+            .withIndex('by_owner', (q) => q.eq('owner', owner._id))
+            .unique(),
+          boundary(ctx, owner, 'asc'),
+          boundary(ctx, owner, 'desc'),
+          ctx.db
+            .query('ingestionSweeps')
+            .withIndex('by_owner', (q) => q.eq('owner', owner._id))
+            .unique(),
+        ]);
+        if (!stats || stats.rebuildAfter !== undefined) return null;
+        return {
+          counts: stats.counts,
+          oldest: oldest?.dto?.start_date ?? null,
+          newest: newest?.dto?.start_date ?? null,
+          retryAt: null,
+          active: writerOf(owner) === 'convex',
+          next: null,
+          lastSummaryReconciledAt: sweep?.completedAt ?? null,
+          sweep: sweep
+            ? {
+                phase: sweep.phase,
+                page: sweep.page,
+                scanStartedAt:
+                  sweep.phase === 'idle' ? null : sweep.scanBefore * 1000,
+                dueAt: sweep.dueAt,
+                error: sweep.error ?? null,
+              }
+            : null,
+        };
+      }
       case 'status': {
         const rows = await liveRows(
           ctx,
@@ -294,8 +339,8 @@ export const read = internalQuery({
           oldest,
           newest,
           retryAt: null,
-          // Provider ingestion is not part of this package yet.
-          active: false,
+          // Jobs here fetch what is missing only for an owner Convex writes.
+          active: writerOf(owner) === 'convex',
           next:
             rows.length === STATUS_PAGE_LIMIT ? Number(rows.at(-1)!.key) : null,
           lastSummaryReconciledAt: null,

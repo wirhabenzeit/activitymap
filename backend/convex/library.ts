@@ -211,7 +211,11 @@ export const summaries = query({
   },
 });
 
-function boundary(ctx: QueryCtx, owner: Doc<'owners'>, order: 'asc' | 'desc') {
+export function boundary(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  order: 'asc' | 'desc',
+) {
   return ctx.db
     .query('activities')
     .withIndex('by_owner_live_start', (q) =>

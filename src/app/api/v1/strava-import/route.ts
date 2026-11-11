@@ -2,6 +2,10 @@ import { after } from 'next/server';
 
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import {
+  readConvexImport,
+  startConvexImport,
+} from '~/server/application/convex-import';
+import {
   runStravaImport,
   startStravaImport,
 } from '~/server/application/strava-import';
@@ -13,10 +17,17 @@ import { stravaImportRepository } from '~/server/repositories/strava-import';
 import { createStravaImportHandler } from './handler';
 
 export const maxDuration = 60;
+// For an account Convex writes for, the command is its reconciliation
+// sweep (src/server/application/convex-import.ts).
 const dependencies = {
   read: (actor: Parameters<typeof startStravaImport>[0]) =>
-    stravaImportRepository.read(actor, stravaAccessEnabled()),
-  start: startStravaImport,
+    actor.convexWrites
+      ? readConvexImport(actor, stravaAccessEnabled())
+      : stravaImportRepository.read(actor, stravaAccessEnabled()),
+  start: (actor: Parameters<typeof startStravaImport>[0]) =>
+    actor.convexWrites
+      ? startConvexImport(actor, stravaAccessEnabled())
+      : startStravaImport(actor),
   run: (claim: Parameters<typeof runStravaImport>[0], timeMs: number) =>
     runStravaImport(claim, { timeMs }),
   afterResponse: after,

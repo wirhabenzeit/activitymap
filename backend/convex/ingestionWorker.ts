@@ -155,31 +155,33 @@ async function recording(
   step: IngestionStep & { phase: 'recording' },
 ) {
   const { job, claim, id } = step;
-  const result = await read(step, { kind: 'streams', id });
-  // An activity without samples is finished without a recording.
-  if (!result.ok && result.error.kind !== 'not_found')
-    throw new ProviderFailure(result.error);
-  if (result.ok) {
-    let streams;
-    try {
-      streams = validateRecording(result.data);
-    } catch {
-      throw new InvalidProviderPayload('streams');
-    }
-    const { file, manifest } = encodeWhole(streams);
-    await prepareRecording(ctx, {
-      scope: step.scope,
-      id,
-      generation: step.generation,
-      sourceRevision: step.sourceRevision,
-      writer: 'convex',
-      recordingGeneration: step.recording.generation ?? randomUUID(),
-      recordingRevision: step.recording.revision,
-      file: await ctx.storage.store(new Blob([new Uint8Array(file)])),
-      manifest,
-    });
+  // An activity without samples gets an empty recording: that is what
+  // records that there is nothing to fetch for it.
+  let streams: ReturnType<typeof validateRecording> = {};
+  if (!step.manual) {
+    const result = await read(step, { kind: 'streams', id });
+    if (result.ok) {
+      try {
+        streams = validateRecording(result.data);
+      } catch {
+        throw new InvalidProviderPayload('streams');
+      }
+    } else if (result.error.kind !== 'not_found')
+      throw new ProviderFailure(result.error);
   }
-  // On to the match, when there is a recording to match.
+  const { file, manifest } = encodeWhole(streams);
+  await prepareRecording(ctx, {
+    scope: step.scope,
+    id,
+    generation: step.generation,
+    sourceRevision: step.sourceRevision,
+    writer: 'convex',
+    recordingGeneration: step.recording.generation ?? randomUUID(),
+    recordingRevision: step.recording.revision,
+    file: await ctx.storage.store(new Blob([new Uint8Array(file)])),
+    manifest,
+  });
+  // On to the match of the new recording.
   return ctx.runMutation(internal.ingestion.advance, { job, claim });
 }
 

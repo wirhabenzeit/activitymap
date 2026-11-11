@@ -420,9 +420,8 @@ What an account needs before it can move:
 - the place catalogue rowset its matching version names has been copied.
 
 What changes for the account afterwards: the mirror and the hourly parity
-check skip it, and features that still read Postgres (the sync status page,
-place debugging, the admin views, the import button) show its library as it
-was at the move.
+check skip it, and features that still read Postgres (place debugging and
+the admin views) show its library as it was at the move.
 
 ## Erasing an account
 
@@ -462,9 +461,10 @@ provider gateway and never holds a provider credential:
 3. **Recording.** Only when the activity has no current recording (a new
    activity, or a change to the fields samples depend on): it reads the
    streams, stores the file and publishes it through the same fenced path
-   the mirror uses. A manual activity is not asked for streams, and an
-   activity whose streams the provider does not have is finished without a
-   recording.
+   the mirror uses. An activity without samples (one typed in by hand,
+   which is not asked for streams, or one whose streams the provider does
+   not have) gets an empty recording: that is how "nothing to fetch" is
+   remembered, and why such an activity does not stay pending.
 4. **Match.** When the activity has a current recording without a match
    for the owner's catalogue, the worker matches it against the copied
    place catalogue with the matcher the shadow runs use
@@ -531,6 +531,20 @@ written to Postgres (`src/server/application/convex-activity-commands.ts`).
 The legacy server actions for edit, refresh and delete only know the
 Postgres path and refuse such an account before calling Strava.
 
+### Sync status and "Fetch from Strava"
+
+For an account Convex writes for, `GET /api/v1/ingestion-status` is built
+from Convex: one read of the counts kept with every write
+(`sync.read` operation `statusSummary`, `convex/stats.ts`) plus the sweep's
+state, with the library walked page by page only while those counts are
+being rebuilt. Outstanding details, photos and recordings are reported as
+scheduled, since the sweep fetches them.
+
+"Fetch from Strava" (`/api/v1/strava-import`) has no import run to start for
+such an account. It starts the reconciliation sweep now (`sweepNow`), unless
+one is under way or finished within the last five minutes, and its status is
+the sweep's (`src/server/application/convex-import.ts`).
+
 ### Share links and export
 
 Links live where the library is written. For an account Convex writes for,
@@ -563,9 +577,12 @@ full.
   costs only the list reads. An empty page ends the scan.
 - **Confirming.** An activity that the list did not contain is not treated
   as deleted. The sweep asks for each such activity, and the job's detail
-  read decides. At most 20 are asked for per hour, so a wrong list cannot
-  spend the request budget on the whole library at once. Activities that
-  started after the sweep began are left alone.
+  read decides. The same walk asks for activities that are in the list but
+  incomplete here: never read in full, photos out of date, or no recording.
+  That is how a library copied from Postgres in the middle of its backfill
+  is finished. At most 20 are asked for per hour in total, so neither a
+  wrong list nor a large backlog can spend the request budget at once.
+  Activities that started after the sweep began are left alone.
 
 A list entry of another athlete stops the page before anything is recorded.
 A rate limit waits for the gateway's time, rejected credentials are tried
@@ -583,9 +600,6 @@ compares with.
 
 Needed before an owner is handed to Convex:
 
-- **Import.** The import command and its progress still belong to
-  Postgres. For an account Convex writes for, the reconciliation sweep is
-  what finds activities that are missing.
 - **Rematching after a catalogue change.** A job matches the recording it
   publishes. Nothing yet selects a new catalogue for an owner Convex writes
   for, or matches the whole library again after one; the mirror did that

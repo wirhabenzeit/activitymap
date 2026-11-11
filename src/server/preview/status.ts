@@ -38,6 +38,16 @@ export const statusPageSchema = z.object({
   next: z.number().nullable(),
   active: z.boolean(),
   lastSummaryReconciledAt: z.number().nullable(),
+  /** The reconciliation sweep of an account Convex writes for. */
+  sweep: z
+    .object({
+      phase: z.enum(['idle', 'scanning', 'confirming']),
+      page: z.number().int().positive(),
+      scanStartedAt: z.number().nullable(),
+      dueAt: z.number(),
+      error: z.string().nullable(),
+    })
+    .nullish(),
 });
 
 export async function previewIngestionStatus(
@@ -70,6 +80,11 @@ export async function previewIngestionStatus(
     schedulingReason: null,
     retryAt: null,
   });
+  // With jobs running in Convex, what is missing is fetched without anyone
+  // asking; for a copy that Postgres writes, nothing here does.
+  const pending = (outstanding: boolean): IngestionScheduling =>
+    !outstanding ? 'idle' : head.active ? 'scheduled' : 'not_scheduled';
+  const sweep = head.sweep ?? null;
   const detailPending = counts.neverFetched + counts.invalidatedDetails;
   const photoPending =
     counts.activitiesWithPhotos - counts.activitiesWithStoredPhotos;
@@ -88,18 +103,24 @@ export async function previewIngestionStatus(
     observedAt: observedAt.toISOString(),
     history: {
       progress: complete ? 'complete' : 'unknown',
-      ...scheduled('not_scheduled'),
+      ...(sweep?.error === 'rate_limited'
+        ? {
+            scheduling: 'waiting' as const,
+            schedulingReason: 'rate_limited' as const,
+            retryAt: iso(sweep.dueAt),
+          }
+        : scheduled(sweep ? 'scheduled' : 'not_scheduled')),
       lastOutcome: null,
       knownActivityCount: counts.total,
       totalActivityCount: complete ? counts.total : null,
       oldestActivityStart: oldest,
       newestActivityStart: newest,
       reconciliation: {
-        phase: 'idle',
-        pagesScanned: null,
-        scanStartedAt: null,
+        phase: sweep?.phase ?? 'idle',
+        pagesScanned: sweep && sweep.phase !== 'idle' ? sweep.page - 1 : null,
+        scanStartedAt: iso(sweep?.scanStartedAt ?? null),
         lastCompletedAt: iso(head.lastSummaryReconciledAt),
-        nextDueAt: null,
+        nextDueAt: sweep?.phase === 'idle' ? iso(sweep.dueAt) : null,
         freshness: !complete
           ? 'never_completed'
           : age >= STRAVA_FRESHNESS_LIMIT_MS
@@ -116,7 +137,7 @@ export async function previewIngestionStatus(
           : counts.detailed > 0
             ? 'in_progress'
             : 'not_started',
-      ...scheduled(detailPending === 0 ? 'idle' : 'not_scheduled'),
+      ...scheduled(pending(detailPending > 0)),
       lastOutcome: null,
       detailed: counts.detailed,
       neverFetched: counts.neverFetched,
@@ -131,9 +152,7 @@ export async function previewIngestionStatus(
             ? 'in_progress'
             : 'not_started',
       ...scheduled(
-        photoPending === 0 && counts.refreshRequiredPhotos === 0
-          ? 'idle'
-          : 'not_scheduled',
+        pending(photoPending > 0 || counts.refreshRequiredPhotos > 0),
       ),
       activitiesWithPhotos: counts.activitiesWithPhotos,
       activitiesWithStoredPhotos: counts.activitiesWithStoredPhotos,

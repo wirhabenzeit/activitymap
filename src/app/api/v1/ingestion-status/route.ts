@@ -4,7 +4,7 @@ import { deriveIngestionStatus } from '~/server/application/ingestion-status';
 import { photoBackfillEnabled } from '~/server/config/photo-backfill';
 import { streamBackfillEnabled } from '~/server/config/stream-backfill';
 import { logger } from '~/server/logging/logger';
-import { convexPreviewFor } from '~/server/preview/convex';
+import { convexPreviewFor, convexReadOwnerFor } from '~/server/preview/convex';
 import { ingestionStatusRepository } from '~/server/repositories/ingestion-status';
 
 import { createIngestionStatusHandler } from './handler';
@@ -13,11 +13,15 @@ const ROUTE = 'GET /api/v1/ingestion-status';
 
 export const GET = withAuthenticatedApiV1(
   async (request, context) => {
-    const preview = convexPreviewFor(await context.actor());
+    const actor = await context.actor();
+    const preview = convexPreviewFor(actor);
+    // The status describes the jobs of the store that writes the library.
+    const written = actor?.convexWrites ? convexReadOwnerFor(actor) : null;
     return createIngestionStatusHandler({
       resolveActor: context.actor,
       loadStatus:
         preview?.loadStatus ??
+        written?.loadStatus ??
         (async (actor, observedAt) =>
           deriveIngestionStatus(
             await ingestionStatusRepository.snapshot(
