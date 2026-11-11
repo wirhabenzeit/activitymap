@@ -385,3 +385,53 @@ void test('photos are compared only where the catch-up pass has been', async () 
   assert.deepEqual(during.photoReads, [['100', '101']]);
   assert.equal(partial.compared.photos, 1);
 });
+
+void test('a recording Postgres gave up fetching is not drift', async () => {
+  const { postgres, convex } = sources({ postgres: library(2) });
+  const failed = (state: string) => ({
+    generation: 'g1',
+    state,
+    fetch_status: 'failed',
+  });
+  const withFailure = (state: string): ParityPostgres => ({
+    ...postgres,
+    activities: async (ids) =>
+      (await postgres.activities(ids)).map((item) =>
+        item.id === '100'
+          ? ({
+              ...item,
+              streams: failed(state),
+              placeMatches: { ...item.placeMatches, streamGeneration: 'g1' },
+            } as unknown as ActivityDTO)
+          : item,
+      ),
+    summaries: async (ids) =>
+      (await postgres.summaries(ids)).map((item) =>
+        item.activity_id === '100'
+          ? ({
+              ...item,
+              metadata: failed(state),
+              last_error: { code: 'not_found' },
+            } as unknown as ActivityStreamSummaryDTO)
+          : item,
+      ),
+  });
+  const check = (state: string) =>
+    checkParity({
+      position: { sequence: 10, revision: 1 },
+      postgres: withFailure(state),
+      convex,
+      now: NOW,
+    });
+
+  const report = await check('not_fetched');
+  assert.equal(report.status, 'ok');
+  assert.deepEqual(report.expectedDifferences, {
+    'activity.placeMatches.resultRevision': 1,
+    'recording.neverFetched': 1,
+  });
+  assert.deepEqual(report.compared, { activities: 2, summaries: 1, photos: 0 });
+
+  // A failed refresh of a recording that is stored is still compared.
+  assert.equal((await check('current')).status, 'drift');
+});
