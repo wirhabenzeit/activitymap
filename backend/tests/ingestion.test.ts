@@ -405,6 +405,56 @@ void test('activities without samples get an empty recording, so nothing stays p
   assert.deepEqual(provider.reads.slice(3), ['activity 8']);
 });
 
+void test('an activity typed in by hand is stored although the provider leaves fields out', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  // What the provider does not send for such an activity is absent from
+  // its answer, not null.
+  const omitted = [
+    'elev_high',
+    'elev_low',
+    'upload_id',
+    'gear_id',
+    'workout_type',
+    'kilojoules',
+    'average_watts',
+    'device_watts',
+    'max_watts',
+    'weighted_average_watts',
+    'hide_from_home',
+    'calories',
+  ];
+  provider.set(
+    detail(7, 'Rowing machine', {
+      manual: true,
+      sport_type: 'Rowing',
+      start_latlng: [],
+      end_latlng: [],
+      map: { id: 'a7', resource_state: 3 },
+      ...Object.fromEntries(omitted.map((field) => [field, undefined])),
+    }),
+  );
+
+  await ingest(convex, '7');
+
+  const { activities, recordings, jobs } = await state(convex);
+  const dto = activities[0]!.dto as unknown as Record<string, unknown>;
+  assert.equal(dto.manual, true);
+  assert.deepEqual(
+    [...omitted, 'map_polyline', 'map_summary_polyline'].map(
+      (field) => dto[field],
+    ),
+    Array.from({ length: omitted.length + 2 }, () => null),
+  );
+  // Nothing to fetch for it: an empty recording, and the job is done.
+  assert.equal(recordings.length, 1);
+  assert.deepEqual(provider.reads, ['activity 7']);
+  assert.deepEqual(
+    jobs.map((job) => [job.status, job.error]),
+    [['idle', undefined]],
+  );
+});
+
 void test('a rate limit waits for the time the gateway names and counts no attempt', async () => {
   const provider = fakeProvider();
   const convex = await owner();

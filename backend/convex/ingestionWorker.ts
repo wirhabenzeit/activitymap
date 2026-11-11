@@ -182,7 +182,11 @@ async function recording(
     writer: 'convex',
     recordingGeneration: step.recording.generation ?? randomUUID(),
     recordingRevision: step.recording.revision,
-    file: await ctx.storage.store(new Blob([new Uint8Array(file)])),
+    // The type is required: in the Node runtime a blob without one is sent
+    // with an empty Content-Type header, which file storage refuses.
+    file: await ctx.storage.store(
+      new Blob([new Uint8Array(file)], { type: 'application/octet-stream' }),
+    ),
     manifest,
   });
   // On to the match of the new recording.
