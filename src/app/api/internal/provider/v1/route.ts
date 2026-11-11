@@ -1,7 +1,4 @@
-import { eq } from 'drizzle-orm';
-
-import { db } from '~/server/db';
-import { users } from '~/server/db/schema';
+import { findUserInternal } from '~/server/db/internal';
 import { logger } from '~/server/logging/logger';
 import { providerGatewayConfig } from '~/server/provider-gateway/config';
 import {
@@ -19,13 +16,8 @@ export const POST = createProviderGatewayHandler({
   config: providerGatewayConfig,
   // Exactly the accounts whose library Convex writes.
   serves: async (userId) => (await writerOf(userId)) === 'convex',
-  athleteFor: async (userId) => {
-    const [user] = await db
-      .select({ athleteId: users.athlete_id })
-      .from(users)
-      .where(eq(users.id, userId));
-    return user?.athleteId ?? null;
-  },
+  athleteFor: async (userId) =>
+    (await findUserInternal(userId))?.athlete_id ?? null,
   read: readFromStrava,
   failureFor: gatewayFailureFor,
   onFailure: (failure, operation) =>

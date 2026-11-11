@@ -6,6 +6,7 @@ import { libraryFromConvex } from '~/server/application/library-export';
 import { resolveActor } from '~/server/auth/actor';
 import { resolveRequestSession } from '~/server/auth/request-session';
 import { db } from '~/server/db';
+import { findStravaAccountInternal } from '~/server/db/internal';
 import { convexReadOwnerFor } from '~/server/preview/convex';
 import { previewSelection } from '~/server/preview/selection';
 
@@ -27,9 +28,7 @@ export async function GET(request: NextRequest) {
     });
   const userID = session.user.id;
 
-  const account = await db.query.accounts.findFirst({
-    where: (accounts, { eq }) => eq(accounts.userId, userID),
-  });
+  const account = await findStravaAccountInternal({ userId: userID });
   if (!account) return new Response('Account not found', { status: 404 });
   // Postgres holds the library only while it writes it.
   const actor = await resolveActor(request.headers);

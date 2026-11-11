@@ -242,6 +242,9 @@ router.route({
           });
           break;
         // The place catalogue belongs to no owner: the signature authorizes.
+        case 'latestCatalogue':
+          result = await ctx.runQuery(internal.places.latest, {});
+          break;
         case 'catalogueState':
           result = await ctx.runQuery(internal.places.state, args);
           break;
@@ -376,6 +379,15 @@ router.route({
             : await ctx.runQuery(internal.authStore.count, args);
         return Response.json(result, { headers });
       }
+      // Counting a request twice only makes the limit stricter, and a
+      // repeated reservation only spends budget: neither needs a nonce.
+      if (kind === 'rateLimit' || kind === 'budgetReserve') {
+        const result =
+          kind === 'rateLimit'
+            ? await ctx.runMutation(internal.appState.hit, args)
+            : await ctx.runMutation(internal.appState.reserve, args);
+        return Response.json(result, { headers });
+      }
       if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(nonce))
         return new Response(null, { status: 400, headers });
       const fresh = await ctx.runMutation(internal.bridge.consumeNonce, {
@@ -393,6 +405,15 @@ router.route({
           break;
         case 'remove':
           result = await ctx.runMutation(internal.authStore.remove, args);
+          break;
+        case 'budgetObserve':
+          result = await ctx.runMutation(internal.appState.observe, args);
+          break;
+        case 'expireRateLimits':
+          result = await ctx.runMutation(
+            internal.appState.expireRateLimits,
+            args,
+          );
           break;
         default:
           return new Response(null, { status: 400, headers });

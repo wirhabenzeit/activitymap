@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 
 import {
   allLibraryStatus,
+  copySignInRecords,
   moveMyLibraryToConvex,
   moveMyLibraryToPostgres,
   moveReadyLibrariesToConvex,
@@ -124,6 +125,19 @@ export function WriterControls() {
           }
         >
           Prepare all
+        </button>
+        <button
+          type="button"
+          className={button}
+          disabled={pending}
+          onClick={() =>
+            run(async () => {
+              const copied = await copySignInRecords();
+              return `Copied ${copied.users} users, ${copied.accounts} linked accounts and ${copied.keys} signing keys to Convex.`;
+            }, 'Copy sign-in records to Convex? Run this right before switching the app to the Convex store; records already there are replaced.')
+          }
+        >
+          Copy sign-in records
         </button>
         <button
           type="button"

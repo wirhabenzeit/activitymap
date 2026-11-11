@@ -456,10 +456,48 @@ write cannot be replayed on this route or the reverse. Reads carry no nonce;
 every change does. `src/server/auth/convex-adapter.ts` is the library's
 adapter over that route. Dates are stored as ISO strings.
 
-Nothing uses the store yet: sign-in still runs on Postgres. Moving it means
-copying users and linked accounts across (keeping their IDs, which the
-owners here are keyed by), switching the library to this adapter, and
-signing everyone in again, since sessions are not copied.
+With `ACTIVITYMAP_AUTH_STORE=convex` set for the app
+(`src/server/auth/store.ts`), the app keeps none of its own records in
+Postgres. Without it, everything below still runs on Postgres.
+
+- **Sign-in**: the auth library uses the adapter above.
+  `src/server/auth/convex-records.ts` is what the rest of the app reads and
+  changes: the user (athlete, writer, epoch), the provider account and its
+  tokens (replaced only if they are still the ones that were read), and the
+  marks for withdrawn access.
+- **Mobile sign-in codes**: records of the model `mobileLoginCode`, redeemed
+  by an update that returns the record as it was, so a code works once.
+- **Rate limits and the provider budget**: `convex/appState.ts`, tables
+  `rateLimits` and `providerBudget`. Both are counted inside one mutation,
+  so two requests cannot take the same slot. Expired rate limit windows are
+  removed daily.
+- **Provider webhooks** (`src/server/strava/convex-webhook.ts`): there is no
+  inbox. An activity event is recorded here before the provider is answered;
+  if that fails the provider is answered with an error and delivers again,
+  and the reconciliation sweep finds what is still missed. Withdrawn access
+  removes the tokens and sets the date of erasure, 30 days later.
+- **Erasure**: the scheduled run and "delete my account" erase the library
+  here first, then the sign-in records, so a failure leaves the records that
+  find the library again.
+- **New accounts**: the first sign-in provisions the owner here directly and
+  starts the first sweep.
+
+### Switching
+
+1. Every account's library is written here (admin page, "Library writer").
+2. Deploy the app and this backend.
+3. Admin page, "Copy sign-in records": copies users, provider accounts with
+   their tokens, and the signing keys, keeping their IDs. It can be run
+   again; it replaces what it copied before.
+4. Set `ACTIVITYMAP_AUTH_STORE=convex` for the app and deploy it again.
+5. Everyone signs in once more: sessions are not copied.
+6. Stop the Postgres jobs in the cron worker (`cloudflare/cron`).
+
+To go back, remove the setting and deploy. Accounts created and tokens
+refreshed in between exist only here; those users sign in again.
+
+Still read from Postgres after the switch: the admin dashboard's job views,
+the place catalogue build and place search.
 
 ## Erasing an account
 

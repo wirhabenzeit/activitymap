@@ -8,6 +8,20 @@ import {
   convexAuthAdapter,
   convexAuthStore,
 } from '../../src/server/auth/convex-adapter';
+import {
+  convexRateLimitRepository,
+  convexStravaRequestBudget,
+} from '../../src/server/auth/convex-app-state';
+import { convexMobileLoginCodesRepository } from '../../src/server/auth/convex-mobile-login-codes';
+import { convexAuthRecords } from '../../src/server/auth/convex-records';
+import {
+  eraseDueAccountsOnConvex,
+  handleWebhookOnConvex,
+} from '../../src/server/strava/convex-webhook';
+import {
+  StravaBudgetBusyError,
+  StravaBudgetExceededError,
+} from '../../src/server/strava/request-budget';
 import schema from '../convex/schema';
 
 /**
@@ -17,6 +31,7 @@ import schema from '../convex/schema';
 
 const modules = {
   './_generated/api.js': () => import('../convex/_generated/api.js'),
+  './appState.ts': () => import('../convex/appState'),
   './authStore.ts': () => import('../convex/authStore'),
   './bridge.ts': () => import('../convex/bridge'),
   './http.ts': () => import('../convex/http'),
@@ -324,4 +339,384 @@ void test('the store refuses what it should not serve', async (t) => {
   const again = await options.fetcher(...replay!);
   assert.equal(again.status, 409);
   assert.equal(await call({ kind: 'count', model: 'user' }), 2);
+});
+
+/** A user with a linked Strava account, as a sign-in leaves them. */
+async function person(
+  call: ReturnType<typeof convexAuthStore>,
+  id: string,
+  athleteId: number,
+  extra: Record<string, unknown> = {},
+) {
+  await call({
+    kind: 'create',
+    model: 'user',
+    data: { id, name: 'Rider', athlete_id: athleteId, ...extra },
+  });
+  await call({
+    kind: 'create',
+    model: 'account',
+    data: {
+      id: `account-${id}`,
+      userId: id,
+      providerId: 'strava',
+      accountId: String(athleteId),
+      accessToken: 'access-1',
+      refreshToken: 'refresh-1',
+      accessTokenExpiresAt: '2026-11-11T12:00:00.000Z',
+    },
+  });
+}
+
+void test('Strava credentials are refreshed once, and never over a newer sign-in', async (t) => {
+  const { call } = setup(t);
+  await person(call, 'u1', 42);
+  const records = convexAuthRecords(call);
+  const user = await records.user('u1');
+  assert.deepEqual(
+    [user?.athlete_id, user?.writer, user?.convexEpoch, user?.emailVerified],
+    [42, 'postgres', null, false],
+  );
+  const read = (await records.accounts.findStravaAccount({ userId: 'u1' }))!;
+  assert.equal(
+    read.accessTokenExpiresAt?.toISOString(),
+    '2026-11-11T12:00:00.000Z',
+  );
+  const fresh = (suffix: string) => ({
+    accessToken: `access-${suffix}`,
+    refreshToken: `refresh-${suffix}`,
+    expiresAtSeconds: 1_800_000_000,
+    expiresAtDate: new Date(1_800_000_000_000),
+  });
+
+  // Two refreshes start from the same credentials: one is saved.
+  const [first, second] = await Promise.all([
+    records.accounts.replaceCredentials(read, fresh('2')),
+    records.accounts.replaceCredentials(read, fresh('3')),
+  ]);
+  assert.equal([first, second].filter(Boolean).length, 1);
+  const saved = (await records.accounts.findStravaAccount({
+    accountId: '42',
+  }))!;
+  assert.equal(saved.accessToken, (first ?? second)!.accessToken);
+  assert.equal(saved.access_token, saved.accessToken);
+  assert.equal(saved.accessTokenExpiresAt?.getTime(), 1_800_000_000_000);
+
+  // The person signs in again, which writes new tokens; a refresh that
+  // read the account before that is refused.
+  await call({
+    kind: 'update',
+    model: 'account',
+    where: [
+      { field: 'id', value: 'account-u1', operator: 'eq', connector: 'AND' },
+    ],
+    update: { accessToken: 'signed-in-again' },
+  });
+  assert.equal(
+    await records.accounts.replaceCredentials(saved, fresh('4')),
+    null,
+  );
+  assert.equal(
+    (await records.accounts.findStravaAccount({ userId: 'u1' }))!.accessToken,
+    'signed-in-again',
+  );
+
+  assert.equal(
+    await records.updateUser('u1', {
+      writer: 'convex',
+      convexEpoch: 'e'.repeat(20),
+    }),
+    true,
+  );
+  assert.deepEqual(
+    [
+      (await records.user('u1'))?.writer,
+      (await records.user('u1'))?.convexEpoch,
+    ],
+    ['convex', 'e'.repeat(20)],
+  );
+  assert.equal(await records.updateUser('nobody', { writer: 'convex' }), false);
+});
+
+void test('a webhook is recorded in Convex or revokes the account, and a failure is passed on', async (t) => {
+  const { call } = setup(t);
+  await person(call, 'u1', 42, { writer: 'convex' });
+  await person(call, 'u2', 43);
+  const records = convexAuthRecords(call);
+  const sent: unknown[] = [];
+  const send = async (owner: unknown, event: unknown) =>
+    void sent.push([owner, event]);
+  const event = (overrides: object = {}) => ({
+    subscription_id: 1,
+    object_type: 'activity' as const,
+    object_id: 7,
+    aspect_type: 'update' as const,
+    owner_id: 42,
+    event_time: 1_794_000_000,
+    ...overrides,
+  });
+  const handle = (data: ReturnType<typeof event>) =>
+    handleWebhookOnConvex(data as never, {
+      records,
+      send: send as never,
+      now: () => new Date('2026-11-11T10:00:00Z'),
+    });
+
+  assert.equal(await handle(event()), 'recorded');
+  assert.equal(await handle(event()), 'recorded');
+  const [[owner, first], [, repeat]] = sent as [
+    [
+      unknown,
+      { event: string; activityId: string; aspect: string; eventTime: number },
+    ],
+    [unknown, { event: string }],
+  ];
+  assert.deepEqual(owner, { userId: 'u1', athleteId: 42 });
+  assert.deepEqual(
+    [first.activityId, first.aspect, first.eventTime],
+    ['7', 'update', 1_794_000_000_000],
+  );
+  // A repeated delivery carries the same ID, so Convex records it once.
+  assert.match(first.event, /^[A-Za-z0-9_-]{1,64}$/);
+  assert.equal(repeat.event, first.event);
+
+  // An athlete nobody here knows, and one whose library has not started.
+  assert.equal(await handle(event({ owner_id: 99 })), 'ignored');
+  assert.equal(await handle(event({ owner_id: 43 })), 'ignored');
+  assert.equal(sent.length, 2);
+
+  // Convex could not take it: the caller answers Strava with an error.
+  await assert.rejects(
+    handleWebhookOnConvex(event() as never, {
+      records,
+      send: async () => {
+        throw new Error('unreachable');
+      },
+    }),
+    /unreachable/,
+  );
+
+  // Access withdrawn: tokens gone, erasure in thirty days, and a repeat of
+  // the notice does not move the date.
+  const withdrawn = event({
+    object_type: 'athlete',
+    object_id: 42,
+    updates: { authorized: 'false' },
+  });
+  assert.equal(await handle(withdrawn), 'revoked');
+  assert.equal(await handle(withdrawn), 'ignored');
+  const account = (await records.accountByAthlete(42))!;
+  assert.deepEqual(
+    [
+      account.accessToken,
+      account.refreshToken,
+      account.scheduledErasureAt?.toISOString(),
+    ],
+    [null, null, '2026-12-11T10:00:00.000Z'],
+  );
+  assert.equal(
+    await handle(
+      event({
+        object_type: 'athlete',
+        object_id: 43,
+        owner_id: 43,
+        updates: { title: 'x' },
+      }),
+    ),
+    'ignored',
+  );
+  assert.equal((await records.accountByAthlete(43))!.revokedAt, null);
+});
+
+void test('revoked accounts are erased when due, and one that signed in again is kept', async (t) => {
+  const { call } = setup(t);
+  const records = convexAuthRecords(call);
+  await person(call, 'gone', 42);
+  await person(call, 'back', 43);
+  await person(call, 'later', 44);
+  const now = new Date('2026-12-20T00:00:00Z');
+  const past = new Date('2026-12-01T00:00:00Z');
+  for (const athlete of [42, 43])
+    await records.revokeAccount(
+      (await records.accountByAthlete(athlete))!.id,
+      new Date('2026-11-01T00:00:00Z'),
+      past,
+    );
+  await records.revokeAccount(
+    (await records.accountByAthlete(44))!.id,
+    now,
+    new Date('2027-01-19T00:00:00Z'),
+  );
+  // `back` signed in again: the library writes tokens next to the marks.
+  await call({
+    kind: 'update',
+    model: 'account',
+    where: [
+      { field: 'id', value: 'account-back', operator: 'eq', connector: 'AND' },
+    ],
+    update: { accessToken: 'new' },
+  });
+  await call({
+    kind: 'create',
+    model: 'session',
+    data: {
+      id: 's1',
+      userId: 'gone',
+      token: 't1',
+      expiresAt: '2027-01-01T00:00:00.000Z',
+    },
+  });
+  const erasedLibraries: string[] = [];
+
+  const result = await eraseDueAccountsOnConvex({
+    records,
+    now,
+    eraseLibrary: async (user) => void erasedLibraries.push(user.id),
+  });
+
+  assert.deepEqual(result, {
+    candidates: 2,
+    erased: 1,
+    cancelled: 1,
+    failed: 0,
+  });
+  assert.deepEqual(erasedLibraries, ['gone']);
+  assert.equal(await records.user('gone'), null);
+  assert.equal(await records.accountByAthlete(42), null);
+  assert.equal(await call({ kind: 'count', model: 'session' }), 0);
+  const kept = (await records.accountByAthlete(43))!;
+  assert.deepEqual(
+    [kept.revokedAt, kept.scheduledErasureAt, kept.accessToken],
+    [null, null, 'new'],
+  );
+  assert.notEqual((await records.accountByAthlete(44))!.revokedAt, null);
+
+  // A library that cannot be erased keeps its records for the next run.
+  await records.revokeAccount(kept.id, new Date('2026-11-01T00:00:00Z'), past);
+  const failed = await eraseDueAccountsOnConvex({
+    records,
+    now,
+    eraseLibrary: async () => {
+      throw new Error('Convex unreachable');
+    },
+  });
+  assert.deepEqual(failed, {
+    candidates: 1,
+    erased: 0,
+    cancelled: 0,
+    failed: 1,
+  });
+  assert.notEqual(await records.user('back'), null);
+});
+
+void test('a mobile login code is consumed once and gives up its session token once', async (t) => {
+  const { call } = setup(t);
+  const codes = convexMobileLoginCodesRepository(call);
+  const created = await codes.create({
+    codeHash: 'hash-1',
+    state: 'state',
+    pkceChallenge: 'challenge',
+    redirectUri: 'activitymap://callback',
+    userId: 'u1',
+    sessionBearerToken: 'bearer',
+    expiresAt: new Date('2026-11-11T10:05:00Z'),
+  });
+  assert.equal(created.consumedAt, null);
+  assert.equal(
+    (await codes.findByCodeHash('hash-1'))?.sessionBearerToken,
+    'bearer',
+  );
+
+  const now = new Date('2026-11-11T10:01:00Z');
+  const [first, second] = await Promise.all([
+    codes.consumeByCodeHash('hash-1', now),
+    codes.consumeByCodeHash('hash-1', now),
+  ]);
+  const winner = first ?? second;
+  assert.equal([first, second].filter(Boolean).length, 1);
+  assert.deepEqual(
+    [
+      winner?.sessionBearerToken,
+      winner?.consumedAt?.toISOString(),
+      winner?.expiresAt.toISOString(),
+    ],
+    ['bearer', now.toISOString(), '2026-11-11T10:05:00.000Z'],
+  );
+  const after = await codes.findByCodeHash('hash-1');
+  assert.deepEqual(
+    [after?.sessionBearerToken, after?.consumedAt?.toISOString()],
+    [null, now.toISOString()],
+  );
+  assert.equal(await codes.consumeByCodeHash('unknown', now), null);
+});
+
+void test('rate limit windows count exactly and the provider budget holds requests back', async (t) => {
+  const { convex, call } = setup(t);
+  const limits = convexRateLimitRepository(call);
+  const window = new Date('2026-11-11T10:00:00Z');
+  const counts = await Promise.all(
+    Array.from({ length: 5 }, () => limits.incrementAndGet('user:u1', window)),
+  );
+  assert.deepEqual([...counts].sort(), [1, 2, 3, 4, 5]);
+  assert.equal(await limits.incrementAndGet('user:u2', window), 1);
+  assert.equal(
+    await limits.incrementAndGet('user:u1', new Date('2026-11-11T10:01:00Z')),
+    1,
+  );
+  assert.equal(
+    await limits.deleteWindowsBefore(new Date('2026-11-11T10:00:30Z')),
+    2,
+  );
+  assert.equal(await limits.incrementAndGet('user:u1', window), 1);
+
+  const budget = convexStravaRequestBudget(undefined, call);
+  const ticket = await budget.reserve(true);
+  assert.equal(ticket.read, true);
+  const rows = () =>
+    convex.run((ctx) => ctx.db.query('providerBudget').collect());
+  assert.deepEqual(
+    (await rows()).map((row) => [row.key, row.used, row.inFlight]).sort(),
+    [
+      ['overall:15m', 1, 1],
+      ['overall:day', 1, 1],
+      ['read:15m', 1, 1],
+      ['read:day', 1, 1],
+    ],
+  );
+  // One request in flight is the most this caller allows.
+  const careful = convexStravaRequestBudget(
+    { fifteenMinutes: 0, daily: 0, maxInFlight: 1 },
+    call,
+  );
+  await assert.rejects(careful.reserve(false), StravaBudgetBusyError);
+
+  // The provider reports the quarter hour nearly used up: the next request
+  // waits for the window, and nothing was reserved for it.
+  await budget.observe(
+    ticket,
+    {
+      overall: {
+        limit15Minutes: 200,
+        limitDaily: 2000,
+        usage15Minutes: 180,
+        usageDaily: 300,
+      },
+      read: {
+        limit15Minutes: 100,
+        limitDaily: 1000,
+        usage15Minutes: 40,
+        usageDaily: 200,
+      },
+    } as never,
+    200,
+  );
+  const before = await rows();
+  assert.equal(before.find((row) => row.key === 'overall:15m')!.inFlight, 0);
+  await assert.rejects(budget.reserve(true), (error: unknown) => {
+    assert(error instanceof StravaBudgetExceededError);
+    assert(!(error instanceof StravaBudgetBusyError));
+    assert(error.retryAfterSeconds >= 1 && error.retryAfterSeconds <= 900);
+    return true;
+  });
+  assert.deepEqual(await rows(), before);
 });

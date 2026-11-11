@@ -2,6 +2,8 @@ import 'server-only';
 
 import { lt, sql } from 'drizzle-orm';
 
+import { convexRateLimitRepository } from '~/server/auth/convex-app-state';
+import { authStoreIsConvex } from '~/server/auth/store';
 import { db as defaultDb } from '~/server/db';
 import { apiRateLimitBuckets } from '~/server/db/schema';
 
@@ -69,5 +71,8 @@ export function createRateLimitRepository(
   };
 }
 
-/** Default, database-backed repository used by application services. */
-export const rateLimitRepository = createRateLimitRepository();
+/** The repository application services use: Postgres, or Convex when the
+ * app's records live there (`~/server/auth/store.ts`). */
+export const rateLimitRepository = authStoreIsConvex()
+  ? convexRateLimitRepository()
+  : createRateLimitRepository();

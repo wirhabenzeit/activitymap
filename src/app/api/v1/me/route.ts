@@ -2,7 +2,10 @@ import { toAuthenticationDTO } from '~/contracts/v1/auth';
 import { toCurrentUserDTOv1 } from '~/contracts/v1/user';
 import { stravaPermissionsFromScope } from '~/lib/strava-permissions';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
-import { db } from '~/server/db';
+import {
+  findStravaAccountInternal,
+  findUserInternal,
+} from '~/server/db/internal';
 import { logger } from '~/server/logging/logger';
 
 import { createCurrentUserHandler } from './handler';
@@ -17,17 +20,8 @@ export const GET = withAuthenticatedApiV1(
         if (!session?.user?.id) return null;
 
         const [user, account] = await Promise.all([
-          db.query.users.findFirst({
-            where: (users, { eq }) => eq(users.id, session.user.id),
-          }),
-          db.query.accounts.findFirst({
-            columns: { access_token: true, accessToken: true, scope: true },
-            where: (accounts, { and, eq }) =>
-              and(
-                eq(accounts.userId, session.user.id),
-                eq(accounts.providerId, 'strava'),
-              ),
-          }),
+          findUserInternal(session.user.id),
+          findStravaAccountInternal({ userId: session.user.id }),
         ]);
         if (!user) {
           throw new Error('Authenticated session has no local user');

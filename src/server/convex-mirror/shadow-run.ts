@@ -2,6 +2,7 @@ import 'server-only';
 
 import { and, asc, eq, isNotNull, ne } from 'drizzle-orm';
 
+import { authStoreIsConvex } from '~/server/auth/store';
 import { externalEffectsEnabled } from '~/server/config/external-effects';
 import { db } from '~/server/db';
 import { users } from '~/server/db/schema';
@@ -33,7 +34,8 @@ export function configuredShadowOwners(): string[] | null {
  * (an account being moved). Null when there are none or shadow writes are
  * off. */
 export async function mirroredOwners(): Promise<string[] | null> {
-  if (!externalEffectsEnabled()) return null;
+  // Nothing is copied from Postgres once the app's records live in Convex.
+  if (!externalEffectsEnabled() || authStoreIsConvex()) return null;
   const moving = await db
     .select({ id: users.id })
     .from(users)

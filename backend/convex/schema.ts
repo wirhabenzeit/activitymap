@@ -182,6 +182,25 @@ export default defineSchema({
     .index('by_model_identifier', ['model', 'identifier'])
     .index('by_model_accountId', ['model', 'accountId'])
     .index('by_model_email', ['model', 'email']),
+  /** The app's API rate limit counters (convex/appState.ts): one row per
+   * caller key and fixed window. */
+  rateLimits: defineTable({
+    key: v.string(),
+    windowStart: v.number(),
+    count: v.number(),
+  })
+    .index('by_key_window', ['key', 'windowStart'])
+    .index('by_window', ['windowStart']),
+  /** The provider's shared request budget (convex/appState.ts): one row per
+   * window key. */
+  providerBudget: defineTable({
+    key: v.string(),
+    windowStart: v.number(),
+    used: v.number(),
+    inFlight: v.number(),
+    ceiling: v.number(),
+    blockedUntil: v.optional(v.number()),
+  }).index('by_key', ['key']),
   ownerEpochs: defineTable({ owner: v.id('owners'), epoch: v.string() }).index(
     'by_owner_epoch',
     ['owner', 'epoch'],

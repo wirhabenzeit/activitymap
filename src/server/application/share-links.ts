@@ -6,6 +6,8 @@ import {
 } from '~/contracts/share/activity';
 import type { ShareLinkFieldOptions } from '~/lib/sharing/fields';
 import type { Actor } from '~/server/auth/actor';
+import { authStoreIsConvex } from '~/server/auth/store';
+import { findStravaAccountInternal } from '~/server/db/internal';
 import type { Activity } from '~/server/db/schema';
 import {
   type ActivitiesRepository,
@@ -85,9 +87,27 @@ export type ShareLinksServiceDeps = {
   convexView?: typeof convexShareView;
 };
 
+/**
+ * With the app's records in Convex there are no share links in Postgres:
+ * every link lives in Convex, and only the question whether the athlete's
+ * provider connection is revoked is answered from the sign-in store.
+ */
+const noPostgresLinks = {
+  listForAthlete: async () => [],
+  revoke: async () => null,
+  findByTokenHash: async () => null,
+  isAthleteRevoked: async (athleteId: number) =>
+    Boolean(
+      (await findStravaAccountInternal({ accountId: String(athleteId) }))
+        ?.revokedAt,
+    ),
+} as unknown as ShareLinksRepository;
+
 function resolveDeps(deps: ShareLinksServiceDeps) {
   return {
-    shareLinksRepo: deps.shareLinksRepo ?? shareLinksRepository,
+    shareLinksRepo:
+      deps.shareLinksRepo ??
+      (authStoreIsConvex() ? noPostgresLinks : shareLinksRepository),
     activitiesRepo: deps.activitiesRepo ?? activitiesRepository,
     now: deps.now ?? (() => new Date()),
     generateToken: deps.generateToken ?? generateShareToken,

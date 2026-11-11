@@ -10,11 +10,13 @@ import {
   summaryAlgorithmVersion,
 } from '~/lib/streams/compact-summary';
 import type { Actor } from '~/server/auth/actor';
+import { authStoreIsConvex } from '~/server/auth/store';
 import { db } from '~/server/db';
 import {
   buildAccountTokenColumnUpdate,
   resolveAccountTokens,
 } from '~/server/db/account-token-normalization';
+import { findStravaAccountInternal } from '~/server/db/internal';
 import {
   type Account,
   accounts,
@@ -208,6 +210,23 @@ export function createActivityStreamsRepository(database: typeof db = db) {
      */
     async readable(actor: Actor, activityIds: string[]): Promise<Set<string>> {
       activityIds.forEach((id) => streamActivityIdSchema.parse(id));
+      // With the app's records in Convex, the account is checked there and
+      // the library decides which activities it has.
+      if (authStoreIsConvex()) {
+        const account = await findStravaAccountInternal({
+          userId: actor.userId,
+        });
+        if (
+          account?.accountId !== String(actor.athleteId) ||
+          account.revokedAt ||
+          account.scheduledErasureAt
+        )
+          throw new ActivityStreamsUnavailableError();
+        const tokens = resolveAccountTokens(account);
+        if (!tokens.accessToken && !tokens.refreshToken)
+          throw new ActivityStreamsUnavailableError();
+        return new Set(activityIds);
+      }
       return database.transaction(async (tx) => {
         if (!(await lockEligibleAccount(tx, actor)))
           throw new ActivityStreamsUnavailableError();

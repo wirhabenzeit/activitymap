@@ -1,12 +1,16 @@
 import 'server-only';
+
 import { eq, sql } from 'drizzle-orm';
+
+import { convexStravaRequestBudget } from '~/server/auth/convex-app-state';
+import { authStoreIsConvex } from '~/server/auth/store';
 import { db } from '~/server/db';
 import { stravaRequestBudgets } from '~/server/db/schema';
 import {
-  StravaBudgetExceededError,
-  StravaBudgetBusyError,
   STRAVA_RATE_LIMIT_15_MINUTE_RESERVE,
   STRAVA_RATE_LIMIT_DAILY_RESERVE,
+  StravaBudgetBusyError,
+  StravaBudgetExceededError,
   type StravaRequestBudget,
 } from '~/server/strava/request-budget';
 
@@ -48,6 +52,10 @@ export function createStravaRequestBudget(
   clock = () => new Date(),
   reserves?: { fifteenMinutes: number; daily: number; maxInFlight?: number },
 ): StravaRequestBudget {
+  // The ledger lives in Convex when the app's records do
+  // (`~/server/auth/store.ts`); a caller that names a database gets Postgres.
+  if (authStoreIsConvex() && database === db)
+    return convexStravaRequestBudget(reserves);
   return {
     async reserve(read) {
       let startedAt: Date;

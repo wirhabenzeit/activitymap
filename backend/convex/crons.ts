@@ -21,4 +21,10 @@ crons.interval(
   internal.maintenance.expireProviderEvents,
   {},
 );
+crons.interval(
+  'expire API rate limit windows',
+  { hours: 24 },
+  internal.appState.expireOldRateLimits,
+  {},
+);
 export default crons;

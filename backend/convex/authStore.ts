@@ -22,7 +22,15 @@ import {
  * Only the app reaches this, through the signed auth route (http.ts).
  */
 
-const MODELS = ['user', 'account', 'session', 'verification', 'jwks'] as const;
+const MODELS = [
+  'user',
+  'account',
+  'session',
+  'verification',
+  'jwks',
+  // The app's own one-time codes for signing in from the iOS app.
+  'mobileLoginCode',
+] as const;
 type Model = (typeof MODELS)[number];
 const LOOKUPS = [
   'userId',
@@ -266,6 +274,8 @@ export const update = internalMutation({
     where: v.array(condition),
     update: v.any(),
     many: v.optional(v.boolean()),
+    /** `before`: answer the one record as it was before the change. */
+    returning: v.optional(v.literal('before')),
   },
   handler: async (ctx, args): Promise<Fields | number | null> => {
     const name = known(args.model);
@@ -277,7 +287,7 @@ export const update = internalMutation({
       const next = { ...(row.doc as Fields), ...(args.update as Fields) };
       next.id = (row.doc as Fields).id;
       await ctx.db.replace('authRecords', row._id, stored(name, next));
-      last = next;
+      last = args.returning === 'before' ? (row.doc as Fields) : next;
     }
     return args.many ? targets.length : last;
   },
