@@ -1,71 +1,11 @@
 'use server';
 
-import { ne } from 'drizzle-orm';
-import { headers } from 'next/headers';
-
-import * as activitiesService from '~/server/application/activities';
-import { requireActor } from '~/server/auth/actor';
 import { requireAdmin } from '~/server/auth/admin';
 import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
-import { db } from '~/server/db';
-import { stravaWebhooks } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
-import { assertPostgresDataActor } from '~/server/preview/selection';
-import { writerOf } from '~/server/repositories/writers';
 
 import { StravaClient } from './client';
-import { type UpdateActivityInput } from './validators';
 import { webhookCallbackSecret, webhookCallbackUrl } from './webhook-callback';
-
-/** These adapters only know the Postgres path. For an account another store
- * writes for, refuse before anything is changed at Strava; the v1 routes
- * serve such an account. */
-async function assertPostgresWriter(userId: string) {
-  if ((await writerOf(userId)) !== 'postgres')
-    throw new Error('Operation unavailable for this account');
-}
-
-/**
- * Thin compatibility adapter: resolves the caller's `Actor` from the current
- * request context and delegates to the application service
- * (`~/server/application/activities.ts`), which resolves the Strava
- * credential itself and enforces ownership. Never accepts a client-supplied
- * access token/account ID here - see issue #116.
- */
-export async function updateActivity(input: UpdateActivityInput) {
-  const actor = await requireActor(await headers());
-  assertPostgresDataActor(actor);
-  await assertPostgresWriter(actor.userId);
-  return activitiesService.updateActivityForActor(actor, input);
-}
-
-/**
- * Re-fetch a single activity (and its photos) from Strava for the
- * authenticated user. This is the only client-callable entry point to the
- * fetchStravaActivities service - it never accepts a caller-supplied token
- * or athlete ID. See issue #116.
- *
- * Thin compatibility adapter over `refreshActivityForActor`.
- */
-export async function refreshActivity(activityId: number) {
-  const actor = await requireActor(await headers());
-  assertPostgresDataActor(actor);
-  await assertPostgresWriter(actor.userId);
-  return activitiesService.refreshActivityForActor(actor, activityId);
-}
-
-/**
- * Thin compatibility adapter over `deleteActivitiesForActor`.
- */
-export async function deleteActivities(input: number[]): Promise<{
-  deletedCount: number;
-  errors: string[];
-}> {
-  const actor = await requireActor(await headers());
-  assertPostgresDataActor(actor);
-  await assertPostgresWriter(actor.userId);
-  return activitiesService.deleteActivitiesForActor(actor, input);
-}
 
 /**
  * Resolves the secret-bearing callback URL this deployment registers with
@@ -86,10 +26,10 @@ function expectedCallbackUrl(): string {
 }
 
 /**
- * Operator-only. Reads this Strava app's push subscription and mirrors the
- * one registered for this deployment's secret callback URL into
- * `strava_webhooks`. Calls `requireAdmin()` first: the subscription id and
- * callback URL must never reach other callers.
+ * Operator-only. Reads this Strava app's push subscriptions and reports
+ * whether one is registered for this deployment's secret callback URL.
+ * Calls `requireAdmin()` first: the subscription id and callback URL must
+ * never reach other callers.
  */
 export async function checkWebhookStatus() {
   await requireAdmin();
@@ -105,33 +45,12 @@ export async function checkWebhookStatus() {
       (sub) => sub.callback_url === expectedUrl,
     );
 
-    let databaseStatus = 'no_matching_subscription';
-
-    if (matchingSubscription) {
-      const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
-      if (!verifyToken) {
-        throw new Error(
-          'STRAVA_WEBHOOK_VERIFY_TOKEN environment variable is not set',
-        );
-      }
-
-      await upsertActiveSubscription({
-        subscriptionId: matchingSubscription.id,
-        verifyToken,
-        callbackUrl: matchingSubscription.callback_url,
-        resourceState: matchingSubscription.resource_state,
-        applicationId: matchingSubscription.application_id,
-        createdAt: new Date(matchingSubscription.created_at),
-        updatedAt: new Date(matchingSubscription.updated_at),
-        verified: true,
-      });
-
-      databaseStatus = 'synchronized';
-    }
-
     return {
       hasMatchingSubscription: !!matchingSubscription,
-      databaseStatus,
+      // Kept for the controls that read it: there is nothing to synchronize.
+      databaseStatus: matchingSubscription
+        ? 'synchronized'
+        : 'no_matching_subscription',
       matchingSubscription: matchingSubscription
         ? { id: matchingSubscription.id }
         : undefined,
@@ -188,16 +107,6 @@ export async function createWebhookSubscription() {
       : 'Created new subscription';
     subscription ??= await client.createSubscription(callbackUrl, verifyToken);
 
-    await upsertActiveSubscription({
-      subscriptionId: subscription.id,
-      verifyToken,
-      callbackUrl,
-    });
-    await db
-      .update(stravaWebhooks)
-      .set({ active: false, updatedAt: new Date() })
-      .where(ne(stravaWebhooks.callbackUrl, callbackUrl));
-
     return {
       success: true,
       subscription: { id: subscription.id },
@@ -210,24 +119,4 @@ export async function createWebhookSubscription() {
       error: 'Webhook subscription failed; see server logs for details.',
     };
   }
-}
-
-async function upsertActiveSubscription(
-  values: Omit<typeof stravaWebhooks.$inferInsert, 'active'>,
-) {
-  await db
-    .insert(stravaWebhooks)
-    .values({ ...values, active: true })
-    .onConflictDoUpdate({
-      target: stravaWebhooks.callbackUrl,
-      set: {
-        subscriptionId: values.subscriptionId,
-        verifyToken: values.verifyToken,
-        resourceState: values.resourceState,
-        applicationId: values.applicationId,
-        verified: values.verified,
-        active: true,
-        updatedAt: values.updatedAt ?? new Date(),
-      },
-    });
 }

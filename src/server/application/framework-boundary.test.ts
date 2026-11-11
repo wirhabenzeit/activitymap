@@ -65,7 +65,7 @@ const applicationDir = path.join(repoRoot, 'src/server/application');
 const repositoriesDir = path.join(repoRoot, 'src/server/repositories');
 
 const filesToCheck = [
-  path.join(repoRoot, 'src/server/db/internal.ts'),
+  path.join(repoRoot, 'src/server/auth/users.ts'),
   ...listSourceFiles(applicationDir).map((name) =>
     path.join(applicationDir, name),
   ),

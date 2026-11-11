@@ -1,13 +1,7 @@
 import 'server-only';
 
-import { and, eq, isNull } from 'drizzle-orm';
-
 import { convexMobileLoginCodesRepository } from '~/server/auth/convex-mobile-login-codes';
-import { authStoreIsConvex } from '~/server/auth/store';
-import { db as defaultDb } from '~/server/db';
-import { type MobileLoginCode, mobileLoginCodes } from '~/server/db/schema';
-
-type DrizzleDb = typeof defaultDb;
+import type { MobileLoginCode } from '~/server/db/schema';
 
 export type NewMobileLoginCode = {
   codeHash: string;
@@ -52,63 +46,5 @@ export interface MobileLoginCodesRepository {
   findByCodeHash(codeHash: string): Promise<MobileLoginCode | null>;
 }
 
-export function createMobileLoginCodesRepository(
-  database: DrizzleDb = defaultDb,
-): MobileLoginCodesRepository {
-  return {
-    async create(record) {
-      const [saved] = await database
-        .insert(mobileLoginCodes)
-        .values(record)
-        .returning();
-      if (!saved) {
-        throw new Error('Failed to create mobile login code');
-      }
-      return saved;
-    },
-
-    async consumeByCodeHash(codeHash, now) {
-      // The row is claimed (consumedAt set) and the bearer token is wiped
-      // from storage in the same transaction, but as two statements: the
-      // claim's `RETURNING *` has to capture the token before it is
-      // cleared, since the caller still needs to hand it back once. Only
-      // the first statement's `WHERE consumedAt IS NULL` is what makes
-      // this safe under concurrent replay - the second statement runs
-      // once per successful claim.
-      return database.transaction(async (tx) => {
-        const [consumed] = await tx
-          .update(mobileLoginCodes)
-          .set({ consumedAt: now })
-          .where(
-            and(
-              eq(mobileLoginCodes.codeHash, codeHash),
-              isNull(mobileLoginCodes.consumedAt),
-            ),
-          )
-          .returning();
-        if (!consumed) return null;
-
-        await tx
-          .update(mobileLoginCodes)
-          .set({ sessionBearerToken: null })
-          .where(eq(mobileLoginCodes.id, consumed.id));
-
-        return consumed;
-      });
-    },
-
-    async findByCodeHash(codeHash) {
-      const [found] = await database
-        .select()
-        .from(mobileLoginCodes)
-        .where(eq(mobileLoginCodes.codeHash, codeHash));
-      return found ?? null;
-    },
-  };
-}
-
-/** Default, database-backed repository used by application services. */
-/** Postgres, or the sign-in store in Convex (`~/server/auth/store.ts`). */
-export const mobileLoginCodesRepository = authStoreIsConvex()
-  ? convexMobileLoginCodesRepository()
-  : createMobileLoginCodesRepository();
+/** The codes, kept in the sign-in store in Convex. */
+export const mobileLoginCodesRepository = convexMobileLoginCodesRepository();

@@ -1,23 +1,7 @@
-import { eq } from 'drizzle-orm';
-import { type NextRequest, NextResponse, after } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 
-import { authStoreIsConvex } from '~/server/auth/store';
-import { mirrorShadowAthleteAfterWrite } from '~/server/convex-mirror/shadow-run';
-import { db } from '~/server/db';
-import { stravaWebhooks } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
 import { handleWebhookOnConvex } from '~/server/strava/convex-webhook';
-import {
-  type RecordedWebhookEvent,
-  findActiveSubscription,
-  isRegisteredStravaAthlete,
-  processInboxEvent,
-  recordWebhookEvent,
-} from '~/server/strava/webhook';
-import {
-  convexDispatchConfigured,
-  dispatchEventToConvex,
-} from '~/server/strava/webhook-dispatch';
 import {
   WEBHOOK_MAX_BODY_BYTES,
   webhookEventSchema,
@@ -52,24 +36,12 @@ export async function handleWebhookVerification(request: NextRequest) {
     return new NextResponse('Forbidden', { status: 403 });
   }
 
-  // Check if the token matches our verification token
+  // The token this deployment registers its subscription with.
   const verifyToken = process.env.STRAVA_WEBHOOK_VERIFY_TOKEN;
   if (verifyToken && token === verifyToken) {
     return NextResponse.json({ 'hub.challenge': challenge });
   }
-
-  try {
-    const webhookRecord = await db.query.stravaWebhooks.findFirst({
-      where: eq(stravaWebhooks.verifyToken, token),
-    });
-    if (webhookRecord) {
-      logger.info('Webhook verification successful, responding with challenge');
-      return NextResponse.json({ 'hub.challenge': challenge });
-    }
-    logger.error('Webhook verification failed: unknown verify token');
-  } catch (error) {
-    logger.error('Database error during webhook verification:', error);
-  }
+  logger.error('Webhook verification failed: unknown verify token');
 
   return new NextResponse('Forbidden', { status: 403 });
 }
@@ -128,73 +100,15 @@ export async function handleWebhookDelivery(request: NextRequest) {
     updated_fields: data.updates ? Object.keys(data.updates) : [],
   });
 
-  // With the app's records in Convex there is no inbox and no subscription
-  // table: the secret in this route's URL is what proves the sender, and
-  // the event is recorded in Convex before Strava is answered.
-  if (authStoreIsConvex()) {
-    try {
-      const outcome = await handleWebhookOnConvex(data);
-      logger.info('[Webhook] Event handled', { outcome });
-      return new NextResponse('Event received', { status: 200 });
-    } catch (error) {
-      logger.error('[Webhook] Event not recorded; Strava will retry', error);
-      return new NextResponse('Error recording event', { status: 500 });
-    }
-  }
-
-  const subscription = await findActiveSubscription(data.subscription_id);
-  if (!subscription) {
-    logger.error(
-      '[Webhook] Rejected event for unknown or inactive subscription:',
-      {
-        subscription_id: data.subscription_id,
-      },
-    );
-    return new NextResponse('Unknown or inactive subscription', {
-      status: 403,
-    });
-  }
-
-  let recorded: RecordedWebhookEvent | null;
+  // There is no inbox and no subscription table: the secret in this
+  // route's URL is what proves the sender, and the event is recorded in the
+  // library before Strava is answered.
   try {
-    // Acknowledge, but never store, events for athletes without an
-    // ActivityMap account: Strava only needs the 200, and anything other
-    // than 2xx makes it redeliver.
-    if (!(await isRegisteredStravaAthlete(data.owner_id))) {
-      logger.info('[Webhook] Ignored event for an unregistered athlete', {
-        object_type: data.object_type,
-        aspect_type: data.aspect_type,
-        owner_id: data.owner_id,
-      });
-      return new NextResponse('Event received', { status: 200 });
-    }
-    recorded = await recordWebhookEvent(data);
+    const outcome = await handleWebhookOnConvex(data);
+    logger.info('[Webhook] Event handled', { outcome });
+    return new NextResponse('Event received', { status: 200 });
   } catch (error) {
-    logger.error('[Webhook] Failed to durably record event:', error);
+    logger.error('[Webhook] Event not recorded; Strava will retry', error);
     return new NextResponse('Error recording event', { status: 500 });
   }
-
-  if (recorded) {
-    after(async () => {
-      await processInboxEvent(recorded.id, recorded.payload);
-      // An owner Convex writes for: the event was left unprocessed above
-      // and is passed on. Claims nothing for anyone else.
-      if (convexDispatchConfigured() && data.object_type === 'activity')
-        await dispatchEventToConvex(recorded.id).catch((error: unknown) =>
-          logger.error('[Webhook] Dispatch to Convex failed', { error }),
-        );
-      // Shadow owners: copy the result to Convex now, not at the next
-      // scheduled mirror run.
-      await mirrorShadowAthleteAfterWrite(data.owner_id);
-    });
-  } else {
-    logger.info('[Webhook] Duplicate delivery ignored', {
-      object_type: data.object_type,
-      object_id: data.object_id,
-      aspect_type: data.aspect_type,
-      event_time: data.event_time,
-    });
-  }
-
-  return new NextResponse('Event received', { status: 200 });
 }

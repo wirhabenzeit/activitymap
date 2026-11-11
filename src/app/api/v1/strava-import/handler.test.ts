@@ -1,14 +1,17 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
-import { createStravaImportHandler } from './handler';
+
 import type { StravaImportDTO } from '~/contracts/v1/strava-import';
-import type { ImportClaim } from '~/server/repositories/strava-import';
 import { StravaImportError } from '~/server/application/strava-import';
-const claim: ImportClaim = {
-  actor: { userId: 'owner', athleteId: 42, authentication: 'cookie' },
-  accountId: 'account',
-  runId: 'run',
-  cursor: null,
+import type { Actor } from '~/server/auth/actor';
+
+import { createStravaImportHandler } from './handler';
+
+const actor: Actor = {
+  userId: 'owner',
+  athleteId: 42,
+  authentication: 'cookie',
 };
 const status: StravaImportDTO = {
   available: true,
@@ -23,61 +26,44 @@ const status: StravaImportDTO = {
   photos: 0,
 };
 function setup() {
-  const queued: (() => Promise<void>)[] = [],
-    errors: unknown[] = [];
-  let started = 0,
-    ran = 0;
+  const errors: unknown[] = [];
+  let started = 0;
   const deps = {
-    resolveActor: async () => claim.actor as typeof claim.actor | null,
+    resolveActor: async () => actor as Actor | null,
     read: async () => status,
-    start: async () => {
+    start: async (): Promise<{ status: StravaImportDTO }> => {
       started++;
-      return { claim: claim as ImportClaim | null, status };
-    },
-    run: async (resolved: ImportClaim, timeMs: number) => {
-      assert.deepEqual(resolved, claim);
-      assert.ok(timeMs <= 35_000);
-      ran++;
-    },
-    afterResponse: (work: () => Promise<void>) => {
-      queued.push(work);
+      return { status };
     },
     onError: (error: unknown) => {
       errors.push(error);
     },
   };
-  return { deps, queued, errors, starts: () => started, runs: () => ran };
+  return { deps, errors, starts: () => started };
 }
 const request = (origin?: string) =>
   new Request('https://example.test/api/v1/strava-import', {
     method: 'POST',
     ...(origin ? { headers: { Origin: origin } } : {}),
   });
-void test('POST persists a run and returns 202 before dispatch; GET never starts work', async () => {
+
+void test('POST starts the fetch and answers with its status; GET never starts work', async () => {
   const f = setup();
   const response = await createStravaImportHandler(f.deps, 'POST')(request());
-  assert.equal(response.status, 202);
-  assert.equal(f.runs(), 0);
-  assert.equal(f.queued.length, 1);
+  assert.equal(response.status, 200);
   assert.equal(response.headers.get('cache-control'), 'private, no-store');
-  await f.queued[0]!();
-  assert.equal(f.runs(), 1);
+  assert.equal(
+    ((await response.json()) as { data: StravaImportDTO }).data.status,
+    'running',
+  );
   assert.equal(
     (await createStravaImportHandler(f.deps, 'GET')(request())).status,
     200,
   );
   assert.equal(f.starts(), 1);
 });
-void test('running/cooldown requests reuse the durable status without another dispatch', async () => {
-  const f = setup();
-  f.deps.start = async () => ({ claim: null, status });
-  assert.equal(
-    (await createStravaImportHandler(f.deps, 'POST')(request())).status,
-    200,
-  );
-  assert.equal(f.queued.length, 0);
-});
-void test('authentication, origin and disconnected accounts prevent dispatch', async () => {
+
+void test('authentication, origin and disconnected accounts prevent a start', async () => {
   const f = setup();
   assert.equal(
     (
@@ -94,7 +80,7 @@ void test('authentication, origin and disconnected accounts prevent dispatch', a
     (await createStravaImportHandler(f.deps, 'POST')(request())).status,
     401,
   );
-  f.deps.resolveActor = async () => claim.actor;
+  f.deps.resolveActor = async () => actor;
   f.deps.start = async () => {
     throw new StravaImportError(
       409,
@@ -106,17 +92,15 @@ void test('authentication, origin and disconnected accounts prevent dispatch', a
     (await createStravaImportHandler(f.deps, 'POST')(request())).status,
     409,
   );
-  assert.equal(f.queued.length, 0);
+  assert.equal(f.errors.length, 0);
 });
-void test('background failures do not reject the response', async () => {
+
+void test('an unexpected failure is reported and answered as an internal error', async () => {
   const f = setup();
-  f.deps.run = async () => {
-    throw new Error('worker failed');
+  f.deps.start = async () => {
+    throw new Error('bridge down');
   };
-  assert.equal(
-    (await createStravaImportHandler(f.deps, 'POST')(request())).status,
-    202,
-  );
-  await f.queued[0]!();
+  const response = await createStravaImportHandler(f.deps, 'POST')(request());
+  assert.equal(response.status, 500);
   assert.equal(f.errors.length, 1);
 });

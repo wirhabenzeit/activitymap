@@ -5,10 +5,8 @@ import { auth } from '~/lib/auth';
 import { libraryFromConvex } from '~/server/application/library-export';
 import { resolveActor } from '~/server/auth/actor';
 import { resolveRequestSession } from '~/server/auth/request-session';
-import { db } from '~/server/db';
-import { findStravaAccountInternal } from '~/server/db/internal';
-import { convexReadOwnerFor } from '~/server/preview/convex';
-import { previewSelection } from '~/server/preview/selection';
+import { findStravaAccountInternal } from '~/server/auth/users';
+import { libraryFor } from '~/server/library';
 
 export const maxDuration = 60;
 
@@ -22,27 +20,16 @@ export async function GET(request: NextRequest) {
     return new Response('Not authenticated', {
       status: 401,
     });
-  if (previewSelection({ userId: session.user.id }))
-    return new Response('CSV export is unavailable in the fixture preview', {
-      status: 503,
-    });
   const userID = session.user.id;
 
   const account = await findStravaAccountInternal({ userId: userID });
   if (!account) return new Response('Account not found', { status: 404 });
   // Postgres holds the library only while it writes it.
   const actor = await resolveActor(request.headers);
-  let activities;
-  if (actor?.convexWrites) {
-    const convex = convexReadOwnerFor(actor);
-    if (!convex)
-      return new Response('The library is unavailable', { status: 503 });
-    activities = await libraryFromConvex(convex, actor);
-  } else
-    activities = await db.query.activities.findMany({
-      where: (activities, { eq }) =>
-        eq(activities.athlete, Number(account.providerAccountId)),
-    });
+  const library = await libraryFor(actor);
+  if (!library || !actor)
+    return new Response('The library is unavailable', { status: 503 });
+  const activities = await libraryFromConvex(library, actor);
   const csv = stringify(
     activities.map(
       ({

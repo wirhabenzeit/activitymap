@@ -5,7 +5,7 @@ import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import {
   findStravaAccountInternal,
   findUserInternal,
-} from '~/server/db/internal';
+} from '~/server/auth/users';
 import { logger } from '~/server/logging/logger';
 
 import { createCurrentUserHandler } from './handler';

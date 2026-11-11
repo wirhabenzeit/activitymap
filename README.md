@@ -30,7 +30,7 @@ Map, list, and analyze all your Strava activities.
 ## Tech stack
 
 - [Next.js](https://nextjs.org/) (App Router) + React 19
-- [Drizzle ORM](https://orm.drizzle.team/) on Postgres
+- [Convex](https://www.convex.dev/) backend (`backend/`) for the library, its ingestion and the sign-in records
 - [better-auth](https://www.better-auth.com/) for Strava OAuth
 - [Mapbox GL](https://www.mapbox.com/) / [react-map-gl](https://visgl.github.io/react-map-gl/) for the map view
 - [TanStack Table](https://tanstack.com/table) and [TanStack Charts](https://tanstack.com/charts) for the list and stats views
@@ -40,26 +40,34 @@ Map, list, and analyze all your Strava activities.
 
 - `src/app` — routes (`list`, `map`, `stats`), API routes, and server actions
 - `src/components` — UI, split by feature area (`map`, `list`, `stats`, `settings`, `layout`)
-- `src/server` — Strava sync, offline import, and database access
+- `src/server` — sign-in, the signed bridges to the backend, Strava access and place matching
+- `backend` — the Convex backend: activities, recordings, photos, place matches, ingestion jobs and sign-in records
 - `src/store` — client-side state (Zustand)
-- `src/cron` — scheduled sync jobs
+- `cloudflare/cron` — the scheduled call that erases accounts whose Strava access was withdrawn
 
 ## Quality checks
 
 Run `pnpm check` for static, generated-file and unit checks. Browser and native runtime checks have explicit isolated startup and evidence: see [Quality checks](docs/quality-checks.md). Use `pnpm format:check` for a nonmutating check of changed files.
 
-## Local database
+## Data
+
+The running app keeps nothing in Postgres. An account's library and the
+app's own records (sign-in, Strava tokens, rate limits) live in the Convex
+backend; see [backend/README.md](backend/README.md). The app needs
+`ACTIVITYMAP_CONVEX_SITE` and the bridge keys described there.
+
+Postgres remains only as the workspace for building a place catalogue
+(`pnpm places:prepare`, `places:combine`, `places:publish`). After
+publishing, `pnpm places:copy-to-convex` copies the catalogue to the backend.
+That workspace is set up with:
 
 ```bash
 docker compose up -d
 pnpm db:migrate
 ```
 
-Schema changes use checked-in Drizzle migrations; `db:push` is intentionally
-not supported. Vercel Preview branches migrate automatically before their
-builds, while Production migrations are automatically queued on `main` and
-remain approval-gated. See [Database migrations](docs/database-migrations.md)
-for the complete workflow.
+See [Database migrations](docs/database-migrations.md) for its schema
+changes.
 
 ## Behavior references
 

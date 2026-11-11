@@ -1,76 +1,35 @@
 import { ZodError } from 'zod';
 
-import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
+import { activityDTOSchema } from '~/contracts/v1/activity';
 import {
-  type UpdateActivityRequest,
   activityRefreshResultSchema,
   activitySummaryFetchResultSchema,
   updateActivityRequestSchema,
 } from '~/contracts/v1/activity-mutations';
 import { makeEnvelope, responseEnvelope } from '~/contracts/v1/envelope';
-import { toPhotoDTO } from '~/contracts/v1/photo';
 import {
   apiFailure as failure,
   mutationOriginAllowed,
   PRIVATE_API_HEADERS as privateHeaders,
 } from '~/server/api/transport';
-import {
-  ActivityMutationError,
-  fetchInitialActivitySummariesForActor,
-  refreshActivityForActor,
-  updateActivityForActor,
-} from '~/server/application/activities';
+import { ActivityMutationError } from '~/server/application/activities';
 import {
   refreshActivityThroughConvex,
   updateActivityThroughConvex,
 } from '~/server/application/convex-activity-commands';
-import {
-  SIGNUP_WARMUP_TIME_MS,
-  warmSignupActivitiesForActor,
-} from '~/server/application/signup-warmup';
 import type { Actor } from '~/server/auth/actor';
-import type { Writer } from '~/server/db/schema';
 import { requestIdFor } from '~/server/http/request-id';
-
-type UpdateResult = Awaited<ReturnType<typeof updateActivityForActor>>;
-type RefreshResult = Awaited<ReturnType<typeof refreshActivityForActor>>;
 
 type MutationHandlerDependencies = {
   resolveActor: (request: Request) => Promise<Actor | null>;
-  update?: (
-    actor: Actor,
-    input: UpdateActivityRequest & { id: number },
-  ) => Promise<UpdateResult>;
-  refresh?: (actor: Actor, activityId: number) => Promise<RefreshResult>;
-  /** Which store writes the actor's library; Postgres when not given. */
-  writerFor?: (actor: Actor) => Promise<Writer>;
-  /** The same commands for an account whose library Convex writes. */
   updateThroughConvex?: typeof updateActivityThroughConvex;
   refreshThroughConvex?: typeof refreshActivityThroughConvex;
-  fetchSummaries?: (actor: Actor) => Promise<number>;
-  afterResponse?: (work: () => Promise<void>) => void;
-  warmSignup?: (
-    ...args: Parameters<typeof warmSignupActivitiesForActor>
-  ) => Promise<unknown>;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
 };
 
 /** Who writes the actor's library. During a handoff nobody does, and a
  * command would change Strava without anywhere to record the result. */
-async function writerFor(deps: MutationHandlerDependencies, actor: Actor) {
-  const writer = (await deps.writerFor?.(actor)) ?? 'postgres';
-  if (writer === 'handoff')
-    throw new ActivityMutationError(
-      'local_state_conflict',
-      'The library is being moved. Try again in a few minutes.',
-      503,
-      true,
-      60,
-    );
-  return writer;
-}
-
 function mutationFailure(error: ActivityMutationError, requestId: string) {
   return failure(requestId, error.status, error.code, error.message, {
     retryable: error.retryable,
@@ -81,11 +40,13 @@ function mutationFailure(error: ActivityMutationError, requestId: string) {
 
 /** Blocking first-page summary fetch, using the same mutation/error boundary. */
 export function createFetchActivitySummariesHandler(
-  deps: MutationHandlerDependencies,
+  deps: Pick<MutationHandlerDependencies, 'resolveActor' | 'onError'> & {
+    /** Starts the first fetch; answers how many activities are known. */
+    fetchSummaries: (actor: Actor) => Promise<number>;
+  },
 ) {
   return async (request: Request) => {
     const requestId = requestIdFor(request);
-    const startedAt = Date.now();
     try {
       const actor = await deps.resolveActor(request);
       if (!actor)
@@ -102,34 +63,7 @@ export function createFetchActivitySummariesHandler(
           'forbidden',
           'The request origin is not allowed.',
         );
-      const count = await (
-        deps.fetchSummaries ?? fetchInitialActivitySummariesForActor
-      )(actor);
-      if (count > 0 && deps.afterResponse) {
-        // Leave ten seconds of the route's 60s lifetime for persistence and
-        // cleanup, including time already spent importing the first page.
-        try {
-          deps.afterResponse(async () => {
-            const timeMs = Math.min(
-              SIGNUP_WARMUP_TIME_MS,
-              50_000 - (Date.now() - startedAt),
-            );
-            if (timeMs <= 0) return;
-            try {
-              await (deps.warmSignup ?? warmSignupActivitiesForActor)(
-                actor,
-                count,
-                { timeMs },
-              );
-            } catch (error) {
-              deps.onError?.(error, requestId);
-            }
-          });
-        } catch (error) {
-          // Optional acceleration must never turn a saved import into a 500.
-          deps.onError?.(error, requestId);
-        }
-      }
+      const count = await deps.fetchSummaries(actor);
       return Response.json(
         responseEnvelope(activitySummaryFetchResultSchema).parse(
           makeEnvelope(count),
@@ -175,15 +109,9 @@ export function createUpdateActivityHandler(deps: MutationHandlerDependencies) {
         );
       const body = updateActivityRequestSchema.parse(await request.json());
       const input = { id, ...body };
-      const activity =
-        (await writerFor(deps, actor)) === 'convex'
-          ? await (deps.updateThroughConvex ?? updateActivityThroughConvex)(
-              actor,
-              input,
-            )
-          : toActivityDTO(
-              await (deps.update ?? updateActivityForActor)(actor, input),
-            );
+      const activity = await (
+        deps.updateThroughConvex ?? updateActivityThroughConvex
+      )(actor, input);
       return Response.json(
         responseEnvelope(activityDTOSchema).parse(
           makeEnvelope(activity, (deps.now ?? (() => new Date()))()),
@@ -239,22 +167,9 @@ export function createRefreshActivityHandler(
           'validation_failed',
           'The activity ID is invalid.',
         );
-      let result;
-      if ((await writerFor(deps, actor)) === 'convex')
-        result = await (
-          deps.refreshThroughConvex ?? refreshActivityThroughConvex
-        )(actor, id);
-      else {
-        const stored = await (deps.refresh ?? refreshActivityForActor)(
-          actor,
-          id,
-        );
-        result = {
-          ...stored,
-          activity: toActivityDTO(stored.activity),
-          photos: stored.photos.map(toPhotoDTO),
-        };
-      }
+      const result = await (
+        deps.refreshThroughConvex ?? refreshActivityThroughConvex
+      )(actor, id);
       const data = activityRefreshResultSchema.parse({
         activity: result.activity,
         photos: result.photos,

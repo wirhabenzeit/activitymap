@@ -32,7 +32,7 @@ export function WebhookControls() {
   const check = async () => {
     const status = await checkWebhookStatus();
     return status.hasMatchingSubscription
-      ? `Registered at this deployment's callback (subscription ${status.matchingSubscription?.id}); database ${status.databaseStatus}.`
+      ? `Registered at this deployment's callback (subscription ${status.matchingSubscription?.id}).`
       : `No subscription for this deployment's callback.${status.otherSubscriptionCount > 0 ? ` ${status.otherSubscriptionCount} subscription for another URL; register to replace it.` : ''}`;
   };
 

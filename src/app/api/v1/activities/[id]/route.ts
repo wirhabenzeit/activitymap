@@ -1,11 +1,6 @@
-import { after } from 'next/server';
-
 import { parseMutationActivityId } from '~/server/api/activity-id';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
-import { mirrorShadowOwnerAfterWrite } from '~/server/convex-mirror/shadow-run';
 import { logger } from '~/server/logging/logger';
-import { previewDataUnavailable } from '~/server/preview/selection';
-import { writerOf } from '~/server/repositories/writers';
 
 import { createUpdateActivityHandler } from './mutation-handler';
 
@@ -18,24 +13,12 @@ export async function PATCH(
 ) {
   return withAuthenticatedApiV1(
     async (request, context) => {
-      const unavailable = await previewDataUnavailable(
-        context.actor,
-        context.requestId,
-      );
-      if (unavailable) return unavailable;
       const { id } = await params;
-      const response = await createUpdateActivityHandler({
+      return createUpdateActivityHandler({
         resolveActor: context.actor,
-        writerFor: (actor) => writerOf(actor.userId),
         onError: (error, requestId) =>
           logger.error('Activity update request failed', { error, requestId }),
       })(request, parseMutationActivityId(id));
-      if (response.ok) {
-        // Shadow owners: copy the edit to Convex once the response is sent.
-        const actor = await context.actor();
-        if (actor) after(() => mirrorShadowOwnerAfterWrite(actor.userId));
-      }
-      return response;
     },
     { route: ROUTE, cache: 'private-no-store' },
   )(request);

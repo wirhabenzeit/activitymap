@@ -68,14 +68,6 @@ export const env = createEnv({
   },
   createFinalSchema: (shape) =>
     z.object(shape).superRefine((values, context) => {
-      if (values.VERCEL && !values.NEON_DATABASE_URL && !values.DATABASE_URL) {
-        context.addIssue({
-          code: 'custom',
-          path: ['NEON_DATABASE_URL'],
-          message: 'NEON_DATABASE_URL or DATABASE_URL is required on Vercel',
-        });
-      }
-
       if (values.ACTIVITYMAP_EXTERNAL_EFFECTS === 'enabled') {
         const externalEffectVariables = {
           AUTH_STRAVA_ID: values.AUTH_STRAVA_ID,

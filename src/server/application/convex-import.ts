@@ -97,7 +97,7 @@ export async function startConvexImport(
   actor: Actor,
   enabled: boolean,
   fetcher: typeof fetch = fetch,
-): Promise<{ status: StravaImportDTO; claim: null }> {
+): Promise<{ status: StravaImportDTO }> {
   if (!enabled)
     throw new StravaImportError(
       403,
@@ -122,6 +122,5 @@ export async function startConvexImport(
             startedAt: new Date().toISOString(),
           }
         : status,
-    claim: null,
   };
 }

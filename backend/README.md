@@ -17,6 +17,22 @@ from this directory against a dedicated development deployment. Select that
 project explicitly and check its name before uploading the bundle. The geo
 lab contains a different schema and uses its own deployment configuration.
 
+## Status
+
+This backend is the application's only store. An account's library, its
+ingestion from the provider, and the app's own records (sign-in, provider
+tokens, rate limits, the provider request budget) all live here; the app
+reaches them through the signed bridges described below and keeps nothing in
+Postgres. Postgres is left only as the workspace in which a place catalogue
+is built, before it is copied here (see "Place catalogue copy").
+
+The sections "Serving preview owners", "Live owners" and "Read owners in
+production", "Writer field", "Moving an account", "Shadow writes", "Shadow
+matching" and "Production parity check" describe how the application moved
+here from Postgres. The app code they name has been removed; the backend
+functions they describe (`importer`, the `writer` field, the mirror
+operations of the write bridge) are still deployed and are no longer called.
+
 ## Deployment boundary
 
 `owners` is the durable owner assignment and permission fence. Owners keep
@@ -456,9 +472,7 @@ write cannot be replayed on this route or the reverse. Reads carry no nonce;
 every change does. `src/server/auth/convex-adapter.ts` is the library's
 adapter over that route. Dates are stored as ISO strings.
 
-With `ACTIVITYMAP_AUTH_STORE=convex` set for the app
-(`src/server/auth/store.ts`), the app keeps none of its own records in
-Postgres. Without it, everything below still runs on Postgres.
+The app keeps all of its own records here:
 
 - **Sign-in**: the auth library uses the adapter above.
   `src/server/auth/convex-records.ts` is what the rest of the app reads and
@@ -482,32 +496,14 @@ Postgres. Without it, everything below still runs on Postgres.
 - **New accounts**: the first sign-in provisions the owner here directly and
   starts the first sweep.
 
-### Switching
-
-1. Every account's library is written here (admin page, "Library writer").
-2. Deploy the app and this backend.
-3. Admin page, "Copy sign-in records": copies users, provider accounts with
-   their tokens, and the signing keys, keeping their IDs. It can be run
-   again; it replaces what it copied before.
-4. Set `ACTIVITYMAP_AUTH_STORE=convex` for the app and deploy it again.
-5. Everyone signs in once more: sessions are not copied.
-6. Stop the Postgres jobs in the cron worker (`cloudflare/cron`).
-
-To go back, remove the setting and deploy. Accounts created and tokens
-refreshed in between exist only here; those users sign in again.
-
-Still read from Postgres after the switch: the admin dashboard's job views,
-the place catalogue build and place search.
-
 ## Erasing an account
 
-An account is erased in both stores together. Postgres decides: the owner
-deleted the account, or provider access was revoked and the retention period
-is over (`src/server/repositories/erasure.ts`). Inside the transaction that
-deletes the account there, the app calls the write bridge operation
-`eraseOwner` (`convex/erasure.ts`, `src/server/convex-mirror/erase.ts`). If
-that call fails, the transaction is rolled back and the erasure is tried
-again, so no library is left here that nothing in Postgres points to.
+An account is erased when its owner deletes it, or when provider access was
+withdrawn and the retention period is over
+(`src/server/strava/convex-webhook.ts`). The library goes first, through the
+write bridge operation `eraseOwner` (`convex/erasure.ts`,
+`src/server/library/erase.ts`), then the sign-in records, so a failure
+leaves the records that find the library again.
 
 `erasure.start` revokes the owner, which fences everything at once: no read,
 write, job or sweep works for a revoked owner. `erasure.step` then deletes
@@ -679,14 +675,12 @@ compares with.
 
 ### Not built yet
 
-Needed before an owner is handed to Convex:
-
 - **Rematching after a catalogue change.** A job matches the recording it
-  publishes. Nothing yet selects a new catalogue for an owner Convex writes
-  for, or matches the whole library again after one; the mirror did that
-  while Postgres wrote.
-- **A live run.** Nothing here has run against a deployed backend and the
-  real gateway.
+  publishes. Nothing yet selects a new catalogue for an owner, or matches
+  the whole library again after one. Until that exists, a newly published
+  catalogue is copied here but existing matches keep the old one.
+- **Publishing a catalogue without Postgres.** Place IDs are assigned in the
+  Postgres workspace, which keeps them stable from one catalogue to the next.
 
 ## Shadow writes
 
@@ -741,11 +735,14 @@ ingestion, stream and match jobs, and any trigger that failed).
 
 ### Place catalogue copy
 
-Matching here needs the places Postgres matches against (step 3 of
-`docs/convex-writer-cutover.md`). The mirror job copies them in whatever
-remains of each run's time budget (`src/server/convex-mirror/catalogue.ts`),
-through the write bridge operations `catalogueState`, `beginCatalogue`,
-`importPlaces` and `completeCatalogue` (`convex/places.ts`).
+A place catalogue is built and published in the Postgres workspace
+(`pnpm places:prepare`, `places:combine`, `places:publish`). Matching here
+needs those places, so after publishing, `pnpm places:copy-to-convex` copies
+them (`src/server/places/convex-catalogue.ts`) through the write bridge
+operations `catalogueState`, `beginCatalogue`, `importPlaces` and
+`completeCatalogue` (`convex/places.ts`). An owner is matched against a new
+catalogue once its matching version is moved to it; nothing does that
+automatically yet.
 
 A rowset is the active serving snapshot at one catalogue revision: its rows
 that are neither retired nor hidden, the same selection as
@@ -761,11 +758,8 @@ digest agree; nothing may read it before. A catalogue change in Postgres
 starts a new rowset, and one that changes during its copy is abandoned.
 Abandoned and superseded rowsets are not removed yet.
 
-The mirror response reports progress under `catalogue`, and the log line is
-`Convex catalogue copy`. The eight-country catalogue has about 176,000 such
-rows, which takes on the order of ten scheduled runs. Deploy this package
-before the app version that copies: an older deployment rejects the new
-operations and the mirror job then answers 500.
+The script reports progress after each minute of sending and can be stopped
+and run again. The eight-country catalogue has about 176,000 such rows.
 
 ### Shadow matching
 

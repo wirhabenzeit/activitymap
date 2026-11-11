@@ -4,8 +4,8 @@ import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 import { auth } from '~/lib/auth';
+import { findUserInternal } from '~/server/auth/users';
 import { isAdminAthlete } from '~/server/config/admin';
-import { findUserInternal } from '~/server/db/internal';
 
 /**
  * Resolves the signed-in admin for the admin dashboard, or renders the

@@ -1,11 +1,10 @@
-import { findUserInternal } from '~/server/db/internal';
+import { findUserInternal } from '~/server/auth/users';
 import { logger } from '~/server/logging/logger';
 import { providerGatewayConfig } from '~/server/provider-gateway/config';
 import {
   gatewayFailureFor,
   readFromStrava,
 } from '~/server/provider-gateway/strava';
-import { writerOf } from '~/server/repositories/writers';
 
 import { createProviderGatewayHandler } from './handler';
 
@@ -15,7 +14,8 @@ export const POST = createProviderGatewayHandler({
   // enabled for this deployment.
   config: providerGatewayConfig,
   // Exactly the accounts whose library Convex writes.
-  serves: async (userId) => (await writerOf(userId)) === 'convex',
+  serves: async (userId) =>
+    (await findUserInternal(userId))?.writer === 'convex',
   athleteFor: async (userId) =>
     (await findUserInternal(userId))?.athlete_id ?? null,
   read: readFromStrava,

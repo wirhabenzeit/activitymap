@@ -503,19 +503,10 @@ void test('share links of an account Convex writes for are made, shown and revok
   let accountRevoked = false;
   // Postgres holds no link and no activity of this account.
   const deps: ShareLinksServiceDeps = {
-    shareLinksRepo: {
-      listForAthlete: async () => [],
-      revoke: async () => false,
-      findByTokenHash: async () => null,
-      isAthleteRevoked: async () => accountRevoked,
-    } as unknown as ShareLinksServiceDeps['shareLinksRepo'],
-    activitiesRepo: {
-      findManyByIds: async () =>
-        assert.fail('Postgres was asked for activities'),
-    } as unknown as ShareLinksServiceDeps['activitiesRepo'],
+    isAthleteRevoked: async () => accountRevoked,
     now: () => new Date(clock),
-    convexLinks: (owner) => convexShareLinks(owner, fetcher),
-    convexView: (tokenHash) => convexShareView(tokenHash, fetcher),
+    links: (owner) => convexShareLinks(owner, fetcher),
+    view: (tokenHash) => convexShareView(tokenHash, fetcher),
   };
   const hour = 60 * 60_000;
 
