@@ -28,7 +28,11 @@ import { internal } from './_generated/api';
 import type { Id } from './_generated/dataModel';
 import { type ActionCtx, internalAction } from './_generated/server';
 import type { IngestionStep } from './ingestion';
-import { SWEEP_PAGE_SIZE, type SweepStep } from './ingestionSweep';
+import {
+  SUMMARIES_PER_CALL,
+  SWEEP_PAGE_SIZE,
+  type SweepStep,
+} from './ingestionSweep';
 import { prepareRecording } from './recordingWorker';
 
 /**
@@ -302,11 +306,33 @@ export const sweep = internalAction({
           });
           return;
         }
+        const items = await listPage(step);
+        // Entries never seen here become summary activities first, so the
+        // page below finds them stored and unchanged.
+        const fresh = new Set(
+          await ctx.runQuery(internal.ingestionSweep.unknown, {
+            owner,
+            ids: items.map((item) => item.id),
+          }),
+        );
+        const summaries = items.flatMap(({ id, dto }) =>
+          fresh.has(id) && dto ? [{ id, dto }] : [],
+        );
+        for (let i = 0; i < summaries.length; i += SUMMARIES_PER_CALL)
+          await ctx.runMutation(internal.ingestionSweep.addSummaries, {
+            owner,
+            claim,
+            items: summaries.slice(i, i + SUMMARIES_PER_CALL),
+          });
         step = await ctx.runMutation(internal.ingestionSweep.applyPage, {
           owner,
           claim,
           page: step.page,
-          items: await listPage(step),
+          items: items.map(({ id, fingerprint, fields }) => ({
+            id,
+            fingerprint,
+            fields,
+          })),
         });
       } catch (error) {
         const failure = failureOf(error);

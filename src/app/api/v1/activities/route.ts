@@ -2,7 +2,13 @@ import { after } from 'next/server';
 
 import { activityDTOSchema, toActivityDTO } from '~/contracts/v1/activity';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
+import {
+  ActivityMutationError,
+  fetchInitialActivitySummariesForActor,
+} from '~/server/application/activities';
 import { warmSignupActivitiesForActor } from '~/server/application/signup-warmup';
+import { LibraryMoving } from '~/server/convex-mirror/new-accounts';
+import { firstFetchFromConvex } from '~/server/convex-mirror/new-accounts-run';
 import { logger } from '~/server/logging/logger';
 import { convexReadsFor } from '~/server/preview/convex';
 import { previewDataUnavailable } from '~/server/preview/selection';
@@ -21,10 +27,34 @@ export const POST = withAuthenticatedApiV1(
       context.requestId,
     );
     if (unavailable) return unavailable;
+    // Whether this request was served from Convex: a new account that
+    // starts there, or one Convex already writes.
+    let fromConvex = false;
     return createFetchActivitySummariesHandler({
       resolveActor: context.actor,
       afterResponse: after,
+      fetchSummaries: async (actor) => {
+        let count: number | null;
+        try {
+          count = await firstFetchFromConvex(actor);
+        } catch (error) {
+          if (!(error instanceof LibraryMoving)) throw error;
+          throw new ActivityMutationError(
+            'local_state_conflict',
+            error.message,
+            503,
+            true,
+            60,
+          );
+        }
+        if (count === null) return fetchInitialActivitySummariesForActor(actor);
+        fromConvex = true;
+        return count;
+      },
       warmSignup: async (actor, count, options) => {
+        // The warmup reads and writes Postgres; in Convex the sweep
+        // completes the newest activities first.
+        if (fromConvex) return null;
         const result = await warmSignupActivitiesForActor(
           actor,
           count,

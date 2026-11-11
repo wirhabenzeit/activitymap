@@ -49,7 +49,9 @@ type MutationHandlerDependencies = {
   refreshThroughConvex?: typeof refreshActivityThroughConvex;
   fetchSummaries?: (actor: Actor) => Promise<number>;
   afterResponse?: (work: () => Promise<void>) => void;
-  warmSignup?: typeof warmSignupActivitiesForActor;
+  warmSignup?: (
+    ...args: Parameters<typeof warmSignupActivitiesForActor>
+  ) => Promise<unknown>;
   now?: () => Date;
   onError?: (error: unknown, requestId: string) => void;
 };

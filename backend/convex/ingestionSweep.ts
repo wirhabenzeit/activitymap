@@ -8,7 +8,8 @@ import {
   internalMutation,
   internalQuery,
 } from './_generated/server';
-import { activityFor } from './activityWrites';
+import { activityMetadataValidator } from './activityValidators';
+import { activityFor, applySourceRecord } from './activityWrites';
 import {
   LEASE_MS,
   incomplete,
@@ -29,7 +30,9 @@ import { idKey, ownerFor } from './owners';
  * ingestion job (convex/ingestion.ts), which reads the activity in full.
  *
  * - **Scanning.** The worker (`ingestionWorker.sweep`) reads the provider's
- *   list of the owner's activities page by page. For every summary,
+ *   list of the owner's activities page by page, newest first. An entry
+ *   that has never been seen here is added as a summary activity
+ *   (`addSummaries`), so a new account's history appears within the scan. For every summary,
  *   `applyPage` records a fingerprint on the activity's job and asks for the
  *   activity when it is unknown here, when its fingerprint differs from the
  *   one recorded by the previous sweep, or when its job is blocked or
@@ -291,6 +294,67 @@ export const applyPage = internalMutation({
   },
 });
 
+export const SUMMARIES_PER_CALL = 32;
+/** Sorts after every activity key (20 digits). */
+const NEWEST = '~';
+
+/** Which of these list entries have never been seen here: no activity and
+ * no record of a deleted one. */
+export const unknown = internalQuery({
+  args: { owner: v.id('owners'), ids: v.array(v.string()) },
+  handler: async (ctx, { owner, ids }): Promise<string[]> => {
+    if (ids.length > SWEEP_PAGE_SIZE) throw new Error('Too many list entries');
+    const rows = await Promise.all(
+      ids.map((id) => activityFor(ctx, owner, idKey(id))),
+    );
+    return ids.filter((_, index) => !rows[index]);
+  },
+});
+
+/**
+ * Add list entries that have never been seen here as summary activities, so
+ * a library shows up at once (a new account's whole history, or an activity
+ * whose event was missed) without a provider read per activity. They are
+ * incomplete, and `confirm` asks for them at its bounded rate. An activity
+ * that exists, or was deleted here, is left to its job.
+ */
+export const addSummaries = internalMutation({
+  args: {
+    owner: v.id('owners'),
+    claim: v.number(),
+    items: v.array(
+      v.object({ id: v.string(), dto: activityMetadataValidator }),
+    ),
+  },
+  handler: async (ctx, args): Promise<number> => {
+    const holder = await held(ctx, args.owner, args.claim);
+    if (!holder || holder.sweep.phase !== 'scanning') return 0;
+    const { owner } = holder;
+    if (!ingests(owner)) throw new Error('Activity owner unavailable');
+    if (args.items.length > SUMMARIES_PER_CALL)
+      throw new Error('Too many summaries');
+    let added = 0;
+    for (const { id, dto } of args.items) {
+      if (await activityFor(ctx, owner._id, idKey(id))) continue;
+      await applySourceRecord(ctx, {
+        scope: {
+          userId: owner.userId,
+          athleteId: owner.athleteId,
+          epoch: owner.epoch,
+        },
+        id,
+        generation: owner.generation,
+        // Nothing was ever written for this activity: any revision is new.
+        sourceRevision: Date.now(),
+        writer: 'convex',
+        dto: { ...dto, geometry_state: 'summary' },
+      });
+      added++;
+    }
+    return added;
+  },
+});
+
 /** Ask for activities the scan did not see, a bounded number at a time,
  * and finish the sweep when the whole library has been looked at. */
 export const confirm = internalMutation({
@@ -308,8 +372,10 @@ export const confirm = internalMutation({
           .eq('owner', owner._id)
           .eq('generation', owner.generation)
           .eq('deleted', false)
-          .gt('key', sweep.after),
+          .lt('key', sweep.after || NEWEST),
       )
+      // Newest first: what an account looks at most is completed first.
+      .order('desc')
       .take(CONFIRM_PAGE);
     let asked = 0;
     let after = sweep.after;

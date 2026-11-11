@@ -423,6 +423,22 @@ What changes for the account afterwards: the mirror and the hourly parity
 check skip it, and features that still read Postgres (place debugging and
 the admin views) show its library as it was at the move.
 
+## New accounts
+
+With `ACTIVITYMAP_CONVEX_NEW_ACCOUNTS=enabled` in the app, a new account
+starts on Convex (`src/server/convex-mirror/new-accounts.ts`). The decision
+is made at the account's first request for activities, the client's fetch
+after sign-up: an account with nothing in Postgres and no library in Convex
+is given one, handed to Convex at once (there is nothing to copy), and its
+reconciliation sweep fills the library from the provider's list. The
+request answers when the sweep has read two pages or finished, after at
+most fifteen seconds; the rest arrives through sync.
+
+If the handover stops, the account stays with Postgres and the request is
+served by the usual first fetch. Accounts that already have activities in
+Postgres are not touched by this; they move through the admin page. The
+Postgres sign-up warmup is skipped for an account served from Convex.
+
 ## Erasing an account
 
 An account is erased in both stores together. Postgres decides: the owner
@@ -569,8 +585,11 @@ activity itself; it asks the activity's job, which reads the activity in
 full.
 
 - **Scanning.** The worker reads the provider's list of the owner's
-  activities, 100 a page, and records a fingerprint of each summary on the
-  activity's job. An activity is asked for when it is unknown here, when its
+  activities, 100 a page and newest first. An entry that has never been
+  seen here is added as a summary activity straight from the list, so a new
+  library, or an activity whose event was missed, appears without a
+  provider read per activity. The worker then records a fingerprint of each
+  summary on the activity's job. An activity is asked for when it is unknown here, when its
   fingerprint differs from the one the previous sweep recorded, or when its
   job is blocked or failed. The first time a known activity is seen, the
   summary is compared with the stored activity instead. An unchanged library
@@ -581,8 +600,10 @@ full.
   incomplete here: never read in full, photos out of date, or no recording.
   That is how a library copied from Postgres in the middle of its backfill
   is finished. At most 20 are asked for per hour in total, so neither a
-  wrong list nor a large backlog can spend the request budget at once.
-  Activities that started after the sweep began are left alone.
+  wrong list nor a large backlog can spend the request budget at once. The
+  walk goes from the newest activity to the oldest, so what an account
+  looks at most is completed first. Activities that started after the sweep
+  began are left alone.
 
 A list entry of another athlete stops the page before anything is recorded.
 A rate limit waits for the gateway's time, rejected credentials are tried

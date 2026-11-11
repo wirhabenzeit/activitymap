@@ -1330,3 +1330,49 @@ void test('the import command starts the sweep now, but not twice in a row', asy
   });
   await assert.rejects(now());
 });
+
+void test('a new library appears from the list at once and is completed newest first, a bounded number at a time', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  // The account's whole history at the provider; nothing here yet.
+  const count = CONFIRM_LIMIT + 5;
+  for (let id = 1; id <= count; id++) provider.set(manual(id, `Ride ${id}`));
+  await advance(convex, 10 * 60_000);
+  assert.equal(
+    await convex.mutation(internal.ingestionSweep.requestNow, { scope }),
+    true,
+  );
+  await settle(convex);
+
+  let { activities, changes, sweep } = await state(convex);
+  // Every activity is in the library after the scan, from the list alone.
+  assert.equal(activities.length, count);
+  assert.equal(
+    changes.filter((row) => row.entityType === 'activity').length >= count,
+    true,
+  );
+  // Only the newest were read in full so far.
+  const read = provider.reads.map((entry) => Number(entry.split(' ')[1]));
+  assert.equal(read.length, CONFIRM_LIMIT);
+  assert.deepEqual(
+    [...read].sort((a, b) => b - a),
+    Array.from({ length: CONFIRM_LIMIT }, (_, index) => count - index),
+  );
+  const summaryOnly = () =>
+    activities
+      .filter((row) => row.dto?.geometry_state === 'summary')
+      .map((row) => Number(row.key))
+      .sort((a, b) => a - b);
+  assert.deepEqual(summaryOnly(), [1, 2, 3, 4, 5]);
+  assert.equal(sweep!.phase, 'confirming');
+  assert.equal(
+    activities.find((row) => Number(row.key) === 1)!.dto?.name,
+    'Ride 1',
+  );
+
+  await advance(convex, CONFIRM_INTERVAL_MS);
+  ({ activities, changes, sweep } = await state(convex));
+  assert.equal(provider.reads.length, count);
+  assert.deepEqual(summaryOnly(), []);
+  assert.equal(sweep!.phase, 'idle');
+});

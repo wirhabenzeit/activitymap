@@ -104,8 +104,32 @@ const summaryShape = z.looseObject({
   start_date_local: z.string(),
 });
 
+/** A list entry as an activity that has not been read in full: what the
+ * library shows until the activity's job has fetched the rest. Undefined
+ * when the entry lacks something an activity needs; such an activity is
+ * read in full instead. */
+function summarySource(
+  row: ReturnType<typeof transformStravaActivity>,
+  athleteId: string,
+): ActivitySource | undefined {
+  try {
+    // A list entry has no description, calories and the like: unknown.
+    const known = Object.fromEntries(
+      Object.entries({ ...row, athlete: Number(athleteId) }).map(
+        ([field, value]) => [field, value === undefined ? null : value],
+      ),
+    ) as unknown as Parameters<typeof toActivityDTO>[0];
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { streams, placeMatches, ...dto } = toActivityDTO(known);
+    return dto;
+  } catch {
+    return undefined;
+  }
+}
+
 /** One entry of the provider's activity list: the fields reconciliation
- * compares, converted like a stored activity. */
+ * compares, converted like a stored activity, and the entry as a summary
+ * activity. */
 export function activitySummary(payload: unknown, athleteId: string) {
   const shape = summaryShape.safeParse(payload);
   if (!shape.success) throw new InvalidProviderPayload('activity list');
@@ -115,6 +139,7 @@ export function activitySummary(payload: unknown, athleteId: string) {
     const row = transformStravaActivity(payload as StravaActivity, false);
     return {
       id: String(row.id),
+      dto: summarySource(row, athleteId),
       fields: {
         name: row.name,
         sport_type: row.sport_type as string,
