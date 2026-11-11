@@ -19,6 +19,12 @@ export function createConvexShadowCronHandler<T>(deps: {
   present?: (result: T) => unknown;
   now?: () => number;
   budgetMs?: number;
+  /** Give every owner a share of the budget instead of letting the first
+   * one that has much to do use all of it. An owner that finishes early
+   * leaves its time to the ones after it. */
+  fair?: boolean;
+  /** The least an owner gets when the budget is shared. */
+  minSliceMs?: number;
   onError?: (error: unknown, userId: string) => void;
   /** Work that belongs to no owner (the place catalogue copy). Runs after
    * the owners with what is left of the budget, on behalf of the first
@@ -49,13 +55,21 @@ export function createConvexShadowCronHandler<T>(deps: {
     const deadline = now() + (deps.budgetMs ?? 40_000);
     const results: Record<string, unknown> = {};
     let failed = false;
-    for (const userId of owners) {
-      if (now() > deadline) {
+    for (const [index, userId] of owners.entries()) {
+      // With shares, an owner is not started with no time left at all.
+      if (now() > deadline || (deps.fair && now() >= deadline)) {
         results[userId] = { skipped: 'time budget exhausted' };
         continue;
       }
+      const share = Math.max(
+        deps.minSliceMs ?? 5_000,
+        (deadline - now()) / (owners.length - index),
+      );
       try {
-        const result = await deps.run(userId, deadline);
+        const result = await deps.run(
+          userId,
+          deps.fair ? Math.min(deadline, now() + share) : deadline,
+        );
         if (deps.failed?.(result)) failed = true;
         results[userId] = deps.present ? deps.present(result) : result;
       } catch (error) {
@@ -81,4 +95,34 @@ export function createConvexShadowCronHandler<T>(deps: {
       { status: failed ? 500 : 200, headers: { 'cache-control': 'no-store' } },
     );
   };
+}
+
+/** How many runs one scheduled trigger may chain: enough to fill the ten
+ * minutes until the next trigger, and no more. */
+export const MAX_CHAINED_RUNS = 9;
+export const CHAIN_HEADER = 'x-mirror-chain';
+
+/**
+ * Whether another run should follow this one at once instead of at the next
+ * scheduled trigger: some owner still has a copy to finish and this run got
+ * somewhere. A run in which nobody advanced (or everybody failed) is left
+ * to the schedule, so a copy that cannot move does not spin.
+ */
+export function shouldContinue(
+  body: { results?: Record<string, unknown> } | null,
+  chained: number,
+): boolean {
+  if (!body?.results || chained >= MAX_CHAINED_RUNS) return false;
+  const results = Object.values(body.results).filter(
+    (result): result is Record<string, unknown> =>
+      typeof result === 'object' && result !== null,
+  );
+  const unfinished = results.some(
+    (result) =>
+      result.complete === false || result.skipped === 'time budget exhausted',
+  );
+  const advanced = results.some(
+    (result) => typeof result.activities === 'number' && result.activities > 0,
+  );
+  return unfinished && advanced;
 }
