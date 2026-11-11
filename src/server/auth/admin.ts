@@ -1,13 +1,11 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
 import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 
 import { auth } from '~/lib/auth';
 import { isAdminAthlete } from '~/server/config/admin';
-import { db } from '~/server/db';
-import { users } from '~/server/db/schema';
+import { findUserInternal } from '~/server/db/internal';
 
 /**
  * Resolves the signed-in admin for the admin dashboard, or renders the
@@ -18,10 +16,7 @@ import { users } from '~/server/db/schema';
 export async function requireAdmin() {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user?.id) notFound();
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, session.user.id),
-    columns: { id: true, name: true, athlete_id: true },
-  });
+  const user = await findUserInternal(session.user.id);
   if (!user || !isAdminAthlete(user.athlete_id)) notFound();
-  return user;
+  return { id: user.id, name: user.name, athlete_id: user.athlete_id };
 }

@@ -1,10 +1,12 @@
 import { eq } from 'drizzle-orm';
 import { type NextRequest, NextResponse, after } from 'next/server';
 
+import { authStoreIsConvex } from '~/server/auth/store';
 import { mirrorShadowAthleteAfterWrite } from '~/server/convex-mirror/shadow-run';
 import { db } from '~/server/db';
 import { stravaWebhooks } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
+import { handleWebhookOnConvex } from '~/server/strava/convex-webhook';
 import {
   type RecordedWebhookEvent,
   findActiveSubscription,
@@ -125,6 +127,20 @@ export async function handleWebhookDelivery(request: NextRequest) {
     subscription_id: data.subscription_id,
     updated_fields: data.updates ? Object.keys(data.updates) : [],
   });
+
+  // With the app's records in Convex there is no inbox and no subscription
+  // table: the secret in this route's URL is what proves the sender, and
+  // the event is recorded in Convex before Strava is answered.
+  if (authStoreIsConvex()) {
+    try {
+      const outcome = await handleWebhookOnConvex(data);
+      logger.info('[Webhook] Event handled', { outcome });
+      return new NextResponse('Event received', { status: 200 });
+    } catch (error) {
+      logger.error('[Webhook] Event not recorded; Strava will retry', error);
+      return new NextResponse('Error recording event', { status: 500 });
+    }
+  }
 
   const subscription = await findActiveSubscription(data.subscription_id);
   if (!subscription) {

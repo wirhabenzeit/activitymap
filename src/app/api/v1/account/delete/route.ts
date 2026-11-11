@@ -1,7 +1,10 @@
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
+import { convexAuthRecords } from '~/server/auth/convex-records';
+import { authStoreIsConvex } from '~/server/auth/store';
 import { logger } from '~/server/logging/logger';
 import { previewDataUnavailable } from '~/server/preview/selection';
 import { accountDeletionRepository } from '~/server/repositories/erasure';
+import { deleteAccountOnConvex } from '~/server/strava/convex-webhook';
 
 import { createAccountDeletionHandler } from './handler';
 
@@ -21,8 +24,15 @@ export const POST = withAuthenticatedApiV1(
           ? { userId: session.user.id, token: session.session.token }
           : null;
       },
-      deleteForSession: (userId, token, now) =>
-        accountDeletionRepository.deleteForSession(userId, token, now),
+      // The caller's session is checked again where the records live, then
+      // the library and the records are erased.
+      deleteForSession: async (userId, token, now) => {
+        if (!authStoreIsConvex())
+          return accountDeletionRepository.deleteForSession(userId, token, now);
+        if (!(await convexAuthRecords().hasSession(userId, token, now)))
+          return false;
+        return deleteAccountOnConvex(userId);
+      },
       onError: (error, requestId) =>
         logger.error('Account deletion failed', { error, requestId }),
     })(request);

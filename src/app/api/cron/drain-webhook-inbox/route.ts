@@ -1,6 +1,7 @@
 import { type NextRequest, NextResponse } from 'next/server';
 
 import { withJobLog } from '~/server/application/job-log';
+import { authStoreIsConvex } from '~/server/auth/store';
 import {
   EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   externalEffectsEnabled,
@@ -65,6 +66,10 @@ const drainInbox = withJobLog(
  * The Cloudflare Worker calls this route once per hour.
  */
 export async function POST(request: NextRequest) {
+  // With the app's records in Convex there is no inbox: an event is
+  // recorded in Convex before Strava is answered.
+  if (authStoreIsConvex())
+    return NextResponse.json({ skipped: 'Webhook events go to Convex' });
   if (!externalEffectsEnabled()) {
     return NextResponse.json(
       { error: EXTERNAL_EFFECTS_DISABLED_MESSAGE },

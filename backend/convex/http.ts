@@ -43,6 +43,12 @@ const channels = {
     keys: 'ACTIVITYMAP_BRIDGE_WRITER_KEYS',
     domain: 'activitymap-write-v1',
   },
+  // The app's sign-in store. The writer's keys, under a domain of its own,
+  // so a signed library write can never be replayed here or the reverse.
+  auth: {
+    keys: 'ACTIVITYMAP_BRIDGE_WRITER_KEYS',
+    domain: 'activitymap-auth-v1',
+  },
 } as const;
 
 async function allowed(
@@ -236,6 +242,9 @@ router.route({
           });
           break;
         // The place catalogue belongs to no owner: the signature authorizes.
+        case 'latestCatalogue':
+          result = await ctx.runQuery(internal.places.latest, {});
+          break;
         case 'catalogueState':
           result = await ctx.runQuery(internal.places.state, args);
           break;
@@ -343,6 +352,75 @@ router.route({
       return Response.json(result ?? null, { headers });
     } catch (error) {
       console.error('Bridge write failed', error);
+      return new Response(null, { status: 400, headers });
+    }
+  }),
+});
+
+/**
+ * The sign-in store (convex/authStore.ts), for the app's auth library.
+ * Reads carry no nonce: repeating one changes nothing. Every change does.
+ */
+router.route({
+  path: '/internal/auth/v1',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await readBody(request, 256 * 1024);
+      if (body === null) return new Response(null, { status: 413, headers });
+      if (!(await allowed(request, body, 'auth')))
+        return new Response(null, { status: 401, headers });
+      const { nonce, operation } = JSON.parse(body);
+      const { kind, ...args } = operation ?? {};
+      if (kind === 'find' || kind === 'count') {
+        const result =
+          kind === 'find'
+            ? await ctx.runQuery(internal.authStore.find, args)
+            : await ctx.runQuery(internal.authStore.count, args);
+        return Response.json(result, { headers });
+      }
+      // Counting a request twice only makes the limit stricter, and a
+      // repeated reservation only spends budget: neither needs a nonce.
+      if (kind === 'rateLimit' || kind === 'budgetReserve') {
+        const result =
+          kind === 'rateLimit'
+            ? await ctx.runMutation(internal.appState.hit, args)
+            : await ctx.runMutation(internal.appState.reserve, args);
+        return Response.json(result, { headers });
+      }
+      if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(nonce))
+        return new Response(null, { status: 400, headers });
+      const fresh = await ctx.runMutation(internal.bridge.consumeNonce, {
+        nonce,
+        expiresAt: Date.now() + 2 * SIGNATURE_WINDOW_MS,
+      });
+      if (!fresh) return new Response(null, { status: 409, headers });
+      let result: unknown;
+      switch (kind) {
+        case 'create':
+          result = await ctx.runMutation(internal.authStore.create, args);
+          break;
+        case 'update':
+          result = await ctx.runMutation(internal.authStore.update, args);
+          break;
+        case 'remove':
+          result = await ctx.runMutation(internal.authStore.remove, args);
+          break;
+        case 'budgetObserve':
+          result = await ctx.runMutation(internal.appState.observe, args);
+          break;
+        case 'expireRateLimits':
+          result = await ctx.runMutation(
+            internal.appState.expireRateLimits,
+            args,
+          );
+          break;
+        default:
+          return new Response(null, { status: 400, headers });
+      }
+      return Response.json(result ?? null, { headers });
+    } catch (error) {
+      console.error('Auth store request failed', error);
       return new Response(null, { status: 400, headers });
     }
   }),

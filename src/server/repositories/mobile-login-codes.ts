@@ -2,8 +2,10 @@ import 'server-only';
 
 import { and, eq, isNull } from 'drizzle-orm';
 
+import { convexMobileLoginCodesRepository } from '~/server/auth/convex-mobile-login-codes';
+import { authStoreIsConvex } from '~/server/auth/store';
 import { db as defaultDb } from '~/server/db';
-import { mobileLoginCodes, type MobileLoginCode } from '~/server/db/schema';
+import { type MobileLoginCode, mobileLoginCodes } from '~/server/db/schema';
 
 type DrizzleDb = typeof defaultDb;
 
@@ -38,7 +40,10 @@ export interface MobileLoginCodesRepository {
    * expired code is also consumed here (preventing any later reuse) rather
    * than surviving as replayable.
    */
-  consumeByCodeHash(codeHash: string, now: Date): Promise<MobileLoginCode | null>;
+  consumeByCodeHash(
+    codeHash: string,
+    now: Date,
+  ): Promise<MobileLoginCode | null>;
   /**
    * Non-atomic lookup used only to distinguish "no such code" from
    * "already consumed" when reporting a replay error after
@@ -103,4 +108,7 @@ export function createMobileLoginCodesRepository(
 }
 
 /** Default, database-backed repository used by application services. */
-export const mobileLoginCodesRepository = createMobileLoginCodesRepository();
+/** Postgres, or the sign-in store in Convex (`~/server/auth/store.ts`). */
+export const mobileLoginCodesRepository = authStoreIsConvex()
+  ? convexMobileLoginCodesRepository()
+  : createMobileLoginCodesRepository();

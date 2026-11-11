@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import {
@@ -52,10 +53,7 @@ void test('accepts an allow-listed custom-scheme universal link', () => {
 
 void test('rejects a host that is not on the allow-list', () => {
   assert.equal(
-    isAllowedMobileRedirectUri(
-      'https://evil.example/auth/callback',
-      ALLOWLIST,
-    ),
+    isAllowedMobileRedirectUri('https://evil.example/auth/callback', ALLOWLIST),
     false,
   );
 });
@@ -102,7 +100,10 @@ void test('rejects a scheme mismatch against an otherwise-matching host', () => 
 
 void test('rejects every candidate when the allow-list is empty (fail closed)', () => {
   assert.equal(
-    isAllowedMobileRedirectUri('https://app.activitymap.example/auth/callback', []),
+    isAllowedMobileRedirectUri(
+      'https://app.activitymap.example/auth/callback',
+      [],
+    ),
     false,
   );
 });

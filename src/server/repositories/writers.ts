@@ -1,9 +1,7 @@
 import 'server-only';
 
-import { eq } from 'drizzle-orm';
-
-import { db } from '~/server/db';
-import { type Writer, users } from '~/server/db/schema';
+import { findUserInternal } from '~/server/db/internal';
+import type { Writer } from '~/server/db/schema';
 
 /**
  * Which store writes a user's library (`users.writer`,
@@ -11,9 +9,5 @@ import { type Writer, users } from '~/server/db/schema';
  * `postgres`: there is nothing of theirs for another store to write.
  */
 export async function writerOf(userId: string): Promise<Writer> {
-  const [user] = await db
-    .select({ writer: users.writer })
-    .from(users)
-    .where(eq(users.id, userId));
-  return user?.writer ?? 'postgres';
+  return (await findUserInternal(userId))?.writer ?? 'postgres';
 }

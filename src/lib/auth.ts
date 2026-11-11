@@ -3,7 +3,6 @@ import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { createAuthMiddleware } from 'better-auth/api';
 import { bearer, jwt, oAuthProxy } from 'better-auth/plugins';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
-import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 
 import { convexJwtOptions } from '~/lib/auth-jwt';
@@ -11,8 +10,15 @@ import {
   callbackScopeParam,
   grantedStravaScope,
 } from '~/lib/strava-permissions';
+import { convexAuthAdapter } from '~/server/auth/convex-adapter';
+import { authStoreIsConvex } from '~/server/auth/store';
 import { stravaAccessEnabled } from '~/server/config/external-effects';
 import { db } from '~/server/db';
+import {
+  findStravaAccountInternal,
+  setAccountScopeInternal,
+  updateUserInternal,
+} from '~/server/db/internal';
 import {
   accounts,
   jwks,
@@ -53,16 +59,20 @@ export const auth = betterAuth({
     fallback: process.env.BETTER_AUTH_URL,
     protocol: process.env.NODE_ENV === 'development' ? 'http' : 'https',
   },
-  database: drizzleAdapter(db, {
-    provider: 'pg',
-    schema: {
-      user: users,
-      account: accounts,
-      session: sessions,
-      verification: verification,
-      jwks,
-    },
-  }),
+  // Sign-in records live in Postgres or in the sign-in store in Convex
+  // (`~/server/auth/store.ts`).
+  database: authStoreIsConvex()
+    ? convexAuthAdapter()
+    : drizzleAdapter(db, {
+        provider: 'pg',
+        schema: {
+          user: users,
+          account: accounts,
+          session: sessions,
+          verification: verification,
+          jwks,
+        },
+      }),
   plugins: [
     ...(stravaAccessEnabled()
       ? [
@@ -160,22 +170,14 @@ export const auth = betterAuth({
         const userId = getSessionUserId(ctx.context.newSession);
         if (userId) {
           try {
-            const account = await db.query.accounts.findFirst({
-              where: and(
-                eq(accounts.userId, userId),
-                eq(accounts.providerId, 'strava'),
-              ),
-            });
+            const account = await findStravaAccountInternal({ userId });
             if (!account) return;
             const athleteId = Number(account.accountId);
             if (!Number.isFinite(athleteId)) {
               return;
             }
 
-            await db
-              .update(users)
-              .set({ athlete_id: athleteId })
-              .where(eq(users.id, userId));
+            await updateUserInternal(userId, { athlete_id: athleteId });
 
             // Strava reports the scopes the person actually approved only on
             // this redirect; Better Auth never records them (issue #303).
@@ -187,10 +189,7 @@ export const auth = betterAuth({
                   : null),
             );
             if (scope !== null) {
-              await db
-                .update(accounts)
-                .set({ scope })
-                .where(eq(accounts.id, account.id));
+              await setAccountScopeInternal(account.id, scope);
             }
           } catch (error) {
             logger.error('[Better Auth] Error updating athlete_id:', error);

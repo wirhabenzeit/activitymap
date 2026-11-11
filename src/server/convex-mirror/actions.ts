@@ -1,6 +1,8 @@
 'use server';
 
 import { requireAdmin } from '~/server/auth/admin';
+import { copySignInRecordsToConvex } from '~/server/auth/copy-to-convex';
+import { authStoreIsConvex } from '~/server/auth/store';
 import { requireExternalEffectsEnabled } from '~/server/config/external-effects';
 import { writerOf } from '~/server/repositories/writers';
 
@@ -57,4 +59,17 @@ export async function moveReadyLibrariesToConvex() {
   await requireAdmin();
   requireExternalEffectsEnabled();
   return moveReadyLibraries();
+}
+
+/**
+ * Copy users, linked accounts with their tokens and the signing keys from
+ * Postgres into the sign-in store in Convex. The last step before the app
+ * is switched to that store; refused once it has been.
+ */
+export async function copySignInRecords() {
+  await requireAdmin();
+  requireExternalEffectsEnabled();
+  if (authStoreIsConvex())
+    throw new Error('Sign-in records already live in Convex');
+  return copySignInRecordsToConvex();
 }
