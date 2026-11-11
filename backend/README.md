@@ -439,6 +439,28 @@ served by the usual first fetch. Accounts that already have activities in
 Postgres are not touched by this; they move through the admin page. The
 Postgres sign-up warmup is skipped for an account served from Convex.
 
+## Sign-in store
+
+The app's auth library (Better Auth) can keep its records here instead of in
+Postgres: users, linked provider accounts with their tokens, sessions,
+verification values and signing keys. `convex/authStore.ts` holds one
+document per record in `authRecords` and implements what the library asks
+of a database: create, find, count, update and delete by a list of
+conditions on a record's fields. The fields the library looks records up by
+(`id`, `userId`, `token`, `identifier`, `accountId`, `email`) are indexed;
+other conditions are checked in memory over the model's records.
+
+The app reaches it through `POST /internal/auth/v1`, signed with the write
+bridge's key under a domain of its own (`activitymap-auth-v1`), so a library
+write cannot be replayed on this route or the reverse. Reads carry no nonce;
+every change does. `src/server/auth/convex-adapter.ts` is the library's
+adapter over that route. Dates are stored as ISO strings.
+
+Nothing uses the store yet: sign-in still runs on Postgres. Moving it means
+copying users and linked accounts across (keeping their IDs, which the
+owners here are keyed by), switching the library to this adapter, and
+signing everyone in again, since sessions are not copied.
+
 ## Erasing an account
 
 An account is erased in both stores together. Postgres decides: the owner
