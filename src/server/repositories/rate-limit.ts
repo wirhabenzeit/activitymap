@@ -1,28 +1,18 @@
 import 'server-only';
 
-import { lt, sql } from 'drizzle-orm';
-
 import { convexRateLimitRepository } from '~/server/auth/convex-app-state';
-import { authStoreIsConvex } from '~/server/auth/store';
-import { db as defaultDb } from '~/server/db';
-import { apiRateLimitBuckets } from '~/server/db/schema';
-
-type DrizzleDb = typeof defaultDb;
 
 /**
- * Repository boundary for the `api_rate_limit_bucket` fixed-window counter
- * table (issue #127), the same pattern as `~/server/repositories/changes.ts`
- * and friends: application code (here, `~/server/http/rate-limit.ts`'s
- * `evaluateRateLimit`) depends on this interface rather than on Drizzle
- * directly, so it can be tested against an in-memory fake instead of a live
- * database.
+ * The fixed-window request counters behind the v1 rate limits
+ * (`~/server/http/rate-limit.ts`). Application code depends on this
+ * interface, so it can be tested against an in-memory fake.
  */
 export interface RateLimitRepository {
   /**
    * Atomically increments the counter for `(key, windowStart)` - creating
    * the row at `count: 1` if this is the first request in that window - and
    * returns the resulting count. Concurrent callers for the same key/window
-   * are serialized by Postgres's `ON CONFLICT` upsert, so two requests
+   * are serialized by the store, so two requests
    * racing at a window boundary can never both read a stale pre-increment
    * count.
    */
@@ -40,39 +30,5 @@ export interface RateLimitRepository {
   deleteWindowsBefore(cutoff: Date): Promise<number>;
 }
 
-export function createRateLimitRepository(
-  database: DrizzleDb = defaultDb,
-): RateLimitRepository {
-  return {
-    async incrementAndGet(key, windowStart) {
-      const [row] = await database
-        .insert(apiRateLimitBuckets)
-        .values({ key, windowStart, count: 1 })
-        .onConflictDoUpdate({
-          target: [apiRateLimitBuckets.key, apiRateLimitBuckets.windowStart],
-          set: {
-            count: sql`${apiRateLimitBuckets.count} + 1`,
-            updatedAt: new Date(),
-          },
-        })
-        .returning({ count: apiRateLimitBuckets.count });
-      // The upsert always returns exactly one row; the fallback only
-      // satisfies the type checker.
-      return row?.count ?? 1;
-    },
-
-    async deleteWindowsBefore(cutoff) {
-      const deleted = await database
-        .delete(apiRateLimitBuckets)
-        .where(lt(apiRateLimitBuckets.windowStart, cutoff))
-        .returning({ key: apiRateLimitBuckets.key });
-      return deleted.length;
-    },
-  };
-}
-
-/** The repository application services use: Postgres, or Convex when the
- * app's records live there (`~/server/auth/store.ts`). */
-export const rateLimitRepository = authStoreIsConvex()
-  ? convexRateLimitRepository()
-  : createRateLimitRepository();
+/** The counters, kept in Convex (`backend/convex/appState.ts`). */
+export const rateLimitRepository = convexRateLimitRepository();

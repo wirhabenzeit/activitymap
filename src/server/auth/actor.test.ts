@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import test from 'node:test';
 
-import { UserNotFoundError } from '~/server/db/internal.ts';
+import { UserNotFoundError } from '~/server/auth/users.ts';
 
 import { UnauthenticatedError, requireActor, resolveActor } from './actor.ts';
 

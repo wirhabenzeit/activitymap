@@ -22,11 +22,11 @@ import {
   dtoToActivityWithPlaces,
 } from '~/lib/sync/v1-mappers';
 import { getCachedActivityDTOs, upsertActivityDTOs } from '~/lib/sync/v1-store';
+import type { Activity as LegacyActivity } from '~/server/db/schema';
 import {
   getPublicActivities,
   getPublicUserActivities,
-} from '~/server/db/actions';
-import type { Activity as LegacyActivity } from '~/server/db/schema';
+} from '~/server/sharing/legacy-actions';
 import { useShallowStore } from '~/store';
 
 import { useLibrarySnapshot } from './use-library-snapshot';

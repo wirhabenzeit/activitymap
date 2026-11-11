@@ -11,16 +11,12 @@ import {
 import { StravaImportError } from '~/server/application/strava-import';
 import type { Actor } from '~/server/auth/actor';
 import { requestIdFor } from '~/server/http/request-id';
-import type { ImportClaim } from '~/server/repositories/strava-import';
 
 type Dependencies = {
   resolveActor: (request: Request) => Promise<Actor | null>;
   read: (actor: Actor) => Promise<StravaImportDTO>;
-  start: (
-    actor: Actor,
-  ) => Promise<{ claim: ImportClaim | null; status: StravaImportDTO }>;
-  run: (claim: ImportClaim, timeMs: number) => Promise<void>;
-  afterResponse: (work: () => Promise<void>) => void;
+  /** Starts the fetch in the backend; answers with its status. */
+  start: (actor: Actor) => Promise<{ status: StravaImportDTO }>;
   onError: (error: unknown, requestId: string) => void;
 };
 const headers = {
@@ -32,7 +28,6 @@ export function createStravaImportHandler(
 ) {
   return async (request: Request) => {
     const requestId = requestIdFor(request);
-    const startedAt = Date.now();
     try {
       const actor = await deps.resolveActor(request);
       if (!actor)
@@ -48,32 +43,11 @@ export function createStravaImportHandler(
           'The request origin is not allowed.',
         );
       let status: StravaImportDTO;
-      let accepted = false;
       if (method === 'GET') status = await deps.read(actor);
-      else {
-        const started = await deps.start(actor);
-        status = started.status;
-        if (started.claim) {
-          const claim = started.claim;
-          deps.afterResponse(async () => {
-            try {
-              await deps.run(
-                claim,
-                Math.max(
-                  0,
-                  Math.min(35_000, 50_000 - (Date.now() - startedAt)),
-                ),
-              );
-            } catch (error) {
-              deps.onError(error, requestId);
-            }
-          });
-          accepted = true;
-        }
-      }
+      else status = (await deps.start(actor)).status;
       return Response.json(
         responseEnvelope(stravaImportDTOSchema).parse(makeEnvelope(status)),
-        { status: accepted ? 202 : 200, headers },
+        { status: 200, headers },
       );
     } catch (error) {
       if (!(error instanceof StravaImportError)) deps.onError(error, requestId);

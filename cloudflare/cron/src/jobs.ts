@@ -12,22 +12,14 @@ export interface CronJob {
 }
 
 export const SCHEDULES: Record<string, CronJob[]> = {
-  // Every account's library is written by Convex, which schedules its own
-  // ingestion, so Postgres has no ingestion jobs left. What remains still
-  // lives there: the webhook inbox, rate limits, account erasure, and the
-  // place catalogue that Convex copies. One batch an hour, so Postgres can
-  // suspend in between.
+  // The library and its ingestion are scheduled by the Convex backend
+  // itself. What the app still does on a schedule is erase accounts whose
+  // provider access was withdrawn long enough ago.
   '0 * * * *': [
-    // Sends on events that could not be handed to Convex when they arrived.
-    { name: 'drain-webhook-inbox', path: '/api/cron/drain-webhook-inbox' },
-    { name: 'cleanup-rate-limits', path: '/api/cron/cleanup-rate-limits' },
     {
       name: 'erase-revoked-athletes',
       path: '/api/cron/erase-revoked-athletes',
     },
-    // No account is copied any more; this run carries place catalogue
-    // changes to Convex.
-    { name: 'mirror-convex-shadow', path: '/api/cron/mirror-convex-shadow' },
   ],
 };
 

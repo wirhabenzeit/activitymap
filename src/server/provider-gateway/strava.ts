@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { AccountCredentialsUnavailableError } from '~/server/application/account-credentials';
-import { getAccountInternal } from '~/server/db/internal';
+import { getAccountInternal } from '~/server/auth/users';
 import {
   StravaApiError,
   StravaClient,

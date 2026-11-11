@@ -270,36 +270,10 @@ jobs:
         run: pnpm db:migrate
       - name: Verify current migration state
         run: pnpm db:migrate:check
-      - name: Prove revoked-athlete erasure against Postgres
-        run: pnpm db:test-erasure
-      - name: Prove the writer fence
-        run: pnpm db:test-writer-fence
-      - name: Prove revoked accounts are excluded from legacy activity sync
-        run: pnpm db:test-legacy-sync-selection
-      - name: Prove resumable Strava summary reconciliation against Postgres
-        run: pnpm db:test-summary-reconciliation
-      - name: Prove raw activity streams and stale-write guards against Postgres
-        run: pnpm db:test-activity-streams
-      - name: Prove stream API, invalidation and shared request budgeting
-        run: pnpm db:test-stream-lifecycle
       - name: Prove activity-place spatial indexes, constraints and erasure
         run: pnpm db:test-activity-places
       - name: Prove frozen catalogue imports are atomic and repeatable
         run: pnpm db:test-place-catalogue
-      - name: Prove catalogue refresh, retirement and concurrent reader consistency
-        run: pnpm db:test-place-refresh
-      - name: Prove read-only on-demand matching and private response fences
-        run: pnpm db:test-on-demand-places
-      - name: Prove persisted place matching versions, invalidation and stale-write guards
-        run: pnpm db:test-place-matching
-      - name: Prove photo catch-up preserves existing data
-        run: pnpm db:test-photo-backfill
-      - name: Prove conservative hourly stream backfill
-        run: pnpm db:test-stream-backfill
-      - name: Prove ingestion eligibility, outcomes and account-scoped status
-        run: pnpm db:test-ingestion-status
-      - name: Prove manual Strava import leases, checkpoints and account isolation
-        run: pnpm db:test-strava-import
       - name: Prove a second migration run is a no-op
         run: pnpm db:migrate
       - name: Verify schema fingerprint

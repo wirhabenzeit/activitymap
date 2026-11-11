@@ -4,7 +4,7 @@ import {
   type ConvexAuthRecords,
   convexAuthRecords,
 } from '~/server/auth/convex-records';
-import { eraseLibraryInConvex } from '~/server/convex-mirror/erase';
+import { eraseLibraryInConvex } from '~/server/library/erase';
 import { logger } from '~/server/logging/logger';
 import { sendEventToConvex } from '~/server/sync/convex-events';
 import type { WebhookRequest } from '~/types/strava';

@@ -1,5 +1,4 @@
 import { betterAuth } from 'better-auth';
-import { drizzleAdapter } from 'better-auth/adapters/drizzle';
 import { createAuthMiddleware } from 'better-auth/api';
 import { bearer, jwt, oAuthProxy } from 'better-auth/plugins';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
@@ -11,21 +10,12 @@ import {
   grantedStravaScope,
 } from '~/lib/strava-permissions';
 import { convexAuthAdapter } from '~/server/auth/convex-adapter';
-import { authStoreIsConvex } from '~/server/auth/store';
-import { stravaAccessEnabled } from '~/server/config/external-effects';
-import { db } from '~/server/db';
 import {
   findStravaAccountInternal,
   setAccountScopeInternal,
   updateUserInternal,
-} from '~/server/db/internal';
-import {
-  accounts,
-  jwks,
-  sessions,
-  users,
-  verification,
-} from '~/server/db/schema';
+} from '~/server/auth/users';
+import { stravaAccessEnabled } from '~/server/config/external-effects';
 import { logger } from '~/server/logging/logger';
 
 const stravaProfileSchema = z.object({
@@ -59,20 +49,9 @@ export const auth = betterAuth({
     fallback: process.env.BETTER_AUTH_URL,
     protocol: process.env.NODE_ENV === 'development' ? 'http' : 'https',
   },
-  // Sign-in records live in Postgres or in the sign-in store in Convex
-  // (`~/server/auth/store.ts`).
-  database: authStoreIsConvex()
-    ? convexAuthAdapter()
-    : drizzleAdapter(db, {
-        provider: 'pg',
-        schema: {
-          user: users,
-          account: accounts,
-          session: sessions,
-          verification: verification,
-          jwks,
-        },
-      }),
+  // Sign-in records live in the sign-in store in Convex
+  // (`backend/convex/authStore.ts`).
+  database: convexAuthAdapter(),
   plugins: [
     ...(stravaAccessEnabled()
       ? [

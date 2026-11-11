@@ -1,14 +1,12 @@
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
+import { libraryFor, notAuthenticated } from '~/server/library';
 import { logger } from '~/server/logging/logger';
-import { authorizedStreams } from '~/server/preview/authorized-streams';
-import { convexPreviewFor, convexReadOwnerFor } from '~/server/preview/convex';
-import { createActivityStreamsRepository } from '~/server/repositories/activity-streams';
+import { connectedStreams } from '~/server/repositories/activity-streams';
 import { streamActivityIdSchema } from '~/server/strava/streams';
 
 import { createActivityStreamsHandler } from '../../handler';
 
 const ROUTE = 'GET /api/v1/activities/{id}/streams/summary/compact';
-export const maxDuration = 60;
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
@@ -16,20 +14,11 @@ export async function GET(
   return withAuthenticatedApiV1(
     async (request, context) => {
       const { id } = await params;
-      const actor = await context.actor();
-      const repository = createActivityStreamsRepository();
-      const copy = convexReadOwnerFor(actor)?.streams;
+      const library = await libraryFor(await context.actor());
+      if (!library) return notAuthenticated(context.requestId);
       return createActivityStreamsHandler({
         resolveActor: context.actor,
-        repository,
-        storedOnly: convexPreviewFor(actor)?.streams,
-        // Postgres stays the authority on who may read these streams.
-        preferred: copy && authorizedStreams(copy, repository),
-        onPreferredError: (error, requestId) =>
-          logger.warn('Convex stream read failed; using Postgres', {
-            error,
-            requestId,
-          }),
+        repository: connectedStreams(library.streams),
         view: 'compact',
         onError: (error, requestId) =>
           logger.error('Activity stream summary request failed', {

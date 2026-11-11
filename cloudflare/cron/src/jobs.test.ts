@@ -37,18 +37,13 @@ void test('the Worker config and job schedule define one hourly batch', () => {
   assert.deepEqual(Object.keys(SCHEDULES), crons);
 });
 
-void test('the hourly batch holds what still lives in Postgres, and no ingestion', async () => {
+void test('the hourly batch erases accounts whose access was withdrawn, and nothing else', async () => {
   const { fetch, calls } = fakeFetch({});
   const results = await runSchedule(hourly, { ...options, fetch });
 
   assert.deepEqual(
     calls.map((call) => new URL(call.url).pathname),
-    [
-      '/api/cron/drain-webhook-inbox',
-      '/api/cron/cleanup-rate-limits',
-      '/api/cron/erase-revoked-athletes',
-      '/api/cron/mirror-convex-shadow',
-    ],
+    ['/api/cron/erase-revoked-athletes'],
   );
   for (const call of calls) {
     assert.equal(call.init.method, 'POST');
@@ -62,17 +57,23 @@ void test('the hourly batch holds what still lives in Postgres, and no ingestion
 });
 
 void test('failure in one job does not stop the jobs after it', async () => {
-  const { fetch } = fakeFetch({ '/api/cron/cleanup-rate-limits': 503 });
-  const results = await runSchedule(hourly, { ...options, fetch });
-  assert.deepEqual(
-    results.map(({ name, status }) => [name, status]),
-    [
-      ['drain-webhook-inbox', 200],
-      ['cleanup-rate-limits', 503],
-      ['erase-revoked-athletes', 200],
-      ['mirror-convex-shadow', 200],
-    ],
-  );
+  const { fetch } = fakeFetch({ '/api/first': 503 });
+  SCHEDULES['8 8 8 8 8'] = [
+    { name: 'first', path: '/api/first' },
+    { name: 'second', path: '/api/second' },
+  ];
+  try {
+    const results = await runSchedule('8 8 8 8 8', { ...options, fetch });
+    assert.deepEqual(
+      results.map(({ name, status }) => [name, status]),
+      [
+        ['first', 503],
+        ['second', 200],
+      ],
+    );
+  } finally {
+    delete SCHEDULES['8 8 8 8 8'];
+  }
 });
 
 void test('a job is skipped when the job it requires did not succeed', async () => {
@@ -97,29 +98,19 @@ void test('a job is skipped when the job it requires did not succeed', async () 
       ['/api/first', '/api/third'],
     );
   } finally {
-    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- test-only entry
     delete SCHEDULES['9 9 9 9 9'];
   }
 });
 
 void test('a network error is reported, not thrown', async () => {
   const { fetch } = fakeFetch({
-    '/api/cron/drain-webhook-inbox': new Error('connection reset'),
+    '/api/cron/erase-revoked-athletes': new Error('connection reset'),
   });
-  const results = await runSchedule(hourly, {
-    ...options,
-    fetch,
-  });
-  const result = results[0]!;
-  assert.equal(
-    results.at(-1)?.status,
-    200,
-    'Later jobs still run when the inbox drain fails',
-  );
+  const [result] = await runSchedule(hourly, { ...options, fetch });
 
-  assert.equal(result.status, 'error');
-  assert.equal(result.body, 'connection reset');
-  assert.equal(isSuccess(result), false);
+  assert.equal(result!.status, 'error');
+  assert.equal(result!.body, 'connection reset');
+  assert.equal(isSuccess(result!), false);
 });
 
 void test('an unknown trigger is an error rather than a silent no-op', async () => {

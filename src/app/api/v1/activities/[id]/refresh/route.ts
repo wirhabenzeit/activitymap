@@ -1,8 +1,6 @@
 import { parseMutationActivityId } from '~/server/api/activity-id';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { logger } from '~/server/logging/logger';
-import { previewDataUnavailable } from '~/server/preview/selection';
-import { writerOf } from '~/server/repositories/writers';
 
 import { createRefreshActivityHandler } from '../mutation-handler';
 
@@ -15,15 +13,9 @@ export async function POST(
 ) {
   return withAuthenticatedApiV1(
     async (request, context) => {
-      const unavailable = await previewDataUnavailable(
-        context.actor,
-        context.requestId,
-      );
-      if (unavailable) return unavailable;
       const { id } = await params;
       return createRefreshActivityHandler({
         resolveActor: context.actor,
-        writerFor: (actor) => writerOf(actor.userId),
         onError: (error, requestId) =>
           logger.error('Activity refresh request failed', { error, requestId }),
       })(request, parseMutationActivityId(id));
