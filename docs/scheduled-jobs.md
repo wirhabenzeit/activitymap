@@ -15,30 +15,19 @@ cron jobs. The `activitymap-cron` Worker in `cloudflare/cron` therefore
 starts one batch on the hour (`0 * * * *`, UTC), so Postgres can suspend
 between batches. The Worker calls these jobs in order:
 
-1. `drain-webhook-inbox`
+1. `drain-webhook-inbox`: sends on Strava events that could not be handed
+   to Convex when they arrived.
 2. `cleanup-rate-limits`
 3. `erase-revoked-athletes`
-4. `reconcile-strava-summaries`
-5. `backfill-activity-streams` (only if reconciliation succeeded)
-6. `backfill-activity-photos`
-7. `sync-activities` (up to 30 detail refreshes and 30 older activities)
-8. `match-activity-places`
+4. `mirror-convex-shadow`: carries place catalogue changes to Convex.
 
-A second trigger (`*/10 * * * *`) calls `mirror-convex-shadow` every ten
-minutes. A third (`5 * * * *`) calls `convex-shadow-parity` once an hour,
-between shadow-write runs: it compares a sample of each shadow owner's Postgres
-data with Convex and answers 500 on drift, so drift shows as a failed
-invocation in Cloudflare's cron history and as a `Convex shadow parity drift`
-error in the app's logs. Both are off (503) unless
-`ACTIVITYMAP_CONVEX_SHADOW_OWNERS` is set; see `backend/README.md`.
-
-While accounts are being copied to Convex, the mirror shares each run's
-forty seconds between them (every account gets a turn, and an account that
-finishes early leaves its time to the next), and a run that left a copy
-unfinished starts the next run itself instead of waiting for the trigger.
-One trigger chains at most nine runs, which fills the ten minutes until the
-next one, and a run in which no account advanced does not chain. Once every
-copy has finished, the job is back to one run per trigger.
+Every account's library is written by Convex, which schedules its own
+ingestion (`backend/README.md`, "Convex ingestion"): jobs run when an event
+arrives or a reconciliation sweep is due, and nothing there polls. The
+Postgres ingestion jobs (summary reconciliation, stream and photo backfill,
+activity sync, place matching) and the hourly parity check are therefore no
+longer scheduled. Their routes remain and skip accounts Postgres does not
+write, so calling one by hand does nothing.
 
 Incoming Strava webhooks still get an immediate processing attempt. The hourly
 drain handles pending events and retries that are due.

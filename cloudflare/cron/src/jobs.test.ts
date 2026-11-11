@@ -24,7 +24,7 @@ function fakeFetch(statuses: Record<string, number | Error>) {
 const options = { baseUrl: 'https://activitymap.cc', cronSecret: 's3cret' };
 const hourly = '0 * * * *';
 
-void test('the Worker config and job schedule define the hourly batch and the Convex shadow triggers', () => {
+void test('the Worker config and job schedule define one hourly batch', () => {
   const config = readFileSync(
     new URL('../wrangler.jsonc', import.meta.url),
     'utf8',
@@ -33,28 +33,11 @@ void test('the Worker config and job schedule define the hourly batch and the Co
     .replace(/,(\s*[}\]])/g, '$1');
   const crons = (JSON.parse(config) as { triggers: { crons: string[] } })
     .triggers.crons;
-  assert.deepEqual(crons, [hourly, '*/10 * * * *', '5 * * * *']);
+  assert.deepEqual(crons, [hourly]);
   assert.deepEqual(Object.keys(SCHEDULES), crons);
 });
 
-void test('failure in housekeeping does not stop later jobs', async () => {
-  const { fetch } = fakeFetch({ '/api/cron/cleanup-rate-limits': 503 });
-  const results = await runSchedule(hourly, { ...options, fetch });
-  assert.deepEqual(
-    results.slice(1).map(({ name, status }) => [name, status]),
-    [
-      ['cleanup-rate-limits', 503],
-      ['erase-revoked-athletes', 200],
-      ['reconcile-strava-summaries', 200],
-      ['backfill-activity-streams', 200],
-      ['backfill-activity-photos', 200],
-      ['sync-activities', 200],
-      ['match-activity-places', 200],
-    ],
-  );
-});
-
-void test('all eight jobs are POSTed once per hour in order with the cron secret and their bounds', async () => {
+void test('the hourly batch holds what still lives in Postgres, and no ingestion', async () => {
   const { fetch, calls } = fakeFetch({});
   const results = await runSchedule(hourly, { ...options, fetch });
 
@@ -64,11 +47,7 @@ void test('all eight jobs are POSTed once per hour in order with the cron secret
       '/api/cron/drain-webhook-inbox',
       '/api/cron/cleanup-rate-limits',
       '/api/cron/erase-revoked-athletes',
-      '/api/cron/reconcile-strava-summaries',
-      '/api/cron/backfill-activity-streams',
-      '/api/cron/backfill-activity-photos',
-      '/api/cron/sync-activities',
-      '/api/cron/match-activity-places',
+      '/api/cron/mirror-convex-shadow',
     ],
   );
   for (const call of calls) {
@@ -77,49 +56,50 @@ void test('all eight jobs are POSTed once per hour in order with the cron secret
       (call.init.headers as Record<string, string>)['x-cron-secret'],
       's3cret',
     );
+    assert.equal(call.init.body, undefined);
   }
-  assert.equal(
-    calls[3]!.init.body,
-    JSON.stringify({ batchSize: 1, pagesPerAthlete: 3 }),
-  );
-  assert.equal(
-    calls[4]!.init.body,
-    JSON.stringify({ activityLimit: 40, requestLimit: 60 }),
-  );
-  assert.equal(calls[5]!.init.body, undefined);
-  assert.equal(
-    calls[6]!.init.body,
-    JSON.stringify({
-      maxIncompleteActivities: 30,
-      maxOldActivities: 30,
-      minActivitiesThreshold: 2,
-    }),
-  );
   assert.ok(results.every(isSuccess));
 });
 
-void test('a failed reconcile skips stream backfill but still catches up photos', async () => {
-  const { fetch, calls } = fakeFetch({
-    '/api/cron/reconcile-strava-summaries': 503,
-  });
+void test('failure in one job does not stop the jobs after it', async () => {
+  const { fetch } = fakeFetch({ '/api/cron/cleanup-rate-limits': 503 });
   const results = await runSchedule(hourly, { ...options, fetch });
-
   assert.deepEqual(
-    results.slice(3).map((result) => [result.name, result.status]),
+    results.map(({ name, status }) => [name, status]),
     [
-      ['reconcile-strava-summaries', 503],
-      ['backfill-activity-streams', 'skipped'],
-      ['backfill-activity-photos', 200],
-      ['sync-activities', 200],
-      ['match-activity-places', 200],
+      ['drain-webhook-inbox', 200],
+      ['cleanup-rate-limits', 503],
+      ['erase-revoked-athletes', 200],
+      ['mirror-convex-shadow', 200],
     ],
   );
-  assert.ok(
-    calls.every(
-      (call) =>
-        new URL(call.url).pathname !== '/api/cron/backfill-activity-streams',
-    ),
-  );
+});
+
+void test('a job is skipped when the job it requires did not succeed', async () => {
+  const { fetch, calls } = fakeFetch({ '/api/first': 503 });
+  SCHEDULES['9 9 9 9 9'] = [
+    { name: 'first', path: '/api/first' },
+    { name: 'second', path: '/api/second', requires: 'first' },
+    { name: 'third', path: '/api/third' },
+  ];
+  try {
+    const results = await runSchedule('9 9 9 9 9', { ...options, fetch });
+    assert.deepEqual(
+      results.map(({ name, status }) => [name, status]),
+      [
+        ['first', 503],
+        ['second', 'skipped'],
+        ['third', 200],
+      ],
+    );
+    assert.deepEqual(
+      calls.map((call) => new URL(call.url).pathname),
+      ['/api/first', '/api/third'],
+    );
+  } finally {
+    // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- test-only entry
+    delete SCHEDULES['9 9 9 9 9'];
+  }
 });
 
 void test('a network error is reported, not thrown', async () => {
@@ -131,11 +111,10 @@ void test('a network error is reported, not thrown', async () => {
     fetch,
   });
   const result = results[0]!;
-  const matching = results.find(({ name }) => name === 'match-activity-places');
   assert.equal(
-    matching?.status,
+    results.at(-1)?.status,
     200,
-    'Matching still runs when webhook ingestion fails',
+    'Later jobs still run when the inbox drain fails',
   );
 
   assert.equal(result.status, 'error');
@@ -145,27 +124,4 @@ void test('a network error is reported, not thrown', async () => {
 
 void test('an unknown trigger is an error rather than a silent no-op', async () => {
   await assert.rejects(runSchedule('1 2 3 4 5', options), /No jobs/);
-});
-
-void test('the Convex shadow-write job runs on its own ten-minute trigger', async () => {
-  const { fetch, calls } = fakeFetch({});
-  const results = await runSchedule('*/10 * * * *', { ...options, fetch });
-  assert.deepEqual(
-    calls.map((call) => new URL(call.url).pathname),
-    ['/api/cron/mirror-convex-shadow'],
-  );
-  assert.deepEqual(
-    results.map(({ name, status }) => [name, status]),
-    [['mirror-convex-shadow', 200]],
-  );
-});
-
-void test('the Convex parity check runs hourly between shadow-write runs', async () => {
-  const { fetch, calls } = fakeFetch({ '/api/cron/convex-shadow-parity': 500 });
-  const results = await runSchedule('5 * * * *', { ...options, fetch });
-  assert.deepEqual(
-    calls.map((call) => new URL(call.url).pathname),
-    ['/api/cron/convex-shadow-parity'],
-  );
-  assert.equal(isSuccess(results[0]!), false);
 });
