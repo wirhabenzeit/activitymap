@@ -43,7 +43,11 @@ export type HandoffDeps = {
   };
   /** One mirror run; `complete` when it reached the head. */
   mirror(deadline: number): Promise<{ complete: boolean }>;
-  parity(): Promise<{ status: 'ok' | 'drift' }>;
+  parity(): Promise<{
+    status: 'ok' | 'drift';
+    /** What differs, by field: how many activities. */
+    differences?: Record<string, { count: number }>;
+  }>;
   /** Send inbox events kept for accounts Convex writes for. */
   dispatch(): Promise<unknown>;
   now?: () => number;
@@ -140,8 +144,16 @@ export function handOffToConvex(deps: HandoffDeps): Promise<HandoffReport> {
       if (!complete)
         return back('The copy to Convex did not finish in time; try again');
       steps.push('Copy to Convex: complete');
-      if ((await deps.parity()).status !== 'ok')
-        return back('The two stores differ; see the parity report');
+      const parity = await deps.parity();
+      if (parity.status !== 'ok') {
+        // Field names and counts only: nothing of the library itself.
+        const fields = Object.entries(parity.differences ?? {})
+          .map(([field, { count }]) => `${field} (${count})`)
+          .join(', ');
+        return back(
+          `The two stores differ${fields ? ` in ${fields}` : ''}; see the parity report`,
+        );
+      }
       steps.push('Parity: ok');
       if ((await deps.convex.setWriter('convex', convex.epoch)) === null)
         return back('Convex was changed by another handoff');
