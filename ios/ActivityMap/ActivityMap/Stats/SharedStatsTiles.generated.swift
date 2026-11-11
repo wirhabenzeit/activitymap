@@ -9,6 +9,7 @@ enum StatsTileID: String, CaseIterable, Hashable, Sendable {
     case yearToDate
     case yearPace
     case records
+    case visitedPlaces
     case totals
     case activityCalendar
     case consistency
@@ -27,6 +28,7 @@ enum StatsTileID: String, CaseIterable, Hashable, Sendable {
         case .yearToDate: AppMessages.statsTileYearToDate(locale: locale)
         case .yearPace: AppMessages.statsTileYearPace(locale: locale)
         case .records: AppMessages.statsTileRecords(locale: locale)
+        case .visitedPlaces: AppMessages.statsTileVisitedPlaces(locale: locale)
         case .totals: AppMessages.statsTileTotals(locale: locale)
         case .activityCalendar: AppMessages.statsTileActivityCalendar(locale: locale)
         case .consistency: AppMessages.statsTileConsistency(locale: locale)
@@ -45,6 +47,7 @@ enum StatsTileID: String, CaseIterable, Hashable, Sendable {
         case .weeklyVolume: AppMessages.statsToggleWeeklyVolume(locale: locale)
         case .yearToDate: AppMessages.statsToggleYearToDate(locale: locale)
         case .yearPace: AppMessages.statsToggleYearPace(locale: locale)
+        case .visitedPlaces: AppMessages.statsToggleVisitedPlaces(locale: locale)
         case .totals: AppMessages.statsToggleTotals(locale: locale)
         case .activityCalendar: AppMessages.statsToggleActivityCalendar(locale: locale)
         case .consistency: AppMessages.statsToggleConsistency(locale: locale)
@@ -119,6 +122,9 @@ enum StatsToggleOption: String, CaseIterable, Hashable, Sendable {
     case last12Months
     case allTime
     case sport
+    case peak
+    case pass
+    case hut
 }
 
 struct StatsTileSpan: Hashable, Sendable {
@@ -217,6 +223,16 @@ enum SharedStatsTiles {
             minHeight: nil,
             isOptional: false,
             toggle: nil
+        ),
+        .init(
+            id: .visitedPlaces,
+            window: .currentYear,
+            group: .thisYear,
+            isPrimary: false,
+            span: .init(columns: 2, rows: 1),
+            minHeight: 300,
+            isOptional: false,
+            toggle: .init(titleID: .visitedPlaces, options: [.peak, .pass, .hut])
         ),
         .init(
             id: .totals,

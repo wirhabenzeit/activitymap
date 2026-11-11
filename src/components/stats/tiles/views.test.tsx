@@ -21,7 +21,7 @@ void test('the shared capability matrix matches actual visible and expandable we
   );
   assert.equal(
     contract.tiles.filter((tile) => tile.visibility === 'visible').length,
-    10,
+    11,
   );
   for (const tile of contract.tiles) {
     const view = tileView(tile.id as (typeof statsTiles)[number]['id']);

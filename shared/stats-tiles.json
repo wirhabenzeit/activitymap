@@ -88,6 +88,18 @@
       "span": { "columns": 2, "rows": 1 }
     },
     {
+      "id": "visitedPlaces",
+      "minHeight": 300,
+      "title": "Most visited places",
+      "window": "currentYear",
+      "group": "thisYear",
+      "span": { "columns": 2, "rows": 1 },
+      "toggle": {
+        "label": "Place type",
+        "options": ["peak", "pass", "hut"]
+      }
+    },
+    {
       "id": "totals",
       "title": "Totals",
       "window": "currentYear",

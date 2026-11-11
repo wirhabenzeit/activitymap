@@ -5,7 +5,7 @@ import Observation
 /// Compound tile queries occupy one bounded controller-cache entry per tile.
 enum StatsDashboard {
     static let ids: [StatsTileID] = [.thisWeek, .monthVsLastMonth, .weeklyVolume,
-        .yearToDate, .yearPace, .records, .activityCalendar,
+        .yearToDate, .yearPace, .records, .visitedPlaces, .activityCalendar,
         .sportMix, .distanceVsElevation, .typicalWeek]
     static let tiles = ids.compactMap { id in SharedStatsTiles.tiles.first { $0.id == id } }
     static func expandable(_ id: StatsTileID) -> Bool {
@@ -22,6 +22,7 @@ nonisolated enum StatsDashboardResult: Sendable {
     case comparison(StatsPeriodComparison, current: [StatsPoint], previous: [StatsPoint], band: StatsComparisonBand?, rhythm: StatsComparisonRhythm, history: [StatsPeriodHistoryComparison])
     case pace(StatsPace)
     case records(StatsRecords, allTime: StatsRecords, best30: [StatsMetric: StatsBestDays])
+    case places(StatsPlaceRanking, allTime: StatsPlaceRanking)
     case calendar(rolling: StatsCalendarSnapshot, years: [Int: StatsCalendarSnapshot])
     case mix([StatsShare], hours: Double, breakdown: [ActivityCategory: StatsTotals])
     case hilliness(StatsClimbing, activities: [StatsHillPoint])
@@ -134,6 +135,10 @@ nonisolated extension StatsEngine {
         case .yearPace: return .pace(yearPace(today: today, metric: metric))
         case .records: return .records(records(today: today), allTime: records(today: today, range: .allTime),
             best30: Dictionary(uniqueKeysWithValues: [StatsMetric.distance, .time, .elevation].map { ($0, best30Days(today: today, metric: $0)) }))
+        case .visitedPlaces:
+            let kind = ActivityMapAPI.PlaceKind(rawValue: option?.rawValue ?? "") ?? .peak
+            return .places(placeRanking(today: today, kind: kind, range: .currentYear),
+                           allTime: placeRanking(today: today, kind: kind, range: .allTime))
         case .activityCalendar:
             let firstYear = StatsDates.parts(min(today, activities.map(\.day).min() ?? today)).year!
             let years = Dictionary(uniqueKeysWithValues: (firstYear...year).map { value in
@@ -184,14 +189,18 @@ struct StatsDashboardFace {
     var monthDay: Int?
     var yearMonth: Int?
     var recordsRange = StatsToggleOption.currentYear
+    var placesRange = StatsToggleOption.currentYear
 }
 
 @MainActor @Observable final class StatsDashboardState {
     private var inspections = Dictionary(uniqueKeysWithValues: StatsDashboard.ids.map { ($0, StatsTileInspection()) })
     func inspection(_ id: StatsTileID) -> StatsTileInspection? { inspections[id] }
     var inspectedActivityID: Int?
+    /// The place whose shared detail is open; inspection never filters.
+    var inspectedPlaceID: String?
     func resetInspection() {
         inspectedActivityID = nil
+        inspectedPlaceID = nil
         expandedTile = nil
         inspections = Dictionary(uniqueKeysWithValues: StatsDashboard.ids.map { ($0, StatsTileInspection()) })
     }
@@ -304,6 +313,9 @@ enum StatsDisplay {
         case .last52Weeks: "52 weeks"
         case .currentYear: "This year"
         case .allTime: "All time"
+        case .peak: "Peaks"
+        case .pass: "Passes"
+        case .hut: "Huts"
         default: option.rawValue
         }
     }

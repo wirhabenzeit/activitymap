@@ -44,6 +44,8 @@ nonisolated struct StatsActivity: Sendable {
     let distance: Double?
     let movingTime: Double?
     let elevation: Double?
+    /// Synced place evidence for Most visited places; nil means unknown.
+    var places: PlaceEvidence? = nil
     var day: Int { StatsDates.day(start) }
     func value(_ metric: StatsMetric) -> Double {
         switch metric {
