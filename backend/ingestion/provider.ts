@@ -47,6 +47,27 @@ export class ForeignProviderActivity extends Error {
 
 export type ActivitySource = Omit<ActivityDTO, 'streams' | 'placeMatches'>;
 
+/**
+ * A converted provider activity as a stored one. The provider leaves out
+ * what does not apply to an activity (elevation and power of one typed in by
+ * hand, for instance): a field it did not send is unknown, which the
+ * contract writes as null, the way a database column would hold it.
+ */
+function stored(
+  row: ReturnType<typeof transformStravaActivity>,
+  athlete: number,
+): ActivitySource {
+  const known = Object.fromEntries(
+    Object.entries({ ...row, athlete }).map(([field, value]) => [
+      field,
+      value === undefined ? null : value,
+    ]),
+  ) as unknown as Parameters<typeof toActivityDTO>[0];
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { streams, placeMatches, ...dto } = toActivityDTO(known);
+  return dto;
+}
+
 /** One detailed activity. `photosCurrent` says whether the photo set written
  * with it is the provider's current one. */
 export function activitySource(
@@ -61,12 +82,10 @@ export function activitySource(
     throw new ForeignProviderActivity();
   const activity = payload as StravaActivity;
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { streams, placeMatches, ...dto } = toActivityDTO({
-      ...transformStravaActivity(activity, true, options),
-      athlete: activity.athlete.id,
-    });
-    return dto;
+    return stored(
+      transformStravaActivity(activity, true, options),
+      activity.athlete.id,
+    );
   } catch {
     throw new InvalidProviderPayload('activity');
   }
@@ -114,14 +133,7 @@ function summarySource(
 ): ActivitySource | undefined {
   try {
     // A list entry has no description, calories and the like: unknown.
-    const known = Object.fromEntries(
-      Object.entries({ ...row, athlete: Number(athleteId) }).map(
-        ([field, value]) => [field, value === undefined ? null : value],
-      ),
-    ) as unknown as Parameters<typeof toActivityDTO>[0];
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { streams, placeMatches, ...dto } = toActivityDTO(known);
-    return dto;
+    return stored(row, Number(athleteId));
   } catch {
     return undefined;
   }
