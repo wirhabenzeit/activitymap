@@ -6,11 +6,21 @@ import test, { after, mock } from 'node:test';
 
 import type { ActivityPlacesResponse } from '../../src/contracts/activity-places';
 import type { PhotoDTO } from '../../src/contracts/v1/photo';
+import {
+  PLACE_ROWS_VERSION,
+  placeRows,
+  publishCatalogue,
+} from '../../src/server/places/catalogue-publish';
 import type { PlaceRow } from '../../src/server/places/catalogue-rows';
+import { createSyntheticCatalogue } from '../../src/server/places/catalogue.fixture';
 import {
   type CatalogueSource,
-  mirrorCatalogue,
+  sendCatalogue,
 } from '../../src/server/places/convex-catalogue';
+import {
+  catalogueIdentity,
+  matchingVersion,
+} from '../../src/server/places/matching-version';
 import type { RawActivityStreams } from '../../src/server/strava/streams';
 import { sendEventToConvex } from '../../src/server/sync/convex-events';
 import { convexWriteBridge } from '../../src/server/sync/convex-writer';
@@ -31,6 +41,7 @@ const modules = {
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './bridge.ts': () => import('../convex/bridge'),
   './catalogue.ts': () => import('../convex/catalogue'),
+  './catalogueWorker.ts': () => import('../convex/catalogueWorker'),
   './http.ts': () => import('../convex/http'),
   './importer.ts': () => import('../convex/importer'),
   './library.ts': () => import('../convex/library'),
@@ -195,7 +206,7 @@ void test('the place catalogue is copied in order, resumably, and accepted only 
   };
   let clock = 0;
   const run = (deadline = Infinity) =>
-    mirrorCatalogue({
+    sendCatalogue({
       source,
       writer,
       upload,
@@ -259,7 +270,7 @@ void test('the place catalogue is copied in order, resumably, and accepted only 
       return page;
     },
   };
-  const abandoned = await mirrorCatalogue({
+  const abandoned = await sendCatalogue({
     source: changing,
     writer,
     upload,
@@ -336,6 +347,95 @@ void test('the place catalogue is copied in order, resumably, and accepted only 
     ).complete,
     true,
   );
+});
+
+void test('an artifact is published after a reviewed dry run, and libraries move to it', async (t) => {
+  const { convex, writer, upload } = setup(t);
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    backend: 'convex',
+    generation: 'shadow-generation-01',
+    catalogue: 'c'.repeat(64),
+    matchingVersion: 'd'.repeat(64),
+  });
+  await convex.mutation(internal.owners.setWriter, {
+    userId: scope.userId,
+    athleteId: scope.athleteId,
+    writer: 'convex',
+    expectedEpoch: 0,
+  });
+  const catalogue = createSyntheticCatalogue({ regionId: 'v1-places' });
+  const snapshotId = catalogue.manifest.catalogue_snapshot_id;
+  const rows = placeRows(catalogue);
+  const publish = (options: Partial<Parameters<typeof publishCatalogue>[0]>) =>
+    publishCatalogue({ catalogue, writer, upload, ...options });
+  const owner = () => convex.run((ctx) => ctx.db.query('owners').first());
+
+  // A dry run reports and changes nothing.
+  const dry = await publish({});
+  assert.deepEqual(
+    [dry.status, dry.snapshotId, dry.count, dry.current],
+    ['would_publish', snapshotId, rows.length, null],
+  );
+  assert.equal(
+    await convex.run((ctx) => ctx.db.query('placeCatalogues').first()),
+    null,
+  );
+  // Publishing needs what the dry run saw, and the serving region.
+  await assert.rejects(publish({ apply: true }), /expectedCurrent/);
+  await assert.rejects(
+    publish({ apply: true, expectedCurrent: 'osm-places-v1:other' }),
+    /changed since dry run/,
+  );
+  await assert.rejects(
+    publishCatalogue({
+      catalogue: createSyntheticCatalogue({ regionId: 'switzerland' }),
+      writer,
+      upload,
+    }),
+    /region switzerland/,
+  );
+
+  const published = await publish({ apply: true, expectedCurrent: null });
+  assert.deepEqual([published.status, published.libraries], ['published', 1]);
+  const stored = await convex.run((ctx) => ctx.db.query('places').collect());
+  assert.deepEqual(
+    stored.map((row) => row.place),
+    rows,
+  );
+  const version = matchingVersion({ snapshotId, revision: PLACE_ROWS_VERSION });
+  const moved = await owner();
+  assert.deepEqual(
+    [moved!.catalogue, moved!.matchingVersion],
+    [catalogueIdentity(version), version],
+  );
+
+  // Publishing it again sends nothing and moves nothing.
+  const again = await publish({ apply: true, expectedCurrent: snapshotId });
+  assert.deepEqual([again.status, again.libraries], ['unchanged', 0]);
+  assert.equal(
+    (await convex.run((ctx) => ctx.db.query('places').collect())).length,
+    rows.length,
+  );
+
+  // A catalogue that lost most of its places is refused unless allowed.
+  const smaller = createSyntheticCatalogue({
+    regionId: 'v1-places',
+    dataAsOf: '2026-11-01T00:00:00Z',
+    transformRows: (all) => all.slice(0, 1),
+  });
+  const shrink = (allowLargeRetirement: boolean) =>
+    publishCatalogue({
+      catalogue: smaller,
+      writer,
+      upload,
+      apply: true,
+      expectedCurrent: snapshotId,
+      allowLargeRetirement,
+    });
+  await assert.rejects(shrink(false), /more than 20%/);
+  assert.equal((await shrink(true)).status, 'published');
+  assert.notEqual((await owner())!.matchingVersion, version);
 });
 
 void test('provider events are recorded once, and only for an owner Convex writes', async (t) => {

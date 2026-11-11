@@ -9,7 +9,7 @@ import test from 'node:test';
 import { prepareCatalogue } from './catalogue-prepare';
 import type { OsmSource } from './osm-pbf';
 import { createPbfFixture } from './osm-pbf.fixture';
-import { validatePublishedCatalogue } from './published-catalogue';
+import { validatePublishedCatalogue } from './published-catalogue-core';
 import { syntheticDem } from './terrain.fixture';
 
 const sources: OsmSource[] = [

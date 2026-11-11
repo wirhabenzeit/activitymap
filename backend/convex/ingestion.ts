@@ -56,6 +56,10 @@ import { applyPhotoSet, photosOfActivities } from './photos';
  * 5. The run ends. If the activity was requested again while it ran, the
  *    job starts over at once.
  *
+ * When the owner's catalogue changes, `requestMatch` queues a job that starts
+ * at the match phase, so every recording is matched again without a provider
+ * read.
+ *
  * Every write names the job's claim. A worker whose lease was taken over
  * (it expired and `recover` or a later claim moved on) changes nothing, and
  * the library writes themselves refuse an owner that Convex no longer writes
@@ -152,6 +156,59 @@ export async function requestIngestion(
   });
   await schedule(ctx, job._id, now);
   return job._id;
+}
+
+/**
+ * Ask for an activity's place match to be computed again, without reading
+ * the provider: the owner's catalogue changed (convex/catalogue.ts). The
+ * caller has already checked that Convex writes for the owner and that the
+ * activity has a current recording.
+ */
+export async function requestMatch(
+  ctx: MutationCtx,
+  owner: Id<'owners'>,
+  activity: string,
+) {
+  const now = Date.now();
+  const job = await ctx.db
+    .query('ingestionJobs')
+    .withIndex('by_owner_activity', (q) =>
+      q.eq('owner', owner).eq('activity', activity),
+    )
+    .unique();
+  if (!job) {
+    const id = await ctx.db.insert('ingestionJobs', {
+      owner,
+      activity,
+      status: 'queued',
+      phase: 'match',
+      requested: 1,
+      attempt: 0,
+      dueAt: now,
+      revision: 0,
+      claims: 0,
+    });
+    await schedule(ctx, id, now);
+    return;
+  }
+  // A running job may be matching against the previous catalogue: it starts
+  // over when it ends, and `matched` drops a result of another version.
+  if (job.lease && job.lease.expiresAt > now) {
+    await ctx.db.patch('ingestionJobs', job._id, {
+      requested: job.requested + 1,
+    });
+    return;
+  }
+  // A waiting job matches against the owner's catalogue when it runs.
+  if (job.status === 'queued') return;
+  await ctx.db.patch('ingestionJobs', job._id, {
+    status: 'queued',
+    phase: 'match',
+    attempt: 0,
+    dueAt: now,
+    error: undefined,
+  });
+  await schedule(ctx, job._id, now);
 }
 
 function needsRecording(row: Doc<'activities'> | null) {
@@ -526,6 +583,12 @@ export const matched = internalMutation({
     const holder = await held(ctx, args.job, args.claim);
     if (!holder?.owner) return;
     const { job, owner } = holder;
+    // Computed for a catalogue the owner has left meanwhile: the rematch
+    // that follows a new catalogue asks for this activity again.
+    if (args.result.matchingVersion !== owner.matchingVersion) {
+      await finish(ctx, job);
+      return;
+    }
     const row = await activityFor(ctx, owner._id, job.activity);
     // Refuses an owner Convex does not write for, which fails the run.
     await publishMatchRecord(ctx, {

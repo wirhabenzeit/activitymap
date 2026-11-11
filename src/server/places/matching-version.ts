@@ -24,5 +24,14 @@ export function matchingVersion(
   catalogue: MatchingCatalogue,
   recipe = MATCHING_RECIPE_HASH,
 ): string {
-  return sha256(canonicalJson({ recipe, ...catalogue }));
+  // Only the two named fields: a caller may pass a rowset that holds more.
+  const { snapshotId, revision } = catalogue;
+  return sha256(canonicalJson({ recipe, snapshotId, revision }));
+}
+
+/** Identity of the catalogue rows an owner is matched against, as owners
+ * and match results name it. It changes exactly when the published catalogue
+ * or the matching recipe changes. */
+export function catalogueIdentity(version: string): string {
+  return sha256(JSON.stringify({ postgresMatchingVersion: version }));
 }

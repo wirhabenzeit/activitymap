@@ -269,8 +269,7 @@ export default defineSchema({
     digest: v.string(),
     complete: v.boolean(),
   }).index('by_dataset', ['dataset']),
-  /** The places of a rowset by quarter-degree tile. `key` is the Postgres
-   * place ID. */
+  /** The places of a rowset by quarter-degree tile. `key` is the place ID. */
   places: defineTable({
     dataset: v.string(),
     key: v.string(),

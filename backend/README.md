@@ -733,30 +733,38 @@ budget and can overlap the scheduled one; fenced writes make that safe, and
 the scheduled run remains the safety net for everything else (hourly
 ingestion, stream and match jobs, and any trigger that failed).
 
-### Place catalogue copy
+### Place catalogue
 
-A place catalogue is built and published in the Postgres workspace
-(`pnpm places:prepare`, `places:combine`, `places:publish`). Matching here
-needs those places, so after publishing, `pnpm places:copy-to-convex` copies
-them (`src/server/places/convex-catalogue.ts`) through the write bridge
-operations `catalogueState`, `beginCatalogue`, `importPlaces` and
-`completeCatalogue` (`convex/places.ts`). An owner is matched against a new
-catalogue once its matching version is moved to it; nothing does that
-automatically yet.
+A place catalogue is built from OpenStreetMap extracts
+(`pnpm places:prepare`, `places:combine`) and published here with
+`pnpm places:publish` (`src/server/places/catalogue-publish.ts`,
+[docs/place-catalogue-refresh.md](../docs/place-catalogue-refresh.md)). The
+publisher sends the artifact's places through the write bridge operations
+`catalogueState`, `beginCatalogue`, `importPlaces` and `completeCatalogue`
+(`convex/places.ts`), then calls `adoptCatalogue`.
 
-A rowset is the active serving snapshot at one catalogue revision: its rows
-that are neither retired nor hidden, the same selection as
-`loadBatchPlaceCatalogue`. Place IDs are the Postgres place IDs, so results
-computed here name the same places as results copied from Postgres. Rows are
-stored in `places` by quarter-degree tile; the catalogue manifest and coverage
-are one stored file referenced from `placeCatalogues`.
+A rowset is one catalogue snapshot under one row format: the artifact's rows
+that the noise filter does not hide. A place's ID is a name-based UUID of its
+OpenStreetMap object, so the same place has the same ID in every catalogue.
+Rows are stored in `places` by quarter-degree tile; the catalogue manifest
+and coverage are one stored file referenced from `placeCatalogues`.
 
-The copy runs in ascending place-ID order, 500 rows a call, and continues from
-the last imported ID after a deadline or an error. Both sides keep a digest
-over the rows, and a rowset is marked complete only when its row count and
-digest agree; nothing may read it before. A catalogue change in Postgres
-starts a new rowset, and one that changes during its copy is abandoned.
-Abandoned and superseded rowsets are not removed yet.
+Rows are sent in ascending place-ID order, 500 a call, and sending continues
+from the last imported ID after a deadline or an error. Both sides keep a
+digest over the rows, and a rowset is marked complete only when its row count
+and digest agree; nothing may read it before. Superseded rowsets are not
+removed yet.
+
+`adoptCatalogue` (`convex/catalogueWorker.ts`) names the newest complete
+rowset under the matching recipe in the deployed code and moves every library
+Convex writes to it (`catalogue.adopt`). For each library the walk
+`catalogue.next` hides the old matches, tells clients, and queues an
+ingestion job that starts at the match phase for every activity with a
+current recording (`ingestion.requestMatch`), so nothing is read from the
+provider. The walk pauses two seconds between steps of sixteen activities. A
+library that already has the catalogue is left alone, so adopting is safe to
+repeat; run `convex run catalogueWorker:adopt` after a deployment that
+changes the matching recipe.
 
 The script reports progress after each minute of sending and can be stopped
 and run again. The eight-country catalogue has about 176,000 such rows.

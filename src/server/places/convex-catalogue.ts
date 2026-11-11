@@ -7,21 +7,20 @@ import {
 import type { ConvexWriter } from '~/server/sync/convex-writer';
 
 /**
- * Copies the place catalogue Postgres matches against into the Convex
- * application backend (`backend/convex/places.ts`), so that matching can run
- * there on the same places (docs/convex-writer-cutover.md, step 3).
+ * Sends a place catalogue to the Convex backend (`backend/convex/places.ts`),
+ * where activities are matched against it.
  *
- * A rowset is one catalogue snapshot at one catalogue revision. It is copied
- * once, in place-ID order, in batches; a run that stops (deadline, error)
- * continues from the last imported ID next time. Both sides keep a digest
- * over the rows, and Convex accepts the rowset only when count and digest
- * agree. If the Postgres catalogue changes while a copy is in progress, the
- * copy is abandoned and the next run starts the new rowset.
+ * A rowset is one catalogue snapshot at one revision. It is sent once, in
+ * place-ID order, in batches; a run that stops (deadline, error) continues
+ * from the last imported ID next time. Both sides keep a digest over the
+ * rows, and Convex accepts the rowset only when count and digest agree. If
+ * the source changes while it is being sent, the rowset is abandoned and the
+ * next run starts the new one.
  */
 
 export type CatalogueSource = {
-  /** The catalogue Postgres currently matches against. `count` is the number
-   * of rows `places` will return in total. */
+  /** The catalogue to send. `count` is the number of rows `places` will
+   * return in total. */
   current(): Promise<{
     snapshotId: string;
     revision: string;
@@ -29,8 +28,8 @@ export type CatalogueSource = {
     /** The catalogue manifest and coverage, as the matcher needs them. */
     metadata: unknown;
   }>;
-  /** Up to `limit` matched-against places of `snapshotId` with an ID after
-   * `after` ('' for the start), in ascending ID order. */
+  /** Up to `limit` places of `snapshotId` with an ID after `after` ('' for
+   * the start), in ascending ID order. */
   places(snapshotId: string, after: string, limit: number): Promise<PlaceRow[]>;
 };
 
@@ -44,7 +43,7 @@ type Progress = {
   complete: boolean;
 };
 
-export type CatalogueMirrorResult = {
+export type CatalogueSendResult = {
   dataset: string;
   count: number;
   imported: number;
@@ -55,7 +54,7 @@ export type CatalogueMirrorResult = {
   stopped?: 'deadline' | 'catalogue changed';
 };
 
-export async function mirrorCatalogue({
+export async function sendCatalogue({
   source,
   writer,
   upload,
@@ -70,14 +69,14 @@ export async function mirrorCatalogue({
   deadline?: number;
   now?: () => number;
   batchSize?: number;
-}): Promise<CatalogueMirrorResult> {
+}): Promise<CatalogueSendResult> {
   const catalogue = await source.current();
   const dataset = await datasetFor(catalogue.snapshotId, catalogue.revision);
   let progress = await writer.write<Progress | null>({
     kind: 'catalogueState',
     dataset,
   });
-  const result = (extra: Partial<CatalogueMirrorResult> = {}) => ({
+  const result = (extra: Partial<CatalogueSendResult> = {}) => ({
     dataset,
     count: catalogue.count,
     imported: progress?.imported ?? 0,
@@ -135,8 +134,8 @@ export async function mirrorCatalogue({
     } else if (progress.after === after)
       throw new Error('Catalogue import made no progress');
   }
-  // Rows read across several transactions are one rowset only if the
-  // catalogue did not change meanwhile.
+  // Rows read in several steps are one rowset only if the source did not
+  // change meanwhile.
   const latest = await source.current();
   if (
     latest.snapshotId !== catalogue.snapshotId ||

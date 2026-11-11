@@ -257,6 +257,10 @@ router.route({
         case 'completeCatalogue':
           result = await ctx.runMutation(internal.places.complete, args);
           break;
+        // Match every library against the newest complete rowset.
+        case 'adoptCatalogue':
+          result = await ctx.runAction(internal.catalogueWorker.adopt, {});
+          break;
         case 'recordEvents':
           result = await ctx.runMutation(internal.providerEvents.record, {
             scope,

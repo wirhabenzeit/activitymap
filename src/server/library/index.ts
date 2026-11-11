@@ -1,11 +1,14 @@
 import 'server-only';
 
-import { createHash, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 
 import { errorEnvelope } from '~/contracts/v1/error';
 import type { Actor } from '~/server/auth/actor';
 import { updateUserInternal } from '~/server/auth/users';
-import { matchingVersion } from '~/server/places/matching-version';
+import {
+  catalogueIdentity,
+  matchingVersion,
+} from '~/server/places/matching-version';
 import { convexAppAdapter } from '~/server/preview/convex';
 import { convexWriteBridge } from '~/server/sync/convex-writer';
 
@@ -20,14 +23,6 @@ function bridge(actor: Actor) {
   const writer = convexWriteBridge(actor);
   if (!writer) throw new Error('ACTIVITYMAP_CONVEX_SITE is not configured');
   return writer;
-}
-
-/** Identity of the catalogue rows an owner is matched against. It changes
- * exactly when the published catalogue or the matching recipe changes. */
-export function catalogueFor(version: string) {
-  return createHash('sha256')
-    .update(JSON.stringify({ postgresMatchingVersion: version }))
-    .digest('hex');
 }
 
 /**
@@ -50,7 +45,7 @@ export async function startLibrary(actor: Actor): Promise<string> {
       kind: 'provision',
       epoch: randomBytes(24).toString('base64url'),
       generation: randomBytes(24).toString('base64url'),
-      catalogue: catalogueFor(version),
+      catalogue: catalogueIdentity(version),
       matchingVersion: version,
     });
     state = await writer.write<State | null>({ kind: 'state' });

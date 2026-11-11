@@ -17,7 +17,6 @@
     "db:migrate:test-geometry-state": "tsx scripts/database/test-geometry-state-migration.ts",
     "db:migrate:test-webhook": "tsx scripts/database/test-webhook-inbox-migration.ts",
     "db:test-activity-places": "tsx --conditions=react-server scripts/database/test-activity-places.ts",
-    "db:test-place-catalogue": "tsx --conditions=react-server scripts/database/test-place-catalogue-import.ts",
     "places:prepare": "tsx --conditions=react-server scripts/places/prepare-catalogue.ts",
     "places:combine": "tsx --conditions=react-server scripts/places/combine-catalogues.ts",
     "places:publish": "tsx --conditions=react-server scripts/places/publish-catalogue.ts",
@@ -61,8 +60,7 @@
     "test:browsing-ui": "tsx --test src/components/list/*.test.tsx",
     "test:activity-places-ui": "node scripts/verify-activity-places.mjs",
     "test:place-search-ui": "node scripts/verify-place-search.mjs",
-    "test:place-debug-ui": "node scripts/verify-place-debug.mjs",
-    "places:copy-to-convex": "tsx --conditions=react-server scripts/places/copy-to-convex.ts"
+    "test:place-debug-ui": "node scripts/verify-place-debug.mjs"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",

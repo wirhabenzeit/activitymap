@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 
 import { convexTest } from 'convex-test';
 import test, { afterEach, beforeEach, mock } from 'node:test';
@@ -10,7 +9,10 @@ import {
   datasetFor,
 } from '../../src/server/places/catalogue-rows';
 import { createSyntheticCatalogue } from '../../src/server/places/catalogue.fixture';
-import { matchingVersion as versionFor } from '../../src/server/places/matching-version';
+import {
+  catalogueIdentity,
+  matchingVersion as versionFor,
+} from '../../src/server/places/matching-version';
 import type {
   GatewayFailure,
   GatewayOperation,
@@ -40,6 +42,7 @@ const modules = {
   './_generated/api.js': () => import('../convex/_generated/api.js'),
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './catalogue.ts': () => import('../convex/catalogue'),
+  './catalogueWorker.ts': () => import('../convex/catalogueWorker'),
   './erasure.ts': () => import('../convex/erasure'),
   './ingestion.ts': () => import('../convex/ingestion'),
   './ingestionSweep.ts': () => import('../convex/ingestionSweep'),
@@ -930,17 +933,13 @@ const track = (latitude: number, longitude: number) =>
   }) as RawActivityStreams;
 const pastThePeak = track(peak.location.latitude, peak.location.longitude);
 
-/** An owner whose matching version names a copied rowset with one peak.
- * The rowset is usable once `complete` has run. */
-async function matchingOwner() {
-  const synthetic = createSyntheticCatalogue();
-  const snapshotId = synthetic.manifest.catalogue_snapshot_id;
-  const revision = '7';
+const synthetic = createSyntheticCatalogue();
+const snapshotId = synthetic.manifest.catalogue_snapshot_id;
+
+/** A rowset of the synthetic catalogue at `revision`, usable once
+ * `complete` has run. */
+async function rowset(convex: Convex, revision: string, places: PlaceRow[]) {
   const version = versionFor({ snapshotId, revision });
-  const identity = createHash('sha256')
-    .update(JSON.stringify({ postgresMatchingVersion: version }))
-    .digest('hex');
-  const convex = await owner({ catalogue: identity, matchingVersion: version });
   const dataset = await datasetFor(snapshotId, revision);
   const metadata = await convex.run((ctx) =>
     ctx.storage.store(
@@ -956,17 +955,27 @@ async function matchingOwner() {
     dataset,
     snapshotId,
     revision,
-    count: 1,
+    count: places.length,
     metadata,
   });
   const { digest } = await convex.mutation(internal.places.importBatch, {
     dataset,
     after: '',
-    places: [peak],
+    places,
   });
   const complete = () =>
     convex.mutation(internal.places.complete, { dataset, digest });
-  return { convex, identity, version, complete };
+  return { identity: catalogueIdentity(version), version, complete };
+}
+
+/** An owner whose matching version names a rowset with one peak. */
+async function matchingOwner() {
+  const version = versionFor({ snapshotId, revision: '7' });
+  const convex = await owner({
+    catalogue: catalogueIdentity(version),
+    matchingVersion: version,
+  });
+  return { convex, ...(await rowset(convex, '7', [peak])) };
 }
 
 void test('a new recording is matched against the owner’s place catalogue', async () => {
@@ -1038,6 +1047,98 @@ void test('a new recording is matched against the owner’s place catalogue', as
       matchOf(7)!.catalogue,
     ],
     ['2', 0, identity],
+  );
+});
+
+void test('a new catalogue moves every library to it and matches every recording again', async () => {
+  const provider = fakeProvider();
+  const { convex, identity, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  provider.set(detail(8, 'Elsewhere'));
+  provider.record('8', track(46.5, 8.5));
+  provider.set(detail(9, 'Typed in by hand', { manual: true }));
+  provider.noStreams('9');
+  await ingest(convex, '7', '8', '9');
+  const reads = provider.reads.length;
+  const matches = async () => {
+    const { activities } = await state(convex);
+    return new Map(
+      activities.map((row) => [Number(row.key), row.projection?.match]),
+    );
+  };
+  const before = await matches();
+  assert.equal(before.get(7)!.catalogue, identity);
+  assert.equal(before.get(7)!.value.places[0]!.id, peak.id);
+
+  // The same place under another ID, and one more place on the other track.
+  const renamed = { ...peak, id: '22222222-2222-4222-8222-222222222222' };
+  const other: PlaceRow = {
+    ...peak,
+    id: '33333333-3333-4333-8333-333333333333',
+    displayName: 'Other',
+    location: { longitude: 8.5, latitude: 46.5 },
+  };
+  const next = await rowset(convex, '8', [renamed, other]);
+  // An incomplete rowset is not adopted.
+  assert.equal(
+    (await convex.action(internal.catalogueWorker.adopt, {})).libraries,
+    0,
+  );
+  await next.complete();
+  const feed = async () =>
+    (
+      await convex.query(internal.sync.read, {
+        ...scope,
+        operation: { kind: 'head' },
+      })
+    ).sequence;
+  const sequence = await feed();
+  const adopted = await convex.action(internal.catalogueWorker.adopt, {});
+  assert.deepEqual(adopted, { snapshotId, revision: '8', libraries: 1 });
+  const moved = await convex.run((ctx) => ctx.db.query('owners').first());
+  assert.deepEqual(
+    [moved!.catalogue, moved!.matchingVersion],
+    [next.identity, next.version],
+  );
+
+  await settle(convex);
+  const after = await matches();
+  for (const [id, place] of [
+    [7, renamed.id],
+    [8, other.id],
+  ] as const) {
+    const match = after.get(id)!;
+    assert.equal(match.catalogue, next.identity);
+    assert.equal(match.value.matchingVersion, next.version);
+    assert.deepEqual(
+      match.value.places.map((item) => item.id),
+      [place],
+    );
+  }
+  // Clients are told; the provider is not asked for anything.
+  assert((await feed()) > sequence);
+  assert.equal(provider.reads.length, reads);
+  const { jobs } = await state(convex);
+  assert(jobs.every((job) => job.status === 'idle'));
+
+  // Adopting again changes nothing.
+  const settled = await feed();
+  assert.equal(
+    (await convex.action(internal.catalogueWorker.adopt, {})).libraries,
+    0,
+  );
+  await settle(convex);
+  assert.equal(await feed(), settled);
+
+  // An activity that arrives later is matched against the new catalogue.
+  provider.set(detail(10, 'Later'));
+  provider.record('10', pastThePeak);
+  await ingest(convex, '10');
+  assert.deepEqual(
+    (await matches()).get(10)!.value.places.map((item) => item.id),
+    [renamed.id],
   );
 });
 
