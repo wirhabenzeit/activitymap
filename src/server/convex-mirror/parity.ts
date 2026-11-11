@@ -115,9 +115,12 @@ export async function checkParity({
       sampled: 0,
       inFlight: 0,
       compared: { activities: 0, summaries: 0, photos: 0 },
-      expectedDifferences: comparison.expected(),
       differences,
       ...fields,
+      expectedDifferences: {
+        ...comparison.expected(),
+        ...fields.expectedDifferences,
+      },
     };
   };
   if (!position) return report({ copy: 'not-started' });
@@ -195,9 +198,38 @@ export async function checkParity({
         settled.has(item.activity_id) && !photosInFlight.has(item.activity_id),
     );
 
+  // A recording Postgres gave up fetching: it holds a record of the failure
+  // and nothing else, and Convex holds nothing, which is the same library.
+  // Convex asks the provider again after the account moves.
+  const convexStatus = new Map(
+    summaries.convex.map((item) => [
+      item.activity_id,
+      item.metadata?.fetch_status,
+    ]),
+  );
+  const neverFetched = new Set(
+    summaries.postgres
+      .filter(
+        (item) =>
+          item.metadata?.fetch_status === 'failed' &&
+          item.metadata.state === 'not_fetched' &&
+          (convexStatus.get(item.activity_id) ?? 'not_fetched') ===
+            'not_fetched',
+      )
+      .map((item) => item.activity_id),
+  );
+  const withoutRecording = <T extends { id: string }>(item: T): T =>
+    neverFetched.has(item.id)
+      ? { ...item, streams: undefined, placeMatches: undefined }
+      : item;
+
   const activities = {
-    postgres: served.postgres.filter((item) => settled.has(item.id)),
-    convex: served.convex.filter((item) => settled.has(item.id)),
+    postgres: served.postgres
+      .filter((item) => settled.has(item.id))
+      .map(withoutRecording),
+    convex: served.convex
+      .filter((item) => settled.has(item.id))
+      .map(withoutRecording),
   };
   comparison.compareItems(
     'activity',
@@ -207,10 +239,14 @@ export async function checkParity({
   );
   const summaryKey = (item: ActivityStreamSummaryDTO) => item.activity_id;
   const settledSummaries = {
-    postgres: summaries.postgres.filter((item) =>
-      settled.has(summaryKey(item)),
+    postgres: summaries.postgres.filter(
+      (item) =>
+        settled.has(summaryKey(item)) && !neverFetched.has(summaryKey(item)),
     ),
-    convex: summaries.convex.filter((item) => settled.has(summaryKey(item))),
+    convex: summaries.convex.filter(
+      (item) =>
+        settled.has(summaryKey(item)) && !neverFetched.has(summaryKey(item)),
+    ),
   };
   comparison.compareItems(
     'summary',
@@ -233,6 +269,13 @@ export async function checkParity({
   return report({
     copy,
     checkpoint,
+    expectedDifferences: [...neverFetched].some((id) => settled.has(id))
+      ? {
+          'recording.neverFetched': [...neverFetched].filter((id) =>
+            settled.has(id),
+          ).length,
+        }
+      : {},
     sampled: sample.length,
     inFlight: sample.length - settled.size,
     compared: {
