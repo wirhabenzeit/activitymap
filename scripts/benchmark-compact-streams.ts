@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
-import { gzipSync, brotliCompressSync, constants } from 'node:zlib';
 import { writeFile } from 'node:fs/promises';
 import { performance } from 'node:perf_hooks';
-import postgres from 'postgres';
-import { compactStreamCorpus } from './fixtures/compact-stream-corpus';
+import { brotliCompressSync, constants, gzipSync } from 'node:zlib';
+
 import {
-  encodeStreamSummary,
   decodeStreamSummary,
+  encodeStreamSummary,
 } from '../src/lib/streams/compact-summary';
+import { compactStreamCorpus } from './fixtures/compact-stream-corpus';
 
 const corpus = compactStreamCorpus().map((entry) => ({
   ...entry,
@@ -47,33 +47,12 @@ const rows = corpus.map((entry) => {
     decode: timings(() => decodeStreamSummary(entry.compact)),
   };
 });
-const databaseUrl = process.env.BENCHMARK_DATABASE_URL;
-let postgresColumns: unknown = null;
-if (databaseUrl) {
-  const target = new URL(databaseUrl);
-  if (
-    !['localhost', '127.0.0.1'].includes(target.hostname) ||
-    !target.pathname.endsWith('_test')
-  )
-    throw new Error('Benchmark accepts only a local *_test database');
-  const client = postgres(databaseUrl, { max: 1, prepare: false });
-  try {
-    await client`create temporary table compact_benchmark (name text, legacy jsonb, compact jsonb)`;
-    for (const entry of corpus)
-      await client`insert into compact_benchmark values (${entry.name}, ${JSON.stringify(entry.summary)}::jsonb, ${JSON.stringify(entry.compact)}::jsonb)`;
-    postgresColumns =
-      await client`select name, pg_column_size(legacy) as legacy_bytes, pg_column_size(compact) as compact_bytes from compact_benchmark order by name`;
-  } finally {
-    await client.end();
-  }
-}
 const report = {
   node: process.version,
   platform: `${process.platform}/${process.arch}`,
   description:
-    'Synthetic summary payloads, Node gzip defaults/Brotli q5; PostgreSQL pg_column_size on stored JSONB, not full-table/disk allocation. Times are local warmed calls. No deployed HTTP, activity-sync page or device-memory claim.',
+    'Synthetic summary payloads, Node gzip defaults/Brotli q5. Times are local warmed calls. No deployed HTTP, activity-sync page or device-memory claim.',
   rows,
-  postgresColumns,
 };
 await writeFile(
   '/tmp/activitymap-compact-benchmark-vectors.json',

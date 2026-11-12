@@ -189,9 +189,6 @@ importers:
       polygon-clipping:
         specifier: 0.15.7
         version: 0.15.7
-      postgres:
-        specifier: ^3.4.9
-        version: 3.4.9
       react:
         specifier: ^19.3.1
         version: 19.3.1
@@ -11624,7 +11621,8 @@ snapshots:
   postgres-range@1.1.4:
     optional: true
 
-  postgres@3.4.9: {}
+  postgres@3.4.9:
+    optional: true
 
   preact@10.29.8: {}
 

@@ -330,8 +330,8 @@ store; runtime loading will be connected to the sync coordinator in Phase D.
 `SyncAPI` and `SyncEngine` use the shared HTTP client and atomic store page saves.
 `SyncController` connects login, foreground and manual refresh to the map/list,
 with cancellation and generation checks across account changes. The test target
-mirrors the web protocol scenarios; `scripts/verify-ios-sync-local.mjs` also drives
-the real local API through the Swift engine into a temporary disk store.
+mirrors the web protocol scenarios; the opt-in `LiveSyncTests` also drive the
+real local API through the Swift engine into a temporary disk store.
 
 **Phase E — Polish.** Basic sync status, offline/error states, rate-limit handling,
 scope clearing and account-sheet freshness dates are included in Phase D.

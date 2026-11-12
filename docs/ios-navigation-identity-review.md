@@ -21,26 +21,26 @@ The committed 20-activity gallery fixture and scene IDs are identical before/aft
 
 Captured with Xcode 27.0 / iOS 27.0 Simulator on iPhone 18 Pro. Configured host viewports are 402×874 phone, 375×667 accessibility3 and 820×1180 regular width; these are not physical-device captures. Map captures use the offline test style, not remote basemap evidence.
 
-| Scene | Before | After |
-| --- | --- | --- |
-| Phone List | ![Before List](ios-navigation-identity/before-list--phone.jpg) | ![After List](ios-navigation-identity/after-list--phone.jpg) |
-| Dark List | ![Before dark List](ios-navigation-identity/before-list--phone-dark.jpg) | ![After dark List](ios-navigation-identity/after-list--phone-dark.jpg) |
-| Large text | ![Before large text](ios-navigation-identity/before-list--small-large-text.jpg) | ![After large text](ios-navigation-identity/after-list--small-large-text.jpg) |
-| Filters | ![Before Filters](ios-navigation-identity/before-filters--phone.jpg) | ![After Filters](ios-navigation-identity/after-filters--phone.jpg) |
-| Shared detail | ![Before detail](ios-navigation-identity/before-list-detail--phone.jpg) | ![After detail](ios-navigation-identity/after-list-detail--phone.jpg) |
+| Scene         | Before                                                                          | After                                                                         |
+| ------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Phone List    | ![Before List](ios-navigation-identity/before-list--phone.jpg)                  | ![After List](ios-navigation-identity/after-list--phone.jpg)                  |
+| Dark List     | ![Before dark List](ios-navigation-identity/before-list--phone-dark.jpg)        | ![After dark List](ios-navigation-identity/after-list--phone-dark.jpg)        |
+| Large text    | ![Before large text](ios-navigation-identity/before-list--small-large-text.jpg) | ![After large text](ios-navigation-identity/after-list--small-large-text.jpg) |
+| Filters       | ![Before Filters](ios-navigation-identity/before-filters--phone.jpg)            | ![After Filters](ios-navigation-identity/after-filters--phone.jpg)            |
+| Shared detail | ![Before detail](ios-navigation-identity/before-list-detail--phone.jpg)         | ![After detail](ios-navigation-identity/after-list-detail--phone.jpg)         |
 
 The Filters gallery scene renders editor content directly; it does not demonstrate the shell's Done button or modal animation. The rendered compact-height shell regression covers presentation/dismissal separately.
 
 Single selection opens activity details directly. The following single-activity captures use the same shell and fixture.
 
-| Expanded | Collapsed |
-| --- | --- |
+| Expanded                                                                            | Collapsed                                                                             |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | ![Single activity expanded](ios-navigation-identity/wide-shell-single-expanded.png) | ![Single activity collapsed](ios-navigation-identity/wide-shell-single-collapsed.png) |
 
 The 1180×820 production shell with Filters open leaves an 860pt map and uses the fixed panel. These synthetic-window captures exercise the actual shell, route renderer and camera fit, then collapse without changing the camera:
 
-| Expanded | Collapsed |
-| --- | --- |
+| Expanded                                                                | Collapsed                                                                 |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------- |
 | ![Wide shell expanded](ios-navigation-identity/wide-shell-expanded.png) | ![Wide shell collapsed](ios-navigation-identity/wide-shell-collapsed.png) |
 
 Local complete galleries: `/tmp/activitymap-gallery/navigation-identity-before/index.html` and `/tmp/activitymap-gallery/navigation-stats-grid/index.html`, 20 captures each. The after index includes baseline comparison. Build hashes are respectively `ad333735af39617b0f1b6421d91ef01387f4d9fdd3559d0605b7699c3237e338` and `ab565d0175e756796a86d7627310ed6f21377a4a2a20277d8859993958cff4b0`.

@@ -33,13 +33,10 @@ import {
 } from './activities';
 
 /**
- * Edit and refresh for an account whose library Convex writes
- * (docs/convex-writer-cutover.md, step 8). The app still makes the Strava
- * call, with the account's own credential and the shared request budget,
- * exactly as for a Postgres-written account. What differs is where the
- * result goes: one signed write to Convex (`ingestion.apply`), and the
- * response is what Convex then serves. Nothing is read from or written to
- * the account's activities in Postgres.
+ * Edit and refresh of an activity. The app makes the Strava call, with the
+ * account's own credential and the shared request budget; the result goes
+ * to Convex in one signed write (`ingestion.apply`), and the response is
+ * what Convex then serves.
  */
 
 export type ConvexActivityCommandDeps = {
@@ -175,7 +172,7 @@ export async function refreshActivityThroughConvex(
       activityIds: [activityId],
       includePhotos: true,
       shouldDeletePhotos: true,
-      // The result goes to Convex below, not to Postgres.
+      // The result goes to Convex below.
       persist: false,
     });
   } catch (error) {

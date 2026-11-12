@@ -14,16 +14,16 @@ The portable examples live in [`shared/parity/`](../shared/parity/README.md). Th
 
 The following target governs the #384 implementation. The selection/picking clauses and v1 fixture semantics later in this document remain the foundation baseline; this amendment supersedes the listed differences for the new delivery. Version 2 transition fixtures now exercise both production state owners; this is not a release/deployment claim.
 
-| Area | Approved target |
-| --- | --- |
-| Group | One shared selected set across Map/List; ordinary map taps replace it, including overlapping hits. Inspection preserves it. |
-| Combine | Shared direct toggle, initially off; icon before selected count in Map header and List footer. On unions map hits, preserves empty-map taps, and enables sport-icon membership toggles. Off retains the group. |
-| Sport icons | Identify sport outside Combine; show overlaid selection checkmarks only inside the mode. Selected rows remain identifiable outside it. No permanent checkbox column. |
-| Show on map | Validate first, then replace by default or union in Combine, activate and frame the target. Existing ordinary-filter recovery remains explicit. |
-| Browsing scope | Only selected activities in Filters intersects the group with ordinary eligibility for Map/List and picking; preserve hidden selected IDs. Stats stays independent. |
-| Clear/reset | Clear includes hidden members and disables Only selected, while retaining Combine. Browsing filter Reset removes ordinary and selected-only restrictions, retaining the group. |
-| Controls | Persistent Map results header / List footer, including active-mode access in detail and at zero selection. Native landscape can use the existing compact-shell adaptation. |
-| Fixtures | Version the intentionally changed interactions and migrate both platform consumers together; do not silently redefine the v1 reference. |
+| Area           | Approved target                                                                                                                                                                                                |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Group          | One shared selected set across Map/List; ordinary map taps replace it, including overlapping hits. Inspection preserves it.                                                                                    |
+| Combine        | Shared direct toggle, initially off; icon before selected count in Map header and List footer. On unions map hits, preserves empty-map taps, and enables sport-icon membership toggles. Off retains the group. |
+| Sport icons    | Identify sport outside Combine; show overlaid selection checkmarks only inside the mode. Selected rows remain identifiable outside it. No permanent checkbox column.                                           |
+| Show on map    | Validate first, then replace by default or union in Combine, activate and frame the target. Existing ordinary-filter recovery remains explicit.                                                                |
+| Browsing scope | Only selected activities in Filters intersects the group with ordinary eligibility for Map/List and picking; preserve hidden selected IDs. Stats stays independent.                                            |
+| Clear/reset    | Clear includes hidden members and disables Only selected, while retaining Combine. Browsing filter Reset removes ordinary and selected-only restrictions, retaining the group.                                 |
+| Controls       | Persistent Map results header / List footer, including active-mode access in detail and at zero selection. Native landscape can use the existing compact-shell adaptation.                                     |
+| Fixtures       | Version the intentionally changed interactions and migrate both platform consumers together; do not silently redefine the v1 reference.                                                                        |
 
 See the [delivery plan](activity-selection-design.md#delivery-plan) for state, cache, query safety, native hosts and acceptance. Stats ends Combine while preserving group/scope. Transient browsing sheets retain it. Native device/accessibility acceptance remains explicit validation work.
 
@@ -37,20 +37,20 @@ These are three distinct concepts:
 
 Visibility means passing the shared activity filter, not being inside the current camera bounds. The results panel shows **visible selected activities**; its count says `N selected · H hidden by filters` when necessary. Map layers and picking use the same visibility predicate. Hidden selected routes are neither drawn nor picked; their IDs remain selected until explicitly cleared, removed or deleted. This preserves deliberate multi-selection without misleading counts.
 
-| Event | Selection | Active map activity | List inspection |
-| --- | --- | --- | --- |
-| Select one / replace selection | Replace with supplied existing IDs | If exactly one resulting selected ID is visible, activate it; otherwise retain the existing active ID only if still selected and visible, or clear | Unchanged |
-| Add selection | Union supplied existing IDs with selection | Preserve the existing active ID if still selected and visible, otherwise none. Adding alone never activates a result, including an addition to empty selection | Unchanged |
-| Remove selection | Subtract supplied IDs | If selection changed and exactly one remaining selected ID is visible, activate that ID; otherwise retain the existing active ID only if still selected and visible, or clear | Unchanged |
-| Toggle one ID | Add if unselected; remove if selected | Use the corresponding add or remove rule above | Unchanged |
-| Activate a result | Unchanged | Set if selected and visible; an invalid activation clears active without selecting anything | Unchanged |
-| Open/close list detail | Unchanged | Unchanged | Open/clear inspected ID |
-| Filter changes | Preserve existing selected IDs | Preserve only if still visible; otherwise clear. Never activate another result, even if exactly one visible selection remains. Restoring a filter does not reopen a formerly active detail | Close if the inspected row is no longer visible |
-| Select all in named scope | Union the indicated IDs with existing selection | Use the add rule; do not activate a new result | Unchanged |
-| Deselect all in named scope | Subtract only the indicated IDs | Use the remove rule | Unchanged |
-| Clear selection | Empty | None | Unchanged |
-| Committed deletion/rebootstrap removal | Remove absent IDs from selection and visibility | Use the remove rule, based on whether selected IDs were removed | Close if absent |
-| Logout/account/deployment transition | Empty | None | None |
+| Event                                  | Selection                                       | Active map activity                                                                                                                                                                        | List inspection                                 |
+| -------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| Select one / replace selection         | Replace with supplied existing IDs              | If exactly one resulting selected ID is visible, activate it; otherwise retain the existing active ID only if still selected and visible, or clear                                         | Unchanged                                       |
+| Add selection                          | Union supplied existing IDs with selection      | Preserve the existing active ID if still selected and visible, otherwise none. Adding alone never activates a result, including an addition to empty selection                             | Unchanged                                       |
+| Remove selection                       | Subtract supplied IDs                           | If selection changed and exactly one remaining selected ID is visible, activate that ID; otherwise retain the existing active ID only if still selected and visible, or clear              | Unchanged                                       |
+| Toggle one ID                          | Add if unselected; remove if selected           | Use the corresponding add or remove rule above                                                                                                                                             | Unchanged                                       |
+| Activate a result                      | Unchanged                                       | Set if selected and visible; an invalid activation clears active without selecting anything                                                                                                | Unchanged                                       |
+| Open/close list detail                 | Unchanged                                       | Unchanged                                                                                                                                                                                  | Open/clear inspected ID                         |
+| Filter changes                         | Preserve existing selected IDs                  | Preserve only if still visible; otherwise clear. Never activate another result, even if exactly one visible selection remains. Restoring a filter does not reopen a formerly active detail | Close if the inspected row is no longer visible |
+| Select all in named scope              | Union the indicated IDs with existing selection | Use the add rule; do not activate a new result                                                                                                                                             | Unchanged                                       |
+| Deselect all in named scope            | Subtract only the indicated IDs                 | Use the remove rule                                                                                                                                                                        | Unchanged                                       |
+| Clear selection                        | Empty                                           | None                                                                                                                                                                                       | Unchanged                                       |
+| Committed deletion/rebootstrap removal | Remove absent IDs from selection and visibility | Use the remove rule, based on whether selected IDs were removed                                                                                                                            | Close if absent                                 |
+| Logout/account/deployment transition   | Empty                                           | None                                                                                                                                                                                       | None                                            |
 
 All active-ID rules use the **resulting selected set intersected with filter-visible IDs**, not just the IDs supplied by the event. Adding an already selected ID or removing an unselected ID is a no-op and does not reopen a detail. A multi-ID toggle, if exposed, computes the final set once: use the remove rule if any previously selected ID was removed, otherwise the add rule. Show on map is an explicit exception to passive addition: it adds the target **and activates it**, as specified below.
 
@@ -74,14 +74,14 @@ Owners: #198 reconciles web selection; #204–#207 implement native state/naviga
 
 All restrictions combine with AND. There is one filter state for list, map routes, result counts, photo eligibility and filtered summaries. Reset means all known sports, no date/numeric restriction, empty search, and **Any** for each binary field.
 
-| Filter | Contract |
-| --- | --- |
-| Name search | Normalize name/query to Unicode NFC, use locale-independent lowercase, trim the query's outer whitespace, then perform substring matching. Internal whitespace and accents remain significant. Empty/whitespace-only search imposes no restriction. |
-| Sport types | A set of canonical sport types; no selected sports means no results. A missing fixture field means all, not an empty set. |
-| Sport groups | A single group toggle modifies only its member types: all → none; none or mixed → all. Derive all/none/mixed from those types. An explicit solo-group action may deselect other groups. There is no second hidden category predicate that can contradict checked types. Existing category memberships/colors are the reference. |
-| Commute/private/flagged | Each has Any/Yes/No. Any includes true, false and unknown/null; Yes matches only true; No matches only false. Unknown is not false. All three restrictions must be visible and resettable. |
-| Numeric values | Inclusive `>=` or `<=` on distance, elapsed duration and elevation gain. An active comparison excludes absent/non-finite values. A measured zero participates normally. UI input converts exactly once to canonical metres/seconds. No restriction means missing values are included. |
-| Dates | Inclusive activity-local calendar-day range, represented semantically as `YYYY-MM-DD` endpoints. No restriction means all dates. Reject invalid/inverted UI ranges with actionable feedback rather than silently applying a different range. |
+| Filter                  | Contract                                                                                                                                                                                                                                                                                                                        |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Name search             | Normalize name/query to Unicode NFC, use locale-independent lowercase, trim the query's outer whitespace, then perform substring matching. Internal whitespace and accents remain significant. Empty/whitespace-only search imposes no restriction.                                                                             |
+| Sport types             | A set of canonical sport types; no selected sports means no results. A missing fixture field means all, not an empty set.                                                                                                                                                                                                       |
+| Sport groups            | A single group toggle modifies only its member types: all → none; none or mixed → all. Derive all/none/mixed from those types. An explicit solo-group action may deselect other groups. There is no second hidden category predicate that can contradict checked types. Existing category memberships/colors are the reference. |
+| Commute/private/flagged | Each has Any/Yes/No. Any includes true, false and unknown/null; Yes matches only true; No matches only false. Unknown is not false. All three restrictions must be visible and resettable.                                                                                                                                      |
+| Numeric values          | Inclusive `>=` or `<=` on distance, elapsed duration and elevation gain. An active comparison excludes absent/non-finite values. A measured zero participates normally. UI input converts exactly once to canonical metres/seconds. No restriction means missing values are included.                                           |
+| Dates                   | Inclusive activity-local calendar-day range, represented semantically as `YYYY-MM-DD` endpoints. No restriction means all dates. Reject invalid/inverted UI ranges with actionable feedback rather than silently applying a different range.                                                                                    |
 
 The current `start_date_local` wire timestamp is a local wall-clock value transported with a UTC-shaped suffix. Its date components describe where/when the activity took place; **do not apply the device timezone or the activity timezone to it again**. For the existing JavaScript Date representation, extracting the ISO/UTC calendar components recovers that encoded local day. UI picker Date objects instead describe the user's chosen calendar components; convert their local Y/M/D to date keys before comparison. Prefer persisting day keys for new state; explicitly migrate legacy persisted instant bounds without losing the user's chosen day in the originating timezone when it is recoverable. Legacy records without timezone context cannot reconstruct a traveled device's historical timezone exactly; document and test the deterministic fallback rather than claiming otherwise.
 
@@ -101,16 +101,16 @@ For each supported primary key, null/unknown values sort last in **both** direct
 
 Supported fields include the existing web sort/display controls: ID, name/description, local date/time, sport type, distance, moving/elapsed time, speed, elevation gain/extrema, HR/power fields, kudos count, photo count and geometry status where present. If a column has no meaningful sort (for example a composite action control), disable its sort affordance explicitly. “No sort” returns to the documented default. Native exposes the same meaningful sort keys through a compact menu; it need not copy a desktop table header.
 
-| Metric | Meaning / aggregation | Display meaning |
-| --- | --- | --- |
-| Distance | Sum of known metres | Kilometres to one decimal |
-| Moving/elapsed duration | Separate sums of known seconds | Hours/minutes, then days/hours for long durations; never conflate moving with elapsed |
-| Elevation gain | Sum of known metres | Whole metres |
-| Elevation high/low | Maximum/minimum of known values | Whole metres; independently available |
-| Average speed | Arithmetic mean of known activity averages (including zero), not total distance/time | km/h to one decimal |
-| Average/weighted-average watts and average HR | Arithmetic mean of known activity values; “weighted” is the source activity metric, not an aggregate weighting instruction | Whole watts/bpm |
-| Max watts/max HR | Maximum of known values | Whole watts/bpm |
-| Date count | Distinct activity-local calendar days in scope | Day count, independent of viewer timezone |
+| Metric                                        | Meaning / aggregation                                                                                                      | Display meaning                                                                       |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Distance                                      | Sum of known metres                                                                                                        | Kilometres to one decimal                                                             |
+| Moving/elapsed duration                       | Separate sums of known seconds                                                                                             | Hours/minutes, then days/hours for long durations; never conflate moving with elapsed |
+| Elevation gain                                | Sum of known metres                                                                                                        | Whole metres                                                                          |
+| Elevation high/low                            | Maximum/minimum of known values                                                                                            | Whole metres; independently available                                                 |
+| Average speed                                 | Arithmetic mean of known activity averages (including zero), not total distance/time                                       | km/h to one decimal                                                                   |
+| Average/weighted-average watts and average HR | Arithmetic mean of known activity values; “weighted” is the source activity metric, not an aggregate weighting instruction | Whole watts/bpm                                                                       |
+| Max watts/max HR                              | Maximum of known values                                                                                                    | Whole watts/bpm                                                                       |
+| Date count                                    | Distinct activity-local calendar days in scope                                                                             | Day count, independent of viewer timezone                                             |
 
 Do not coerce null to zero in rows, detail, filtering or totals. Show each available metric independently; missing a max does not hide an average, and missing elevation extrema does not hide gain. An empty scope has count zero and additive totals zero; means/extrema are absent. A nonempty all-unknown scope has an **unknown** total, not a measured zero. For partial aggregates track the known-value count and make missing coverage discoverable. Round only for display, using the same semantic precision; locale-specific separators/spacing/date presentation may remain native. Numeric fixtures compare unrounded results within `1e-9`.
 
@@ -120,17 +120,17 @@ Owners: #199, #203, #211 and #212. The native default hierarchy is name/sport/lo
 
 ## Adaptive presentation and desktop equivalents
 
-| Web outcome | Native adaptation / expected behavior | Owner |
-| --- | --- | --- |
-| One selected route detail | Direct detail in map results; keep map interaction available | #208/#209 |
-| Multiple selected routes | Compact count/result panel with explicit expansion; clear selection and active feedback remain reachable | #209 |
+| Web outcome                           | Native adaptation / expected behavior                                                                                                                                             | Owner     |
+| ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| One selected route detail             | Direct detail in map results; keep map interaction available                                                                                                                      | #208/#209 |
+| Multiple selected routes              | Compact count/result panel with explicit expansion; clear selection and active feedback remain reachable                                                                          | #209      |
 | Inline independent list detail (#194) | A single inline expansion on larger layouts; compact native presentation may use a detented detail if it preserves independent inspection, scroll return and separate action taps | #208/#211 |
-| Responsive table/hidden columns | Configurable row metrics/density, full information in detail, adaptive wider iPad layout | #211 |
-| Column pinning/horizontal width modes | Keep identifying name/context visible while browsing metrics; do not require a 900px table on a phone | #211 |
-| Pagination | Lazy continuous traversal is acceptable if all filtered results are reachable and summary scope remains explicit | #211/#212 |
-| Hover photo/route hints | Explicit tap and accessible actions, including fullscreen gallery | #218/#219 |
-| Desktop fullscreen | Map-focused native presentation with collapsible chrome and recoverable controls | #209/#223 |
-| Rectangle selection | Explicit confirmed area mode plus accessible visible-region alternative | #207 |
+| Responsive table/hidden columns       | Configurable row metrics/density, full information in detail, adaptive wider iPad layout                                                                                          | #211      |
+| Column pinning/horizontal width modes | Keep identifying name/context visible while browsing metrics; do not require a 900px table on a phone                                                                             | #211      |
+| Pagination                            | Lazy continuous traversal is acceptable if all filtered results are reachable and summary scope remains explicit                                                                  | #211/#212 |
+| Hover photo/route hints               | Explicit tap and accessible actions, including fullscreen gallery                                                                                                                 | #218/#219 |
+| Desktop fullscreen                    | Map-focused native presentation with collapsible chrome and recoverable controls                                                                                                  | #209/#223 |
+| Rectangle selection                   | Explicit confirmed area mode plus accessible visible-region alternative                                                                                                           | #207      |
 
 These are proposed capability-preserving adaptations for review, not claims of reviewed visual acceptance. Any capability removed rather than adapted needs an explicit exception linked from #195.
 
@@ -150,31 +150,31 @@ Photo metadata is already synced. Galleries preserve activity association and di
 
 `cachePresentationCases.expected` names observable outcomes, not literal UI strings or mutually exclusive internal states:
 
-| Fixture outcome | Required presentation and lifecycle behavior |
-| --- | --- |
-| `show_cached_offline` | Read the authorized, completed cache, including current cached profiles; lack of connectivity or old sync age alone does not clear it or expire sign-in. |
-| `show_cached_with_retry` | Keep that cache visible after a retryable transport failure and expose retry/progress feedback while respecting server retry timing. Do not treat the failure as sign-out. |
-| `clear_scoped_data_sign_in_expired` | A confirmed invalid session clears/fences scoped activity, photo and stream caches and presents expired sign-in/reconnection UI. |
-| `profile_not_current` | Known source invalidation suppresses the invalidated profile's current presentation; keep unrelated authorized activity data. Retained last-good storage is not permission to display that profile as current. |
+| Fixture outcome                          | Required presentation and lifecycle behavior                                                                                                                                                                                                     |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `show_cached_offline`                    | Read the authorized, completed cache, including current cached profiles; lack of connectivity or old sync age alone does not clear it or expire sign-in.                                                                                         |
+| `show_cached_with_retry`                 | Keep that cache visible after a retryable transport failure and expose retry/progress feedback while respecting server retry timing. Do not treat the failure as sign-out.                                                                       |
+| `clear_scoped_data_sign_in_expired`      | A confirmed invalid session clears/fences scoped activity, photo and stream caches and presents expired sign-in/reconnection UI.                                                                                                                 |
+| `profile_not_current`                    | Known source invalidation suppresses the invalidated profile's current presentation; keep unrelated authorized activity data. Retained last-good storage is not permission to display that profile as current.                                   |
 | `rebootstrap_once_reconcile_orphan_data` | Recover from `sync_rebootstrap_required` with one bounded snapshot replacement/catch-up attempt. Reconcile orphaned scoped activity/photo/stream data against the authoritative snapshot; a repeat failure surfaces an error instead of looping. |
 
 Owners: #200, #213–#219, #227 and #230. Stream contracts remain in #185; this document is not an alternate transport schema.
 
 ## Capability ownership and release evidence
 
-| Capability / preparation | Implementation issues | Evidence gate |
-| --- | --- | --- |
-| Shared decisions, fixture corpus, matching references | #196 | Fixture consumers plus screenshot/device checklist below |
-| Web filter/state/metric/stream reconciliation | #197–#200 | Shared vectors and focused regression tests |
-| Authenticated v1 edit/refresh | #201/#202 | Owned/non-owned boundaries, truthful upstream/local outcomes, sync/lifecycle tests |
-| Native faithful models, state, camera, picking, area selection | #203–#207 | Transition and geometry fixtures |
-| Reusable detail/results/filter/list/summary/offline UI | #208–#213 | Composed flows and adaptive/device review |
-| Native transport, summary cache, raw cache | #214–#216 under #185 | Disk reopen, generation/race/rebootstrap tests |
-| Elevation and photo gallery/map layer | #217–#219 | Series/coordinate/offline and accessibility fixtures |
-| Native edit, refresh, GPX/Strava actions | #220–#222 | Real actions with progress/error; no simulated success |
-| Location/terrain, GPX import, image export, catalogue/Friflyt | #223–#226 | Style/feature/file fixtures and physical-device checks |
-| Composed regression, adaptive/accessibility, performance | #227–#229 | Linked release evidence, not source inspection alone |
-| Default backfill and compact-summary investigation | #230 | Observed production rollout; measured format decision |
+| Capability / preparation                                       | Implementation issues | Evidence gate                                                                      |
+| -------------------------------------------------------------- | --------------------- | ---------------------------------------------------------------------------------- |
+| Shared decisions, fixture corpus, matching references          | #196                  | Fixture consumers plus screenshot/device checklist below                           |
+| Web filter/state/metric/stream reconciliation                  | #197–#200             | Shared vectors and focused regression tests                                        |
+| Authenticated v1 edit/refresh                                  | #201/#202             | Owned/non-owned boundaries, truthful upstream/local outcomes, sync/lifecycle tests |
+| Native faithful models, state, camera, picking, area selection | #203–#207             | Transition and geometry fixtures                                                   |
+| Reusable detail/results/filter/list/summary/offline UI         | #208–#213             | Composed flows and adaptive/device review                                          |
+| Native transport, summary cache, raw cache                     | #214–#216 under #185  | Disk reopen, generation/race/rebootstrap tests                                     |
+| Elevation and photo gallery/map layer                          | #217–#219             | Series/coordinate/offline and accessibility fixtures                               |
+| Native edit, refresh, GPX/Strava actions                       | #220–#222             | Real actions with progress/error; no simulated success                             |
+| Location/terrain, GPX import, image export, catalogue/Friflyt  | #223–#226             | Style/feature/file fixtures and physical-device checks                             |
+| Composed regression, adaptive/accessibility, performance       | #227–#229             | Linked release evidence, not source inspection alone                               |
+| Default backfill and compact-summary investigation             | #230                  | Observed production rollout; measured format decision                              |
 
 The following evidence is still outstanding for #196 and must not be marked complete by a documentation-only PR:
 

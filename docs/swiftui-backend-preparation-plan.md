@@ -1,5 +1,11 @@
 # SwiftUI Backend Preparation Plan
 
+> **Historical record.** This describes the implementation from before the
+> move to Convex (November 2026), when the library, its jobs and their
+> verification lived in Postgres. The migrations, database proofs and hourly
+> jobs named here no longer exist; for how this works now, see
+> [backend/README.md](../backend/README.md).
+
 ## Objective
 
 Prepare the existing Next.js application to support a native SwiftUI client
@@ -248,16 +254,16 @@ Required correction:
 
 ### Initial endpoint set
 
-| Method | Path | Purpose |
-| --- | --- | --- |
-| `GET` | `/api/v1/me` | Safe current-user and connection status |
-| `GET` | `/api/v1/sync/bootstrap` | Paginated local database bootstrap |
-| `GET` | `/api/v1/sync/changes` | Ordered activity/photo upserts and deletions |
-| `GET` | `/api/v1/activities/{id}` | Fetch one complete activity DTO |
-| `PATCH` | `/api/v1/activities/{id}` | Update fields in Strava and local storage |
-| `POST` | `/api/v1/activities/{id}/refresh` | Explicitly refetch one activity and photos |
-| `POST` | `/api/v1/auth/mobile/exchange` | Exchange a one-use mobile login code |
-| `POST` | `/api/v1/auth/logout` | Revoke the current ActivityMap session |
+| Method  | Path                              | Purpose                                      |
+| ------- | --------------------------------- | -------------------------------------------- |
+| `GET`   | `/api/v1/me`                      | Safe current-user and connection status      |
+| `GET`   | `/api/v1/sync/bootstrap`          | Paginated local database bootstrap           |
+| `GET`   | `/api/v1/sync/changes`            | Ordered activity/photo upserts and deletions |
+| `GET`   | `/api/v1/activities/{id}`         | Fetch one complete activity DTO              |
+| `PATCH` | `/api/v1/activities/{id}`         | Update fields in Strava and local storage    |
+| `POST`  | `/api/v1/activities/{id}/refresh` | Explicitly refetch one activity and photos   |
+| `POST`  | `/api/v1/auth/mobile/exchange`    | Exchange a one-use mobile login code         |
+| `POST`  | `/api/v1/auth/logout`             | Revoke the current ActivityMap session       |
 
 Bulk repair, administrative synchronization, public sharing, and CSV export do
 not need to be part of the first native API.

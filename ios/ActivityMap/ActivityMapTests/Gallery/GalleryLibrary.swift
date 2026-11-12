@@ -4,8 +4,8 @@ import Foundation
 
 /// Activities shown in the screenshot gallery, decoded through the production
 /// mapper. Prefers, in order: a full local export named by
-/// `ACTIVITYMAP_GALLERY_LIBRARY`, the committed curated `gallery-activities.json`
-/// (from `scripts/export-gallery-library.mjs`), then a deterministic synthetic set.
+/// `ACTIVITYMAP_GALLERY_LIBRARY`, the committed curated `gallery-activities.json`,
+/// then a deterministic synthetic set.
 enum GalleryLibrary {
     struct Loaded {
         let source: String

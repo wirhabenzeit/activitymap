@@ -12,11 +12,11 @@ Standard's night lighting darkens custom line layers when emissive strength is l
 
 The existing screenshot gallery uses production screens and its committed activity fixture. Captures used a public Mapbox token and real remote tiles, rather than the gallery's offline fallback. The before run temporarily omitted only the six emissive modifiers; the fixed source was restored afterward.
 
-| State | Before, night | Fixed, night | Fixed, day |
-| --- | --- | --- | --- |
-| Ordinary routes | [Before](ios-route-colors/before-map--phone-dark.jpg) | [After](ios-route-colors/after-map--phone-dark.jpg) | [Day](ios-route-colors/after-map--phone.jpg) |
+| State                | Before, night                                                 | Fixed, night                                                | Fixed, day                                           |
+| -------------------- | ------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------- |
+| Ordinary routes      | [Before](ios-route-colors/before-map--phone-dark.jpg)         | [After](ios-route-colors/after-map--phone-dark.jpg)         | [Day](ios-route-colors/after-map--phone.jpg)         |
 | Four selected routes | [Before](ios-route-colors/before-map-results--phone-dark.jpg) | [After](ios-route-colors/after-map-results--phone-dark.jpg) | [Day](ios-route-colors/after-map-results--phone.jpg) |
-| Active route | [Before](ios-route-colors/before-map-detail--phone-dark.jpg) | [After](ios-route-colors/after-map-detail--phone-dark.jpg) | [Day](ios-route-colors/after-map-detail--phone.jpg) |
+| Active route         | [Before](ios-route-colors/before-map-detail--phone-dark.jpg)  | [After](ios-route-colors/after-map-detail--phone-dark.jpg)  | [Day](ios-route-colors/after-map-detail--phone.jpg)  |
 
 The fixed night captures show the sport colors and white outlines clearly. The day captures retain the intended palette. The white casing is prominent but still distinguishes selected routes in these simulator captures; no palette or casing adjustment was needed for this fix.
 

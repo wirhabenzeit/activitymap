@@ -51,11 +51,11 @@ Baseline: `55528efd`. Tests use synthetic photos; no private image library or li
 
 The previous web lightbox is captured from the baseline source after activating photo 2; it opens on photo 1 and shows no caption/counter. The replacement displays the tapped photo with explicit controls. These isolated production-component captures establish the interaction changes; they do not establish physical-device or live-account release acceptance.
 
-| Capture | Reference |
-| --- | --- |
-| Previous web lightbox | [Before, desktop](photo-viewer/web-before-desktop.png) |
-| New web viewer | [Portrait, phone](photo-viewer/web-portrait-phone.png), [panorama, desktop](photo-viewer/web-panorama-desktop.png), [broken image](photo-viewer/web-broken-image.png) |
-| Native viewer | [Phone](photo-viewer/ios-phone.png), [landscape layout](photo-viewer/ios-landscape.png), [large text](photo-viewer/ios-large-text.png), [missing image](photo-viewer/ios-missing.png) |
+| Capture               | Reference                                                                                                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Previous web lightbox | [Before, desktop](photo-viewer/web-before-desktop.png)                                                                                                                                |
+| New web viewer        | [Portrait, phone](photo-viewer/web-portrait-phone.png), [panorama, desktop](photo-viewer/web-panorama-desktop.png), [broken image](photo-viewer/web-broken-image.png)                 |
+| Native viewer         | [Phone](photo-viewer/ios-phone.png), [landscape layout](photo-viewer/ios-landscape.png), [large text](photo-viewer/ios-large-text.png), [missing image](photo-viewer/ios-missing.png) |
 
 Remaining release review: actual Safari/iPhone touch and focus behavior; native VoiceOver focus/announcements, real rotation and iPad; live-account long-offline reconciliation; and full map route picking/count screenshots against the composed app. Native map photo markers are still owned by #219. No issues are closed by this validation record.
 

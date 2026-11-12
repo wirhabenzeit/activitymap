@@ -1,7 +1,7 @@
 {
   "node": "v22.22.0",
   "platform": "darwin/arm64",
-  "description": "Synthetic summary payloads, Node gzip defaults/Brotli q5; PostgreSQL pg_column_size on stored JSONB, not full-table/disk allocation. Times are local warmed calls. No deployed HTTP, activity-sync page or device-memory claim.",
+  "description": "Synthetic summary payloads, Node gzip defaults/Brotli q5. Times are local warmed calls. No deployed HTTP, activity-sync page or device-memory claim.",
   "rows": [
     {
       "name": "short-ride",
@@ -18,12 +18,12 @@
         "brotli": 153
       },
       "encode": {
-        "medianUs": 6.2910000000044874,
-        "p95Us": 6.750000000010914
+        "medianUs": 6.1670000000049185,
+        "p95Us": 6.582999999977801
       },
       "decode": {
-        "medianUs": 4.166999999995369,
-        "p95Us": 5.1660000000026685
+        "medianUs": 4.37499999998181,
+        "p95Us": 5.749999999977717
       }
     },
     {
@@ -41,12 +41,12 @@
         "brotli": 718
       },
       "encode": {
-        "medianUs": 61.16599999998584,
-        "p95Us": 103.3339999999896
+        "medianUs": 64.24999999998704,
+        "p95Us": 111.08300000000781
       },
       "decode": {
-        "medianUs": 17.666999999988775,
-        "p95Us": 19.1250000000025
+        "medianUs": 18.041999999979907,
+        "p95Us": 19.58299999998303
       }
     },
     {
@@ -64,12 +64,12 @@
         "brotli": 1200
       },
       "encode": {
-        "medianUs": 63.91600000000608,
-        "p95Us": 70.83399999999074
+        "medianUs": 64.41699999999173,
+        "p95Us": 80.33400000005031
       },
       "decode": {
-        "medianUs": 20.832999999981894,
-        "p95Us": 21.54200000001083
+        "medianUs": 19.917000000020835,
+        "p95Us": 21.24999999995225
       }
     },
     {
@@ -87,12 +87,12 @@
         "brotli": 980
       },
       "encode": {
-        "medianUs": 61.666999999999916,
-        "p95Us": 127.37499999997226
+        "medianUs": 61.91599999999653,
+        "p95Us": 69.500000000005
       },
       "decode": {
-        "medianUs": 18.167000000005373,
-        "p95Us": 20.916999999997188
+        "medianUs": 16.833000000019638,
+        "p95Us": 19.457999999985987
       }
     },
     {
@@ -110,12 +110,12 @@
         "brotli": 439
       },
       "encode": {
-        "medianUs": 60.20800000004556,
-        "p95Us": 71.95799999999508
+        "medianUs": 58.91600000001063,
+        "p95Us": 67.37500000002683
       },
       "decode": {
-        "medianUs": 16.999999999995907,
-        "p95Us": 19.833999999946172
+        "medianUs": 16.499999999950887,
+        "p95Us": 18.000000000029104
       }
     },
     {
@@ -133,12 +133,12 @@
         "brotli": 576
       },
       "encode": {
-        "medianUs": 32.83299999998235,
-        "p95Us": 37.8329999999778
+        "medianUs": 31.375000000025466,
+        "p95Us": 35.91700000004039
       },
       "decode": {
-        "medianUs": 10.24999999992815,
-        "p95Us": 11.833000000024185
+        "medianUs": 9.291999999959444,
+        "p95Us": 9.79199999994762
       }
     },
     {
@@ -156,12 +156,12 @@
         "brotli": 676
       },
       "encode": {
-        "medianUs": 29.792000000043117,
-        "p95Us": 36.66699999996581
+        "medianUs": 28.541000000018357,
+        "p95Us": 31.04099999995924
       },
       "decode": {
         "medianUs": 10.5829999999969,
-        "p95Us": 12.000000000057298
+        "p95Us": 11.374999999929969
       }
     },
     {
@@ -179,12 +179,12 @@
         "brotli": 420
       },
       "encode": {
-        "medianUs": 47.207999999955064,
-        "p95Us": 49.58299999998417
+        "medianUs": 47.37500000010186,
+        "p95Us": 52.58299999991323
       },
       "decode": {
-        "medianUs": 13.583000000039647,
-        "p95Us": 28.95899999998619
+        "medianUs": 13.874999999984539,
+        "p95Us": 18.16699999994853
       }
     },
     {
@@ -202,12 +202,12 @@
         "brotli": 728
       },
       "encode": {
-        "medianUs": 60.417000000029475,
-        "p95Us": 67.49999999999545
+        "medianUs": 60.54200000005494,
+        "p95Us": 70.70899999996527
       },
       "decode": {
-        "medianUs": 17.665999999962878,
-        "p95Us": 18.917000000101325
+        "medianUs": 18.24999999996635,
+        "p95Us": 20.75000000002092
       }
     },
     {
@@ -226,64 +226,12 @@
       },
       "encode": {
         "medianUs": 0.12500000002546585,
-        "p95Us": 0.16700000003311288
+        "p95Us": 0.12500000002546585
       },
       "decode": {
-        "medianUs": 0.8750000000645741,
-        "p95Us": 0.9170000000722212
+        "medianUs": 0.8749999999508873,
+        "p95Us": 1.0419999999840002
       }
-    }
-  ],
-  "postgresColumns": [
-    {
-      "name": "flat-negative-altitude",
-      "legacy_bytes": 5406,
-      "compact_bytes": 659
-    },
-    {
-      "name": "gps-discontinuity",
-      "legacy_bytes": 5452,
-      "compact_bytes": 1125
-    },
-    {
-      "name": "indoor-time-no-gps",
-      "legacy_bytes": 2906,
-      "compact_bytes": 1044
-    },
-    {
-      "name": "long-ride",
-      "legacy_bytes": 6858,
-      "compact_bytes": 1771
-    },
-    {
-      "name": "no-axis",
-      "legacy_bytes": 35,
-      "compact_bytes": 77
-    },
-    {
-      "name": "noisy-power",
-      "legacy_bytes": 6829,
-      "compact_bytes": 1525
-    },
-    {
-      "name": "pauses-irregular-axis",
-      "legacy_bytes": 3446,
-      "compact_bytes": 861
-    },
-    {
-      "name": "short-ride",
-      "legacy_bytes": 897,
-      "compact_bytes": 333
-    },
-    {
-      "name": "smooth-ride",
-      "legacy_bytes": 6330,
-      "compact_bytes": 1113
-    },
-    {
-      "name": "sparse-sensors",
-      "legacy_bytes": 5561,
-      "compact_bytes": 677
     }
   ]
 }

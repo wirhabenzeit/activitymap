@@ -1,9 +1,9 @@
 # Quality checks
 
 Use Node 22+ and the repository's pinned pnpm version. Install dependencies with
-`pnpm install --frozen-lockfile`. The commands below do not run migrations or need
-a database. Database integration checks remain in the separate CI job with its
-explicit disposable Postgres service.
+`pnpm install --frozen-lockfile`. The commands below need no database or backend
+deployment. The Convex backend has its own checks and tests
+(`backend/README.md`).
 
 | Command                                | Boundary                                                                                                                          |
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |

@@ -2,8 +2,10 @@ import Foundation
 import Testing
 @testable import ActivityMap
 
-/// Opt-in proof against the actual local Next.js handlers and Docker database.
-/// Run with scripts/verify-ios-sync-local.mjs; CI uses deterministic fixtures.
+/// Opt-in proof against the actual local Next.js handlers. Runs when
+/// `ACTIVITYMAP_SYNC_TEST_TOKEN` holds a bearer session of a local account and
+/// the expected counts are set (see the iOS README); CI uses deterministic
+/// fixtures.
 @MainActor
 struct LiveSyncTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["ACTIVITYMAP_SYNC_TEST_TOKEN"] != nil))
