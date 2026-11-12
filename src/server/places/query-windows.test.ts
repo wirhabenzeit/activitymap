@@ -100,3 +100,21 @@ void test('window inputs are bounded and duplicate routes share the same query b
     /Invalid/,
   );
 });
+void test('a long route is covered in stretches, not by one box around it', () => {
+  // A diagonal of about 500 km in 2,000 steps.
+  const points = Array.from({ length: 2001 }, (_, i) => [
+    6 + (i / 2000) * 5,
+    45 + (i / 2000) * 3,
+  ]);
+  const boxes = placeQueryWindows(geometry(...points), 300);
+  assert.equal(boxes.length, 8);
+  // Every recorded point and its discovery circle is still inside.
+  for (const [lon, lat] of points)
+    for (let bearing = 0; bearing < 360; bearing += 90)
+      assert(contains(boxes, destination(lon!, lat!, bearing, 304)));
+  // The corners of the route's bounding box, far from the route, are not.
+  assert(!contains(boxes, [6, 48]));
+  assert(!contains(boxes, [11, 45]));
+  const area = (b: PlaceQueryWindow) => (b.east - b.west) * (b.north - b.south);
+  assert(boxes.reduce((sum, b) => sum + area(b), 0) < (5 * 3) / 6);
+});
