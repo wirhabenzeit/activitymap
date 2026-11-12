@@ -83,9 +83,15 @@ function geographicWindows(box: Box): PlaceQueryWindow[] {
   return [{ west, south, east, north }];
 }
 
-/** One padded envelope per continuous section, never a bridge between distant
- * recording sections/activities. Uses the local discovery radius plus 2m, so
- * filtering cannot remove any candidate the existing local matcher can see. */
+/** How many consecutive track edges share one window. */
+const WINDOW_EDGES = 256;
+
+/** Padded envelopes along each continuous section, one per stretch of
+ * `WINDOW_EDGES` edges: never a bridge between distant recording
+ * sections/activities, and never one box around a long route, which would
+ * take in every place of the region it crosses. Uses the local discovery
+ * radius plus 2m, so filtering cannot remove any candidate the existing local
+ * matcher can see. */
 export function placeQueryWindows(
   geometry: GeometryCollection,
   radiusM: number,
@@ -101,12 +107,21 @@ export function placeQueryWindows(
     if (!points.length) throw new Error('Empty prepared section');
     let previous = vector(points[0]!),
       envelope = bounds([previous]);
+    const close = () =>
+      result.push(
+        ...geographicWindows(combine([envelope], radiusM * 1.01 + 3)),
+      );
     for (let i = 1; i < points.length; i++) {
       const next = vector(points[i]!);
       envelope = combine([envelope, arc(previous, next).box]);
       previous = next;
+      // The next stretch starts at the point this one ends on.
+      if (i % WINDOW_EDGES === 0 && i < points.length - 1) {
+        close();
+        envelope = bounds([previous]);
+      }
     }
-    result.push(...geographicWindows(combine([envelope], radiusM * 1.01 + 3)));
+    close();
   }
   return uniqueQueryWindows(result);
 }
