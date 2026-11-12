@@ -22,6 +22,7 @@ import {
   StravaBudgetBusyError,
   StravaBudgetExceededError,
 } from '../../src/server/strava/request-budget';
+import { BridgeResponseError } from '../../src/server/sync/bridge-response-error';
 import schema from '../convex/schema';
 
 /**
@@ -735,4 +736,101 @@ void test('batched rate limits retain ordered rejection and do not count later b
     requests.filter((request) => request.kind === 'rateLimits').length,
     2,
   );
+});
+
+void test('rate limits survive app-first rollout and use batching automatically after upgrade', async (t) => {
+  const { convex, options } = setup(t);
+  let upgraded = false;
+  const operations: string[] = [];
+  const limits = convexRateLimitRepository(
+    convexAuthStore({
+      ...options,
+      fetcher: async (url, init) => {
+        const { operation } = JSON.parse(String(init?.body)) as {
+          operation: { kind: string };
+        };
+        operations.push(operation.kind);
+        // The previous auth HTTP action returns an empty 400 for unknown kinds.
+        if (!upgraded && operation.kind === 'rateLimits')
+          return new Response(null, { status: 400 });
+        return options.fetcher(url, init);
+      },
+    }),
+  );
+  const windows = [
+    { key: 'session:rollout', windowStart: 0, limit: 2 },
+    { key: 'ip:rollout', windowStart: 0, limit: 10 },
+  ];
+  assert.deepEqual(await limits.incrementManyAndGet!(windows), [1, 1]);
+  assert.deepEqual(await limits.incrementManyAndGet!(windows), [2, 2]);
+  assert.deepEqual(await limits.incrementManyAndGet!(windows), [3]);
+  const ip = await convex.run((ctx) =>
+    ctx.db
+      .query('rateLimits')
+      .withIndex('by_key_window', (q) =>
+        q.eq('key', 'ip:rollout').eq('windowStart', 0),
+      )
+      .unique(),
+  );
+  assert.equal(
+    ip!.count,
+    2,
+    'rejected session must not count the later IP bucket',
+  );
+  upgraded = true;
+  operations.length = 0;
+  assert.deepEqual(
+    await limits.incrementManyAndGet!(
+      windows.map((window) => ({ ...window, windowStart: 1000 })),
+    ),
+    [1, 1],
+  );
+  assert.deepEqual(operations, ['rateLimits']);
+  upgraded = false;
+  operations.length = 0;
+  assert.deepEqual(
+    await limits.incrementManyAndGet!(
+      windows.map((window) => ({ ...window, windowStart: 1000 })),
+    ),
+    [2, 2],
+  );
+  assert.deepEqual(operations, ['rateLimits', 'rateLimit', 'rateLimit']);
+});
+
+void test('rate-limit compatibility never falls back on authorization, conflict, server or transport failures', async (t) => {
+  const { options } = setup(t);
+  const windows = [{ key: 'session:rollout', windowStart: 0, limit: 2 }];
+  for (const status of [401, 403, 409, 429, 500, 503]) {
+    let requests = 0;
+    const limits = convexRateLimitRepository(
+      convexAuthStore({
+        ...options,
+        fetcher: async () => {
+          requests++;
+          return new Response(null, { status });
+        },
+      }),
+    );
+    await assert.rejects(
+      limits.incrementManyAndGet!(windows),
+      (error: unknown) =>
+        error instanceof BridgeResponseError && error.status === status,
+    );
+    assert.equal(requests, 1);
+  }
+  let requests = 0;
+  const limits = convexRateLimitRepository(
+    convexAuthStore({
+      ...options,
+      fetcher: async () => {
+        requests++;
+        throw new TypeError('network unavailable');
+      },
+    }),
+  );
+  await assert.rejects(
+    limits.incrementManyAndGet!(windows),
+    /network unavailable/,
+  );
+  assert.equal(requests, 1);
 });

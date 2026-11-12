@@ -5,7 +5,12 @@ import { convexTest } from 'convex-test';
 import test, { after, mock } from 'node:test';
 
 import syncFixtures from '../../shared/sync-integrity-fixtures.v1.json';
+import { createSyncChangesHandler } from '../../src/app/api/v1/sync/changes/handler';
+import { responseEnvelope } from '../../src/contracts/v1/envelope';
+import { syncChangesPageDTOSchema } from '../../src/contracts/v1/sync';
+import { convexAppAdapter } from '../../src/server/preview/convex';
 import { convexSyncBridge } from '../../src/server/sync/convex-bridge';
+import { encodeSyncCursor } from '../../src/server/sync/cursor';
 import { SyncRebootstrapRequiredError } from '../../src/server/sync/errors';
 import { internal } from '../convex/_generated/api';
 import { publishChange } from '../convex/activityWrites';
@@ -91,6 +96,94 @@ const fixture = previewFixtureActivity(
   'Test ride',
   Date.now(),
 );
+
+void test('new delta API works before and after a backend upgrade without changing its cursor', async (t) => {
+  const convex = convexTest(schema, modules);
+  await convex.mutation(internal.owners.provision, config);
+  const id = '1234';
+  await convex.mutation(testWrites.applySource, {
+    ...source,
+    id,
+    dto: { ...fixture, id },
+  });
+  const secret = 'a'.repeat(64);
+  for (const [name, value] of Object.entries({
+    ACTIVITYMAP_CONVEX_SITE: 'https://convex.invalid',
+    ACTIVITYMAP_CONVEX_KEY_ID: 'current',
+    ACTIVITYMAP_CONVEX_SIGNING_KEY: secret,
+    ACTIVITYMAP_BRIDGE_SIGNING_KEYS: JSON.stringify({ current: secret }),
+  })) {
+    const previous = process.env[name];
+    process.env[name] = value;
+    t.after(() => {
+      if (previous === undefined) delete process.env[name];
+      else process.env[name] = previous;
+    });
+  }
+  const candidate = { ...actor, authentication: 'bearer' as const };
+  let upgraded = false;
+  const operations: string[] = [];
+  const fetcher: typeof fetch = (url, init) => {
+    const { operation } = JSON.parse(String(init?.body)) as {
+      operation: { kind: string };
+    };
+    operations.push(operation.kind);
+    if (!upgraded && operation.kind === 'changesPage')
+      return Promise.resolve(new Response(null, { status: 400 }));
+    return convex.fetch(new URL(String(url)).pathname, init);
+  };
+  const read = async (cursor: string) => {
+    const library = convexAppAdapter(candidate, scope.epoch, fetcher);
+    const handler = createSyncChangesHandler({
+      ...library,
+      resolveActor: async () => candidate,
+      onError: (error) => {
+        throw error;
+      },
+    });
+    const response = await handler(
+      new Request(
+        `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}&limit=500`,
+      ),
+    );
+    assert.equal(response.status, 200);
+    return responseEnvelope(syncChangesPageDTOSchema).parse(
+      await response.json(),
+    ).data;
+  };
+  const cursor = encodeSyncCursor({
+    sequence: 0,
+    athleteId: actor.athleteId,
+    issuedAt: new Date(),
+    backend: convexAppAdapter(candidate, scope.epoch, fetcher).cursorBackend,
+  });
+  const old = await read(cursor);
+  assert.equal(old.items[0]!.activity!.id, id);
+  assert.deepEqual(operations, [
+    'changesPage',
+    'retention',
+    'head',
+    'changes',
+    'activityIds',
+  ]);
+  const empty = await read(old.nextCursor);
+  assert.deepEqual(empty.items, []);
+  assert.equal(empty.nextCursor, old.nextCursor);
+  upgraded = true;
+  operations.length = 0;
+  const fast = await read(cursor);
+  assert.deepEqual(fast, old);
+  assert.deepEqual(operations, ['changesPage']);
+  upgraded = false;
+  operations.length = 0;
+  assert.deepEqual(
+    await read(cursor),
+    old,
+    'backend rollback must restore the legacy path automatically',
+  );
+  assert.equal(operations[0], 'changesPage');
+  assert(operations.includes('retention'));
+});
 
 void test('atomic delta includes current photo metadata and its deletion', async () => {
   const convex = convexTest(schema, modules);

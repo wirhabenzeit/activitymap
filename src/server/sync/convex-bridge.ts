@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { timeRequestWork } from '~/server/api/request-timing';
 import type { Actor } from '~/server/auth/actor';
 
+import { BridgeResponseError } from './bridge-response-error';
 import { SyncRebootstrapRequiredError } from './errors';
 
 const assignmentSchema = z.discriminatedUnion('backend', [
@@ -76,7 +77,10 @@ export function convexSyncBridge(
         throw new SyncRebootstrapRequiredError();
     }
     if (!result.ok)
-      throw new Error(`Convex sync bridge unavailable (${result.status})`);
+      throw new BridgeResponseError(
+        `Convex sync bridge unavailable (${result.status})`,
+        result.status,
+      );
     return result;
   }
 

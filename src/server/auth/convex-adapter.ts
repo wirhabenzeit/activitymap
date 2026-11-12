@@ -3,6 +3,7 @@ import { createHmac, randomBytes } from 'node:crypto';
 import { createAdapterFactory } from 'better-auth/adapters';
 
 import { timeRequestWork } from '~/server/api/request-timing';
+import { BridgeResponseError } from '~/server/sync/bridge-response-error';
 
 /**
  * The auth library's database adapter over the sign-in store in Convex
@@ -67,8 +68,9 @@ export function convexAuthStore(
         body,
       });
       if (!response.ok)
-        throw new Error(
+        throw new BridgeResponseError(
           `Convex auth store rejected ${operation.kind} (${response.status})`,
+          response.status,
         );
       return (await response.json()) as T;
     });

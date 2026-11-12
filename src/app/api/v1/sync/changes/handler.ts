@@ -44,11 +44,11 @@ export interface SyncChangesHandlerDependencies {
   };
   cursorBackend?: string;
   itemByteBudget?: number;
-  /** Atomic, byte-bounded backend read of the head, feed and current entities. */
+  /** Atomic backend read; null selects the legacy path during a mixed-version rollout. */
   changesPage?: (
     actor: Actor,
     args: { after: number; limit: number },
-  ) => Promise<ChangesSnapshot>;
+  ) => Promise<ChangesSnapshot | null>;
   placesRepo?: Pick<PlaceMatchingRepository, 'sync'>;
   freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
@@ -156,11 +156,14 @@ export function createSyncChangesHandler({
       let items: SyncChangeItemDTO[];
       let freshness: ChangesSnapshot['freshness'];
       let lastSequence: number;
-      if (changesPage) {
-        ({ items, freshness, lastSequence } = await changesPage(actor, {
-          after: decoded.sequence,
-          limit,
-        }));
+      const snapshot = changesPage
+        ? await changesPage(actor, {
+            after: decoded.sequence,
+            limit,
+          })
+        : null;
+      if (snapshot) {
+        ({ items, freshness, lastSequence } = snapshot);
       } else {
         if (
           changesRepo.retentionFloor &&

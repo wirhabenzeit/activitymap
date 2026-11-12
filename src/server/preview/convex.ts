@@ -30,6 +30,7 @@ import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
 } from '~/server/strava/streams';
+import { BridgeResponseError } from '~/server/sync/bridge-response-error';
 import { convexSyncBridge } from '~/server/sync/convex-bridge';
 
 import { previewSelection } from './selection';
@@ -409,12 +410,19 @@ function convexAdapter(actor: Actor, transport: Transport) {
       ? async (
           candidate: Actor,
           args: { after: number; limit: number },
-        ): Promise<ChangesSnapshot> => {
+        ): Promise<ChangesSnapshot | null> => {
           assertActor(candidate);
           const result = await query(
             { kind: 'changesPage', ...args },
             changesSnapshotSchema,
-          );
+          ).catch((error: unknown) => {
+            // Older deployments reject the new operation with 400. The route
+            // then uses the existing, fully fenced repository read path.
+            if (error instanceof BridgeResponseError && error.status === 400)
+              return null;
+            throw error;
+          });
+          if (result === null) return null;
           if (
             result.lastSequence < args.after ||
             result.lastSequence > result.head.sequence

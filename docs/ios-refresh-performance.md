@@ -79,20 +79,44 @@ Run the native measurement with the project's existing simulator test setup
 and `-only-testing:ActivityMapTests/SyncRefreshPerformanceTests`. Look for
 `SYNC_REFRESH_BENCHMARK` in test output.
 
-## Release and verification
+## Rollout compatibility and verification
 
-Validation passed: 1,049 app tests, 78 backend tests, 87 focused native tests,
+Validation passed: 1,009 app tests, 80 backend tests, 87 focused native tests,
 app and backend type checks, lint, changed-file formatting and the production
 Next build with Webpack. Native regressions include expiry, cancellation,
 replacement, editing, place invalidation and failed photo-cache recovery.
 
-1. Deploy the Convex backend first. It adds `changesPage` and `rateLimits`;
-   existing app releases continue using the old operations.
-2. Deploy the web/API change. It requires those new backend operations.
-3. Release the iOS change. Its larger page request also works with the prior
-   API because the v1 contract already allows a limit of 500.
-4. Compare `/me` and `/sync/changes` duration and phase counts for warm
-   refreshes and a backlog. Capture iOS `Sync` logs if a long refresh recurs.
+The app, backend and iOS release can ship in either order. No manual ordering
+or feature setting is required:
+
+- With an older backend, its empty HTTP 400 rejection of `rateLimits` causes
+  the API to check the existing single-window `rateLimit` operation in the
+  same order, stopping at the first exhausted bucket.
+- Rejection of `changesPage` with HTTP 400 uses the existing retention,
+  head, feed and entity read path. That path preserves the same cursor and
+  all authorization and retention checks.
+- The next request tries the new operations again, so the API adopts the
+  faster path automatically when the Convex deployment becomes available.
+  There is no cached capability or authentication state to clear.
+- Authentication failures, conflicts, retention rejection, rate limits,
+  server errors, malformed successful responses and network failures do not
+  trigger compatibility fallback. The old bridge's generic 400 cannot
+  distinguish an unknown operation from other invalid requests; any such
+  fallback still must pass every existing check on the legacy path.
+- Existing API versions accept the iOS limit of 500; the optimized backend
+  also retains its existing operations for old app releases.
+
+Integration tests reject the new operations as the older HTTP bridges do,
+exercise the existing operations against the real Convex test backend, then
+enable the new operations and verify the same data/cursor and ordered
+request limits, and roll back the backend to verify fallback resumes.
+Production deployment approvals remain unchanged and may
+complete independently of Vercel.
+
+After release, compare `/me` and `/sync/changes` durations and phase counts
+for warm refreshes and a backlog. Capture iOS `Sync` logs if a long refresh
+recurs. A cursor past the feed head now consistently returns
+`409 sync_rebootstrap_required` from the existing `changes` operation too.
 
 The fixes preserve the existing HTTP sync protocol and do not add native
 Convex subscriptions. Session verification, expiry and revocation remain on
