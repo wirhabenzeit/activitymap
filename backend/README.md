@@ -22,9 +22,9 @@ lab contains a different schema and uses its own deployment configuration.
 This backend is the application's only store. An account's library, its
 ingestion from the provider, and the app's own records (sign-in, provider
 tokens, rate limits, the provider request budget) all live here; the app
-reaches them through the signed bridges described below and keeps nothing in
-Postgres. Postgres is left only as the workspace in which a place catalogue
-is built, before it is copied here (see "Place catalogue copy").
+reaches them through the signed bridges described below. A place catalogue
+is built from OpenStreetMap extracts on disk and published here (see "Place
+catalogue").
 
 The sections "Serving preview owners", "Live owners" and "Read owners in
 production", "Writer field", "Moving an account", "Shadow writes", "Shadow
@@ -96,8 +96,7 @@ ACTIVITYMAP_CONVEX_KEY_ID=dev1
 ACTIVITYMAP_CONVEX_SIGNING_KEY=<hex>
 ```
 
-The importer and the shadow-write mirror write through a separate signed
-route, `/internal/write/v1`. It has its own key map and signature domain, so
+The app writes through a separate signed route, `/internal/write/v1`. It has its own key map and signature domain, so
 the read bridge's key can never authorize a write, and every request carries a
 single-use nonce (`bridgeNonces`, expired hourly). Add a writer key next to the
 reader key:
@@ -108,21 +107,6 @@ pnpm exec convex env set ACTIVITYMAP_BRIDGE_WRITER_KEYS '{"devw1":"<hex>"}'
 ACTIVITYMAP_CONVEX_WRITER_KEY_ID=devw1
 ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY=<hex>
 ```
-
-Copy an owner from the local development Postgres, keep it current, and
-compare what the v1 handlers serve from both backends:
-
-```sh
-pnpm convex:import-owner --user <userId>
-pnpm convex:mirror-owner --user <userId> [--watch <seconds>]
-pnpm convex:verify-owner --user <userId>
-```
-
-Provisioning stays operator-only (`owners.provision` through the Convex CLI);
-it is not exposed on the write bridge. All three scripts refuse to read
-anything but the local database. The verifier runs the real bootstrap and
-stream-summary handlers against Postgres and against this package, and exits
-non-zero on any difference.
 
 ## Authenticated clients
 
