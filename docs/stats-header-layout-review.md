@@ -8,29 +8,29 @@ Sport mix retains the range switch beside “Moving time”. The switch already 
 
 ## Dashboard audit
 
-| Tile | Decision |
-| --- | --- |
-| Training volume | Pair headline and metric switch; caption distinguishes the 28-day total from the 12-week chart. |
-| This month | Pair headline and metric switch; caption names the months and “so far”. |
-| Year to date | Pair headline and metric switch; caption names the years and “so far”. |
-| Year-end projection | Pair headline and metric switch; caption names the projection year. |
-| Sport mix | Keep caption and range switch together; remove duplicate range text. |
-| This week | Retain dates and metric switch together; dates add useful context to the title. |
-| Activity calendar | Separate weekday-calendar work owns this tile. |
-| Records | No dashboard switch to relocate. |
-| Hilliness | No switch to relocate. |
-| Typical week | No switch to relocate. |
+| Tile                | Decision                                                                                        |
+| ------------------- | ----------------------------------------------------------------------------------------------- |
+| Training volume     | Pair headline and metric switch; caption distinguishes the 28-day total from the 12-week chart. |
+| This month          | Pair headline and metric switch; caption names the months and “so far”.                         |
+| Year to date        | Pair headline and metric switch; caption names the years and “so far”.                          |
+| Year-end projection | Pair headline and metric switch; caption names the projection year.                             |
+| Sport mix           | Keep caption and range switch together; remove duplicate range text.                            |
+| This week           | Retain dates and metric switch together; dates add useful context to the title.                 |
+| Activity calendar   | Separate weekday-calendar work owns this tile.                                                  |
+| Records             | No dashboard switch to relocate.                                                                |
+| Hilliness           | No switch to relocate.                                                                          |
+| Typical week        | No switch to relocate.                                                                          |
 
 ## Matched captures
 
 Both clients use the 20-activity gallery fixture, reporting day 2026-09-22, and the distance option. Native captures are production tiles at 378pt and default text size; web captures are production cards in the 390px fixture preview.
 
-| Example | Before | After |
-| --- | --- | --- |
-| Web Training volume | [Before](stats-header-layout-review/before-web-390-weeklyVolume.png) | [After](stats-header-layout-review/after-web-390-weeklyVolume.png) |
-| Web This month | [Before](stats-header-layout-review/before-web-390-monthVsLastMonth.png) | [After](stats-header-layout-review/after-web-390-monthVsLastMonth.png) |
-| iOS Training volume | [Before](stats-header-layout-review/before-ios-weeklyVolume-collapsed.png) | [After](stats-header-layout-review/after-ios-weeklyVolume-collapsed.png) |
-| iOS This month | [Before](stats-header-layout-review/before-ios-monthVsLastMonth-collapsed.png) | [After](stats-header-layout-review/after-ios-monthVsLastMonth-collapsed.png) |
+| Example             | Before                                                                         | After                                                                        |
+| ------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- |
+| Web Training volume | [Before](stats-header-layout-review/before-web-390-weeklyVolume.png)           | [After](stats-header-layout-review/after-web-390-weeklyVolume.png)           |
+| Web This month      | [Before](stats-header-layout-review/before-web-390-monthVsLastMonth.png)       | [After](stats-header-layout-review/after-web-390-monthVsLastMonth.png)       |
+| iOS Training volume | [Before](stats-header-layout-review/before-ios-weeklyVolume-collapsed.png)     | [After](stats-header-layout-review/after-ios-weeklyVolume-collapsed.png)     |
+| iOS This month      | [Before](stats-header-layout-review/before-ios-monthVsLastMonth-collapsed.png) | [After](stats-header-layout-review/after-ios-monthVsLastMonth-collapsed.png) |
 | iOS calendar picker | [Before](stats-header-layout-review/before-ios-activityCalendar-collapsed.png) | [After](stats-header-layout-review/after-ios-activityCalendar-collapsed.png) |
 
 At matched native width, Training volume changes from 326pt to 307pt, This month from 326pt to 317pt, Year to date from 336pt to 317pt, and Year-end projection from 280pt to 270pt. Sport mix remains 282pt. Dashboard grid minimums remain intact; additional space goes to charts where the card height is constrained.

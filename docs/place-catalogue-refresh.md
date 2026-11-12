@@ -10,8 +10,7 @@ same entry points. Nothing runs automatically when the web application starts.
 Preparation and combination have no database access: they turn OpenStreetMap
 extracts into an artifact on disk. Publication sends that artifact to the
 Convex backend (`backend/convex/places.ts`), which matches activities against
-it. Earlier versions published to Postgres; the sections on measured runs and
-rehearsals further down describe that period and are kept as a record.
+it. The measured runs further down record extraction timings and counts.
 
 Publication is not automatically undone, and libraries only ever move to the
 newest complete rowset. Keep the input artifacts: going back to an earlier
@@ -62,7 +61,7 @@ if you need to rerun the extraction itself.
 ## Publish or refresh
 
 A catalogue is published to the Convex backend, where activities are matched
-against it. Nothing else stores it: there is no Postgres step.
+against it. Nothing else stores it.
 
 The publisher signs its requests with the write bridge key. It needs
 `ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and
@@ -243,9 +242,7 @@ are kept. New Zealand's hidden passes are mostly elevation-only names (`1212m`).
 
 `osm-places-v1` artifacts and manifests stay readable: they have no `terrain`
 section and no filter counts, and every place is listed. Already published v1
-catalogues keep serving until a v2 artifact is published. Migration
-`0029_place-noise-filter` adds the nullable `pass_highways`, `pass_amp_m` and
-`hidden_reason` columns; deploy it before backend code that reads them.
+catalogues keep serving until a v2 artifact is published.
 `counts.filter` in the manifest reports hidden places by kind and reason and
 the road passes without terrain. Publication dry runs list up to 20 hidden
 examples.
@@ -254,42 +251,7 @@ Attribution: © DLR e.V. and Airbus, Copernicus programme. The Copernicus DEM is
 free to use with this attribution; the map layers that show places carry it
 next to the OSM attribution.
 
-## Verification
-
-```sh
-pnpm db:test-place-refresh
-```
-
-Supply `MIGRATION_DATABASE_URL`, `MIGRATION_EXPECTED_HOST`,
-`MIGRATION_EXPECTED_DATABASE` and `MIGRATION_REQUIRE_TARGET_GUARDS=true` pointing at
-a migrated local database whose name ends in `_test`. The proof creates and
-removes a unique scratch schema. It covers adoption, dry-run isolation, exact
-repeats, refresh diffs, stable IDs, retirement/reactivation, rollback after an
-injected database failure, concurrent publishers/readers, spatial exclusion of
-retired rows and independent regional refreshes. Public catalogue tables are not
-changed by the proof.
-
-The catalogue-only release was also verified from an isolated copy of the staged
-foundation, excluding the local matching adapter. All 1,183 unit tests,
-typecheck, scoped lint and schema generation checks passed. An empty local
-database accepted all migrations; frozen import, refresh/consolidation, existing
-matching/query and spatial-schema proofs passed, and a second migration run was
-a no-op. The serving reader proof covers Swiss fallback, combined preference and
-strict explicit region selection. Source exclusion names use normalization's
-same nonblank-name and language preferences, including translated-name fallback.
-
-Implementation verification on 23 October 2026 rebuilt all 11,325 Swiss places
-from the existing complete 20 October extract, then published the resulting
-artifact to a disposable database. The refresh, frozen-import and spatial-matching
-integration proofs pass. The full unit suite passes (1,180 tests), along with
-typecheck, scoped lint and migration consistency checks. Migration 0025 and exact
-frozen-catalogue adoption were applied to local development `main`; activity,
-account, stream and saved-evidence fingerprints and place identity fingerprints
-were unchanged. A live selection match successfully used database-backed
-metadata. No production database was accessed or changed during this local
-verification.
-
-### Node preparation implementation
+## Node preparation implementation
 
 The PBF reader streams bounded file blocks and supports raw and zlib compression,
 sparse/dense nodes, packed/unpacked fields, exact 64-bit IDs and delta references,
@@ -396,7 +358,7 @@ Extraction on the local development machine took:
 | Italy       |                                49,607 |           280 s |
 
 Combining took another 3 seconds, for approximately 7 minutes 24 seconds overall,
-excluding downloads and database publication. These are measured local timings,
+excluding downloads and publication. These are measured local timings,
 not service guarantees.
 
 The 82,880 input rows produced **80,366 unique places**. There were 2,512 shared
@@ -417,14 +379,6 @@ areas and one hut site relation.
 
 The artifact is `output/places/ch-at-it-2026-10-20`, with snapshot identity
 `osm-places-v1:1a9e03962c0a18e0bea01dfddb5feaa1f96b1b0c65636b22a8e881f77811ac9b`.
-It was published to local development `main`, preserving all 11,325 original
-place UUIDs and the activity/account/stream/evidence fingerprints. PostGIS probes
-confirmed coverage across each pair of country borders and rejection outside
-the union. A live selected-activity match used the combined catalogue successfully.
-The full unit suite passes (1,183 tests), as do typecheck, scoped lint and refresh
-integration proofs, including failed and successful consolidation. This initial
-measurement only changed local development data; the production-derived
-rehearsal is recorded below.
 
 ## Eight countries (`v1-places`)
 
@@ -457,93 +411,3 @@ The 30 October extracts (`2026-10-30T21:24:51Z`) combine in 9 seconds to
 722 low-relief road passes and 760 non-mountain huts; 176,478 are listed. The
 artifact is `output/places/v1-places-2026-10-30`, snapshot
 `osm-places-v1:138fead059c8543ef5ff58ccb921a7d10a6353d04c982067f766f65cd4e412a0`.
-
-On a disposable database, the original `ch-at-it` artifact was published and
-then consolidated into `v1-places`: 97,789 places added, 80,362 updated, and 4
-retired (deleted from OSM after 20 October). All 80,366 existing place UUIDs
-were unchanged, `ch-at-it` became inactive and `v1-places` active. No
-production or development database was changed.
-
-## Production-derived rehearsal (2026-10-23)
-
-This rehearsal used the catalogue foundation at `0fa79162` on the experimental
-branch, including internal matching probes. The focused release retains the same
-three migration files and catalogue processing implementation; it excludes the
-experimental matcher, preview adapters and UI. The migration and ingestion
-results below apply to that shared foundation.
-
-The release was rehearsed on `rehearsal/place-catalogue-2026-10-23`
-(`br-autumn-sun-a23xnrae`), a fresh data-and-schema child of production
-`main` (`br-proud-rice-a2hvhn9j`) in the canonical Vercel-managed Neon project
-`neon-indigo-mountain` (`black-snowflake-48725396`). The test branch expires on
-25 October 2026 at 12:35 UTC and its compute suspends after five idle minutes.
-The parent relationship was verified through Neon. Every direct connection used
-the test endpoint, verified TLS, an exact expected child branch and database;
-the migration runner also explicitly forbade the production branch.
-Application environment files and deployment settings were unchanged.
-
-Production's copied migration history was an exact, checksum-matching prefix
-through `0022_manual-strava-import`. The rehearsal therefore applied all three
-pending places migrations, not just the refresh migration:
-
-- `0023_activity-places`
-- `0024_places-proximity-visits`
-- `0025_place-catalogue-refresh`
-
-All three applied successfully in approximately 2.2 seconds. Existing data in all
-30 pre-existing application tables retained identical counts and full-row
-fingerprints, including 11,703 activities and 11,703 stream rows. The newly
-created activity-evidence table was empty. Migration status reported 26 applied
-migrations and zero pending; repeating migration was a no-op.
-
-The combined artifact and snapshot described above were then published:
-
-| Operation                | Result                                                | Command time |
-| ------------------------ | ----------------------------------------------------- | -----------: |
-| Publication dry run      | 80,366 additions; no updates, retirements or adoption |        3.0 s |
-| Publication              | 80,366 unique, active OSM source identities           |       16.8 s |
-| Exact-repeat publication | All 80,366 unchanged                                  |        8.9 s |
-
-These are measured command wall times, including startup, artifact validation and
-network access. Because production has no existing places catalogue, first
-publication needs neither frozen adoption nor Swiss-region replacement flags.
-The rehearsal used `--expect-current none` for first publication and the exact
-published snapshot ID for the repeat.
-
-Full-row fingerprints of both catalogue tables confirmed that the repeat
-preserved all place UUIDs, contents and import/publication timestamps. All 31
-noncatalogue application tables, including activity evidence, retained identical
-fingerprints after publication, application probes and the repeat. No activity
-evidence was published or recomputed in the database.
-
-Application read probes used the real repository and matching service with the
-published database metadata in a repeatable-read transaction. Three sampled
-owned activities completed report-only matching successfully: one had three
-matched places among four candidates, while two had no candidates. Measured
-evaluation/read times were 1,161 ms, 656 ms and 628 ms. Existing positive-membership
-queries returned no saved results, as expected for the empty evidence table;
-an unrelated actor also received no memberships. No HTTP endpoint or deployed UI
-was enabled by these internal read probes.
-
-Real PostGIS discovery confirmed coverage across each country pair and rejection
-outside the three-country union. The Austrian–Italian probe found one candidate;
-the other border probes had none. The final public-schema fingerprint matched
-local development exactly:
-`23e54b8e4e9035caf95fe21efadf7462f2dc3737791749e6550c58ede1ca478d`.
-
-A final read-only check of the production branch still showed 23 applied
-migrations and no `places` or `place_catalogues` table. No production schema or
-data was changed. Production rollout must still follow the protected migration
-workflow in [database migrations](database-migrations.md), followed by a separately
-reviewed catalogue publication. This rehearsal does not test a deployed UI or
-replace the production recovery-branch/backup step.
-
-## Focused release validation (2026-10-23)
-
-The production release was extracted onto a fresh branch from current `main`,
-excluding experimental matcher/preview code, title experiments and native UI
-changes. `pnpm check` passed: 1,130 unit tests, browsing/stats/settings UI suites,
-quality-harness tests, typecheck, lint and generated-artifact checks. Fresh local
-migrations, spatial schema/erasure, frozen import and refresh/consolidation proofs
-passed. Schema generation produced no drift, a second migration run was a no-op,
-and the resulting schema fingerprint matched the production-derived rehearsal.

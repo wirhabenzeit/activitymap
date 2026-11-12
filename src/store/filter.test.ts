@@ -1,12 +1,21 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
 import { type StateCreator } from 'zustand';
-import { createStore } from 'zustand/vanilla';
 import { immer } from 'zustand/middleware/immer';
+import { createStore } from 'zustand/vanilla';
 
-import { type SportType } from '~/server/db/schema.ts';
+import type { SportType } from '~/contracts/sport';
+
 import {
+  type BinaryColumn,
+  type BinaryFilterMode,
+  type FilterSlice,
+  type FilterState,
+  type FilterableActivity,
+  type ValueColumn,
+  type ValueFilter,
   applyFilters,
   calendarDateFromLocalDate,
   createFilterSlice,
@@ -20,13 +29,6 @@ import {
   sanitizePersistedDateRange,
   toPersistedValues,
   toggleSportGroupState,
-  type BinaryColumn,
-  type BinaryFilterMode,
-  type FilterableActivity,
-  type FilterSlice,
-  type FilterState,
-  type ValueColumn,
-  type ValueFilter,
 } from './filter.ts';
 
 type FixtureActivity = FilterableActivity & { id: string };

@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict';
-import { readdirSync, readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 import test from 'node:test';
 
+import { type Activity } from '~/server/records';
 import { aliasMap } from '~/settings/category';
-import { type Activity } from '~/server/db/schema';
 
 import {
+  type StatsActivity,
   activityCalendar,
   best30Days,
   climbing,
@@ -25,7 +27,6 @@ import {
   weeklyVolume,
   yearPace,
   yearToDate,
-  type StatsActivity,
 } from './tile-data';
 
 type Fixture = {

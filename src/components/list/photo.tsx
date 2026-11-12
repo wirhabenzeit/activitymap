@@ -23,7 +23,7 @@ import {
   photoVariant,
 } from '~/lib/photo-gallery';
 import { cn } from '~/lib/utils';
-import type { Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/records';
 import { useShallowStore } from '~/store';
 
 export function PhotoImage({

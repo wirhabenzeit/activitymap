@@ -657,7 +657,6 @@ export function buildActivityPlaceEvidence(
       previousGroup.fragments.push(fragment);
       previousGroup.pauses.push(pause);
       // This is an in-memory Map, not a database delete.
-      // eslint-disable-next-line drizzle/enforce-delete-with-where
       remaining.delete(pauseKey!);
     } else groups.push({ fragments: [fragment], pauses: [] });
   }

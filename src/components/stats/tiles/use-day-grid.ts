@@ -15,7 +15,6 @@ export function useDayGrid(
   return (day: number) => ({
     ref: (element: HTMLButtonElement | null) => {
       if (element) cells.current.set(day, element);
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- DOM refs, not database rows.
       else cells.current.delete(day);
     },
     tabIndex: day === current ? 0 : -1,

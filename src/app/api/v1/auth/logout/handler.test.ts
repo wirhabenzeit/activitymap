@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
+
 import { createLogoutHandler } from './handler.ts';
 
 const now = new Date('2026-09-20T12:00:00.000Z');
@@ -36,7 +38,6 @@ function createFakeSessionStore() {
     },
     // This is a plain in-memory `Map`, not a Drizzle query builder.
     revokeSessionByToken: async (token: string) => {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where
       activeTokens.delete(token);
     },
   };

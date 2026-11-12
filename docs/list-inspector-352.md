@@ -10,12 +10,12 @@ Previous/next and ↑/↓ use the filtered, sorted row model before pagination. 
 
 ## Captures
 
-| Viewport | Presentation | Capture |
-| --- | --- | --- |
-| 1440 × 1000 | Side panel | [Desktop](list-inspector-352/web-list-detail--1440x1000.png) |
-| 1024 × 768 | Side panel | [Tablet](list-inspector-352/web-list-detail--1024x768.png) |
-| 760 × 768 | Push | [Narrow](list-inspector-352/web-list-detail--760x768.png) |
-| 402 × 874 | Push | [Phone](list-inspector-352/web-list-detail--402x874.png) |
+| Viewport    | Presentation | Capture                                                      |
+| ----------- | ------------ | ------------------------------------------------------------ |
+| 1440 × 1000 | Side panel   | [Desktop](list-inspector-352/web-list-detail--1440x1000.png) |
+| 1024 × 768  | Side panel   | [Tablet](list-inspector-352/web-list-detail--1024x768.png)   |
+| 760 × 768   | Push         | [Narrow](list-inspector-352/web-list-detail--760x768.png)    |
+| 402 × 874   | Push         | [Phone](list-inspector-352/web-list-detail--402x874.png)     |
 
 Captures use the committed 20-activity navigation/gallery fixture, including Lunch Ride from the navigation reference, in Chrome 155.0.8059.39, light appearance, default text size and reduced motion. The temporary fixture route renders the production List, detail, header and sidebar without an account or backend; its navigation tab highlight differs from `/list`. Traversal tests additionally use 205 synthetic copies to exercise the 200-row page boundary.
 

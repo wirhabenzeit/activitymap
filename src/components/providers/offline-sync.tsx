@@ -75,7 +75,6 @@ export function OfflineSyncProvider() {
         // The coordinator has aborted and drained the writer before erasing disk.
         await summariesRef.current.get(departingUserId);
         clearStreamSummarySyncAttempts(departingUserId);
-        // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
         summaryRetryAtRef.current.delete(departingUserId);
         await removeStreamSummaryScope(queryClient, departingUserId);
         await clearV1Scope(scope);
@@ -121,7 +120,6 @@ export function OfflineSyncProvider() {
           },
         })
           .then(() => {
-            // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
             summaryRetryAtRef.current.delete(currentUserId);
           })
           .catch(async (error: unknown) => {
@@ -149,7 +147,6 @@ export function OfflineSyncProvider() {
           })
           .finally(() => {
             if (summariesRef.current.get(currentUserId) === task) {
-              // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
               summariesRef.current.delete(currentUserId);
             }
           });

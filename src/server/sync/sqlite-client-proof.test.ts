@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
-import { DatabaseSync } from 'node:sqlite';
 
-import type { Actor } from '~/server/auth/actor.ts';
-import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
+import { DatabaseSync } from 'node:sqlite';
+import test from 'node:test';
+
 import { createSyncBootstrapHandler } from '~/app/api/v1/sync/bootstrap/handler.ts';
 import { createSyncChangesHandler } from '~/app/api/v1/sync/changes/handler.ts';
 import type { ActivityDTO } from '~/contracts/v1/activity.ts';
 import type { PhotoDTO } from '~/contracts/v1/photo.ts';
 import type { SyncChangeItemDTO } from '~/contracts/v1/sync.ts';
+import type { Actor } from '~/server/auth/actor.ts';
+import type { Activity, Photo, SyncChange } from '~/server/records';
 import { encodeSyncCursor } from '~/server/sync/cursor.ts';
 
 /**
@@ -34,10 +35,16 @@ import { encodeSyncCursor } from '~/server/sync/cursor.ts';
  *   cursor ends up in exactly the state an uninterrupted client would have.
  */
 
-const ACTOR: Actor = { userId: 'user-1', athleteId: 42, authentication: 'cookie' };
+const ACTOR: Actor = {
+  userId: 'user-1',
+  athleteId: 42,
+  authentication: 'cookie',
+};
 const NOW = new Date('2026-09-20T12:00:00.000Z');
 
-function buildActivity(overrides: Partial<Activity> & { id: number }): Activity {
+function buildActivity(
+  overrides: Partial<Activity> & { id: number },
+): Activity {
   return {
     athlete: ACTOR.athleteId,
     public_id: overrides.id * 7,
@@ -134,7 +141,9 @@ class FakeServer {
   changes: SyncChange[] = [];
   private nextSequence = 1;
 
-  private recordChange(entry: Omit<SyncChange, 'sequence' | 'athleteId' | 'changedAt'>) {
+  private recordChange(
+    entry: Omit<SyncChange, 'sequence' | 'athleteId' | 'changedAt'>,
+  ) {
     this.changes.push({
       sequence: this.nextSequence++,
       athleteId: ACTOR.athleteId,
@@ -145,29 +154,46 @@ class FakeServer {
 
   upsertActivity(activity: Activity) {
     this.activities.set(activity.id, activity);
-    this.recordChange({ entityType: 'activity', entityId: String(activity.id), operation: 'upsert' });
+    this.recordChange({
+      entityType: 'activity',
+      entityId: String(activity.id),
+      operation: 'upsert',
+    });
   }
 
   deleteActivity(id: number) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
     this.activities.delete(id);
-    this.recordChange({ entityType: 'activity', entityId: String(id), operation: 'delete' });
+    this.recordChange({
+      entityType: 'activity',
+      entityId: String(id),
+      operation: 'delete',
+    });
   }
 
   upsertPhoto(photo: Photo) {
     this.photos.set(photo.unique_id, photo);
-    this.recordChange({ entityType: 'photo', entityId: photo.unique_id, operation: 'upsert' });
+    this.recordChange({
+      entityType: 'photo',
+      entityId: photo.unique_id,
+      operation: 'upsert',
+    });
   }
 
   deletePhoto(id: string) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
     this.photos.delete(id);
-    this.recordChange({ entityType: 'photo', entityId: id, operation: 'delete' });
+    this.recordChange({
+      entityType: 'photo',
+      entityId: id,
+      operation: 'delete',
+    });
   }
 
   activitiesRepo() {
     return {
-      findPageByAthlete: async (athleteId: number, { afterId = 0, limit }: { afterId?: number; limit: number }) =>
+      findPageByAthlete: async (
+        athleteId: number,
+        { afterId = 0, limit }: { afterId?: number; limit: number },
+      ) =>
         [...this.activities.values()]
           .filter((a) => a.athlete === athleteId && a.id > afterId)
           .sort((a, b) => a.id - b.id)
@@ -205,7 +231,9 @@ class FakeServer {
         { limit = 500 }: { limit?: number } = {},
       ) =>
         this.changes
-          .filter((c) => c.athleteId === athleteId && c.sequence > afterSequence)
+          .filter(
+            (c) => c.athleteId === athleteId && c.sequence > afterSequence,
+          )
           .sort((a, b) => a.sequence - b.sequence)
           .slice(0, limit),
     };
@@ -249,12 +277,14 @@ function applyBootstrapPage(
       const stmt = db.prepare(
         'INSERT INTO activities (id, json) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET json = excluded.json',
       );
-      for (const item of items as ActivityDTO[]) stmt.run(item.id, JSON.stringify(item));
+      for (const item of items as ActivityDTO[])
+        stmt.run(item.id, JSON.stringify(item));
     } else {
       const stmt = db.prepare(
         'INSERT INTO photos (unique_id, json) VALUES (?, ?) ON CONFLICT(unique_id) DO UPDATE SET json = excluded.json',
       );
-      for (const item of items as PhotoDTO[]) stmt.run(item.unique_id, JSON.stringify(item));
+      for (const item of items as PhotoDTO[])
+        stmt.run(item.unique_id, JSON.stringify(item));
     }
     db.exec('COMMIT');
   } catch (error) {
@@ -295,26 +325,30 @@ function applyChangesPage(db: DatabaseSync, items: SyncChangeItemDTO[]) {
 
 function setCursor(db: DatabaseSync, cursor: string) {
   db.prepare(
-    'INSERT INTO sync_state (key, value) VALUES (\'cursor\', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+    "INSERT INTO sync_state (key, value) VALUES ('cursor', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
   ).run(cursor);
 }
 
 function getCursor(db: DatabaseSync): string | null {
-  const row = db.prepare('SELECT value FROM sync_state WHERE key = \'cursor\'').get() as
-    | { value: string }
-    | undefined;
+  const row = db
+    .prepare("SELECT value FROM sync_state WHERE key = 'cursor'")
+    .get() as { value: string } | undefined;
   return row?.value ?? null;
 }
 
 function countRows(db: DatabaseSync, table: 'activities' | 'photos'): number {
-  const row = db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as { n: number };
+  const row = db.prepare(`SELECT COUNT(*) AS n FROM ${table}`).get() as {
+    n: number;
+  };
   return row.n;
 }
 
 function activityIds(db: DatabaseSync): string[] {
-  return (db.prepare('SELECT id FROM activities ORDER BY id').all() as { id: string }[]).map(
-    (r) => r.id,
-  );
+  return (
+    db.prepare('SELECT id FROM activities ORDER BY id').all() as {
+      id: string;
+    }[]
+  ).map((r) => r.id);
 }
 
 type BootstrapResult = { snapshotCursor: string; pageCount: number };
@@ -344,7 +378,11 @@ async function bootstrapResource(
     if (cursor) url.searchParams.set('cursor', cursor);
 
     const response = await bootstrapGET(new Request(url));
-    assert.equal(response.status, 200, `bootstrap ${resource} page must succeed`);
+    assert.equal(
+      response.status,
+      200,
+      `bootstrap ${resource} page must succeed`,
+    );
     const body = (await response.json()) as {
       data: {
         items: (ActivityDTO | PhotoDTO)[];
@@ -366,7 +404,10 @@ async function bootstrapResource(
     // Only `resource=activities`'s first page - the documented start of a
     // bootstrap run - captures the snapshot; see the handler's own doc
     // comment and its dedicated regression test in `handler.test.ts`.
-    assert.ok(snapshotCursor, "resource=activities' first page must yield a snapshotCursor");
+    assert.ok(
+      snapshotCursor,
+      "resource=activities' first page must yield a snapshotCursor",
+    );
   }
   return { snapshotCursor: snapshotCursor ?? '', pageCount };
 }
@@ -405,20 +446,31 @@ async function drainChanges(
 
 void test('bootstrap + catch-up populates a real SQLite store matching server state, across multiple keyset pages', async () => {
   const server = new FakeServer();
-  for (let id = 1; id <= 5; id += 1) server.upsertActivity(buildActivity({ id }));
-  for (const uid of ['p1', 'p2', 'p3']) server.upsertPhoto(buildPhoto({ unique_id: uid }));
+  for (let id = 1; id <= 5; id += 1)
+    server.upsertActivity(buildActivity({ id }));
+  for (const uid of ['p1', 'p2', 'p3'])
+    server.upsertPhoto(buildPhoto({ unique_id: uid }));
 
   const { bootstrapGET, changesGET } = buildHandlers(server);
   const db = createClientDb();
 
-  const activitiesResult = await bootstrapResource(bootstrapGET, db, 'activities', 2);
+  const activitiesResult = await bootstrapResource(
+    bootstrapGET,
+    db,
+    'activities',
+    2,
+  );
   const photosResult = await bootstrapResource(bootstrapGET, db, 'photos', 2);
 
   // 5 activities at 2/page -> 3 pages (2, 2, 1); 3 photos at 2/page -> 2 pages.
   assert.equal(activitiesResult.pageCount, 3);
   assert.equal(photosResult.pageCount, 2);
 
-  const { finalCursor } = await drainChanges(changesGET, db, activitiesResult.snapshotCursor);
+  const { finalCursor } = await drainChanges(
+    changesGET,
+    db,
+    activitiesResult.snapshotCursor,
+  );
 
   assert.equal(countRows(db, 'activities'), 5);
   assert.equal(countRows(db, 'photos'), 3);
@@ -432,7 +484,8 @@ void test('bootstrap + catch-up populates a real SQLite store matching server st
 
 void test('a mutation that happens during bootstrap is not lost: snapshotCursor + a changes catch-up picks it up', async () => {
   const server = new FakeServer();
-  for (let id = 1; id <= 4; id += 1) server.upsertActivity(buildActivity({ id }));
+  for (let id = 1; id <= 4; id += 1)
+    server.upsertActivity(buildActivity({ id }));
 
   const { bootstrapGET, changesGET } = buildHandlers(server);
   const db = createClientDb();
@@ -452,21 +505,31 @@ void test('a mutation that happens during bootstrap is not lost: snapshotCursor 
       // - update the already-delivered row (bootstrap will not read it again)
       // - delete the next not-yet-delivered row
       // - insert a new row that a later bootstrap page may also see
-      server.upsertActivity(buildActivity({ id: 1, name: 'Updated mid-bootstrap' }));
+      server.upsertActivity(
+        buildActivity({ id: 1, name: 'Updated mid-bootstrap' }),
+      );
       server.deleteActivity(2);
-      server.upsertActivity(buildActivity({ id: 5, name: 'Created mid-bootstrap' }));
+      server.upsertActivity(
+        buildActivity({ id: 5, name: 'Created mid-bootstrap' }),
+      );
     },
   );
 
   const { totalItems } = await drainChanges(changesGET, db, snapshotCursor);
 
-  assert.equal(totalItems, 3, 'all three concurrent changes must be delivered exactly once');
+  assert.equal(
+    totalItems,
+    3,
+    'all three concurrent changes must be delivered exactly once',
+  );
   assert.deepEqual(
     activityIds(db),
     ['1', '3', '4', '5'],
     'the update, delete, and insert made during bootstrap are all reflected, and nothing else changed',
   );
-  const activity1 = db.prepare('SELECT json FROM activities WHERE id = ?').get('1') as {
+  const activity1 = db
+    .prepare('SELECT json FROM activities WHERE id = ?')
+    .get('1') as {
     json: string;
   };
   assert.equal(
@@ -497,15 +560,23 @@ void test('delta pages are safe to replay: applying the same page twice does not
       )}`,
     ),
   );
-  const body = (await response.json()) as { data: { items: SyncChangeItemDTO[]; nextCursor: string } };
+  const body = (await response.json()) as {
+    data: { items: SyncChangeItemDTO[]; nextCursor: string };
+  };
 
   applyChangesPage(db, body.data.items);
-  const afterFirstApply = { activities: countRows(db, 'activities'), ids: activityIds(db) };
+  const afterFirstApply = {
+    activities: countRows(db, 'activities'),
+    ids: activityIds(db),
+  };
 
   // Replay the exact same page again (simulating a client that applied it
   // but crashed before persisting its own advanced cursor, then retried).
   applyChangesPage(db, body.data.items);
-  const afterReplay = { activities: countRows(db, 'activities'), ids: activityIds(db) };
+  const afterReplay = {
+    activities: countRows(db, 'activities'),
+    ids: activityIds(db),
+  };
 
   assert.deepEqual(afterReplay, afterFirstApply);
   assert.deepEqual(activityIds(db), ['2']);
@@ -513,7 +584,8 @@ void test('delta pages are safe to replay: applying the same page twice does not
 
 void test('sync resumes correctly after a simulated interruption: stopping after page N and resuming reaches the same end state as an uninterrupted run', async () => {
   const server = new FakeServer();
-  for (let id = 1; id <= 6; id += 1) server.upsertActivity(buildActivity({ id }));
+  for (let id = 1; id <= 6; id += 1)
+    server.upsertActivity(buildActivity({ id }));
 
   // Run A: uninterrupted bootstrap, all in one go.
   const uninterrupted = buildHandlers(server);

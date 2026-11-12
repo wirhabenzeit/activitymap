@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import type { Photo } from '~/server/db/schema';
+
+import type { Photo } from '~/server/records';
+
 import { idString, isoDateTime, toIdString, toIsoDateTime } from './primitives';
 
 /** The v1 wire shape of a photo. See `activity.ts` for the id/date rules. */

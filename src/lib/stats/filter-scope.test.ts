@@ -1,22 +1,25 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
-import { createStore } from 'zustand/vanilla';
-import { immer } from 'zustand/middleware/immer';
 import { type StateCreator } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
+import { createStore } from 'zustand/vanilla';
+
+import { type Activity } from '~/server/records';
+import {
+  type FilterSlice,
+  type FilterState,
+  type FilterableActivity,
+  createFilterSlice,
+  initializeBinary,
+  initializeSportGroup,
+  initializeSportType,
+  initializeValues,
+} from '~/store/filter';
+
 import { filterStatsActivities, statsFilterScope } from './filter-scope';
 import { dayFromISODate, yearToDate } from './tile-data';
 import { toStatsActivity } from './tile-series';
-import {
-  createFilterSlice,
-  type FilterSlice,
-  initializeSportType,
-  initializeSportGroup,
-  initializeValues,
-  initializeBinary,
-  type FilterState,
-  type FilterableActivity,
-} from '~/store/filter';
-import { type Activity } from '~/server/db/schema';
 
 const state = (): FilterState => ({
   sportType: initializeSportType(),
@@ -112,12 +115,10 @@ void test('clearing stats activity filters preserves the hidden date range', () 
   const range = { start: '2024-01-01', end: '2024-12-31' };
   store.getState().setDateRange(range);
   store.getState().setSearch('ride');
-  store
-    .getState()
-    .setValues((values) => ({
-      ...values,
-      distance: { operator: '>=', value: 10000 },
-    }));
+  store.getState().setValues((values) => ({
+    ...values,
+    distance: { operator: '>=', value: 10000 },
+  }));
   store.getState().setBinary((binary) => ({ ...binary, commute: 'no' }));
   store.getState().setSportType((types) => ({ ...types, Run: false }));
   store.getState().resetActivityFilters();

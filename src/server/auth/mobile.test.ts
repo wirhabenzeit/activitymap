@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 import test from 'node:test';
 
-import type { MobileLoginCode } from '~/server/db/schema';
+import type { MobileLoginCode } from '~/server/records';
 import type {
   MobileLoginCodesRepository,
   NewMobileLoginCode,

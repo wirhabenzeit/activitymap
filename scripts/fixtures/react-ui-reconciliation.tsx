@@ -45,7 +45,7 @@ import { activityDTOSchema } from '~/contracts/v1/activity';
 import { useElementSize } from '~/hooks/use-element-size';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import { upsertActivityDTOs } from '~/lib/sync/v1-store';
-import type { Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/records';
 import { store } from '~/store';
 
 import fixture from '../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';

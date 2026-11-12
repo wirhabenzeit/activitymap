@@ -16,9 +16,9 @@ import { Toaster } from '~/components/ui/toaster';
 import { BrowsingProvider } from '~/hooks/use-browsing-library';
 import { auth } from '~/lib/auth';
 import { QueryProvider } from '~/providers/query-provider';
+import { toCurrentUserDTO } from '~/server/auth/current-user';
 import { getAccountInternal, getUserInternal } from '~/server/auth/users';
 import { convexLiveUrlFor } from '~/server/convex-live-owners';
-import { toCurrentUserDTO } from '~/server/db/dto';
 import { previewSelection } from '~/server/preview/selection';
 import type { InitialAuth } from '~/store/auth';
 

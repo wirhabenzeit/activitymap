@@ -3,7 +3,7 @@ import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import type { PhotoDTO } from '~/contracts/v1/photo';
 import type { Activity } from '~/lib/activity';
 import { syncedActivityPlaces } from '~/lib/activity-places';
-import type { Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/records';
 
 // Compatibility alias for callers adopting the explicit frontend projection.
 export type ActivityWithStreams = Activity;

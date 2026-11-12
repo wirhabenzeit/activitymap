@@ -27,8 +27,7 @@
     "incremental": true,
     /* Path Aliases */
     "paths": {
-      "~/*": ["./src/*"],
-      "drizzle/*": ["./drizzle/*"]
+      "~/*": ["./src/*"]
     }
   },
   "include": [

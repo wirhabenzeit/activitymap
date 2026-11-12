@@ -4,7 +4,7 @@ import test from 'node:test';
 import { immer } from 'zustand/middleware/immer';
 import { createStore } from 'zustand/vanilla';
 
-import type { CurrentUserDTO } from '~/server/db/dto';
+import type { CurrentUserDTO } from '~/server/auth/current-user';
 
 import { createAuthSlice } from './auth';
 import type { RootState } from './index';

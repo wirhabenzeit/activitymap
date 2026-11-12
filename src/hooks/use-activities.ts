@@ -22,7 +22,7 @@ import {
   dtoToActivityWithPlaces,
 } from '~/lib/sync/v1-mappers';
 import { getCachedActivityDTOs, upsertActivityDTOs } from '~/lib/sync/v1-store';
-import type { Activity as LegacyActivity } from '~/server/db/schema';
+import type { Activity as LegacyActivity } from '~/server/records';
 import {
   getPublicActivities,
   getPublicUserActivities,

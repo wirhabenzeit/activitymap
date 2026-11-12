@@ -13,7 +13,7 @@ import {
   encodeStreamSummary,
   unpackStreamSummary,
 } from '~/lib/streams/compact-summary';
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/server/records';
 
 /**
  * Elevation by distance, in the stream-summary codec

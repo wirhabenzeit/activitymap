@@ -1,11 +1,14 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
-import type { Account } from './schema';
+
+import type { Account } from '~/server/records';
+
 import {
   accountTokenColumnsNeedNormalization,
   buildAccountTokenColumnUpdate,
   resolveAccountTokens,
-} from './account-token-normalization';
+} from './account-tokens';
 
 const account = (overrides: Partial<Account>): Account =>
   ({

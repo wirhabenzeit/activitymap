@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
+
 import polyline from '@mapbox/polyline';
-import { createStore } from 'zustand/vanilla';
+import test from 'node:test';
 import { immer } from 'zustand/middleware/immer';
+import { createStore } from 'zustand/vanilla';
+
+import type { Activity } from '~/server/records';
 import type { RootState } from '~/store';
-import type { Activity } from '~/server/db/schema';
 import { createFilterSlice } from '~/store/filter';
 import { createSelectionSlice } from '~/store/selection';
+
 import { showActivityOnMap } from './show-on-map';
 
 const activity = (id: number, name: string, gps = true) =>

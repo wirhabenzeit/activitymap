@@ -1,18 +1,24 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 
 import polyline from '@mapbox/polyline';
+import test from 'node:test';
 
-import type { Activity } from '~/server/db/schema';
 import { DEFAULT_SHARE_LINK_FIELD_OPTIONS } from '~/lib/sharing/fields';
-import { SHARED_ROUTE_END_TRIM_METERS, type LatLng } from '~/lib/sharing/route-trim';
+import {
+  type LatLng,
+  SHARED_ROUTE_END_TRIM_METERS,
+} from '~/lib/sharing/route-trim';
 import { decodeStreamSummary } from '~/lib/streams/compact-summary';
+import type { Activity } from '~/server/records';
 import type { StreamSummary } from '~/server/strava/stream-summary';
 
 import { sharedActivityDTOSchema, toSharedActivityDTO } from './activity.ts';
 
 // About 1.5 km due east along 47°N, one point every ~76 m.
-const ROUTE: LatLng[] = Array.from({ length: 21 }, (_, index) => [47, 8 + index * 0.001]);
+const ROUTE: LatLng[] = Array.from({ length: 21 }, (_, index) => [
+  47,
+  8 + index * 0.001,
+]);
 const ROUTE_POLYLINE = polyline.encode(ROUTE);
 
 function metersBetween([lat1, lng1]: LatLng, [lat2, lng2]: LatLng) {
@@ -22,7 +28,9 @@ function metersBetween([lat1, lng1]: LatLng, [lat2, lng2]: LatLng) {
   return Math.hypot(x, y) * 6_371_000;
 }
 
-function buildActivity(overrides: Partial<Activity> & { id: number; athlete: number }): Activity {
+function buildActivity(
+  overrides: Partial<Activity> & { id: number; athlete: number },
+): Activity {
   return {
     public_id: overrides.id * 7,
     name: `Activity ${overrides.id}`,
@@ -106,8 +114,14 @@ void test('shares exactly the track-level allow-list', () => {
 });
 
 void test('never exposes health, social, location or account fields, whatever the options', () => {
-  for (const fields of [DEFAULT_SHARE_LINK_FIELD_OPTIONS, { showRouteEnds: true }]) {
-    const dto = toSharedActivityDTO(ACTIVITY, fields) as Record<string, unknown>;
+  for (const fields of [
+    DEFAULT_SHARE_LINK_FIELD_OPTIONS,
+    { showRouteEnds: true },
+  ]) {
+    const dto = toSharedActivityDTO(ACTIVITY, fields) as Record<
+      string,
+      unknown
+    >;
     for (const key of [
       'average_heartrate',
       'max_heartrate',
@@ -140,9 +154,18 @@ void test('trims both route ends by default', () => {
   const shared = polyline.decode(dto.route_polyline);
 
   const start = metersBetween(ROUTE[0]!, shared[0] as LatLng);
-  const finish = metersBetween(ROUTE[ROUTE.length - 1]!, shared[shared.length - 1] as LatLng);
-  assert.ok(Math.abs(start - SHARED_ROUTE_END_TRIM_METERS) < 2, `start trimmed by ${start} m`);
-  assert.ok(Math.abs(finish - SHARED_ROUTE_END_TRIM_METERS) < 2, `finish trimmed by ${finish} m`);
+  const finish = metersBetween(
+    ROUTE[ROUTE.length - 1]!,
+    shared[shared.length - 1] as LatLng,
+  );
+  assert.ok(
+    Math.abs(start - SHARED_ROUTE_END_TRIM_METERS) < 2,
+    `start trimmed by ${start} m`,
+  );
+  assert.ok(
+    Math.abs(finish - SHARED_ROUTE_END_TRIM_METERS) < 2,
+    `finish trimmed by ${finish} m`,
+  );
 });
 
 void test('keeps the full route only when the athlete shows start and finish', () => {
@@ -161,9 +184,12 @@ void test('shares no route when too little would remain after trimming', () => {
     null,
   );
   assert.equal(
-    toSharedActivityDTO(buildActivity({ id: 44, athlete: 1001, map_summary_polyline: null }), {
-      showRouteEnds: true,
-    }).route_polyline,
+    toSharedActivityDTO(
+      buildActivity({ id: 44, athlete: 1001, map_summary_polyline: null }),
+      {
+        showRouteEnds: true,
+      },
+    ).route_polyline,
     null,
   );
 });
@@ -205,27 +231,48 @@ const STREAM_SUMMARY: StreamSummary = {
 };
 
 void test('shares an elevation profile trimmed like the route, without time, heart rate or power', () => {
-  const dto = toSharedActivityDTO(ACTIVITY, DEFAULT_SHARE_LINK_FIELD_OPTIONS, STREAM_SUMMARY);
+  const dto = toSharedActivityDTO(
+    ACTIVITY,
+    DEFAULT_SHARE_LINK_FIELD_OPTIONS,
+    STREAM_SUMMARY,
+  );
   assert.ok(dto.elevation_profile);
   assert.equal('heartrate' in dto.elevation_profile, false);
   assert.equal('time' in dto.elevation_profile, false);
   assert.equal('watts' in dto.elevation_profile, false);
 
   const profile = decodeStreamSummary(dto.elevation_profile);
-  assert.deepEqual(profile.distance, [225, 300, 375, 450, 525, 600, 675, 750, 825, 900, 975, 1050, 1125, 1200, 1275]);
+  assert.deepEqual(
+    profile.distance,
+    [
+      225, 300, 375, 450, 525, 600, 675, 750, 825, 900, 975, 1050, 1125, 1200,
+      1275,
+    ],
+  );
   assert.equal(profile.altitude?.[0], 403);
   assert.deepEqual(profile.latlng?.[0], ROUTE[3]);
   assert.equal(profile.heartrate, undefined);
 });
 
 void test('shares the whole elevation profile only when start and finish are shown', () => {
-  const dto = toSharedActivityDTO(ACTIVITY, { showRouteEnds: true }, STREAM_SUMMARY);
+  const dto = toSharedActivityDTO(
+    ACTIVITY,
+    { showRouteEnds: true },
+    STREAM_SUMMARY,
+  );
   assert.ok(dto.elevation_profile);
-  assert.equal(decodeStreamSummary(dto.elevation_profile).distance?.length, ROUTE.length);
+  assert.equal(
+    decodeStreamSummary(dto.elevation_profile).distance?.length,
+    ROUTE.length,
+  );
 });
 
 void test('shares no elevation profile without a usable summary', () => {
-  assert.equal(toSharedActivityDTO(ACTIVITY, DEFAULT_SHARE_LINK_FIELD_OPTIONS).elevation_profile, null);
+  assert.equal(
+    toSharedActivityDTO(ACTIVITY, DEFAULT_SHARE_LINK_FIELD_OPTIONS)
+      .elevation_profile,
+    null,
+  );
   const short: StreamSummary = {
     ...STREAM_SUMMARY,
     distance: STREAM_SUMMARY.distance!.slice(0, 6),
@@ -236,12 +283,18 @@ void test('shares no elevation profile without a usable summary', () => {
     watts: undefined,
   };
   assert.equal(
-    toSharedActivityDTO(ACTIVITY, DEFAULT_SHARE_LINK_FIELD_OPTIONS, short).elevation_profile,
+    toSharedActivityDTO(ACTIVITY, DEFAULT_SHARE_LINK_FIELD_OPTIONS, short)
+      .elevation_profile,
     null,
   );
-  const noAltitude: StreamSummary = { version: 1, basis: 'distance', distance: [0, 1000] };
+  const noAltitude: StreamSummary = {
+    version: 1,
+    basis: 'distance',
+    distance: [0, 1000],
+  };
   assert.equal(
-    toSharedActivityDTO(ACTIVITY, { showRouteEnds: true }, noAltitude).elevation_profile,
+    toSharedActivityDTO(ACTIVITY, { showRouteEnds: true }, noAltitude)
+      .elevation_profile,
     null,
   );
 });

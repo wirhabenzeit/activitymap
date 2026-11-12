@@ -56,8 +56,9 @@ export function writerOf(owner: Doc<'owners'>): Writer {
 /**
  * The owner, for a write by `writer`. Every write to an owner's library
  * goes through this in its own transaction, so a writer that picked its
- * work before a handoff is refused when it publishes after it. Copies from
- * Postgres (the mirror and the importer) write as `postgres`, the default.
+ * work before a handoff is refused when it publishes after it. `postgres`,
+ * the default, is the writer of the libraries copied from Postgres before
+ * they were handed to Convex.
  */
 export async function requireWritableOwner(
   ctx: QueryCtx,
@@ -232,5 +233,25 @@ export const revoke = internalMutation({
     const owner = await ownerFor(ctx, scope.userId);
     if (owner?.epoch === scope.epoch && owner.athleteId === scope.athleteId)
       await ctx.db.patch('owners', owner._id, { revoked: true });
+  },
+});
+
+/** The owner's fences, for the write bridge's `state` operation: whether a
+ * library exists, its routing epoch and who writes it. */
+export const state = internalQuery({
+  args: { userId: v.string(), athleteId: v.string() },
+  handler: async (ctx, { userId, athleteId }) => {
+    const owner = await ownerFor(ctx, userId);
+    if (!owner || owner.athleteId !== athleteId) return null;
+    return {
+      backend: owner.backend,
+      writer: writerOf(owner),
+      writerEpoch: owner.writerEpoch ?? 0,
+      epoch: owner.epoch,
+      generation: owner.generation,
+      revoked: owner.revoked,
+      catalogue: owner.catalogue,
+      matchingVersion: owner.matchingVersion,
+    };
   },
 });

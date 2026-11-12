@@ -98,7 +98,6 @@ class Store implements LibraryOwnerStore {
   subscribeV1LibraryCommits = (listener: (commit: V1LibraryCommit) => void) => {
     this.listeners.add(listener);
     return () => {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Set
       this.listeners.delete(listener);
     };
   };

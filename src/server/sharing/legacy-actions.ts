@@ -1,7 +1,7 @@
 'use server';
 
 import { assertLegacySharingEnabled } from '~/lib/legacy-sharing';
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/server/records';
 
 /**
  * The retired guest reads (`/map?activities=`, `/map?user=`). Legacy sharing

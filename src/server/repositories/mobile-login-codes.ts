@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { convexMobileLoginCodesRepository } from '~/server/auth/convex-mobile-login-codes';
-import type { MobileLoginCode } from '~/server/db/schema';
+import type { MobileLoginCode } from '~/server/records';
 
 export type NewMobileLoginCode = {
   codeHash: string;

@@ -5,7 +5,7 @@ import { type StateCreator } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { createStore } from 'zustand/vanilla';
 
-import type { CurrentUserDTO } from '~/server/db/dto';
+import type { CurrentUserDTO } from '~/server/auth/current-user';
 
 import { useActivityPlaceFocus } from './activity-place-focus';
 import { createAuthSlice } from './auth';

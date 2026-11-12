@@ -12,12 +12,12 @@ Summaries were deliberately removed by the earlier `b0f5ddf` change. That behavi
 
 Eight scenes per revision use the same 20-activity fixture. Screenshots compare the current merged UI with reduced row padding, full-width sortable headers and a bottom status bar. The bar uses roughly one row of vertical space compared with the preceding header-settings iteration. Long names and large text may naturally use more height.
 
-| Variant | Before | After |
-| --- | --- | --- |
-| Phone | ![Before phone](ios-list-density/before-phone.jpg) | ![After phone](ios-list-density/after-phone.jpg) |
-| Dark | ![Before dark](ios-list-density/before-phone-dark.jpg) | ![After dark](ios-list-density/after-phone-dark.jpg) |
+| Variant    | Before                                                             | After                                                            |
+| ---------- | ------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| Phone      | ![Before phone](ios-list-density/before-phone.jpg)                 | ![After phone](ios-list-density/after-phone.jpg)                 |
+| Dark       | ![Before dark](ios-list-density/before-phone-dark.jpg)             | ![After dark](ios-list-density/after-phone-dark.jpg)             |
 | Large text | ![Before large text](ios-list-density/before-small-large-text.jpg) | ![After large text](ios-list-density/after-small-large-text.jpg) |
-| Tablet | ![Before tablet](ios-list-density/before-tablet.jpg) | ![After tablet](ios-list-density/after-tablet.jpg) |
+| Tablet     | ![Before tablet](ios-list-density/before-tablet.jpg)               | ![After tablet](ios-list-density/after-tablet.jpg)               |
 
 ## Validation
 

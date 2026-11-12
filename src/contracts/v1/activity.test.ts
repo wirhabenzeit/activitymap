@@ -1,7 +1,10 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toActivityDTO, activityDTOSchema } from './activity.ts';
-import type { Activity } from '~/server/db/schema';
+
+import { test } from 'node:test';
+
+import type { Activity } from '~/server/records';
+
+import { activityDTOSchema, toActivityDTO } from './activity.ts';
 
 const fixtureActivity: Activity = {
   id: 12345678901234, // a realistically large activity id, encoded as a string on the wire

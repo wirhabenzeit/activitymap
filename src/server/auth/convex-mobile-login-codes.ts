@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
-import type { MobileLoginCode } from '~/server/db/schema';
+import type { MobileLoginCode } from '~/server/records';
 import type { MobileLoginCodesRepository } from '~/server/repositories/mobile-login-codes';
 
 import { convexAuthStore } from './convex-adapter';

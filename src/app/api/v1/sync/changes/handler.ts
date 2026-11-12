@@ -11,8 +11,8 @@ import {
   syncChangesQuerySchema,
 } from '~/contracts/v1/sync';
 import type { Actor } from '~/server/auth/actor';
-import type { SyncChange } from '~/server/db/schema';
 import { requestIdFor } from '~/server/http/request-id';
+import type { SyncChange } from '~/server/records';
 import type { ActivitiesRepository } from '~/server/repositories/activities';
 import type { ChangesRepository } from '~/server/repositories/changes';
 import { DEFAULT_RETENTION_DAYS } from '~/server/repositories/changes';

@@ -5,7 +5,7 @@ import test from 'node:test';
 import { createSyncBootstrapHandler } from '~/app/api/v1/sync/bootstrap/handler.ts';
 import { createSyncChangesHandler } from '~/app/api/v1/sync/changes/handler.ts';
 import type { Actor } from '~/server/auth/actor.ts';
-import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
+import type { Activity, Photo, SyncChange } from '~/server/records';
 import { encodeSyncCursor } from '~/server/sync/cursor.ts';
 
 import {
@@ -127,7 +127,6 @@ class FakeServer {
   }
 
   deleteActivity(id: number) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory fake, not a drizzle table
     this.activities.delete(id);
     this.recordChange({
       entityType: 'activity',

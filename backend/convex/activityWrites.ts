@@ -75,12 +75,12 @@ export async function publishChange(
 }
 
 /** The provider coordinator supplies a locally assigned, monotonic source revision. */
-const applySourceArgs = {
+export const applySourceArgs = {
   ...fence,
   dto: v.union(activityMetadataValidator, v.null()),
 };
 
-/** Shared by the mutation and batched trusted writers such as the importer. */
+/** Apply one activity's provider metadata, fenced by the owner's writer. */
 export async function applySourceRecord(
   ctx: MutationCtx,
   args: ObjectType<typeof applySourceArgs>,
@@ -186,7 +186,7 @@ export async function applySourceRecord(
   };
   if (prior) await ctx.db.replace('activities', prior._id, next);
   else await ctx.db.insert('activities', next);
-  // Re-applying identical metadata (mirror replays, importer re-runs) only
+  // Re-applying identical metadata (a repeated provider read) only
   // advances the revision fence; clients have nothing new to sync.
   if (!(preserve && sameValue(prior!.dto, dto)))
     await publishChange(ctx, owner, args.id, 'upsert');
@@ -220,11 +220,6 @@ function sameValue(left: unknown, right: unknown): boolean {
     a.length === b.size && a.every(([key, item]) => sameValue(item, b.get(key)))
   );
 }
-
-export const applySource = internalMutation({
-  args: applySourceArgs,
-  handler: applySourceRecord,
-});
 
 /** Stream revisions are decimal counters assigned by the stream store. */
 function newerRevision(candidate: string, current: string) {
@@ -350,7 +345,7 @@ export const publishRecording = internalMutation({
   },
 });
 
-const publishMatchArgs = {
+export const publishMatchArgs = {
   ...fence,
   recording: v.id('recordings'),
   catalogue: v.string(),
@@ -392,8 +387,3 @@ export async function publishMatchRecord(
   await publishChange(ctx, owner, args.id, 'upsert');
   return true;
 }
-
-export const publishMatch = internalMutation({
-  args: publishMatchArgs,
-  handler: publishMatchRecord,
-});

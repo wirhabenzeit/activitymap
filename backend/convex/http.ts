@@ -160,9 +160,9 @@ router.route({
 });
 
 /**
- * Trusted writers (the shadow-write mirror and the importer). Every request
- * carries a single-use nonce inside the signed body; the writes themselves
- * are fenced by revision, so even an accepted duplicate would be a no-op.
+ * The app's writes. Every request carries a single-use nonce inside the
+ * signed body; the writes themselves are fenced by revision, so even an
+ * accepted duplicate would be a no-op.
  */
 router.route({
   path: '/internal/write/v1',
@@ -186,33 +186,9 @@ router.route({
       let result: unknown;
       switch (kind) {
         case 'state':
-          result = await ctx.runQuery(internal.importer.mirrorState, {
+          result = await ctx.runQuery(internal.owners.state, {
             userId,
             athleteId,
-          });
-          break;
-        case 'applySources':
-          result = await ctx.runMutation(internal.importer.applySources, {
-            scope,
-            ...args,
-          });
-          break;
-        case 'deleteSources':
-          result = await ctx.runMutation(internal.importer.deleteSources, {
-            scope,
-            ...args,
-          });
-          break;
-        case 'applyPhotoSets':
-          result = await ctx.runMutation(internal.importer.applyPhotoSets, {
-            scope,
-            ...args,
-          });
-          break;
-        case 'deletePhotos':
-          result = await ctx.runMutation(internal.importer.deletePhotos, {
-            scope,
-            ...args,
           });
           break;
         case 'uploadUrls':
@@ -221,25 +197,7 @@ router.route({
             ...scope,
             operation: { kind: 'head' },
           });
-          result = await ctx.runMutation(internal.importer.uploadUrls, args);
-          break;
-        case 'prepareRecordings':
-          result = await ctx.runAction(internal.importer.prepareRecordings, {
-            scope,
-            ...args,
-          });
-          break;
-        case 'publishMatches':
-          result = await ctx.runMutation(internal.importer.publishMatches, {
-            scope,
-            ...args,
-          });
-          break;
-        case 'selectCatalogue':
-          result = await ctx.runMutation(internal.catalogue.select, {
-            scope,
-            ...args,
-          });
+          result = await ctx.runMutation(internal.places.uploadUrls, args);
           break;
         // The place catalogue belongs to no owner: the signature authorizes.
         case 'latestCatalogue':
@@ -301,17 +259,17 @@ router.route({
             tokenHash: args.tokenHash,
           });
           break;
-        // Account erasure (convex/erasure.ts). The app calls this inside the
-        // transaction that deletes the account in Postgres.
+        // Account erasure (convex/erasure.ts), before the app deletes the
+        // account's sign-in records (src/server/library/erase.ts).
         case 'eraseOwner':
           result = await ctx.runMutation(internal.erasure.start, {
             userId,
             athleteId,
           });
           break;
-        // A new library for an account that is about to be copied
-        // (src/server/convex-mirror/accounts.ts). An owner that exists is
-        // never reassigned here: that needs its current epoch.
+        // A new library for an account (src/server/library/index.ts). An
+        // owner that exists is never reassigned here: that needs its
+        // current epoch.
         case 'provision':
           result = await ctx.runMutation(internal.owners.provision, {
             userId,
@@ -323,8 +281,9 @@ router.route({
             matchingVersion: args.matchingVersion,
           });
           break;
-        // The handoff (src/server/convex-mirror/handoff.ts): a compare-and-set
-        // on the owner's writer epoch.
+        // Hand a new library to Convex as its writer
+        // (src/server/library/index.ts): a compare-and-set on the writer
+        // epoch.
         case 'setWriter':
           result = await ctx.runMutation(internal.owners.setWriter, {
             userId,
@@ -340,12 +299,6 @@ router.route({
           break;
         case 'applyActivity':
           result = await ctx.runMutation(internal.ingestion.apply, {
-            scope,
-            ...args,
-          });
-          break;
-        case 'checkpoint':
-          result = await ctx.runMutation(internal.importer.checkpoint, {
             scope,
             ...args,
           });

@@ -6,7 +6,7 @@ import { responseEnvelope } from '~/contracts/v1/envelope.ts';
 import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
 import { syncChangesPageDTOSchema } from '~/contracts/v1/sync.ts';
 import type { Actor } from '~/server/auth/actor.ts';
-import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
+import type { Activity, Photo, SyncChange } from '~/server/records';
 import { encodeSyncCursor } from '~/server/sync/cursor.ts';
 import { SyncRebootstrapRequiredError } from '~/server/sync/errors';
 

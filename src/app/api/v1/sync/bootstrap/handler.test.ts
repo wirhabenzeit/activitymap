@@ -7,7 +7,7 @@ import { responseEnvelope } from '~/contracts/v1/envelope.ts';
 import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
 import { syncBootstrapPageDTOSchema } from '~/contracts/v1/sync.ts';
 import type { Actor } from '~/server/auth/actor.ts';
-import type { Activity, Photo } from '~/server/db/schema.ts';
+import type { Activity, Photo } from '~/server/records';
 import { encodeScopedBootstrapCursor } from '~/server/sync/bootstrap-cursor';
 import { encodeBootstrapCursor } from '~/server/sync/bootstrap-cursor.ts';
 import { decodeSyncCursor } from '~/server/sync/cursor.ts';
