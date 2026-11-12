@@ -67,6 +67,7 @@ final class SyncController {
     // Stats, route sources, selection caches or loaded photo images.
     @ObservationIgnored private var publishedActivities: [ActivityMapAPI.Activity]?
     @ObservationIgnored private var publishedActivityRevision: Int?
+    @ObservationIgnored private var publishedStoreRevision: Int?
     @ObservationIgnored private var publishedPhotos: [ActivityMapAPI.Photo]?
     @ObservationIgnored private var photoCacheConfigured = false
 
@@ -381,11 +382,21 @@ final class SyncController {
     /// its upserts and tombstones. Sign-out, sign-in expiry, disconnection and
     /// an explicit 401 still clear it.
     private func loadCache(_ session: SyncSession, storage: LocalStore, generation current: Int) async throws {
+        let metadata = try await storage.syncMetadata(scope: session.scope)
+        guard current == generation, !Task.isCancelled else { throw CancellationError() }
+        if publishedStoreRevision == metadata.revision, publishedActivities != nil, photoCacheConfigured,
+           publishedActivityRevision == activities.activitiesRevision,
+           metadata.checkpoint?.bootstrapComplete == true, metadata.checkpoint?.lastSyncAt != nil,
+           activities.placeMatchingVersion == metadata.checkpoint?.freshness?.placeMatchingVersion {
+            checkpoint = metadata.checkpoint
+            return
+        }
         let snapshot = try await storage.snapshot(scope: session.scope)
         guard current == generation, !Task.isCancelled else { throw CancellationError() }
         checkpoint = snapshot.checkpoint
+        publishedStoreRevision = snapshot.revision
         guard let checkpoint, checkpoint.bootstrapComplete, checkpoint.lastSyncAt != nil else {
-            publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
+            publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil; publishedStoreRevision = nil
             photoCacheConfigured = false
             if !activities.activities.isEmpty { activities.activities = [] }
             if !photos.isEmpty { photos = [] }
@@ -435,7 +446,7 @@ final class SyncController {
         fetchedInitialSummaries = false
         importingInitialSummaries = false
         summarySync.pause()
-        publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil
+        publishedActivities = nil; publishedActivityRevision = nil; publishedPhotos = nil; publishedStoreRevision = nil
         photoCacheConfigured = false
         summaries.reset()
         places.reset()

@@ -616,3 +616,13 @@ The app on Vercel and this package deploy independently, a minute or so
 apart, in no fixed order. Keep changes to the bridges and the schema
 additive: add an operation or a field in one change, and remove what it
 replaces only after both sides run the new code.
+
+New app callers also need a compatible path while a backend deployment is
+pending approval. The `rateLimits` and `changesPage` callers handle the older
+bridge's HTTP 400 response by using the existing operations, with the same
+authorization, retention and ordered rate limits. They try the optimized
+operation again on the next request, so either deployment can finish first.
+Authentication, cursor, server and transport failures are not treated as
+unsupported operations. Tests cover an app-first rollout and the automatic
+switch after the backend upgrade. Adding a new bridge operation should include
+this mixed-version proof rather than a manual release-order instruction.

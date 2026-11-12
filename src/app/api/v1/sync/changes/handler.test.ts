@@ -23,6 +23,52 @@ function encode(sequence: number, athleteId = ACTOR.athleteId, issuedAt = now) {
   return encodeSyncCursor({ sequence, athleteId, issuedAt });
 }
 
+void test('atomic delta snapshot avoids separate reads and preserves an unchanged cursor deadline', async () => {
+  const unexpected = async (): Promise<never> => {
+    throw new Error('separate read');
+  };
+  let calls = 0;
+  const handler = createSyncChangesHandler({
+    now: () => now,
+    resolveActor: async () => ACTOR,
+    activitiesRepo: { findManyByIds: unexpected },
+    photosRepo: { findManyByIds: unexpected },
+    changesRepo: {
+      latestSequence: unexpected,
+      findAfter: unexpected,
+      retentionFloor: unexpected,
+    },
+    freshnessRepo: { lastCompletedAt: unexpected },
+    placesRepo: { sync: unexpected },
+    changesPage: async (actor, args) => {
+      calls++;
+      assert.equal(actor, ACTOR);
+      assert.deepEqual(args, { after: 4, limit: 500 });
+      return {
+        items: [],
+        lastSequence: 4,
+        freshness: {
+          lastSummaryReconciledAt: null,
+          placeMatchingVersion: 'b'.repeat(64),
+        },
+      };
+    },
+  });
+  const cursor = encode(4);
+  const response = await handler(
+    new Request(
+      `https://example.test/api/v1/sync/changes?cursor=${encodeURIComponent(cursor)}&limit=500`,
+    ),
+  );
+  assert.equal(response.status, 200);
+  const { data } = responseEnvelope(syncChangesPageDTOSchema).parse(
+    await response.json(),
+  );
+  assert.equal(data.nextCursor, cursor);
+  assert.equal(data.freshness.placeMatchingVersion, 'b'.repeat(64));
+  assert.equal(calls, 1);
+});
+
 function buildActivity(
   overrides: Partial<Activity> & { id: number },
 ): Activity {

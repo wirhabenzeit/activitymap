@@ -34,6 +34,7 @@ struct SyncAPITests {
             let components = URLComponents(url: request.url!, resolvingAgainstBaseURL: false)!
             #expect(components.path == "/api/v1/sync/changes")
             #expect(components.queryItems?.first?.value == cursor)
+            #expect(components.queryItems?.first(where: { $0.name == "limit" })?.value == "500")
             #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer secret-for-test")
             #expect(!request.httpShouldHandleCookies)
             let json = """

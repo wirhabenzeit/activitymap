@@ -2,6 +2,9 @@ import { createHmac, randomBytes } from 'node:crypto';
 
 import { createAdapterFactory } from 'better-auth/adapters';
 
+import { timeRequestWork } from '~/server/api/request-timing';
+import { BridgeResponseError } from '~/server/sync/bridge-response-error';
+
 /**
  * The auth library's database adapter over the sign-in store in Convex
  * (backend/convex/authStore.ts), through the signed auth route. Every
@@ -44,24 +47,33 @@ export function convexAuthStore(
     const signature = createHmac('sha256', Buffer.from(secret, 'hex'))
       .update(`activitymap-auth-v1\n${version}\n${timestamp}\n${body}`)
       .digest('hex');
-    const response = await fetcher(url, {
-      method: 'POST',
-      cache: 'no-store',
-      redirect: 'error',
-      signal: AbortSignal.timeout(20_000),
-      headers: {
-        'Content-Type': 'application/json',
-        'X-ActivityMap-Key-Id': version,
-        'X-ActivityMap-Timestamp': timestamp,
-        'X-ActivityMap-Signature': signature,
-      },
-      body,
+    const phase = ['rateLimit', 'rateLimits'].includes(operation.kind)
+      ? 'rate_limit'
+      : operation.kind === 'find' &&
+          ['session', 'user', 'account'].includes(String(operation.model))
+        ? `auth_${String(operation.model)}`
+        : 'auth_other';
+    return timeRequestWork(phase, async () => {
+      const response = await fetcher(url, {
+        method: 'POST',
+        cache: 'no-store',
+        redirect: 'error',
+        signal: AbortSignal.timeout(20_000),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-ActivityMap-Key-Id': version,
+          'X-ActivityMap-Timestamp': timestamp,
+          'X-ActivityMap-Signature': signature,
+        },
+        body,
+      });
+      if (!response.ok)
+        throw new BridgeResponseError(
+          `Convex auth store rejected ${operation.kind} (${response.status})`,
+          response.status,
+        );
+      return (await response.json()) as T;
     });
-    if (!response.ok)
-      throw new Error(
-        `Convex auth store rejected ${operation.kind} (${response.status})`,
-      );
-    return (await response.json()) as T;
   };
 }
 

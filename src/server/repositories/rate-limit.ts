@@ -17,6 +17,10 @@ export interface RateLimitRepository {
    * count.
    */
   incrementAndGet(key: string, windowStart: Date): Promise<number>;
+  /** Ordered checks in one transaction; stops after the first exhausted bucket. */
+  incrementManyAndGet?(
+    windows: { key: string; windowStart: number; limit: number }[],
+  ): Promise<number[]>;
 
   /**
    * Deletes bucket rows whose window started before `cutoff`. Every window

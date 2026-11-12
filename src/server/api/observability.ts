@@ -1,8 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
 import { errorEnvelope } from '~/contracts/v1/error';
-import { logger } from '~/server/logging/logger';
 import { requestIdFor, withRequestIdHeader } from '~/server/http/request-id';
+import { logger } from '~/server/logging/logger';
+
+import {
+  type RequestTimings,
+  timingSummary,
+  withRequestTimings,
+} from './request-timing';
 
 export interface ApiV1ObservabilityOptions {
   /** A human-readable `"METHOD /path"` label used as the log line's `route` field. */
@@ -49,10 +55,13 @@ export function withApiV1Observability(
     const requestId = requestIdFor(request, createRequestId);
     const taggedRequest = await withRequestIdHeader(request, requestId);
     const startedAt = now();
+    const timings: RequestTimings = new Map();
 
     let response: Response;
     try {
-      response = await handler(taggedRequest);
+      response = await withRequestTimings(timings, () =>
+        handler(taggedRequest),
+      );
     } catch (error) {
       // Defense in depth: every v1 handler already catches its own errors
       // and returns a 500 envelope, so this branch should be unreachable
@@ -64,15 +73,20 @@ export function withApiV1Observability(
         route: options.route,
         method: request.method,
         durationMs,
+        phases: timingSummary(timings),
         requestId,
         error,
       });
       return tagResponse(
         Response.json(
-          errorEnvelope('internal_error', 'The request could not be completed.', {
-            requestId,
-            retryable: true,
-          }),
+          errorEnvelope(
+            'internal_error',
+            'The request could not be completed.',
+            {
+              requestId,
+              retryable: true,
+            },
+          ),
           { status: 500 },
         ),
         requestId,
@@ -85,6 +99,7 @@ export function withApiV1Observability(
       method: request.method,
       status: response.status,
       durationMs,
+      phases: timingSummary(timings),
       requestId,
     };
     if (response.status >= 500) {
@@ -93,7 +108,25 @@ export function withApiV1Observability(
       logger.info('[ApiV1] request completed', logLine);
     }
 
-    return tagResponse(response, requestId);
+    const tagged = tagResponse(response, requestId);
+    if (timings.size) {
+      const headers = new Headers(tagged.headers);
+      headers.append(
+        'Server-Timing',
+        [...timings]
+          .map(
+            ([name, value]) =>
+              `${name};dur=${value.durationMs.toFixed(1)};desc="${value.calls} calls"`,
+          )
+          .join(', '),
+      );
+      return new Response(tagged.body, {
+        status: tagged.status,
+        statusText: tagged.statusText,
+        headers,
+      });
+    }
+    return tagged;
   };
 }
 

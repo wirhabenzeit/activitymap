@@ -4,8 +4,10 @@ import { createHmac } from 'node:crypto';
 
 import { z } from 'zod';
 
+import { timeRequestWork } from '~/server/api/request-timing';
 import type { Actor } from '~/server/auth/actor';
 
+import { BridgeResponseError } from './bridge-response-error';
 import { SyncRebootstrapRequiredError } from './errors';
 
 const assignmentSchema = z.discriminatedUnion('backend', [
@@ -44,19 +46,27 @@ export function convexSyncBridge(
     const signature = createHmac('sha256', Buffer.from(secret, 'hex'))
       .update(`activitymap-sync-v1\n${version}\n${timestamp}\n${body}`)
       .digest('hex');
-    const result = await fetcher(url, {
-      method: 'POST',
-      cache: 'no-store',
-      redirect: 'error',
-      signal: AbortSignal.timeout(15_000),
-      headers: {
-        'Content-Type': 'application/json',
-        'X-ActivityMap-Key-Id': version,
-        'X-ActivityMap-Timestamp': timestamp,
-        'X-ActivityMap-Signature': signature,
-      },
-      body,
-    });
+    const result = await timeRequestWork(
+      operation.kind === 'changesPage'
+        ? 'sync_page'
+        : ['head', 'retention', 'changes'].includes(operation.kind)
+          ? 'sync_metadata'
+          : 'sync_entities',
+      () =>
+        fetcher(url, {
+          method: 'POST',
+          cache: 'no-store',
+          redirect: 'error',
+          signal: AbortSignal.timeout(15_000),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-ActivityMap-Key-Id': version,
+            'X-ActivityMap-Timestamp': timestamp,
+            'X-ActivityMap-Signature': signature,
+          },
+          body,
+        }),
+    );
     if (result.status === 409) {
       const error: unknown = await result.json().catch(() => null);
       if (
@@ -67,7 +77,10 @@ export function convexSyncBridge(
         throw new SyncRebootstrapRequiredError();
     }
     if (!result.ok)
-      throw new Error(`Convex sync bridge unavailable (${result.status})`);
+      throw new BridgeResponseError(
+        `Convex sync bridge unavailable (${result.status})`,
+        result.status,
+      );
     return result;
   }
 

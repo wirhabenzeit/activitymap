@@ -12,6 +12,7 @@ nonisolated struct StoreSnapshot: Sendable {
     let activities: [ActivityMapAPI.Activity]
     let photos: [ActivityMapAPI.Photo]
     let checkpoint: SyncCheckpoint?
+    var revision: Int = 0
 }
 
 /// One writer per container. Model objects and contexts never leave this actor.
@@ -21,6 +22,8 @@ actor LocalStore {
     enum PlacesSyncError: Error { case invalidScope }
     private let container: ModelContainer
     let save: @Sendable (ModelContext) throws -> Void
+    // Only successful library writes change this; checkpoint-only polls do not.
+    var libraryRevision = 0
 
     var streamFences = StreamFences()
     var summaryObservers: [UUID: AsyncStream<SummaryStoreChange>.Continuation] = [:]
@@ -47,6 +50,13 @@ actor LocalStore {
         return try ModelContainer(for: schema, configurations: [configuration])
     }
 
+    func syncMetadata(scope: StoreScope) throws -> (checkpoint: SyncCheckpoint?, revision: Int) {
+        let key = scope.key
+        let state = try makeContext().fetch(FetchDescriptor<SyncState>(
+            predicate: #Predicate { $0.scope == key })).first
+        return (try state?.decoded(), libraryRevision)
+    }
+
     func snapshot(scope: StoreScope) throws -> StoreSnapshot {
         let context = makeContext()
         let key = scope.key
@@ -61,7 +71,7 @@ actor LocalStore {
                 $0.startDate == $1.startDate ? $0.id < $1.id : $0.startDate > $1.startDate
             },
             photos: photos.map { try $0.decoded() }.sorted { $0.uniqueID < $1.uniqueID },
-            checkpoint: state?.decoded())
+            checkpoint: state?.decoded(), revision: libraryRevision)
     }
 
     /// A nil checkpoint preserves current sync state (e.g. a bootstrap page).
@@ -148,6 +158,7 @@ actor LocalStore {
             }
             try Task.checkCancellation()
             try save(context)
+            if !mutations.isEmpty || placesVersionChanged { libraryRevision += 1 }
             for id in invalidatedIDs { streamFences.invalidate(StoreScope.key([scopeKey, id])) }
             if !invalidatedIDs.isEmpty { notifySummaryChange(scope: scopeKey, activityIDs: invalidatedIDs) }
             if placesVersionChanged {
@@ -178,6 +189,7 @@ actor LocalStore {
             for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>(predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<StoredPlacesContext>(predicate: #Predicate { $0.scope == key })) { context.delete(row) }
             try save(context)
+            libraryRevision += 1
             streamFences.invalidate(key)
             notifySummaryChange(scope: key)
         } catch {
@@ -199,6 +211,7 @@ actor LocalStore {
             for row in try context.fetch(FetchDescriptor<StoredActivityPlaces>()) where row.scope != keep { context.delete(row) }
             for row in try context.fetch(FetchDescriptor<StoredPlacesContext>()) where row.scope != keep { context.delete(row) }
             try save(context)
+            libraryRevision += 1
             streamFences.invalidateAll()
             notifySummaryChange(scope: nil)
         } catch {

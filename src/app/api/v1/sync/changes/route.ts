@@ -16,6 +16,7 @@ const handle = withAuthenticatedApiV1(
       activitiesRepo: library.activitiesRepo,
       photosRepo: library.photosRepo,
       changesRepo: library.changesRepo,
+      changesPage: library.changesPage,
       cursorBackend: library.cursorBackend,
       itemByteBudget: 2 * 1024 * 1024,
       freshnessRepo: library.freshnessRepo,

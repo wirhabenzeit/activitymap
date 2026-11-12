@@ -4,6 +4,8 @@ import {
   StravaBudgetExceededError,
   type StravaRequestBudget,
 } from '~/server/strava/request-budget';
+import { warnBridgeFallback } from '~/server/sync/bridge-fallback-warning';
+import { BridgeResponseError } from '~/server/sync/bridge-response-error';
 
 import { convexAuthStore } from './convex-adapter';
 
@@ -19,6 +21,28 @@ export function convexRateLimitRepository(
   call: Call = convexAuthStore(),
 ): RateLimitRepository {
   return {
+    incrementManyAndGet: async (windows) => {
+      try {
+        return await call<number[]>({ kind: 'rateLimits', windows });
+      } catch (error) {
+        // The previous auth bridge rejects unknown operations with 400. Keep
+        // enforcing the SAME ordered buckets until the backend is upgraded.
+        if (!(error instanceof BridgeResponseError) || error.status !== 400)
+          throw error;
+        warnBridgeFallback('rateLimits');
+        const counts: number[] = [];
+        for (const { key, windowStart, limit } of windows) {
+          const count = await call<number>({
+            kind: 'rateLimit',
+            key,
+            windowStart,
+          });
+          counts.push(count);
+          if (count > limit) break;
+        }
+        return counts;
+      }
+    },
     incrementAndGet: (key, windowStart) =>
       call<number>({
         kind: 'rateLimit',

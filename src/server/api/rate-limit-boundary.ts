@@ -1,16 +1,16 @@
 import { errorEnvelope } from '~/contracts/v1/error';
-import { logger } from '~/server/logging/logger';
 import {
+  type RateLimitRule,
   evaluateRateLimit,
   ipKeyFor,
   sessionKeyFor,
-  type RateLimitRule,
   userKeyFor,
 } from '~/server/http/rate-limit';
 import { requestIdFor } from '~/server/http/request-id';
+import { logger } from '~/server/logging/logger';
 import {
-  rateLimitRepository,
   type RateLimitRepository,
+  rateLimitRepository,
 } from '~/server/repositories/rate-limit';
 
 export type { RateLimitRule };
@@ -39,7 +39,7 @@ export const STRICT_IP_RATE_LIMIT: RateLimitRule = {
 export interface RateLimitBoundaryOptions {
   /** A human-readable `"METHOD /path"` label, used only for logging. */
   route: string;
-  repo?: Pick<RateLimitRepository, 'incrementAndGet'>;
+  repo?: Pick<RateLimitRepository, 'incrementAndGet' | 'incrementManyAndGet'>;
   now?: () => Date;
   sessionRule?: RateLimitRule;
   userRule?: RateLimitRule;
@@ -118,8 +118,14 @@ export function withApiV1RateLimit(
       scope: 'session' | 'user' | 'ip',
       key: string,
       rule: RateLimitRule,
+      count?: number,
     ): Promise<Response | null> => {
-      const decision = await evaluateRateLimit(repo, key, rule, nowValue);
+      const decision = await evaluateRateLimit(
+        count === undefined ? repo : { incrementAndGet: async () => count },
+        key,
+        rule,
+        nowValue,
+      );
       if (decision.allowed) return null;
 
       onLimited({ scope, requestId, route: options.route });
@@ -143,8 +149,27 @@ export function withApiV1RateLimit(
       );
     };
 
-    for (const check of checks) {
-      const limitedResponse = await enforce(check.scope, check.key, check.rule);
+    const counts =
+      checks.length > 0 && repo.incrementManyAndGet
+        ? await repo.incrementManyAndGet(
+            checks.map(({ key, rule }) => ({
+              key,
+              windowStart:
+                Math.floor(nowValue.getTime() / rule.windowMs) * rule.windowMs,
+              limit: rule.limit,
+            })),
+          )
+        : undefined;
+    for (let i = 0; i < checks.length; i++) {
+      const check = checks[i]!;
+      if (counts && counts[i] === undefined)
+        throw new Error('Incomplete rate limit result');
+      const limitedResponse = await enforce(
+        check.scope,
+        check.key,
+        check.rule,
+        counts?.[i],
+      );
       if (limitedResponse) return limitedResponse;
     }
 
