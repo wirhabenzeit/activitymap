@@ -30,6 +30,7 @@ import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
 } from '~/server/strava/streams';
+import { warnBridgeFallback } from '~/server/sync/bridge-fallback-warning';
 import { BridgeResponseError } from '~/server/sync/bridge-response-error';
 import { convexSyncBridge } from '~/server/sync/convex-bridge';
 
@@ -418,8 +419,10 @@ function convexAdapter(actor: Actor, transport: Transport) {
           ).catch((error: unknown) => {
             // Older deployments reject the new operation with 400. The route
             // then uses the existing, fully fenced repository read path.
-            if (error instanceof BridgeResponseError && error.status === 400)
+            if (error instanceof BridgeResponseError && error.status === 400) {
+              warnBridgeFallback('changesPage');
               return null;
+            }
             throw error;
           });
           if (result === null) return null;

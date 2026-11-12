@@ -81,7 +81,7 @@ and `-only-testing:ActivityMapTests/SyncRefreshPerformanceTests`. Look for
 
 ## Rollout compatibility and verification
 
-Validation passed: 1,009 app tests, 80 backend tests, 87 focused native tests,
+Validation passed: 1,010 app tests, 80 backend tests, 87 focused native tests,
 app and backend type checks, lint, changed-file formatting and the production
 Next build with Webpack. Native regressions include expiry, cancellation,
 replacement, editing, place invalidation and failed photo-cache recovery.
@@ -98,6 +98,9 @@ or feature setting is required:
 - The next request tries the new operations again, so the API adopts the
   faster path automatically when the Convex deployment becomes available.
   There is no cached capability or authentication state to clear.
+- Fallback emits a warning with the operation and status. Warnings are limited
+  to one per operation per minute per server process, with a suppressed-call
+  count on the next warning. No user identity, token, URL or payload is logged.
 - Authentication failures, conflicts, retention rejection, rate limits,
   server errors, malformed successful responses and network failures do not
   trigger compatibility fallback. The old bridge's generic 400 cannot

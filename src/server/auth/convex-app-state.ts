@@ -4,6 +4,7 @@ import {
   StravaBudgetExceededError,
   type StravaRequestBudget,
 } from '~/server/strava/request-budget';
+import { warnBridgeFallback } from '~/server/sync/bridge-fallback-warning';
 import { BridgeResponseError } from '~/server/sync/bridge-response-error';
 
 import { convexAuthStore } from './convex-adapter';
@@ -28,6 +29,7 @@ export function convexRateLimitRepository(
         // enforcing the SAME ordered buckets until the backend is upgraded.
         if (!(error instanceof BridgeResponseError) || error.status !== 400)
           throw error;
+        warnBridgeFallback('rateLimits');
         const counts: number[] = [];
         for (const { key, windowStart, limit } of windows) {
           const count = await call<number>({
