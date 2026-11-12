@@ -135,7 +135,7 @@ void test('atomic delta includes current photo metadata and its deletion', async
 void test('atomic delta pages preserve tombstones, skip superseded upserts and enforce scope and retention', async () => {
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, config);
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     dto: fixture,
   });
@@ -153,7 +153,7 @@ void test('atomic delta pages preserve tombstones, skip superseded upserts and e
   assert.equal(first.head.sequence, 1);
   assert.deepEqual((await read(1)).items, []);
   assert.equal((await read(1)).lastSequence, 1);
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 2,
     dto: null,
@@ -192,7 +192,7 @@ void test('atomic deltas stop at the byte budget without acknowledging a deferre
   await convex.mutation(internal.owners.provision, config);
   for (let i = 1; i <= 30; i++) {
     const id = String(i);
-    await convex.mutation(internal.activityWrites.applySource, {
+    await convex.mutation(testWrites.applySource, {
       ...source,
       id,
       dto: {
