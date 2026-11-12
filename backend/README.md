@@ -556,14 +556,6 @@ changes the matching recipe.
 The script reports progress after each minute of sending and can be stopped
 and run again. The eight-country catalogue has about 176,000 such rows.
 
-## Retired data
-
-`shadowMatchRuns`, `shadowMatches` and `ownerHeads.mirror` hold what the
-move off Postgres left behind: the shadow matcher's comparison runs and the
-position of the copy from Postgres. Nothing writes them. Run
-`pnpm exec convex run maintenance:clearRetired` once; when it reports
-`done`, the two tables and the field can be removed from the schema.
-
 ## Recordings and publication
 
 Activity rows hold bounded DTO metadata and versioned stream/matching

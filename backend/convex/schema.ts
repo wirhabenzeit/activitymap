@@ -34,21 +34,6 @@ export default defineSchema({
     sequence: v.number(),
     retentionFloor: v.number(),
     catalogueAfter: v.optional(v.string()),
-    /** Retired: the position of the copy from Postgres. Nothing writes it;
-     * `maintenance.clearRetired` removes it, then the field can go. */
-    mirror: v.optional(
-      v.object({
-        sequence: v.number(),
-        revision: v.number(),
-        /** An unfinished full copy: last copied activity ID and the change
-         * sequence it started from. */
-        full: v.optional(v.object({ after: v.string(), through: v.number() })),
-        /** Photo catch-up: last activity ID copied, or null when finished. */
-        photos: v.optional(v.union(v.string(), v.null())),
-        /** The last mirrored photo change sequence. */
-        photoSequence: v.optional(v.number()),
-      }),
-    ),
   }).index('by_owner', ['owner']),
   /** Library counts per owner (convex/stats.ts). `rebuildAfter` is set while
    * a recount runs: the last activity key it has counted. */
@@ -289,49 +274,6 @@ export default defineSchema({
   })
     .index('by_dataset_tile', ['dataset', 'tile', 'key'])
     .index('by_dataset_key', ['dataset', 'key']),
-  /** Retired: runs of the shadow matcher, which compared matching here with
-   * Postgres. Nothing writes them; `maintenance.clearRetired` empties this
-   * table and `shadowMatches`, then both can go. */
-  shadowMatchRuns: defineTable({
-    owner: v.id('owners'),
-    dataset: v.string(),
-    after: v.string(),
-    done: v.boolean(),
-    matched: v.number(),
-    /** Activities without a current recording. */
-    skipped: v.number(),
-    /** Results dropped because the recording changed during matching. */
-    stale: v.number(),
-    failed: v.array(v.object({ key: v.string(), reason: v.string() })),
-    error: v.optional(v.string()),
-    /** Comparison with the results copied from Postgres. */
-    comparison: v.optional(
-      v.object({
-        after: v.string(),
-        done: v.boolean(),
-        same: v.number(),
-        different: v.number(),
-        onlyPostgres: v.number(),
-        onlyShadow: v.number(),
-        neither: v.number(),
-        examples: v.array(
-          v.object({
-            key: v.string(),
-            postgres: v.string(),
-            shadow: v.string(),
-          }),
-        ),
-      }),
-    ),
-  }).index('by_owner', ['owner']),
-  /** Retired: the shadow matcher's results (see `shadowMatchRuns`). */
-  shadowMatches: defineTable({
-    owner: v.id('owners'),
-    activity: v.string(),
-    recording: v.id('recordings'),
-    dataset: v.string(),
-    result: placeMatchValidator,
-  }).index('by_owner_activity', ['owner', 'activity']),
   changes: defineTable({
     owner: v.id('owners'),
     sequence: v.number(),
