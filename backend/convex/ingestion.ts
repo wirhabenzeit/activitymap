@@ -40,14 +40,13 @@ import { applyPhotoSet, photosOfActivities } from './photos';
  *
  * 1. `claim` gives it a lease and, for the `source` phase, a new source
  *    revision: the larger of the current time in milliseconds and one more
- *    than every revision already used for the activity, so revisions keep
- *    one order across a handoff from the mirror.
+ *    than every revision already used for the activity.
  * 2. `source` phase: the worker reads the activity (and its photos) through
  *    the provider gateway and `publishSource` writes them, or the deletion
  *    when the provider says the activity is gone.
  * 3. `recording` phase, only when the activity has no current recording:
  *    the worker reads the streams, stores the file and publishes it through
- *    the same fenced path the mirror uses. An activity without samples (one
+ *    the fenced recording path (`recordingWorker.ts`). An activity without samples (one
  *    typed in by hand, or one the provider has no streams for) gets an empty
  *    recording, which is how "nothing to fetch" is remembered.
  * 4. `match` phase, when the activity has a current recording without a
@@ -416,13 +415,13 @@ async function held(ctx: QueryCtx, id: Id<'ingestionJobs'>, claim: number) {
 
 /** A new source revision for the job's activity: the larger of the current
  * time in milliseconds and one more than every revision already used for
- * it, so revisions keep one order across a handoff from the mirror. */
+ * it. */
 async function nextRevision(
   ctx: QueryCtx,
   owner: Doc<'owners'>,
   job: Pick<Doc<'ingestionJobs'>, 'activity' | 'revision'>,
 ) {
-  const [row, set, head] = await Promise.all([
+  const [row, set] = await Promise.all([
     activityFor(ctx, owner._id, job.activity),
     ctx.db
       .query('photoSets')
@@ -430,14 +429,12 @@ async function nextRevision(
         q.eq('owner', owner._id).eq('activity', job.activity),
       )
       .unique(),
-    requireHead(ctx, owner._id),
   ]);
   return Math.max(
     Date.now(),
     job.revision + 1,
     (row?.sourceRevision ?? 0) + 1,
     (set?.revision ?? 0) + 1,
-    (head.mirror?.revision ?? 0) + 1,
   );
 }
 

@@ -1,5 +1,11 @@
 # Places along selected routes (web v1)
 
+> **Historical record.** This describes the implementation from before the
+> move to Convex (November 2026), when the library, its jobs and their
+> verification lived in Postgres. The migrations, database proofs and hourly
+> jobs named here no longer exist; for how this works now, see
+> [backend/README.md](../backend/README.md).
+
 Selecting activities on the web map automatically matches their stored GPS against
 the active Switzerland/Austria/Italy catalogue. Opening a route detail also asks
 for its matches. Matched peaks, passes and huts appear on the map; route details
@@ -150,11 +156,6 @@ profile before annotations are shown.
 ## Verification
 
 - `pnpm check`: typecheck, lint, generated checks and repository test suites.
-- `pnpm db:test-on-demand-places`: requires explicit guarded local
-  `MIGRATION_*` settings and a migrated database whose name ends in `_test`.
-  Uses invented catalogue/account/stream fixtures through the actual Neon driver
-  and HTTP handler. Proves lossless IDs, no data writes, account eligibility,
-  stale input rejection, concurrent revocation/replacement, coverage and budgets.
 - `pnpm test:activity-places-ui`: isolated browser proof with the production hooks,
   actual Mapbox layers, elevation chart and synthetic API responses. Covers
   shared requests, repeated encounters, keyboard focus, multi-selection, filters,
@@ -163,8 +164,7 @@ profile before annotations are shown.
   loading height and the absence of the former place list.
   Screenshots/results are retained under `output/quality/browser/activity-places`.
 
-The database and browser proofs run in CI; persistent-state coverage is described
-below.
+The browser proof runs in CI.
 
 ## Local batch matcher
 

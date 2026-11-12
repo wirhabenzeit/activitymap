@@ -4,7 +4,7 @@ import polyline from '@mapbox/polyline';
 import test from 'node:test';
 import { renderToStaticMarkup } from 'react-dom/server';
 
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/server/records';
 
 import { ActivityMapAction } from './activity-map-action';
 

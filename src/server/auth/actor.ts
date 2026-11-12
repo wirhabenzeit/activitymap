@@ -2,7 +2,7 @@ import 'server-only';
 
 import { auth } from '~/lib/auth';
 import { UserNotFoundError, getUserInternal } from '~/server/auth/users';
-import type { User } from '~/server/db/schema';
+import type { User } from '~/server/records';
 
 /**
  * The authenticated caller of an application service.

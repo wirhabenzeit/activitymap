@@ -24,7 +24,6 @@ export async function GET(request: NextRequest) {
 
   const account = await findStravaAccountInternal({ userId: userID });
   if (!account) return new Response('Account not found', { status: 404 });
-  // Postgres holds the library only while it writes it.
   const actor = await resolveActor(request.headers);
   const library = await libraryFor(actor);
   if (!library || !actor)

@@ -4,8 +4,8 @@ import {
   type ResolvedAccountTokens,
   buildAccountTokenColumnUpdate,
   resolveAccountTokens,
-} from '~/server/db/account-token-normalization';
-import type { Account, User } from '~/server/db/schema';
+} from '~/server/auth/account-tokens';
+import type { Account, User } from '~/server/records';
 import type {
   AccountIdentity,
   AccountsRepository,

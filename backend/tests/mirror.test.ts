@@ -43,7 +43,6 @@ const modules = {
   './catalogue.ts': () => import('../convex/catalogue'),
   './catalogueWorker.ts': () => import('../convex/catalogueWorker'),
   './http.ts': () => import('../convex/http'),
-  './importer.ts': () => import('../convex/importer'),
   './library.ts': () => import('../convex/library'),
   './ingestion.ts': () => import('../convex/ingestion'),
   './ingestionSweep.ts': () => import('../convex/ingestionSweep'),

@@ -90,7 +90,6 @@ export async function runActivityCommand<T>(
   } finally {
     unsubscribe();
     if (scoped.get(key) === controller) {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory command registry
       scoped.delete(key);
     }
   }

@@ -1,4 +1,4 @@
-import type { Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/records';
 
 /** Reads of an account's photos, as the sync routes need them. */
 export interface PhotosRepository {

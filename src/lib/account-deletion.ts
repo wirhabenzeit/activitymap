@@ -42,7 +42,6 @@ export async function clearLocalAccountData(userId: string) {
     await Promise.all(
       names
         .filter((name) => name.startsWith('activitymap-'))
-        // eslint-disable-next-line drizzle/enforce-delete-with-where -- browser CacheStorage, not a database table
         .map((name) => caches.delete(name)),
     );
   }

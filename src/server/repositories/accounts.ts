@@ -2,8 +2,8 @@ import 'server-only';
 
 import { createHash } from 'node:crypto';
 
-import type { ResolvedAccountTokens } from '~/server/db/account-token-normalization';
-import type { Account } from '~/server/db/schema';
+import type { ResolvedAccountTokens } from '~/server/auth/account-tokens';
+import type { Account } from '~/server/records';
 
 export type AccountIdentity =
   | { userId: string; accountId?: string }

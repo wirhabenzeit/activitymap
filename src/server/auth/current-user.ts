@@ -2,8 +2,7 @@ import {
   type StravaPermissions,
   stravaPermissionsFromScope,
 } from '~/lib/strava-permissions';
-
-import type { Account, User } from './schema';
+import type { Account, User } from '~/server/records';
 
 /**
  * The only user/account shape that may cross the server/client boundary.

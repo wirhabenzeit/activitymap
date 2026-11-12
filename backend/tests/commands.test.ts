@@ -23,7 +23,7 @@ import {
   revokeShareLinkForActor,
 } from '../../src/server/application/share-links';
 import type { Actor } from '../../src/server/auth/actor';
-import type { Activity, Photo } from '../../src/server/db/schema';
+import type { Activity, Photo } from '../../src/server/records';
 import { StravaApiError } from '../../src/server/strava/client';
 import {
   transformStravaActivity,
@@ -43,6 +43,7 @@ import { internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
 import { activitySource } from '../ingestion/provider';
 import { stravaDetail, stravaPhoto } from './fixtures';
+import { seedModule, testWrites } from './seed-api';
 
 /**
  * Edit and refresh for an account Convex writes for, end to end: the app's
@@ -51,13 +52,13 @@ import { stravaDetail, stravaPhoto } from './fixtures';
  */
 
 const modules = {
+  ...seedModule,
   './_generated/api.js': () => import('../convex/_generated/api.js'),
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './bridge.ts': () => import('../convex/bridge'),
   './catalogue.ts': () => import('../convex/catalogue'),
   './erasure.ts': () => import('../convex/erasure'),
   './http.ts': () => import('../convex/http'),
-  './importer.ts': () => import('../convex/importer'),
   './ingestion.ts': () => import('../convex/ingestion'),
   './ingestionSweep.ts': () => import('../convex/ingestionSweep'),
   './ingestionWorker.ts': () => import('../convex/ingestionWorker'),
@@ -121,7 +122,7 @@ async function setup(t: test.TestContext, writer: 'convex' | 'postgres') {
 
   /** Put an activity in the library as its writer would. */
   const seed = (activity: StravaActivity, revision = 1) =>
-    convex.mutation(internal.activityWrites.applySource, {
+    convex.mutation(testWrites.applySource, {
       scope,
       id: String(activity.id),
       generation: 'test-generation-01',
@@ -436,8 +437,8 @@ void test('the bridge gives an account a library in Convex once, and never reass
 
   const state = await bridge.write<Record<string, unknown>>({ kind: 'state' });
   assert.deepEqual(
-    [state.backend, state.epoch, state.writer, state.revoked, state.mirror],
-    ['convex', 'newcomer-epoch-0001', 'postgres', false, null],
+    [state.backend, state.epoch, state.writer, state.revoked],
+    ['convex', 'newcomer-epoch-0001', 'postgres', false],
   );
   // The same assignment again changes nothing; another epoch is refused,
   // even when the caller names the current one.

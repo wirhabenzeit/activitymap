@@ -1,5 +1,11 @@
 # Ingestion status
 
+> **Historical record.** This describes the implementation from before the
+> move to Convex (November 2026), when the library, its jobs and their
+> verification lived in Postgres. The migrations, database proofs and hourly
+> jobs named here no longer exist; for how this works now, see
+> [backend/README.md](../backend/README.md).
+
 How ActivityMap records and reports what it has imported from Strava for an
 account (issues #296 and #297). The web and iOS settings screens (#300, #301)
 present this. Later recovery actions (#298) will extend it.
@@ -74,13 +80,6 @@ honor existing activity backoffs. Per-activity failures leave other manual work
 eligible; account/quota/deadline stops end the batch. A lost worker reports
 `interrupted` after its lease expires. This is a bounded request follow-up;
 scheduled ingestion remains responsible for eventual completion.
-
-Apply migration 0022 before deploying this code. No extra scheduling switch is
-needed; the ordinary Strava-access environment guard applies. Existing coverage
-enums and the native data model stay compatible. Run `pnpm db:test-strava-import`
-against guarded local Postgres and `node scripts/verify-strava-import.mjs`
-against a local dev server for the database and fixture-only browser proofs.
-The new database proof is included in CI.
 
 ## Categories
 
@@ -239,9 +238,6 @@ its `snapshot` and checks that the counts partition as documented. Client tests
 in #300 and #301 should assert their presentation against the same `status`
 values.
 
-`pnpm db:test-ingestion-status` checks the eligibility rule, detail backoff,
-outcomes, heartbeats and account isolation against PostgreSQL.
-
 ## Settings clients (#300 / #301)
 
 Web Settings and the native Settings form use the same compact presentation:
@@ -327,25 +323,3 @@ Leases recover after crashes; late
 responses cannot publish after an activity update, deletion, grant change or
 account revocation. Existing photo rows and their metadata are never cleared
 because a request failed.
-
-Enabling photo catch-up is part of the Settings rollout, not a separate
-follow-up. Complete the rollout in this order:
-
-1. Run `pnpm db:test-photo-backfill` against guarded local Postgres and verify
-   the Preview migration/build.
-2. Apply migrations through 0019 using the existing Production migration
-   workflow, and confirm that no migrations remain pending for the release.
-3. Deploy the dependent code. Cloudflare invokes photo catch-up on the next
-   hourly run.
-4. Inspect the photo job in Workers Logs. Confirm an enabled run, its
-   selected/fetched counts and stop reason, and that ingestion status in
-   Settings reflects the resulting photo coverage and remaining refresh work.
-
-The rollout is complete only after photo catch-up is enabled and its first
-production run is verified. The hourly cap is
-20 activities and 48 requests. To resume after a pause, remove the Vercel
-Production pause switch (or set it to `enabled`) and redeploy. The next
-[Cloudflare run](scheduled-jobs.md) resumes catch-up.
-
-Preview never runs this production cron; the database proof injects a fake
-Strava source to exercise failure and deletion cases without touching Strava.

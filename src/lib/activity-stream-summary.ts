@@ -1,25 +1,24 @@
 import type { QueryClient } from '@tanstack/react-query';
 
 import {
+  type ActivityCompactStreamSummaryDTO,
+  type ActivityStreamSummaryDTO,
+  type StreamMetadata,
   activityCompactStreamSummariesDTOSchema,
   activityCompactStreamSummaryDTOSchema,
-  type ActivityStreamSummaryDTO,
-  type ActivityCompactStreamSummaryDTO,
-  type StreamMetadata,
 } from '~/contracts/v1/activity-streams';
 import { responseEnvelope } from '~/contracts/v1/envelope';
 import { errorEnvelopeSchema } from '~/contracts/v1/error';
+import {
+  type CompactStreamSummary,
+  decodeStreamSummary,
+  hasCompactElevationProfile,
+} from '~/lib/streams/compact-summary';
 import { sameStreamMetadata as sameMetadata } from '~/lib/streams/summary-cache-record';
 import {
   clearCachedStreamSummaries,
   deleteCachedStreamSummary,
 } from '~/lib/sync/v1-store';
-
-import {
-  decodeStreamSummary,
-  hasCompactElevationProfile,
-  type CompactStreamSummary,
-} from '~/lib/streams/compact-summary';
 
 export type ElevationProfile = {
   altitude: number[];
@@ -513,7 +512,6 @@ export async function removeStreamSummaryActivity(
   activityId: string,
 ) {
   fenceStreamSummaryActivity(userId, activityId);
-  // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map, not a database table
   observedMetadata.delete(fenceKey(userId, activityId));
   const queryKey = streamSummaryQueryKey(userId, activityId);
   await queryClient.cancelQueries({ queryKey, exact: true });
@@ -544,7 +542,6 @@ export async function removeStreamSummaryScope(
 ) {
   fenceStreamSummaryScope(userId);
   for (const key of observedMetadata.keys()) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map, not a database table
     if (key.startsWith(`${userId}\u0000`)) observedMetadata.delete(key);
   }
   const queryKey = [...STREAM_SUMMARY_QUERY_ROOT, userId];
@@ -559,7 +556,6 @@ export async function reloadStreamSummaryScope(
 ) {
   fenceStreamSummaryScope(userId);
   for (const key of observedMetadata.keys()) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map, not a database table
     if (key.startsWith(`${userId}\u0000`)) observedMetadata.delete(key);
   }
   const queryKey = [...STREAM_SUMMARY_QUERY_ROOT, userId];

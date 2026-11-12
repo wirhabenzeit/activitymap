@@ -4,7 +4,7 @@ import test from 'node:test';
 
 import { toActivityDTO } from '~/contracts/v1/activity.ts';
 import { toPhotoDTO } from '~/contracts/v1/photo.ts';
-import type { Activity, Photo } from '~/server/db/schema.ts';
+import type { Activity, Photo } from '~/server/records';
 
 import {
   activityStreamMetadata,

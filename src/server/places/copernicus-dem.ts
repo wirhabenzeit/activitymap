@@ -294,6 +294,5 @@ export class CopernicusDem implements DemSource {
 }
 
 function forget<K, V>(map: Map<K, V>, key: K) {
-  // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
   map.delete(key);
 }

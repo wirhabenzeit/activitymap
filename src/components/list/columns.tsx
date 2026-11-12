@@ -22,7 +22,7 @@ import {
   speedDisplayForSports,
   speedLabel,
 } from '~/lib/speed-display';
-import type { Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/records';
 import {
   type ActivityField,
   type ActivityValueType,

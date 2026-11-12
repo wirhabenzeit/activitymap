@@ -1,5 +1,11 @@
 # Raw activity streams
 
+> **Historical record.** This describes the implementation from before the
+> move to Convex (November 2026), when the library, its jobs and their
+> verification lived in Postgres. The migrations, database proofs and hourly
+> jobs named here no longer exist; for how this works now, see
+> [backend/README.md](../backend/README.md).
+
 Issue #182 added ingestion, #183 added the API/lifecycle, and #184 adds hourly historical backfill. The service requests `time`, `distance`,
 `latlng`, `altitude`, `watts`, and `heartrate` together from
 `GET /activities/{id}/streams?keys=…&key_by_type=true` using `StravaClient`.
@@ -153,19 +159,10 @@ URLProtocol, alongside the existing sync/auth compatibility tests.
   Independent raw loading/persistence remains #216. The web elevation chart
   consumes server-generated summaries; native chart presentation remains #217.
 
-Follow [the migration deployment sequence](database-migrations.md) before
-enabling a production consumer.
-
 ## Verification
 
 `pnpm test` covers runtime validation, large string IDs, one multi-key request,
-rate-limit propagation, and guarded token refresh behavior. With the guarded
-local `*_test` database variables described in the migration guide,
-`pnpm db:test-activity-streams` exercises actual PostgreSQL transactions:
-exact six-stream round trips, partial/empty successes, cached reuse, failures
-preserving the last payload, rollback after a database exception, cross-user
-access, concurrent attempts, source changes during fetch, credential changes,
-revocation, delete/recreate and user erasure. CI runs this proof after migrations.
+rate-limit propagation, and guarded token refresh behavior.
 
 ## API and lifecycle (#183)
 
@@ -255,22 +252,11 @@ The budget stores only four rows and rolls them forward at UTC boundaries.
 The historical backfill uses this same accounting with the additional reserves
 and batch limits below.
 
-### Deployment and validation
+### Validation
 
-Migrations 0011–0013 add lease/freshness/budget metadata, lifecycle triggers and
-the small availability projection. Existing #182 payloads are retained and
-marked stale once when switching source-version schemes. Apply these additive
-migrations before deploying the endpoint **or the changed shared Strava client**;
-the client now requires the budget table. Preview follows the existing migration
-runner; Production follows the approval/order documented in the migration guide.
-
-`pnpm db:test-stream-lifecycle` proves endpoint ownership for both auth modes,
-deduplication, exact samples, array-free list/feed metadata, replay, no age
-limit, known and explicit invalidation, late saves, publication rollback,
-empty success, throttling, deauthorization, deletion and shared budget races.
 `bash scripts/verify-stream-dtos.sh <base-ref>` compiles both the new DTOs and
 the actual previous generated Swift file, then decodes new/old activity payloads
-and raw stream arrays. CI runs the PostgreSQL proof and Swift decoding check.
+and raw stream arrays.
 
 ## Historical backfill (#184)
 

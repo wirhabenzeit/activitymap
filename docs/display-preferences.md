@@ -6,11 +6,11 @@ Implementation reference for #199 and #299. Login work (#303/#304) and the sync 
 
 Web and iOS expose these working preferences in Settings → Display:
 
-| Preference | Default | Choices |
-| --- | --- | --- |
-| Appearance | System | System, Light, Dark |
-| Units | Metric | Metric, Imperial |
-| Date format | System | System, Day first (31.12.2026), Month first (12/31/2026), ISO (2026-12-31) |
+| Preference  | Default | Choices                                                                    |
+| ----------- | ------- | -------------------------------------------------------------------------- |
+| Appearance  | System  | System, Light, Dark                                                        |
+| Units       | Metric  | Metric, Imperial                                                           |
+| Date format | System  | System, Day first (31.12.2026), Month first (12/31/2026), ISO (2026-12-31) |
 
 Preferences apply immediately and persist in the current browser/device, independently of account sign-in. They are not synchronized between devices. Web preserves existing theme selections through the existing theme provider; the toolbar theme toggle is removed. System appearance follows OS changes; explicit Light/Dark override it.
 
@@ -18,14 +18,14 @@ System dates follow the browser/device locale. Fixed date formats use Gregorian 
 
 ## Measurement contract
 
-| Quantity | Metric | Imperial | Activity precision |
-| --- | --- | --- | --- |
-| Distance | km | mi | 1 decimal |
-| Elevation, including extrema | m | ft | whole number |
-| Speed | km/h | mph | 1 decimal |
-| Running pace | min/km | min/mi | nearest second, m:ss |
-| Swimming pace | min/100 m | min/100 yd | nearest second, m:ss |
-| Stats hilliness | m / km | ft / mi | 1 decimal |
+| Quantity                     | Metric    | Imperial   | Activity precision   |
+| ---------------------------- | --------- | ---------- | -------------------- |
+| Distance                     | km        | mi         | 1 decimal            |
+| Elevation, including extrema | m         | ft         | whole number         |
+| Speed                        | km/h      | mph        | 1 decimal            |
+| Running pace                 | min/km    | min/mi     | nearest second, m:ss |
+| Swimming pace                | min/100 m | min/100 yd | nearest second, m:ss |
+| Stats hilliness              | m / km    | ft / mi    | 1 decimal            |
 
 A mile is exactly 1609.344 metres; a foot is exactly 0.3048 metres. Durations, power, heart rate and counts retain their existing units. Stats retains its existing whole-number / daily-rate presentation precision, applying conversion before rounding. Native numeric separators remain locale-aware. Compact chart-axis precision follows the interval between ticks after unit conversion, preserving fractional labels (for example 0, 0.5, 1 hours) while retaining thousands abbreviations. Measurements that round to zero never display a negative zero on either platform.
 

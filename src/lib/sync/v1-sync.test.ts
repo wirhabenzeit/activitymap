@@ -9,7 +9,7 @@ import type { ActivityDTO } from '~/contracts/v1/activity.ts';
 import type { PhotoDTO } from '~/contracts/v1/photo.ts';
 import { syncedActivityPlaces } from '~/lib/activity-places';
 import type { Actor } from '~/server/auth/actor.ts';
-import type { Activity, Photo, SyncChange } from '~/server/db/schema.ts';
+import type { Activity, Photo, SyncChange } from '~/server/records';
 import type { PlaceMatchingRepository } from '~/server/repositories/place-matching';
 import { encodeSyncCursor } from '~/server/sync/cursor.ts';
 
@@ -125,7 +125,6 @@ class FakeServer {
   }
 
   deleteActivity(id: number) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory fake, not a drizzle table
     this.activities.delete(id);
     this.recordChange({
       entityType: 'activity',
@@ -237,7 +236,6 @@ function createFakeStore() {
     },
     deleteActivityDTOsByIds: async (scope: string, ids: string[]) => {
       const m = forActivities(scope);
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
       for (const id of ids) m.delete(id);
     },
     deletePhotoDTOsByActivityIds: async (
@@ -247,21 +245,16 @@ function createFakeStore() {
       const m = forPhotos(scope);
       const idSet = new Set(activityIds);
       for (const [key, photo] of m) {
-        // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
         if (idSet.has(photo.activity_id)) m.delete(key);
       }
     },
     deletePhotoDTOsByIds: async (scope: string, ids: string[]) => {
       const m = forPhotos(scope);
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
       for (const id of ids) m.delete(id);
     },
     clearV1Scope: async (scope: string) => {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
       activities.delete(scope);
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
       photos.delete(scope);
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- plain in-memory `Map.delete`, not a drizzle table
       states.delete(scope);
     },
   };

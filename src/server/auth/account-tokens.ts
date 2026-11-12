@@ -1,4 +1,4 @@
-import type { Account } from './schema';
+import type { Account } from '~/server/records';
 
 export type ResolvedAccountTokens = {
   accessToken: string | null;

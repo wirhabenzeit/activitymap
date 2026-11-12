@@ -19,18 +19,18 @@ does not restate them.
 The backend work this depends on is largely done, so iOS ingestion is not
 blocked on server development.
 
-| Capability | Status | Location |
-| --- | --- | --- |
-| Safe current-user endpoint | Implemented | `src/app/api/v1/me/route.ts` |
-| Paginated bootstrap | Implemented | `src/app/api/v1/sync/bootstrap/` |
-| Ordered change feed | Implemented | `src/app/api/v1/sync/changes/` |
-| Activity and photo lists | Implemented | `src/app/api/v1/{activities,photos}/route.ts` |
-| Mobile PKCE login + exchange | Implemented | `src/app/api/v1/auth/mobile/` |
-| Logout and per-session revocation | Implemented | `src/app/api/v1/auth/{logout,sessions}/` |
-| Rate limits, request IDs, redacted logs | Implemented | `src/server/api/`, `src/server/logging/` |
-| Durable webhook inbox and cron drains | Implemented | `src/app/api/cron/`, `src/app/api/strava/webhook/` |
-| Wire contracts | Implemented | `src/contracts/v1/` |
-| OpenAPI 3.1 document | Committed | `openapi/v1.json` |
+| Capability                              | Status      | Location                                           |
+| --------------------------------------- | ----------- | -------------------------------------------------- |
+| Safe current-user endpoint              | Implemented | `src/app/api/v1/me/route.ts`                       |
+| Paginated bootstrap                     | Implemented | `src/app/api/v1/sync/bootstrap/`                   |
+| Ordered change feed                     | Implemented | `src/app/api/v1/sync/changes/`                     |
+| Activity and photo lists                | Implemented | `src/app/api/v1/{activities,photos}/route.ts`      |
+| Mobile PKCE login + exchange            | Implemented | `src/app/api/v1/auth/mobile/`                      |
+| Logout and per-session revocation       | Implemented | `src/app/api/v1/auth/{logout,sessions}/`           |
+| Rate limits, request IDs, redacted logs | Implemented | `src/server/api/`, `src/server/logging/`           |
+| Durable webhook inbox and cron drains   | Implemented | `src/app/api/cron/`, `src/app/api/strava/webhook/` |
+| Wire contracts                          | Implemented | `src/contracts/v1/`                                |
+| OpenAPI 3.1 document                    | Committed   | `openapi/v1.json`                                  |
 
 Two things make the iOS work considerably smaller than it looks.
 
@@ -56,20 +56,17 @@ revocation through the shared `APIClient`. The account sheet displays the real
 
 ## The iOS client does not talk to the database
 
-Worth stating explicitly, because "wire in the dev/prod database" is the natural
-way to describe the goal: the app must never hold a Postgres connection, a Neon
-credential, or a Strava token. Connecting the native app directly to Postgres is
-on the plan doc's anti-pattern list.
+Worth stating explicitly: the app never holds a database connection, a
+backend deployment key, or a Strava token. It talks only to the ActivityMap API.
 
-"Dev versus prod" on iOS therefore means *which deployment the app points at*,
-and the database follows from that deployment's own configuration per the
-[environment matrix](environment-and-database-rollout.md#target-environment-matrix):
+"Dev versus prod" on iOS therefore means _which deployment the app points at_;
+the data follows from that deployment's own configuration:
 
-| iOS build configuration | API base URL | Resulting database | Native sign-in |
-| --- | --- | --- | --- |
-| Debug (local) | `http://localhost:3000` | Docker Postgres via local `DATABASE_URL` | Yes, once external effects and Strava credentials are configured |
-| Debug (preview) | The Vercel preview URL | That preview's dedicated Neon branch | Yes, after [Preview Strava setup](preview-strava-login.md) and mobile redirect allow-list configuration |
-| Release | The production URL | Neon production branch | Yes |
+| iOS build configuration | API base URL            | Resulting data                                           | Native sign-in                                                                                          |
+| ----------------------- | ----------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Debug (local)           | `http://localhost:3000` | The Convex deployment the local server is configured for | Yes, once external effects and Strava credentials are configured                                        |
+| Debug (preview)         | The Vercel preview URL  | The preview's Convex deployment                          | Yes, after [Preview Strava setup](preview-strava-login.md) and mobile redirect allow-list configuration |
+| Release                 | The production URL      | The production Convex deployment                         | Yes                                                                                                     |
 
 Preview deployments support Strava sign-in and interactive API requests by
 default after [Preview Strava setup](preview-strava-login.md). Native sign-in
@@ -258,7 +255,7 @@ The views should keep reading in-memory `Activity` values through
 `StoredActivity` instead of `SampleData`, via a mapper that mirrors
 `v1-mappers.ts`.
 
-Deliberately *not* recommended for now: `@Query` directly in the views. The
+Deliberately _not_ recommended for now: `@Query` directly in the views. The
 filter panel composes seven independent, individually-optional predicates over
 sport type, date range, distance, elevation, duration, and commute, and the
 stats screen aggregates across the whole filtered set. That is a poor fit for
@@ -315,26 +312,26 @@ follow if profiling shows whole-snapshot decoding is too expensive.
 
 Each phase is independently useful and leaves the app running.
 
-**Phase A — Contract and configuration.** *Done.* Deployment configuration, the
+**Phase A — Contract and configuration.** _Done._ Deployment configuration, the
 URL scheme, the localhost ATS exception, the stable bundle identifier,
 `APIConfiguration`, and Swift 6 language mode are in place, with
 `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback` set in the local
 `.env`. The Zod-derived Swift DTOs and their CI drift check are in place too.
 
-**Phase B — Authentication.** *Done.* `AuthController`, `SessionStore` and
+**Phase B — Authentication.** _Done._ `AuthController`, `SessionStore` and
 `AccountSheet` use the shared API client and render the real `/api/v1/me` response.
 
-**Phase C — Local store.** *Done.* Three `@Model` types, scoped `LocalStore`,
+**Phase C — Local store.** _Done._ Three `@Model` types, scoped `LocalStore`,
 container wiring, DTO/UI mappers, and simulator Swift Testing coverage are in
 place. Sample data is preview-only. `ActivityStore.load(from:scope:)` reads the
 store; runtime loading will be connected to the sync coordinator in Phase D.
 
-**Phase D — Sync engine.** *Implemented on the branch stacked above Phase C.*
+**Phase D — Sync engine.** _Implemented on the branch stacked above Phase C._
 `SyncAPI` and `SyncEngine` use the shared HTTP client and atomic store page saves.
 `SyncController` connects login, foreground and manual refresh to the map/list,
 with cancellation and generation checks across account changes. The test target
-mirrors the web protocol scenarios; `scripts/verify-ios-sync-local.mjs` also drives
-the real local API through the Swift engine into a temporary disk store.
+mirrors the web protocol scenarios; the opt-in `LiveSyncTests` also drive the
+real local API through the Swift engine into a temporary disk store.
 
 **Phase E — Polish.** Basic sync status, offline/error states, rate-limit handling,
 scope clearing and account-sheet freshness dates are included in Phase D.

@@ -331,13 +331,18 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
 
 Required iOS CI builds the app and runs the selected unit/app-hosted suites plus seven real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
-To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server and Docker database, then run:
+To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server, sign in once to get a bearer session for a connected account, and run the opt-in test with that session and the account's activity and photo counts:
 
 ```sh
-node --env-file=.env scripts/verify-ios-sync-local.mjs <simulator-udid>
+TEST_RUNNER_ACTIVITYMAP_SYNC_TEST_TOKEN=<bearer token> \
+TEST_RUNNER_ACTIVITYMAP_SYNC_EXPECTED_ACTIVITIES=<count> \
+TEST_RUNNER_ACTIVITYMAP_SYNC_EXPECTED_PHOTOS=<count> \
+xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap \
+  -destination 'platform=iOS Simulator,id=<simulator-udid>' \
+  -parallel-testing-enabled NO -only-testing:ActivityMapTests/LiveSyncTests CODE_SIGNING_ALLOWED=NO
 ```
 
-This opt-in test uses an existing connected account in the local database. It creates and removes a temporary 30-minute local session, verifies bootstrap, delta catch-up, disk reload and offline UI loading, and prints only counts. It rejects non-local database targets. Normal CI skips this test and uses deterministic HTTP/page fixtures.
+It verifies bootstrap, delta catch-up, disk reload and offline UI loading. Normal CI skips this test and uses deterministic HTTP/page fixtures.
 
 ## Screenshot gallery
 
@@ -359,7 +364,7 @@ Runs default to timestamped names under `/tmp/activitymap-gallery`; existing run
 
 The runner uses stable per-checkout DerivedData for incremental builds. `--reuse-build` runs `test-without-building` only if the Swift/project source fingerprint, simulator name and Xcode version match the last successful build. Scene/variant filters and fixture changes do not require recompilation. `--web-only` and `--index-only` never invoke Xcode. Web capture waits for mounted fixture content, fonts and map/tile readiness instead of fixed multi-second sleeps. Failures stop the run and retain diagnostics.
 
-Both clients load `ActivityMapTests/Gallery/gallery-activities.json`, the curated 20-activity fixture with trimmed route ends. `export-gallery-library.mjs --all` writes a full local export to `~/Library/Caches/ActivityMapGallery/library.json`; `--full-library` uses that exact file on both platforms. Missing files or scenario IDs fail validation before building. The runner does not silently fall back to unrelated synthetic activities.
+Both clients load `ActivityMapTests/Gallery/gallery-activities.json`, the curated 20-activity fixture with trimmed route ends. `--full-library` uses a full library export at `~/Library/Caches/ActivityMapGallery/library.json` on both platforms. Missing files or scenario IDs fail validation before building. The runner does not silently fall back to unrelated synthetic activities.
 
 Web fixture injection is enabled only in a development build, using the production routes/components and DTO mapper with an in-memory query cache. It needs no temporary session or database writes, uses signed-out account chrome, and excludes live photos/streams. Start `pnpm dev` from this checkout. Set `ACTIVITYMAP_GALLERY_WEB_URL` for a different local port. Set `NEXT_PUBLIC_MAPBOX_TOKEN` in the runner environment for native remote tiles; web uses the dev server's token. Offline native basemaps and platform-specific map styles are not pixel-equivalent. Both use Europe/Zurich and de-CH presentation; web 150% text is an accessibility stress case, not an exact Dynamic Type equivalent. Captures are visual review evidence, not automated visual approval.
 

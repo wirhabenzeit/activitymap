@@ -28,7 +28,7 @@ const identity = {
 
 /** Point an owner at a catalogue and start the walk over its library.
  * False when the owner already has it. */
-async function selectFor(
+export async function selectFor(
   ctx: MutationCtx,
   owner: Doc<'owners'>,
   {
@@ -65,15 +65,6 @@ async function selectFor(
   });
   return true;
 }
-
-/** Hide old matches immediately, then durably publish their invalidations. */
-export const select = internalMutation({
-  args: { scope: v.object(scopeFields), ...identity },
-  handler: async (ctx, { scope, ...args }) =>
-    // Selected by a copy from Postgres, for the catalogue Postgres matched
-    // with.
-    selectFor(ctx, await requireWritableOwner(ctx, scope), args),
-});
 
 /**
  * Move every library Convex writes to a catalogue: the newest complete

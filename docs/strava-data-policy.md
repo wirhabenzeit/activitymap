@@ -31,8 +31,8 @@ original cause and whether refresh already succeeded upstream. Activity
 application boundaries classify credential failures before making activity
 requests. Deterministic service/repository tests cover freshness, compatibility,
 reconnection, failed persistence, 429/401/5xx and controlled revoke/reconnect or
-delete/recreate races; these tests use fake transactions and clients, not live
-Postgres or Strava accounts.
+delete/recreate races; these tests use fake transactions and clients, not a live
+backend or Strava accounts.
 
 ## 2. Retention and freshness
 

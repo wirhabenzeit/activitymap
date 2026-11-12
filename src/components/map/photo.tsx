@@ -11,7 +11,7 @@ import {
   mapPhotoPolicy,
 } from '~/lib/map-photos';
 import { photoVariant, validPhotoLocation } from '~/lib/photo-gallery';
-import type { Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/records';
 import { useShallowStore } from '~/store';
 
 import { PhotoImage, PhotoLightbox } from '../list/photo';

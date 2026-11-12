@@ -31,7 +31,6 @@ function source() {
     subscribe: (listener: () => void) => {
       listeners.add(listener);
       return () => {
-        // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory subscribers
         listeners.delete(listener);
       };
     },

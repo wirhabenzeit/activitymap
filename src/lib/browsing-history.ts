@@ -20,7 +20,6 @@ export function subscribeBrowsingHistory(listener: Listener) {
   if (!listeners.size) window.addEventListener('popstate', pop);
   listeners.add(listener);
   return () => {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Set membership, not SQL.
     listeners.delete(listener);
     if (!listeners.size) window.removeEventListener('popstate', pop);
   };

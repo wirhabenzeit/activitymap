@@ -1,6 +1,5 @@
 import nextVitals from 'eslint-config-next/core-web-vitals';
 import prettier from 'eslint-config-prettier/flat';
-import drizzle from 'eslint-plugin-drizzle';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
@@ -17,16 +16,12 @@ export default tseslint.config(
   },
   {
     files: ['**/*.{ts,tsx,mts,cts}'],
-    plugins: {
-      drizzle,
-    },
     languageOptions: {
       parserOptions: {
         project: './tsconfig.json',
       },
     },
     rules: {
-      ...drizzle.configs.recommended.rules,
       '@typescript-eslint/array-type': 'off',
       '@typescript-eslint/consistent-type-definitions': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',

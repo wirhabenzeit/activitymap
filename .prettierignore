@@ -5,5 +5,4 @@ output/
 coverage/
 pnpm-lock.yaml
 public/
-drizzle/
 **/*.generated.*

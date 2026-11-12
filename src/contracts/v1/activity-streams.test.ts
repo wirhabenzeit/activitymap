@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
-import { readFileSync } from 'node:fs';
+
+import type { StreamSnapshot } from '~/server/repositories/activity-streams';
+import { RAW_STREAMS_FIXTURE } from '~/server/strava/streams.fixture';
+
 import {
   activityStreamsDTOSchema,
   toActivityStreamsDTO,
 } from './activity-streams';
-import { RAW_STREAMS_FIXTURE } from '~/server/strava/streams.fixture';
-import type { StreamSnapshot } from '~/server/repositories/activity-streams';
-import { STREAM_SOURCE_FIELDS } from '~/server/strava/stream-policy';
 
 const now = new Date('2026-09-22T12:00:00Z');
 export const streamSnapshotFixture: StreamSnapshot = {
@@ -82,20 +83,6 @@ void test('stored samples have no age limit until invalidated', () => {
   assert.equal(dto.metadata.expires_at, null);
   assert.deepEqual(dto.streams, RAW_STREAMS_FIXTURE);
 });
-void test('SQL invalidation projection tracks the documented source fields', () => {
-  const migration = readFileSync(
-    new URL(
-      '../../../drizzle/0012_stream-lifecycle-triggers.sql',
-      import.meta.url,
-    ),
-    'utf8',
-  );
-  const fields = [...migration.matchAll(/to_jsonb\(a\)->'([^']+)'/g)].map(
-    (entry) => entry[1],
-  );
-  assert.deepEqual(fields, [...STREAM_SOURCE_FIELDS]);
-});
-
 void test('compact and legacy endpoints preserve identical samples and stale/absent states', async () => {
   const { toActivityStreamSummaryDTO, toCompactStreamSummaryDTO } =
     await import('./activity-streams');

@@ -16,8 +16,8 @@ import { compactStreamSummarySchema } from '~/lib/streams/compact-summary';
 import { ActivityPlacesUnavailableError } from '~/server/application/match-activity-places';
 import type { Actor } from '~/server/auth/actor';
 import { convexReadEpoch } from '~/server/convex-read-owners';
-import type { Activity, Photo } from '~/server/db/schema';
 import { MATCHING_RECIPE } from '~/server/places/matching-version';
+import type { Activity, Photo } from '~/server/records';
 import {
   ActivityStreamsUnavailableError,
   type StreamSummarySnapshot,

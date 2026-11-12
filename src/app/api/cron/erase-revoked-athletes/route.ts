@@ -9,8 +9,8 @@ import { createErasureCronHandler } from './handler';
 
 /**
  * Production-only executor for Strava's 30-day deauthorization erasure
- * deadline. The database service revalidates every candidate under a row
- * lock and performs each athlete's deletion in one transaction.
+ * deadline. Each due account's library is erased in Convex, then its
+ * sign-in records (`~/server/strava/convex-webhook.ts`).
  */
 export const POST = createErasureCronHandler({
   externalEffectsEnabled,

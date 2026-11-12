@@ -1,7 +1,7 @@
 import 'server-only';
 
-import type { Activity, Photo } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
+import type { Activity, Photo } from '~/server/records';
 
 import { StravaClient, isStravaActivityNotFoundError } from './client';
 import { transformStravaActivity, transformStravaPhoto } from './transforms';

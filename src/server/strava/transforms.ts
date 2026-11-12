@@ -1,5 +1,7 @@
 import polyline from '@mapbox/polyline';
-import type { Activity, Photo } from '~/server/db/schema';
+
+import type { Activity, Photo } from '~/server/records';
+
 import type { StravaActivity, StravaPhoto } from './types';
 
 export function transformStravaActivity(
@@ -15,9 +17,9 @@ export function transformStravaActivity(
 
   let bbox: [number, number, number, number] = [0, 0, 0, 0];
   if (activity.map?.summary_polyline) {
-    const coordinates = polyline.decode(activity.map.summary_polyline).map(
-      ([lat, lon]) => [lon, lat] as [number, number],
-    );
+    const coordinates = polyline
+      .decode(activity.map.summary_polyline)
+      .map(([lat, lon]) => [lon, lat] as [number, number]);
     bbox = coordinates.reduce(
       (acc, coord) => [
         Math.min(acc[0], coord[0]),
@@ -101,7 +103,8 @@ export function transformStravaActivity(
     last_updated: observedAt,
     geometryState: isComplete ? 'detailed' : 'summary',
     photosState:
-      options.photosCurrent || (activity.total_photo_count === 0 && activity.photo_count === 0)
+      options.photosCurrent ||
+      (activity.total_photo_count === 0 && activity.photo_count === 0)
         ? 'current'
         : 'refresh_required',
     lastSummarySeenAt: observedAt,
@@ -116,17 +119,19 @@ export function transformStravaActivity(
  */
 export function mergeAndProcessStravaPhotos(
   smallPhotos: StravaPhoto[],
-  largePhotos: StravaPhoto[]
+  largePhotos: StravaPhoto[],
 ): StravaPhoto[] {
   // Create maps for faster lookup
-  const smallPhotoMap = new Map(smallPhotos.map(p => [p.unique_id, p]));
-  const largePhotoMap = new Map(largePhotos.map(p => [p.unique_id, p]));
+  const smallPhotoMap = new Map(smallPhotos.map((p) => [p.unique_id, p]));
+  const largePhotoMap = new Map(largePhotos.map((p) => [p.unique_id, p]));
 
   // Get all unique photo IDs
-  const allPhotoIds = Array.from(new Set([
-    ...smallPhotos.map(p => p.unique_id),
-    ...largePhotos.map(p => p.unique_id)
-  ]));
+  const allPhotoIds = Array.from(
+    new Set([
+      ...smallPhotos.map((p) => p.unique_id),
+      ...largePhotos.map((p) => p.unique_id),
+    ]),
+  );
 
   // Merge photos based on ID rather than index
   const mergedPhotos: StravaPhoto[] = [];
@@ -136,7 +141,6 @@ export function mergeAndProcessStravaPhotos(
     const largePhoto = largePhotoMap.get(photoId);
 
     if (!smallPhoto && !largePhoto) {
-
       continue;
     }
 
@@ -144,13 +148,12 @@ export function mergeAndProcessStravaPhotos(
     const basePhoto = largePhoto ?? smallPhoto!;
 
     // Special case: Check if the photo is a special size (like 1800)
-    const specialSize = basePhoto.urls &&
-      basePhoto.urls["256"] === undefined &&
-      basePhoto.urls["5000"] === undefined;
+    const specialSize =
+      basePhoto.urls &&
+      basePhoto.urls['256'] === undefined &&
+      basePhoto.urls['5000'] === undefined;
 
     if (specialSize) {
-
-
       // For special size photos, check if this appears to be a placeholder
       // Primary detection: Look for "placeholder" in the URL
       let isPlaceholder = false;
@@ -168,9 +171,8 @@ export function mergeAndProcessStravaPhotos(
 
       // Fallback detection: Check for special size pattern
       const urlKeys = basePhoto.urls ? Object.keys(basePhoto.urls) : [];
-      if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === "1800") {
+      if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === '1800') {
         isPlaceholder = true;
-
       }
 
       if (isPlaceholder) {
@@ -185,16 +187,15 @@ export function mergeAndProcessStravaPhotos(
       ...basePhoto,
       urls: {
         ...(smallPhoto?.urls ?? {}),
-        ...(largePhoto?.urls ?? {})
+        ...(largePhoto?.urls ?? {}),
       },
       sizes: {
         ...(smallPhoto?.sizes ?? {}),
-        ...(largePhoto?.sizes ?? {})
+        ...(largePhoto?.sizes ?? {}),
       },
     };
 
     if (mergedPhotos.length === 0) {
-
     }
 
     mergedPhotos.push(merged);
@@ -209,12 +210,9 @@ export function mergeAndProcessStravaPhotos(
  */
 export function transformStravaPhoto(
   photo: StravaPhoto,
-  athlete_id: number
+  athlete_id: number,
 ): Photo | null {
-
-
   // Log the input photo data for debugging
-
 
   // Check if this appears to be a placeholder by looking for "placeholder" in the URL
   let isPlaceholder = false;
@@ -232,14 +230,12 @@ export function transformStravaPhoto(
 
   // Fallback check - if it only has size 1800 (for backward compatibility)
   const urlKeys = photo.urls ? Object.keys(photo.urls) : [];
-  if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === "1800") {
+  if (!isPlaceholder && urlKeys.length === 1 && urlKeys[0] === '1800') {
     isPlaceholder = true;
-
   }
 
   // Skip placeholder images completely
   if (isPlaceholder) {
-
     return null;
   }
 
@@ -248,13 +244,15 @@ export function transformStravaPhoto(
 
   if (photo.location) {
     // Validate location data
-    if (Array.isArray(photo.location) && photo.location.length === 2 &&
-      typeof photo.location[0] === 'number' && typeof photo.location[1] === 'number') {
+    if (
+      Array.isArray(photo.location) &&
+      photo.location.length === 2 &&
+      typeof photo.location[0] === 'number' &&
+      typeof photo.location[1] === 'number'
+    ) {
       // Strava uses [lat, lng] format - convert to array for db schema
       location = [photo.location[0], photo.location[1]];
-
     } else {
-
     }
   }
 

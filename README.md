@@ -51,7 +51,7 @@ Run `pnpm check` for static, generated-file and unit checks. Browser and native 
 
 ## Data
 
-The running app keeps nothing in Postgres. An account's library and the
+An account's library and the
 app's own records (sign-in, Strava tokens, rate limits) live in the Convex
 backend; see [backend/README.md](backend/README.md). The app needs
 `ACTIVITYMAP_CONVEX_SITE` and the bridge keys described there.
@@ -60,10 +60,6 @@ A place catalogue is built from OpenStreetMap extracts and published
 straight to the backend (`pnpm places:prepare`, `places:combine`,
 `places:publish`); see
 [Place catalogue preparation and refresh](docs/place-catalogue-refresh.md).
-
-Nothing needs Postgres any more. What is left of it in this repository (the
-schema in `src/server/db`, which still supplies types, and the migration
-tooling in `drizzle/` and `scripts/database`) is to be removed.
 
 ## Behavior references
 

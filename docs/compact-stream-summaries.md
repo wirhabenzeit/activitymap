@@ -16,7 +16,14 @@ acceptance work under #230/#229.
 ## Format
 
 ```json
-{"codec":"polyline-v1","algorithm_version":1,"basis":"distance","count":2,"distance":"?gE","altitude":"?S"}
+{
+  "codec": "polyline-v1",
+  "algorithm_version": 1,
+  "basis": "distance",
+  "count": 2,
+  "distance": "?gE",
+  "altitude": "?S"
+}
 ```
 
 The example decodes to distance `[0,10]` metres and altitude `[0,1]` metres.
@@ -27,12 +34,12 @@ algorithm version with `STREAM_SUMMARY_VERSION`.
 Source generation/revision/state stay in the existing response metadata. No TTL
 is added. A codec conversion does not change source revision or generation.
 
-| Field | Integer scale | Meaning |
-| --- | ---: | --- |
-| time | 1 | elapsed seconds |
-| distance, altitude | 10 | metres, preserving 0.1 m precision |
-| watts, heartrate | 1 | watts / beats per minute |
-| latlng | 100000 | latitude, longitude in degrees |
+| Field              | Integer scale | Meaning                            |
+| ------------------ | ------------: | ---------------------------------- |
+| time               |             1 | elapsed seconds                    |
+| distance, altitude |            10 | metres, preserving 0.1 m precision |
+| watts, heartrate   |             1 | watts / beats per minute           |
+| latlng             |        100000 | latitude, longitude in degrees     |
 
 For each series, multiply by its fixed scale, encode the first signed integer
 relative to zero and subsequent signed differences relative to the previous
@@ -120,65 +127,13 @@ disappearance, and decode/validate samples off the main actor.
 nondecreasing distance and positive span still require decoded validation. No
 expanded sample arrays are stored or published by persistence or the loader.
 
-## Bounded conversion and rollback
-
-Do not run an older array-only server against a database already containing
-compact summaries. Use this deployment sequence:
-
-1. Deploy the dual-reader server with
-   `ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT=json`. Keep old endpoints available.
-2. After old server/worker invocations have drained, switch writes to
-   `polyline-v1` explicitly and migrate existing summaries in bounded batches.
-3. Verify both endpoint formats and continue tracking ingestion/retry errors.
-
-The converter uses the existing guarded migration connection/host/database
-variables and verifies the connected identity. It defaults to a read-only
-preview. Example using a disposable local test database:
-
-```sh
-export MIGRATION_DATABASE_URL=postgres://postgres:postgres@127.0.0.1:55439/activitymap_test
-export MIGRATION_EXPECTED_HOST=127.0.0.1
-export MIGRATION_EXPECTED_DATABASE=activitymap_test
-export MIGRATION_REQUIRE_TARGET_GUARDS=true
-pnpm db:convert-stream-summaries --format polyline-v1 --limit 100
-pnpm db:convert-stream-summaries --format polyline-v1 --limit 100 --apply --confirm 127.0.0.1:55439/activitymap_test
-```
-
-Each invocation processes at most 100 rows by default (maximum 1000), in a
-transaction with a five-second statement timeout and row locks. Invalid summaries
-are left untouched and reported in `failures` by activity ID; successful rows in
-the same batch still commit. A report with failures exits with status 2. SQL or
-connection errors still abort the transaction; retry those with the same cursor.
-Pass the returned `nextAfterId` as `--after-id ID` on the next invocation,
-including after a batch with failures. This advances past invalid rows even when
-an entire batch fails. Keep the failure list for repair; reaching the end of a
-scan does not mean those rows were converted. Restart from the beginning after
-repairs or to include rows inserted behind the cursor. A dry-run cursor must not
-be reused to start the apply scan. Already converted rows are excluded.
-Reported byte counts
-are serialized JSON, not measured disk savings. The existing stream update
-trigger emits ordinary activity upserts for changed rows; conversion can thus
-produce one additional delta event per activity. It does not repeatedly rewrite
-current-format rows or change source freshness. Sync still contains no arrays.
-The cursor never skips locked rows: a lock timeout fails the invocation, and
-retrying uses the same cursor. Verify remaining rows before declaring completion.
-
-For rollback, first deploy the dual-reader build with legacy writes enabled,
-then run the same converter with `--format json`, advancing the cursor and
-repairing every reported failure until no compact rows remain.
-Verify with `SELECT count(*) FROM activity_streams WHERE summary->>'codec' IS
-NOT NULL` before reverting to an array-only server. Coordinate the web rollback
-as well: the new web client expects the compact endpoints. Codec-compatible
-application rollback needs no conversion. No converter is run automatically
-against production by this PR or by deployment builds.
-
 ## Measurements and limits
 
 The reproducible [benchmark](compact-stream-summary-benchmark.json) uses ten
 synthetic cases: short/long rides, smooth/noisy power, negative/flat altitude,
 pauses/irregular axes, time-only/no GPS, sparse sensors and a GPS discontinuity,
 plus no usable axis. It measures complete supported summaries, including JSON
-envelopes, Node gzip/Brotli and stored PostgreSQL JSONB `pg_column_size`.
+envelopes and Node gzip/Brotli.
 The synthetic signals are deliberately structured; they are not representative
 p95 real-world compression statistics. #230's earlier real-activity prototype
 remains separate evidence.
@@ -190,9 +145,7 @@ small corpus on the development Mac. This is not an iPhone/UI performance budget
 or a peak-memory measurement. Raw storage is unchanged, so these percentages
 must not be applied to the entire database.
 
-Reproduce with `pnpm benchmark:compact-streams`. Optionally supply
-`BENCHMARK_DATABASE_URL` for a local `*_test` PostgreSQL database; it creates only
-a temporary table. The script also writes vectors under `/tmp` for
+Reproduce with `pnpm benchmark:compact-streams`. The script also writes vectors under `/tmp` for
 `bash scripts/verify-compact-stream-codec.sh /tmp/activitymap-compact-benchmark-vectors.json`.
 Both language implementations must exactly round-trip the existing summaries.
 

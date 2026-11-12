@@ -1,4 +1,4 @@
-import type { SyncChange } from '~/server/db/schema';
+import type { SyncChange } from '~/server/records';
 
 /** An account's change feed: what the changes route pages through. */
 export interface ChangesRepository {

@@ -1,7 +1,10 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { toPhotoDTO, photoDTOSchema } from './photo.ts';
-import type { Photo } from '~/server/db/schema';
+
+import { test } from 'node:test';
+
+import type { Photo } from '~/server/records';
+
+import { photoDTOSchema, toPhotoDTO } from './photo.ts';
 
 const fixturePhoto: Photo = {
   unique_id: 'abc-123',
@@ -30,7 +33,11 @@ void test('toPhotoDTO encodes activity_id/athlete_id as strings', () => {
 });
 
 void test('toPhotoDTO maps null timestamps through as null', () => {
-  const dto = toPhotoDTO({ ...fixturePhoto, uploaded_at: null, created_at: null });
+  const dto = toPhotoDTO({
+    ...fixturePhoto,
+    uploaded_at: null,
+    created_at: null,
+  });
   assert.equal(dto.uploaded_at, null);
   assert.equal(dto.created_at, null);
 });

@@ -1,6 +1,7 @@
 # Operational runbook
 
-Use production logs and the production database only through approved access.
+Use production logs and the production Convex deployment only through
+approved access.
 Do not paste credentials, webhook payloads, or personal data into tickets.
 
 ## API failures
@@ -11,82 +12,43 @@ The `/api/v1` completion line includes route, method, status, and duration.
 For `429 rate_limited`, honor `Retry-After`. Investigate only if normal client
 traffic is being limited repeatedly or failures affect many users.
 
-## Webhook backlog
+## Webhook events
 
-Cloudflare runs `drain-webhook-inbox` once per hour. Incoming Strava webhooks
-still get an immediate processing attempt.
+A Strava activity event is recorded in Convex (`providerEvents`) before Strava
+is answered. If Convex cannot take it, the webhook answers with an error and
+Strava delivers the event again. Each recorded event queues an ingestion job
+for its activity.
 
-1. Look for missing or failed runs in Cron Events for `activitymap-cron`.
-2. Production logs for `[Cron] drain-webhook-inbox complete` or `failed`.
-3. `metrics.countsByStatus` and `metrics.oldestPendingAgeMs`. Growing
-   `pending`/`failed` counts mean the drain is falling behind. Deletion events
-   approaching 48 hours are urgent.
-4. Repeated non-zero `reconciled` counts, which indicate workers are becoming
-   stuck or timing out.
+Look for `[Webhook]` errors in the production logs. Missed or lost events are
+picked up by the account's reconciliation sweep, which re-reads the activity
+list from Strava every six days.
 
-After fixing the cause, confirm the next scheduled drain succeeds. For an
-immediate retry, send an authenticated `POST /api/cron/drain-webhook-inbox`
-with the cron secret. Use the defaults of 25 events and concurrency 5 while
-Strava or the database is recovering.
+## Failed ingestion
 
-## Summary reconciliation freshness
+Ingestion jobs (`ingestionJobs` in Convex, one per account and activity) run
+in phases: the activity, its recording, its place matches. Look for jobs with
+status `failed` or `blocked` and their `error` on the Convex dashboard. A
+failed job is retried by the account's next sweep, which requests every
+activity that is still incomplete. To retry sooner, start the sweep: the
+account's owner can use **Fetch from Strava** in Settings, or an operator can
+send the write bridge's `sweepNow` operation for the account.
 
-Cloudflare runs `reconcile-strava-summaries` hourly to keep cached Strava
-data within the seven-day limit. The `overdue` count includes connected
-athletes whose last complete scan is more than seven days old. For athletes
-awaiting their first scan, it counts from sign-up. A non-zero value is logged as
-`[Summary reconciliation] Athletes past the freshness limit`.
-
-`overdue` should stay at zero. If it rises, check Workers Logs for recent
-failures, `stoppedForRateLimit`, or `stoppedForTimeBudget`. Each run handles
-one athlete with up to three pages of 200 summaries, so a steadily growing
-count means the job no longer keeps up and needs a larger `batchSize`.
-
-## Dead letters
-
-Webhooks for athletes without an ActivityMap Strava account are acknowledged
-with `200` and never stored. Strava sends them for anyone who authorised the
-Strava app, including sign-ups on local or preview deployments and erased
-athletes. A dead letter therefore always concerns a registered athlete.
-
-Inspect recent rows without selecting `payload` unless it is necessary:
-
-```sql
-select id, object_type, aspect_type, owner_id, event_time,
-       attempt_count, last_error, updated_at
-from strava_webhook_events
-where status = 'dead_letter'
-order by updated_at desc
-limit 50;
-```
-
-Do not requeue permanent failures such as a missing/erased local account. Once
-a transient root cause is fixed, requeue one reviewed event:
-
-```sql
-update strava_webhook_events
-set status = 'pending',
-    attempt_count = 0,
-    next_attempt_at = now(),
-    updated_at = now()
-where id = '<event id>'
-  and status = 'dead_letter';
-```
-
-Confirm the next drain succeeds. Never bulk-requeue dead letters.
+A `blocked` job waits for the account's Strava credentials to change, for
+example after a reconnect.
 
 ## Credential revocation
 
 The athlete-deauthorization webhook clears stored Strava tokens immediately,
-sets `account.revoked_at`, and schedules erasure in
-`account.scheduled_erasure_at`. The hourly `erase-revoked-athletes` job
+marks the account revoked, and schedules its erasure 30 days later (sign-in
+records in Convex, `~/server/strava/convex-webhook.ts`). The hourly `erase-revoked-athletes` job
 deletes due data after 30 days. See [Strava data policy](strava-data-policy.md)
 for the policy.
 
 If revocation appears stuck, check the records in this order.
 
-1. Check the athlete webhook row and its status/error.
-2. Confirm both revocation timestamps and that token columns are empty.
+1. Check the production logs for the athlete webhook.
+2. Confirm the account's revocation and erasure times are set and its tokens
+   are empty.
 3. Check the erasure job in Workers Logs after the scheduled time.
 
 Never clear revocation fields manually. A genuine reconnect through Strava
@@ -101,5 +63,5 @@ resume changes from the returned `snapshotCursor`.
 
 Investigate when many clients start receiving 409s together or one client gets
 another 409 immediately after a successful bootstrap. Use request IDs to check
-for a recent retention/configuration change, database restore, stale cursor
+for a recent retention/configuration change, backend restore, stale cursor
 reuse, or a server regression.
