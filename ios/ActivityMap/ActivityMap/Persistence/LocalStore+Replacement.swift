@@ -58,6 +58,7 @@ extension LocalStore {
             } else { context.insert(try SyncState(scope: key, checkpoint: checkpoint)) }
             try Task.checkCancellation()
             try save(context)
+            libraryRevision += 1
             summaryReplacementCommitted(scopeKey: key)
         } catch {
             context.rollback()

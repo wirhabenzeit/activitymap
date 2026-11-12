@@ -1,7 +1,7 @@
 import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
-import { internalMutation } from './_generated/server';
+import { type MutationCtx, internalMutation } from './_generated/server';
 
 /**
  * Two counters the app keeps for itself, held here instead of in Postgres:
@@ -16,23 +16,49 @@ const PAGE = 256;
 
 /** Count one request in the fixed window `(key, windowStart)`; the new
  * count. */
+async function increment(
+  ctx: MutationCtx,
+  key: string,
+  windowStart: number,
+): Promise<number> {
+  if (!key || key.length > 512 || !Number.isSafeInteger(windowStart))
+    throw new Error('Invalid rate limit window');
+  const row = await ctx.db
+    .query('rateLimits')
+    .withIndex('by_key_window', (q) =>
+      q.eq('key', key).eq('windowStart', windowStart),
+    )
+    .unique();
+  if (!row) {
+    await ctx.db.insert('rateLimits', { key, windowStart, count: 1 });
+    return 1;
+  }
+  await ctx.db.patch('rateLimits', row._id, { count: row.count + 1 });
+  return row.count + 1;
+}
+
 export const hit = internalMutation({
   args: { key: v.string(), windowStart: v.number() },
-  handler: async (ctx, { key, windowStart }): Promise<number> => {
-    if (!key || key.length > 512 || !Number.isSafeInteger(windowStart))
-      throw new Error('Invalid rate limit window');
-    const row = await ctx.db
-      .query('rateLimits')
-      .withIndex('by_key_window', (q) =>
-        q.eq('key', key).eq('windowStart', windowStart),
-      )
-      .unique();
-    if (!row) {
-      await ctx.db.insert('rateLimits', { key, windowStart, count: 1 });
-      return 1;
+  handler: (ctx, { key, windowStart }) => increment(ctx, key, windowStart),
+});
+
+export const hitMany = internalMutation({
+  args: {
+    windows: v.array(
+      v.object({ key: v.string(), windowStart: v.number(), limit: v.number() }),
+    ),
+  },
+  handler: async (ctx, { windows }) => {
+    if (windows.length > 4) throw new Error('Too many rate limit windows');
+    const counts: number[] = [];
+    for (const { key, windowStart, limit } of windows) {
+      if (!Number.isSafeInteger(limit) || limit < 0)
+        throw new Error('Invalid rate limit');
+      const count = await increment(ctx, key, windowStart);
+      counts.push(count);
+      if (count > limit) break;
     }
-    await ctx.db.patch('rateLimits', row._id, { count: row.count + 1 });
-    return row.count + 1;
+    return counts;
   },
 });
 

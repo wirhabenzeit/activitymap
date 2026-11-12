@@ -385,11 +385,17 @@ router.route({
       }
       // Counting a request twice only makes the limit stricter, and a
       // repeated reservation only spends budget: neither needs a nonce.
-      if (kind === 'rateLimit' || kind === 'budgetReserve') {
+      if (
+        kind === 'rateLimit' ||
+        kind === 'rateLimits' ||
+        kind === 'budgetReserve'
+      ) {
         const result =
           kind === 'rateLimit'
             ? await ctx.runMutation(internal.appState.hit, args)
-            : await ctx.runMutation(internal.appState.reserve, args);
+            : kind === 'rateLimits'
+              ? await ctx.runMutation(internal.appState.hitMany, args)
+              : await ctx.runMutation(internal.appState.reserve, args);
         return Response.json(result, { headers });
       }
       if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(nonce))

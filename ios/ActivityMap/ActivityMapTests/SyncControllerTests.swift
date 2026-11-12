@@ -26,6 +26,30 @@ actor GatedSyncSource: SyncPageSource {
 
 @MainActor
 struct SyncControllerTests {
+    @Test func unchangedRefreshRetriesFailedPhotoCacheConfiguration() async throws {
+        let root = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        // A file occupying the cache directory makes the first configuration fail.
+        try Data().write(to: root)
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
+        let source = ScriptedSyncSource([
+            .changes("cursor-1", .success(SyncFixtures.changes(next: "cursor-1"))),
+            .changes("cursor-1", .success(SyncFixtures.changes(next: "cursor-1"))),
+        ])
+        let activities = ActivityStore(photoImages: PhotoImageCache(bytes: PhotoByteCache(root: root)))
+        let controller = SyncController(activities: activities, source: { _ in source }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        #expect(controller.status == .ready)
+        try FileManager.default.removeItem(at: root)
+        await controller.refresh()
+        let index = root.appending(path: PhotoByteCache.digest(Fixtures.scope.key)).appending(path: "index.json")
+        #expect(FileManager.default.fileExists(atPath: index.path))
+        controller.pause()
+        await controller.summarySync.stopAndWait()
+    }
+
     @Test func deletionWaitsForCancelledSyncBeforeClearingOfflineData() async throws {
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity()

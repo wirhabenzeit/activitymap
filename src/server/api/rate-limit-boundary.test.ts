@@ -1,11 +1,52 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import { withApiV1Observability } from './observability.ts';
 import {
-  withApiV1RateLimit,
   type RateLimitRule,
+  withApiV1RateLimit,
 } from './rate-limit-boundary.ts';
+
+void test('batched admission keeps pre-auth limits ahead of authentication and user limits', async () => {
+  const calls: string[] = [];
+  const handler = withApiV1RateLimit(
+    async () => {
+      calls.push('handler');
+      return Response.json({ ok: true });
+    },
+    {
+      route: 'GET /test',
+      now: () => new Date(500_001),
+      repo: {
+        incrementManyAndGet: async (windows) => {
+          calls.push('batch');
+          assert.deepEqual(
+            windows.map((window) => window.windowStart),
+            [300_000, 300_000],
+          );
+          return [1, 1];
+        },
+        incrementAndGet: async (key) => {
+          assert(key.startsWith('user:'));
+          calls.push('user');
+          return 1;
+        },
+      },
+      resolveUserId: async () => {
+        calls.push('auth');
+        return 'owner';
+      },
+    },
+  );
+  const response = await handler(
+    new Request('https://example.com/test', {
+      headers: { authorization: 'Bearer test', 'x-forwarded-for': '192.0.2.1' },
+    }),
+  );
+  assert.equal(response.status, 200);
+  assert.deepEqual(calls, ['batch', 'auth', 'user', 'handler']);
+});
 
 function fakeRepo() {
   const buckets = new Map<string, number>();

@@ -164,4 +164,24 @@ struct LocalStoreTests {
         #expect(viewStore.activities.map(\.name) == [dto.name])
         #expect(viewStore.activities.first?.coordinates.count == 3)
     }
+
+    @Test func checkpointOnlyPollsPreserveLibraryRevisionButWritesAndInvalidationChangeIt() async throws {
+        let store = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        try await store.apply([.upsertActivity(try Fixtures.activity())], checkpoint: Fixtures.checkpoint, scope: Fixtures.scope)
+        let initial = try await store.syncMetadata(scope: Fixtures.scope)
+        var advanced = Fixtures.checkpoint
+        advanced.lastSyncAt = .now
+        try await store.apply([], checkpoint: advanced, scope: Fixtures.scope)
+        let unchanged = try await store.syncMetadata(scope: Fixtures.scope)
+        #expect(unchanged.revision == initial.revision && unchanged.checkpoint == advanced)
+        try await store.apply([.upsertPhoto(try Fixtures.photo())], scope: Fixtures.scope)
+        #expect(try await store.syncMetadata(scope: Fixtures.scope).revision > unchanged.revision)
+        let beforeInvalidation = try await store.syncMetadata(scope: Fixtures.scope).revision
+        advanced.freshness = .init(lastSummaryReconciledAt: advanced.freshness?.lastSummaryReconciledAt,
+                                   placeMatchingVersion: String(repeating: "a", count: 64))
+        try await store.apply([], checkpoint: advanced, scope: Fixtures.scope)
+        #expect(try await store.syncMetadata(scope: Fixtures.scope).revision > beforeInvalidation)
+        try await store.clear(scope: Fixtures.scope)
+        #expect(try await store.syncMetadata(scope: Fixtures.scope).checkpoint == nil)
+    }
 }

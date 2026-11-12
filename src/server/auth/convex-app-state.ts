@@ -19,6 +19,8 @@ export function convexRateLimitRepository(
   call: Call = convexAuthStore(),
 ): RateLimitRepository {
   return {
+    incrementManyAndGet: (windows) =>
+      call<number[]>({ kind: 'rateLimits', windows }),
     incrementAndGet: (key, windowStart) =>
       call<number>({
         kind: 'rateLimit',

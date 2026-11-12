@@ -22,6 +22,15 @@ import type { SummaryReconciliationRepository } from '~/server/repositories/summ
 import { encodeSyncCursor, tryDecodeSyncCursor } from '~/server/sync/cursor';
 import { SyncRebootstrapRequiredError } from '~/server/sync/errors';
 
+export type ChangesSnapshot = {
+  items: SyncChangeItemDTO[];
+  lastSequence: number;
+  freshness: {
+    lastSummaryReconciledAt: string | null;
+    placeMatchingVersion?: string;
+  };
+};
+
 export interface SyncChangesHandlerDependencies {
   createRequestId?: () => string;
   now?: () => Date;
@@ -35,6 +44,11 @@ export interface SyncChangesHandlerDependencies {
   };
   cursorBackend?: string;
   itemByteBudget?: number;
+  /** Atomic, byte-bounded backend read of the head, feed and current entities. */
+  changesPage?: (
+    actor: Actor,
+    args: { after: number; limit: number },
+  ) => Promise<ChangesSnapshot>;
   placesRepo?: Pick<PlaceMatchingRepository, 'sync'>;
   freshnessRepo?: Pick<SummaryReconciliationRepository, 'lastCompletedAt'>;
   /** Overridable only for tests; production always uses `DEFAULT_RETENTION_DAYS`. */
@@ -67,6 +81,7 @@ export function createSyncChangesHandler({
   changesRepo,
   cursorBackend,
   itemByteBudget,
+  changesPage,
   freshnessRepo = { lastCompletedAt: async () => null },
   placesRepo,
   retentionDays = DEFAULT_RETENTION_DAYS,
@@ -138,72 +153,85 @@ export function createSyncChangesHandler({
         );
       }
 
-      if (
-        changesRepo.retentionFloor &&
-        decoded.sequence < (await changesRepo.retentionFloor(nowValue))
-      ) {
-        return rebootstrapRequired(
-          requestId,
-          'The requested cursor is older than the retained change history.',
-        );
-      }
-
-      const latestSequence = await changesRepo.latestSequence(actor.athleteId);
-      if (decoded.sequence > latestSequence) {
-        return rebootstrapRequired(
-          requestId,
-          'The requested cursor is beyond the current change-feed high-water mark.',
-        );
-      }
-
-      const changes = await changesRepo.findAfter(
-        actor.athleteId,
-        decoded.sequence,
-        { limit },
-      );
-
-      const items = await resolveChangeItems(changes, {
-        athleteId: actor.athleteId,
-        activitiesRepo,
-        photosRepo,
-      });
-
-      const freshness = {
-        lastSummaryReconciledAt:
-          (
-            await freshnessRepo.lastCompletedAt(actor.athleteId)
-          )?.toISOString() ?? null,
-      };
-
-      if (placesRepo) {
-        const matches = await placesRepo.sync(
-          actor,
-          items.flatMap((item) => (item.activity ? [item.id] : [])),
-        );
-        Object.assign(freshness, {
-          placeMatchingVersion: matches.version,
-        });
-        for (const item of items) {
-          if (item.activity)
-            item.activity.placeMatches = matches.results.get(item.id);
+      let items: SyncChangeItemDTO[];
+      let freshness: ChangesSnapshot['freshness'];
+      let lastSequence: number;
+      if (changesPage) {
+        ({ items, freshness, lastSequence } = await changesPage(actor, {
+          after: decoded.sequence,
+          limit,
+        }));
+      } else {
+        if (
+          changesRepo.retentionFloor &&
+          decoded.sequence < (await changesRepo.retentionFloor(nowValue))
+        ) {
+          return rebootstrapRequired(
+            requestId,
+            'The requested cursor is older than the retained change history.',
+          );
         }
-      }
 
-      let lastSequence = changes.at(-1)?.sequence ?? decoded.sequence;
-      if (itemByteBudget !== undefined) {
-        let bytes = 2;
-        for (let i = 0; i < items.length; i++) {
-          bytes += Buffer.byteLength(JSON.stringify(items[i])) + Number(i > 0);
-          // The first item always advances the cursor. Convex separately
-          // bounds individual projection documents.
-          if (i > 0 && bytes > itemByteBudget) {
-            const deferred = Number(items[i]!.sequence);
-            const next = changes.findIndex(
-              (change) => change.sequence === deferred,
-            );
-            lastSequence = changes[next - 1]!.sequence;
-            items.length = i;
-            break;
+        const latestSequence = await changesRepo.latestSequence(
+          actor.athleteId,
+        );
+        if (decoded.sequence > latestSequence) {
+          return rebootstrapRequired(
+            requestId,
+            'The requested cursor is beyond the current change-feed high-water mark.',
+          );
+        }
+
+        const changes = await changesRepo.findAfter(
+          actor.athleteId,
+          decoded.sequence,
+          { limit },
+        );
+
+        items = await resolveChangeItems(changes, {
+          athleteId: actor.athleteId,
+          activitiesRepo,
+          photosRepo,
+        });
+
+        freshness = {
+          lastSummaryReconciledAt:
+            (
+              await freshnessRepo.lastCompletedAt(actor.athleteId)
+            )?.toISOString() ?? null,
+        };
+
+        if (placesRepo) {
+          const matches = await placesRepo.sync(
+            actor,
+            items.flatMap((item) => (item.activity ? [item.id] : [])),
+          );
+          Object.assign(freshness, {
+            placeMatchingVersion: matches.version,
+          });
+          for (const item of items) {
+            if (item.activity)
+              item.activity.placeMatches = matches.results.get(item.id);
+          }
+        }
+
+        lastSequence = changes.at(-1)?.sequence ?? decoded.sequence;
+        if (itemByteBudget !== undefined) {
+          let bytes = 2;
+          for (let i = 0; i < items.length; i++) {
+            bytes +=
+              Buffer.byteLength(JSON.stringify(items[i])) + Number(i > 0);
+            // The first item always advances the cursor. Convex separately
+            // bounds individual projection documents.
+            if (i > 0 && bytes > itemByteBudget) {
+              const deferred = Number(items[i]!.sequence);
+              const next = changes.findIndex(
+                (change) => change.sequence === deferred,
+              );
+              lastSequence = changes[next - 1]!.sequence;
+              items.length = i;
+              break;
+            }
           }
         }
       }

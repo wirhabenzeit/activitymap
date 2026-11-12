@@ -6,12 +6,14 @@ import { gunzipSync } from 'node:zlib';
 import { z } from 'zod';
 
 import type { BootstrapSnapshot } from '~/app/api/v1/sync/bootstrap/handler';
+import type { ChangesSnapshot } from '~/app/api/v1/sync/changes/handler';
 import { type ActivityDTO, activityDTOSchema } from '~/contracts/v1/activity';
 import {
   type StreamMetadata,
   streamMetadataSchema,
 } from '~/contracts/v1/activity-streams';
 import { type PhotoDTO, photoDTOSchema } from '~/contracts/v1/photo';
+import { syncChangeItemDTOSchema } from '~/contracts/v1/sync';
 import { compactStreamSummarySchema } from '~/lib/streams/compact-summary';
 import { ActivityPlacesUnavailableError } from '~/server/application/match-activity-places';
 import type { Actor } from '~/server/auth/actor';
@@ -62,6 +64,11 @@ const changeSchema = z.object({
   entityType: z.enum(['activity', 'photo']),
   entityId: z.string(),
   operation: z.enum(['upsert', 'delete']),
+});
+const changesSnapshotSchema = z.object({
+  head: headSchema,
+  items: z.array(syncChangeItemDTOSchema),
+  lastSequence: z.number().int().nonnegative(),
 });
 const summariesSchema = z.array(
   z.object({
@@ -141,6 +148,7 @@ type Transport = {
   /** Largest list page one call returns; a shorter page ends the list. */
   pageSize: number;
   summaryBatch: number;
+  atomicChanges?: boolean;
   send: (operation: Operation) => Promise<Response>;
 };
 
@@ -245,6 +253,7 @@ function appTransport(
     // Mirrors the list and summary limits in backend/convex/sync.ts.
     pageSize: 32,
     summaryBatch: 48,
+    atomicChanges: true,
     send: (operation) => bridge.send(appOperation(operation), epoch),
   };
 }
@@ -396,6 +405,51 @@ function convexAdapter(actor: Actor, transport: Transport) {
 
   return {
     cursorBackend,
+    changesPage: transport.atomicChanges
+      ? async (
+          candidate: Actor,
+          args: { after: number; limit: number },
+        ): Promise<ChangesSnapshot> => {
+          assertActor(candidate);
+          const result = await query(
+            { kind: 'changesPage', ...args },
+            changesSnapshotSchema,
+          );
+          if (
+            result.lastSequence < args.after ||
+            result.lastSequence > result.head.sequence
+          )
+            throw new Error('Invalid changes snapshot sequence');
+          const version = result.head.matchingVersion ?? cursorBackend;
+          let previous = args.after;
+          for (const item of result.items) {
+            const sequence = Number(item.sequence);
+            if (
+              !Number.isSafeInteger(sequence) ||
+              sequence <= previous ||
+              sequence > result.lastSequence
+            )
+              throw new Error('Invalid changes snapshot order');
+            previous = sequence;
+            if (item.activity) {
+              captureActivities([item.activity]);
+              item.activity.placeMatches = matchFor(item.activity, version);
+            }
+            if (item.photo) capturePhotos([item.photo]);
+          }
+          return {
+            items: result.items,
+            lastSequence: result.lastSequence,
+            freshness: {
+              lastSummaryReconciledAt:
+                result.head.lastSummaryReconciledAt === null
+                  ? null
+                  : new Date(result.head.lastSummaryReconciledAt).toISOString(),
+              placeMatchingVersion: version,
+            },
+          };
+        }
+      : undefined,
     bootstrapPage: async (
       candidate: Actor,
       args: {

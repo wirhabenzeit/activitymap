@@ -4,9 +4,12 @@ import { createHmac } from 'node:crypto';
 import { convexTest } from 'convex-test';
 import test, { after, mock } from 'node:test';
 
+import syncFixtures from '../../shared/sync-integrity-fixtures.v1.json';
 import { convexSyncBridge } from '../../src/server/sync/convex-bridge';
 import { SyncRebootstrapRequiredError } from '../../src/server/sync/errors';
 import { internal } from '../convex/_generated/api';
+import { publishChange } from '../convex/activityWrites';
+import { idKey } from '../convex/owners';
 import schema from '../convex/schema';
 import { encodeWhole } from '../recording/codec';
 import { previewFixtureActivity } from './fixtures';
@@ -86,6 +89,146 @@ const fixture = previewFixtureActivity(
   'Test ride',
   Date.now(),
 );
+
+void test('atomic delta includes current photo metadata and its deletion', async () => {
+  const convex = convexTest(schema, modules);
+  await convex.mutation(internal.owners.provision, config);
+  const photo = syncFixtures.photo;
+  await convex.run(async (ctx) => {
+    const owner = (await ctx.db.query('owners').first())!;
+    await ctx.db.insert('photos', {
+      owner: owner._id,
+      generation: owner.generation,
+      sourceRevision: 1,
+      activity: idKey(photo.activity_id),
+      key: photo.unique_id,
+      dto: photo,
+    });
+    await publishChange(ctx, owner, photo.unique_id, 'upsert', 'photo');
+  });
+  const read = (after: number) =>
+    convex.query(internal.sync.read, {
+      ...scope,
+      operation: { kind: 'changesPage', after, limit: 500 },
+    });
+  const first = await read(0);
+  assert.deepEqual(first.items[0]!.photo, photo);
+  await convex.run(async (ctx) => {
+    const owner = (await ctx.db.query('owners').first())!;
+    const row = (await ctx.db.query('photos').first())!;
+    await ctx.db.delete('photos', row._id);
+    await publishChange(ctx, owner, photo.unique_id, 'delete', 'photo');
+  });
+  const deleted = await read(1);
+  assert.deepEqual(deleted.items, [
+    {
+      sequence: '2',
+      entityType: 'photo',
+      operation: 'delete',
+      id: photo.unique_id,
+    },
+  ]);
+});
+
+void test('atomic delta pages preserve tombstones, skip superseded upserts and enforce scope and retention', async () => {
+  const convex = convexTest(schema, modules);
+  await convex.mutation(internal.owners.provision, config);
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    dto: fixture,
+  });
+  const read = (after: number) =>
+    convex.query(internal.sync.read, {
+      ...scope,
+      operation: { kind: 'changesPage', after, limit: 500 },
+    });
+  const first = await read(0);
+  assert.equal(first.lastSequence, 1);
+  assert.deepEqual(
+    first.items.map((item) => item.activity?.id),
+    [source.id],
+  );
+  assert.equal(first.head.sequence, 1);
+  assert.deepEqual((await read(1)).items, []);
+  assert.equal((await read(1)).lastSequence, 1);
+  await convex.mutation(internal.activityWrites.applySource, {
+    ...source,
+    sourceRevision: 2,
+    dto: null,
+  });
+  const deleted = await read(0);
+  assert.equal(deleted.lastSequence, 2);
+  assert.deepEqual(deleted.items, [
+    {
+      sequence: '2',
+      entityType: 'activity',
+      operation: 'delete',
+      id: source.id,
+    },
+  ]);
+  await assert.rejects(read(3), /sync_rebootstrap_required/);
+  await assert.rejects(
+    convex.query(internal.sync.read, {
+      ...scope,
+      userId: 'another-owner',
+      operation: { kind: 'changesPage', after: 0, limit: 500 },
+    }),
+  );
+  await convex.run(async (ctx) => {
+    const owner = (await ctx.db.query('owners').first())!;
+    const head = (await ctx.db
+      .query('ownerHeads')
+      .withIndex('by_owner', (q) => q.eq('owner', owner._id))
+      .unique())!;
+    await ctx.db.patch('ownerHeads', head._id, { retentionFloor: 2 });
+  });
+  await assert.rejects(read(1), /sync_rebootstrap_required/);
+});
+
+void test('atomic deltas stop at the byte budget without acknowledging a deferred event', async () => {
+  const convex = convexTest(schema, modules);
+  await convex.mutation(internal.owners.provision, config);
+  for (let i = 1; i <= 30; i++) {
+    const id = String(i);
+    await convex.mutation(internal.activityWrites.applySource, {
+      ...source,
+      id,
+      dto: {
+        ...previewFixtureActivity(
+          id,
+          scope.athleteId,
+          'Large route',
+          Date.now(),
+        ),
+        map_polyline: '?'.repeat(100_000),
+      },
+    });
+  }
+  let after = 0;
+  const ids: string[] = [];
+  while (true) {
+    const page = await convex.query(internal.sync.read, {
+      ...scope,
+      operation: { kind: 'changesPage', after, limit: 500 },
+    });
+    assert(
+      new TextEncoder().encode(JSON.stringify(page.items)).length <=
+        2 * 1024 * 1024,
+    );
+    if (!page.items.length) {
+      assert.equal(page.lastSequence, after);
+      break;
+    }
+    assert.equal(Number(page.items.at(-1)!.sequence), page.lastSequence);
+    assert(page.lastSequence > after);
+    ids.push(...page.items.map((item) => item.id));
+    after = page.lastSequence;
+  }
+  assert.deepEqual(
+    ids,
+    Array.from({ length: 30 }, (_, i) => String(i + 1)),
+  );
+});
 
 void test('publishes only the assigned owner’s current source, recording and catalogue', async () => {
   const convex = convexTest(schema, modules);

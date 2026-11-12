@@ -1,7 +1,30 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import { withApiV1Observability } from './observability.ts';
+import { timeRequestWork } from './request-timing';
+
+void test('request phase timings remain isolated and survive immutable redirect headers', async () => {
+  const handler = withApiV1Observability(
+    async (request) => {
+      if (new URL(request.url).pathname === '/measured')
+        await timeRequestWork('sync_page', async () => undefined);
+      return Response.redirect('https://example.com/next');
+    },
+    { route: 'GET /test' },
+  );
+  const [measured, other] = await Promise.all([
+    handler(new Request('https://example.com/measured')),
+    handler(new Request('https://example.com/other')),
+  ]);
+  assert.match(
+    measured.headers.get('server-timing')!,
+    /sync_page;dur=[\d.]+;desc="1 calls"/,
+  );
+  assert.equal(other.headers.get('server-timing'), null);
+  assert.equal(measured.status, 302);
+});
 
 void test('withApiV1Observability propagates the caller-supplied requestId into the handler and the response header', async () => {
   let seenRequestId: string | null = null;
@@ -9,10 +32,14 @@ void test('withApiV1Observability propagates the caller-supplied requestId into 
     seenRequestId = request.headers.get('x-request-id');
     return Response.json({ ok: true });
   };
-  const wrapped = withApiV1Observability(handler, { route: 'GET /api/v1/test' });
+  const wrapped = withApiV1Observability(handler, {
+    route: 'GET /api/v1/test',
+  });
 
   const response = await wrapped(
-    new Request('https://example.com', { headers: { 'x-request-id': 'client-req-1' } }),
+    new Request('https://example.com', {
+      headers: { 'x-request-id': 'client-req-1' },
+    }),
   );
 
   assert.equal(seenRequestId, 'client-req-1');
@@ -37,10 +64,15 @@ void test('withApiV1Observability generates a requestId when the caller supplies
 });
 
 void test('withApiV1Observability preserves the handler response body and status', async () => {
-  const handler = async () => Response.json({ hello: 'world' }, { status: 201 });
-  const wrapped = withApiV1Observability(handler, { route: 'POST /api/v1/test' });
+  const handler = async () =>
+    Response.json({ hello: 'world' }, { status: 201 });
+  const wrapped = withApiV1Observability(handler, {
+    route: 'POST /api/v1/test',
+  });
 
-  const response = await wrapped(new Request('https://example.com', { method: 'POST' }));
+  const response = await wrapped(
+    new Request('https://example.com', { method: 'POST' }),
+  );
 
   assert.equal(response.status, 201);
   const body = (await response.json()) as { hello: string };
@@ -48,7 +80,8 @@ void test('withApiV1Observability preserves the handler response body and status
 });
 
 void test('withApiV1Observability preserves a redirect response, tagging it with the requestId', async () => {
-  const handler = async () => Response.redirect('https://example.com/next', 302);
+  const handler = async () =>
+    Response.redirect('https://example.com/next', 302);
   const wrapped = withApiV1Observability(handler, {
     route: 'GET /api/v1/auth/mobile/start',
     createRequestId: () => 'redirect-req',
@@ -67,7 +100,9 @@ void test('withApiV1Observability tags a POST request with a JSON body through t
     seenBody = await request.json();
     return Response.json({ ok: true });
   };
-  const wrapped = withApiV1Observability(handler, { route: 'POST /api/v1/test' });
+  const wrapped = withApiV1Observability(handler, {
+    route: 'POST /api/v1/test',
+  });
 
   await wrapped(
     new Request('https://example.com', {

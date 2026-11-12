@@ -1,6 +1,8 @@
 import Foundation
+import OSLog
 
 nonisolated struct SyncEngine: Sendable {
+    private static let log = Logger(subsystem: "cc.activitymap", category: "Sync")
     enum ProtocolError: Error { case invalidPage, stalledCursor, missingSnapshot, placesBootstrapRequired }
 
     let source: any SyncPageSource
@@ -10,7 +12,7 @@ nonisolated struct SyncEngine: Sendable {
 
     func run() async throws -> SyncCheckpoint {
         do {
-            let checkpoint = try await store.snapshot(scope: scope).checkpoint
+            let checkpoint = try await store.syncMetadata(scope: scope).checkpoint
             if let checkpoint, checkpoint.bootstrapComplete, let cursor = checkpoint.changesCursor, !cursor.isEmpty {
                 return try await catchUp(checkpoint)
             }
@@ -29,7 +31,7 @@ nonisolated struct SyncEngine: Sendable {
         // A replacement must not erase an authorized completed cache if a
         // later snapshot page/catch-up fails. Initial bootstrap still commits
         // partial pages so its existing restart behavior is unchanged.
-        let previous = try await store.snapshot(scope: scope).checkpoint
+        let previous = try await store.syncMetadata(scope: scope).checkpoint
         let replacing = previous?.bootstrapComplete == true && previous?.lastSyncAt != nil
         let destination = replacing
             ? try LocalStore(container: LocalStore.makeContainer(inMemory: true))
@@ -90,13 +92,29 @@ nonisolated struct SyncEngine: Sendable {
     }
 
     private func catchUp(_ initial: SyncCheckpoint, destination: LocalStore? = nil) async throws -> SyncCheckpoint {
+        let clock = ContinuousClock()
+        let started = clock.now
+        var requests = 0
+        var received = 0
+        var networkMs = 0.0
+        var persistenceMs = 0.0
+        defer {
+            Self.log.info("Delta sync requests=\(requests) items=\(received) networkMs=\(networkMs) persistenceMs=\(persistenceMs) totalMs=\(Self.milliseconds(started.duration(to: clock.now)))")
+        }
         let destination = destination ?? store
         var checkpoint = initial
         var seen = Set(initial.changesCursor.map { [$0] } ?? [])
         while true {
             try Task.checkCancellation()
             guard let cursor = checkpoint.changesCursor else { throw ProtocolError.missingSnapshot }
-            let page = try await source.changes(cursor: cursor)
+            let page: ActivityMapAPI.SyncChangesPage
+            do {
+                let start = clock.now
+                defer { networkMs += Self.milliseconds(start.duration(to: clock.now)) }
+                requests += 1
+                page = try await source.changes(cursor: cursor)
+            }
+            received += page.items.count
             try Task.checkCancellation()
             if page.freshness.placeMatchingVersion != nil && checkpoint.placesSyncReady != true {
                 throw ProtocolError.placesBootstrapRequired
@@ -117,9 +135,17 @@ nonisolated struct SyncEngine: Sendable {
             checkpoint.retention = page.retention
             checkpoint.freshness = page.freshness
             if caughtUp { checkpoint.lastSyncAt = now() }
-            try await destination.apply(mutations, checkpoint: checkpoint, scope: scope)
+            do {
+                let start = clock.now
+                defer { persistenceMs += Self.milliseconds(start.duration(to: clock.now)) }
+                try await destination.apply(mutations, checkpoint: checkpoint, scope: scope)
+            }
             if caughtUp { return checkpoint }
         }
+    }
+
+    private static func milliseconds(_ duration: Duration) -> Double {
+        Double(duration.components.seconds) * 1000 + Double(duration.components.attoseconds) / 1e15
     }
 
     private static func mutation(_ item: ActivityMapAPI.SyncChangeItem) throws -> StoreMutation {

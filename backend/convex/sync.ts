@@ -1,6 +1,7 @@
 import { ConvexError, v } from 'convex/values';
 
 import type { ActivityDTO } from '~/contracts/v1/activity';
+import type { SyncChangeItemDTO } from '~/contracts/v1/sync';
 
 import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, internalQuery } from './_generated/server';
@@ -46,6 +47,11 @@ const operation = v.union(
   v.object({ kind: v.literal('statusSummary') }),
   v.object({
     kind: v.literal('changes'),
+    after: v.number(),
+    limit: v.number(),
+  }),
+  v.object({
+    kind: v.literal('changesPage'),
     after: v.number(),
     limit: v.number(),
   }),
@@ -133,7 +139,13 @@ export const read = internalQuery({
   handler: async (ctx, { operation: op, ...scope }) => {
     const owner = await requireOwner(ctx, scope);
     // Item/summary queries depend on assignment, not the frequently updated head.
-    const feed = ['head', 'bootstrap', 'changes', 'retention'].includes(op.kind)
+    const feed = [
+      'head',
+      'bootstrap',
+      'changes',
+      'changesPage',
+      'retention',
+    ].includes(op.kind)
       ? await requireHead(ctx, owner._id)
       : null;
     const head = {
@@ -160,13 +172,14 @@ export const read = internalQuery({
         const { items, more } = await bootstrapPage(ctx, owner, op);
         return { ...response, items, more };
       }
-      case 'changes': {
+      case 'changes':
+      case 'changesPage': {
         if (
           !Number.isSafeInteger(op.after) ||
           op.after < 0 ||
           op.after > feed!.sequence
         )
-          throw new Error('Invalid sync sequence');
+          throw new ConvexError('sync_rebootstrap_required');
         if (op.after < feed!.retentionFloor)
           throw new ConvexError('sync_rebootstrap_required');
         const rows = await ctx.db
@@ -175,6 +188,57 @@ export const read = internalQuery({
             q.eq('owner', owner._id).gt('sequence', op.after),
           )
           .take(op.limit);
+        if (op.kind === 'changesPage') {
+          // Resolve the feed and its current entities in ONE snapshot. Small
+          // local batches bound read work when a page reaches its byte budget.
+          const items: SyncChangeItemDTO[] = [];
+          let lastSequence = op.after;
+          let bytes = 2;
+          for (let offset = 0; offset < rows.length; offset += 8) {
+            const batch = rows.slice(offset, offset + 8);
+            const resolved = await Promise.all(
+              batch.map(async (change) => {
+                const base = {
+                  sequence: String(change.sequence),
+                  entityType: change.entityType,
+                  operation: change.operation,
+                  id: change.entityId,
+                };
+                if (change.operation === 'delete') return base;
+                if (change.entityType === 'activity') {
+                  const row = await activityFor(
+                    ctx,
+                    owner._id,
+                    idKey(change.entityId),
+                  );
+                  const activity = row && project(row, owner);
+                  return activity ? { ...base, activity } : null;
+                }
+                const [photo] = await photosByIds(ctx, owner, [
+                  change.entityId,
+                ]);
+                return photo ? { ...base, photo } : null;
+              }),
+            );
+            for (let i = 0; i < batch.length; i++) {
+              const item = resolved[i];
+              if (item) {
+                const size =
+                  utf8.encode(JSON.stringify(item)).length +
+                  Number(items.length > 0);
+                // Always admit the first item; individual DTOs are bounded at
+                // publication. Do not acknowledge the first deferred event.
+                if (items.length > 0 && bytes + size > MAX_PAGE_BYTES)
+                  return { head, items, lastSequence };
+                bytes += size;
+                items.push(item);
+              }
+              // Superseded upserts still advance, even on an empty page.
+              lastSequence = batch[i]!.sequence;
+            }
+          }
+          return { head, items, lastSequence };
+        }
         return rows.map(
           ({ sequence, entityType, entityId, operation, changedAt }) => ({
             sequence,

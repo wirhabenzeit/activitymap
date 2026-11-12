@@ -21,6 +21,7 @@ extension LocalStore {
             row.payload = try StoreCodec.encode(dto)
             try Task.checkCancellation()
             try save(context)
+            libraryRevision += 1
             if invalidates {
                 streamFences.invalidate(key)
                 notifySummaryChange(scope: scope.key, activityIDs: [dto.id])

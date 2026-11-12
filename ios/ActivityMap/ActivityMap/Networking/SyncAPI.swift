@@ -22,7 +22,7 @@ nonisolated struct SyncAPI: SyncPageSource {
 
     func changes(cursor: String) async throws -> ActivityMapAPI.SyncChangesPage {
         try await APIClient.get(
-            "/api/v1/sync/changes", query: [URLQueryItem(name: "cursor", value: cursor)],
+            "/api/v1/sync/changes", query: [URLQueryItem(name: "cursor", value: cursor), URLQueryItem(name: "limit", value: "500")],
             bearerToken: token, baseURL: baseURL, session: session, as: ActivityMapAPI.SyncChangesPage.self)
     }
 }

@@ -720,3 +720,19 @@ void test('rate limit windows count exactly and the provider budget holds reques
   });
   assert.deepEqual(await rows(), before);
 });
+
+void test('batched rate limits retain ordered rejection and do not count later buckets', async (t) => {
+  const { call, requests } = setup(t);
+  const limits = convexRateLimitRepository(call);
+  const windows = [
+    { key: 'session:batch', windowStart: 0, limit: 1 },
+    { key: 'ip:batch', windowStart: 0, limit: 10 },
+  ];
+  assert.deepEqual(await limits.incrementManyAndGet!(windows), [1, 1]);
+  assert.deepEqual(await limits.incrementManyAndGet!(windows), [2]);
+  assert.equal(await limits.incrementAndGet('ip:batch', new Date(0)), 2);
+  assert.equal(
+    requests.filter((request) => request.kind === 'rateLimits').length,
+    2,
+  );
+});
