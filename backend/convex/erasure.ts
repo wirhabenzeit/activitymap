@@ -116,20 +116,6 @@ export const step = internalMutation({
       await ctx.db.delete('shareLinks', doc._id);
       removed++;
     }
-    for (const doc of await ctx.db
-      .query('shadowMatches')
-      .withIndex('by_owner_activity', (q) => q.eq('owner', id))
-      .take(DOCUMENTS_PER_STEP)) {
-      await ctx.db.delete('shadowMatches', doc._id);
-      removed++;
-    }
-    for (const doc of await ctx.db
-      .query('shadowMatchRuns')
-      .withIndex('by_owner', (q) => q.eq('owner', id))
-      .take(DOCUMENTS_PER_STEP)) {
-      await ctx.db.delete('shadowMatchRuns', doc._id);
-      removed++;
-    }
 
     if (removed > 0) {
       await ctx.scheduler.runAfter(0, internal.erasure.step, args);
