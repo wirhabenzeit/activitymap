@@ -34,8 +34,8 @@ export default defineSchema({
     sequence: v.number(),
     retentionFloor: v.number(),
     catalogueAfter: v.optional(v.string()),
-    /** Shadow-write position: the last mirrored Postgres change sequence and
-     * the source revision used for it (revisions only ever increase). */
+    /** Retired: the position of the copy from Postgres. Nothing writes it;
+     * `maintenance.clearRetired` removes it, then the field can go. */
     mirror: v.optional(
       v.object({
         sequence: v.number(),
@@ -289,8 +289,9 @@ export default defineSchema({
   })
     .index('by_dataset_tile', ['dataset', 'tile', 'key'])
     .index('by_dataset_key', ['dataset', 'key']),
-  /** One pass of the shadow matcher over an owner's library
-   * (convex/shadowMatching.ts). `after` is the last activity key handled. */
+  /** Retired: runs of the shadow matcher, which compared matching here with
+   * Postgres. Nothing writes them; `maintenance.clearRetired` empties this
+   * table and `shadowMatches`, then both can go. */
   shadowMatchRuns: defineTable({
     owner: v.id('owners'),
     dataset: v.string(),
@@ -323,8 +324,7 @@ export default defineSchema({
       }),
     ),
   }).index('by_owner', ['owner']),
-  /** Match results computed here, kept apart from the results clients read
-   * (`activities.projection.match`) until the two have been compared. */
+  /** Retired: the shadow matcher's results (see `shadowMatchRuns`). */
   shadowMatches: defineTable({
     owner: v.id('owners'),
     activity: v.string(),

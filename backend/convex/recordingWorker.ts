@@ -10,7 +10,7 @@ import { type ActionCtx, internalAction } from './_generated/server';
 import { scopeFields, writerValidator } from './ownerScope';
 import { manifestValidator } from './recordingValidators';
 
-const prepareArgs = {
+export const prepareArgs = {
   scope: v.object(scopeFields),
   id: v.string(),
   generation: v.string(),
@@ -83,9 +83,3 @@ export async function prepareRecording(
     throw error;
   }
 }
-
-/** The trusted worker passes a staged immutable file and its manifest. */
-export const prepare = internalAction({
-  args: prepareArgs,
-  handler: prepareRecording,
-});

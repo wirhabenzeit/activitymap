@@ -10,12 +10,14 @@ import { internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
 import { encodeWhole } from '../recording/codec';
 import { previewFixtureActivity } from './fixtures';
+import { seedModule, testWrites } from './seed-api';
 
 // Install once before convex-test wraps timer globals with invocation-local accessors.
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
 after(() => mock.timers.reset());
 
 const modules = {
+  ...seedModule,
   './_generated/api.js': () => import('../convex/_generated/api.js'),
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './catalogue.ts': () => import('../convex/catalogue'),
@@ -92,7 +94,7 @@ void test('publishes only the assigned owner’s current source, recording and c
   const snapshot = () =>
     convex.query(internal.sync.read, { ...scope, operation });
   await convex.mutation(internal.owners.provision, config);
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     dto: fixture,
   });
@@ -115,10 +117,7 @@ void test('publishes only the assigned owner’s current source, recording and c
     recordingGeneration: 'test-recording-generation',
     recordingRevision: '1',
   };
-  assert.equal(
-    await convex.action(internal.recordingWorker.prepare, publishRecording),
-    true,
-  );
+  assert.equal(await convex.action(testWrites.prepare, publishRecording), true);
   const recording = await convex.run(
     async (ctx) => (await ctx.db.query('recordings').first())!._id,
   );
@@ -138,20 +137,20 @@ void test('publishes only the assigned owner’s current source, recording and c
     },
   };
   assert.equal(
-    await convex.mutation(internal.activityWrites.publishMatch, publishMatch),
+    await convex.mutation(testWrites.publishMatch, publishMatch),
     true,
   );
   assert.equal((await snapshot()).items[0].placeMatches.resultRevision, '3');
 
   const changedCatalogue = 'c'.repeat(64);
-  await convex.mutation(internal.catalogue.select, {
+  await convex.mutation(testWrites.selectCatalogue, {
     scope,
     catalogue: changedCatalogue,
     matchingVersion: 'd'.repeat(64),
   });
   assert.equal((await snapshot()).items[0].placeMatches, undefined);
   assert.equal(
-    await convex.mutation(internal.activityWrites.publishMatch, publishMatch),
+    await convex.mutation(testWrites.publishMatch, publishMatch),
     false,
   );
   assert.deepEqual(
@@ -164,25 +163,25 @@ void test('publishes only the assigned owner’s current source, recording and c
   assert.equal((await snapshot()).head.sequence, 4);
 
   const newerSource = { ...source, sourceRevision: 2 };
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...newerSource,
     dto: { ...fixture, name: 'Updated' },
   });
   assert.equal((await snapshot()).items[0].streams.state, 'current');
   assert.equal(
-    await convex.action(internal.recordingWorker.prepare, {
+    await convex.action(testWrites.prepare, {
       ...publishRecording,
       file: await stageFile(),
     }),
     false,
   );
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...newerSource,
     dto: null,
   });
   assert.deepEqual((await snapshot()).items, []);
   assert.equal(
-    await convex.mutation(internal.activityWrites.applySource, {
+    await convex.mutation(testWrites.applySource, {
       ...newerSource,
       dto: fixture,
     }),
@@ -267,7 +266,7 @@ void test('signed bridge derives scope from the actor and old routing epochs can
 
   // Compaction can advance the floor after the client's separate preflight.
   assert.equal(await bridge.read({ kind: 'retention' }, scope.epoch), 0);
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     dto: fixture,
   });
@@ -310,7 +309,7 @@ void test('metadata changes preserve recordings, summaries and matches; source f
   const assignmentBefore = await convex.run((ctx) =>
     ctx.db.query('owners').first(),
   );
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     dto: fixture,
   });
@@ -325,7 +324,7 @@ void test('metadata changes preserve recordings, summaries and matches; source f
   const file = await convex.run((ctx) =>
     ctx.storage.store(new Blob([new Uint8Array(encoded.file)])),
   );
-  await convex.action(internal.recordingWorker.prepare, {
+  await convex.action(testWrites.prepare, {
     ...source,
     file,
     manifest: encoded.manifest,
@@ -345,7 +344,7 @@ void test('metadata changes preserve recordings, summaries and matches; source f
     matcherVersion: 'test',
     places: [],
   };
-  await convex.mutation(internal.activityWrites.publishMatch, {
+  await convex.mutation(testWrites.publishMatch, {
     ...source,
     recording: recording._id,
     catalogue,
@@ -358,7 +357,7 @@ void test('metadata changes preserve recordings, summaries and matches; source f
     });
   const before = await summary();
   const metadata = { ...fixture, name: 'Renamed', kudos_count: 42 };
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 2,
     dto: metadata,
@@ -379,7 +378,7 @@ void test('metadata changes preserve recordings, summaries and matches; source f
     assignmentBefore,
   );
   assert.equal(
-    await convex.mutation(internal.activityWrites.publishMatch, {
+    await convex.mutation(testWrites.publishMatch, {
       ...source,
       recording: recording._id,
       catalogue,
@@ -394,7 +393,7 @@ void test('metadata changes preserve recordings, summaries and matches; source f
     'cleanup retains referenced file',
   );
 
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 3,
     dto: { ...metadata, distance: (metadata.distance ?? 0) + 1 },
@@ -413,7 +412,7 @@ void test('projection upgrades degrade derived data without taking an owner or p
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, config);
   for (const id of ['1', '2', '3'])
-    await convex.mutation(internal.activityWrites.applySource, {
+    await convex.mutation(testWrites.applySource, {
       ...source,
       id,
       dto: { ...fixture, id },
@@ -462,7 +461,7 @@ void test('scheduled catalogue invalidation drains multiple pages and ignores su
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, config);
   for (let i = 1; i <= 35; i++)
-    await convex.mutation(internal.activityWrites.applySource, {
+    await convex.mutation(testWrites.applySource, {
       ...source,
       id: String(i),
       dto: { ...fixture, id: String(i) },
@@ -488,12 +487,12 @@ void test('scheduled catalogue invalidation drains multiple pages and ignores su
         },
       });
   });
-  await convex.mutation(internal.catalogue.select, {
+  await convex.mutation(testWrites.selectCatalogue, {
     scope,
     catalogue: 'c'.repeat(64),
     matchingVersion: 'd'.repeat(64),
   });
-  await convex.mutation(internal.catalogue.select, {
+  await convex.mutation(testWrites.selectCatalogue, {
     scope,
     catalogue: 'e'.repeat(64),
     matchingVersion: 'f'.repeat(64),
@@ -590,7 +589,7 @@ void test('retention drains bounded batches, preserves recent changes and reject
 void test('rejected and malformed staged recordings are cleaned without deleting accepted files', async () => {
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, config);
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     dto: fixture,
   });
@@ -608,7 +607,7 @@ void test('rejected and malformed staged recordings are cleaned without deleting
     recordingRevision: '1',
   };
   assert.equal(
-    await convex.action(internal.recordingWorker.prepare, {
+    await convex.action(testWrites.prepare, {
       ...args,
       sourceRevision: 99,
     }),
@@ -617,7 +616,7 @@ void test('rejected and malformed staged recordings are cleaned without deleting
   assert.equal(await convex.run((ctx) => ctx.storage.get(file)), null);
   const corrupt = await stage();
   await assert.rejects(
-    convex.action(internal.recordingWorker.prepare, {
+    convex.action(testWrites.prepare, {
       ...args,
       file: corrupt,
       manifest: { ...encoded.manifest, contentHash: '0'.repeat(64) },
@@ -630,13 +629,13 @@ void test('rejected and malformed staged recordings are cleaned without deleting
 void test('catalogue invalidation pauses at handoff and resumes under a fresh Convex epoch', async () => {
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, config);
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     dto: fixture,
   });
   const nextCatalogue = 'c'.repeat(64);
   const nextVersion = 'd'.repeat(64);
-  await convex.mutation(internal.catalogue.select, {
+  await convex.mutation(testWrites.selectCatalogue, {
     scope,
     catalogue: nextCatalogue,
     matchingVersion: nextVersion,
@@ -693,7 +692,7 @@ void test('catalogue invalidation stops with its writer and is finished by the n
   // More activities than one continuation handles.
   const ids = Array.from({ length: 40 }, (_, index) => String(1000 + index));
   for (const id of ids)
-    await convex.mutation(internal.activityWrites.applySource, {
+    await convex.mutation(testWrites.applySource, {
       ...source,
       id,
       dto: { ...fixture, id },
@@ -718,7 +717,7 @@ void test('catalogue invalidation stops with its writer and is finished by the n
       expectedEpoch: expected,
     });
   const nextCatalogue = 'c'.repeat(64);
-  await convex.mutation(internal.catalogue.select, {
+  await convex.mutation(testWrites.selectCatalogue, {
     scope,
     catalogue: nextCatalogue,
     matchingVersion: 'd'.repeat(64),
@@ -756,7 +755,7 @@ void test('catalogue invalidation stops with its writer and is finished by the n
 void test('metadata updates allow in-flight recording and first match publication, but source changes fence them', async () => {
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, config);
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     dto: fixture,
   });
@@ -777,13 +776,13 @@ void test('metadata updates allow in-flight recording and first match publicatio
     name: 'Renamed during fetch',
     kudos_count: 20,
   };
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 2,
     dto: metadata,
   });
   assert.equal(
-    await convex.action(internal.recordingWorker.prepare, { ...work, file }),
+    await convex.action(testWrites.prepare, { ...work, file }),
     true,
   );
   const recording = await convex.run(
@@ -817,13 +816,13 @@ void test('metadata updates allow in-flight recording and first match publicatio
       places: [],
     },
   };
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 3,
     dto: { ...metadata, kudos_count: 21 },
   });
   assert.equal(
-    await convex.mutation(internal.activityWrites.publishMatch, match),
+    await convex.mutation(testWrites.publishMatch, match),
     true,
     'first result survives metadata changes',
   );
@@ -833,48 +832,45 @@ void test('metadata updates allow in-flight recording and first match publicatio
     'complete',
   );
 
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 4,
     dto: { ...metadata, private: !metadata.private },
   });
+  assert.equal(await convex.mutation(testWrites.publishMatch, match), false);
   assert.equal(
-    await convex.mutation(internal.activityWrites.publishMatch, match),
-    false,
-  );
-  assert.equal(
-    await convex.action(internal.recordingWorker.prepare, {
+    await convex.action(testWrites.prepare, {
       ...work,
       file: await stage(),
     }),
     false,
   );
   // Reverting source values must not resurrect jobs from the earlier source.
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 5,
     dto: metadata,
   });
   assert.equal(
-    await convex.action(internal.recordingWorker.prepare, {
+    await convex.action(testWrites.prepare, {
       ...work,
       file: await stage(),
     }),
     false,
   );
   const freshFile = await stage();
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 6,
     dto: null,
   });
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     ...source,
     sourceRevision: 7,
     dto: metadata,
   });
   assert.equal(
-    await convex.action(internal.recordingWorker.prepare, {
+    await convex.action(testWrites.prepare, {
       ...work,
       sourceRevision: 5,
       file: freshFile,
@@ -935,7 +931,7 @@ void test('bootstrap pages fill the byte budget and the bridge text matches the 
   await convex.mutation(internal.owners.provision, config);
   const polyline = 'x'.repeat(20_000);
   for (let i = 1; i <= 150; i++)
-    await convex.mutation(internal.activityWrites.applySource, {
+    await convex.mutation(testWrites.applySource, {
       ...source,
       id: String(1000 + i),
       dto: { ...fixture, id: String(1000 + i), map_polyline: polyline },

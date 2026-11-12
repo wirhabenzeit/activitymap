@@ -27,11 +27,9 @@ is built from OpenStreetMap extracts on disk and published here (see "Place
 catalogue").
 
 The sections "Serving preview owners", "Live owners" and "Read owners in
-production", "Writer field", "Moving an account", "Shadow writes", "Shadow
-matching" and "Production parity check" describe how the application moved
-here from Postgres. The app code they name has been removed; the backend
-functions they describe (`importer`, the `writer` field, the mirror
-operations of the write bridge) are still deployed and are no longer called.
+production" describe per-account settings from the move off Postgres that
+the app still reads (`src/server/preview/selection.ts`,
+`src/server/convex-live-owners.ts`, `src/server/convex-read-owners.ts`).
 
 ## Deployment boundary
 
@@ -278,171 +276,44 @@ owner's token and store the new one.
 
 ## Writer field
 
-Which store ingests and writes an owner's library is recorded per owner
-(`docs/convex-writer-cutover.md`, decision 3). In Postgres it is
-`user.writer` (`postgres`, `handoff` or `convex`) with `user.writer_epoch`,
-which a handoff increments in the same statement as a compare-and-set
-(`src/server/db/writer-fence.ts`). Every account is `postgres` until a handoff
-says otherwise.
-
-Postgres enforces it with triggers (migration 0031): an insert, update or
-delete on an owner's activities, activity streams, photos, place results or
-place checks is refused with SQLSTATE `AMW01` unless the writer is
-`postgres`. The check is part of the writing transaction, so it covers every
-code path:
-
-- Each write takes a share lock on the owner's user row. A handoff updates
-  that row, so it waits until the transactions that have written for the
-  owner are finished.
-- A transaction that first writes after the handoff committed is refused, by
-  the fence or, if its snapshot is older, as a serialization failure.
-
-Two kinds of write pass on purpose, by setting `activitymap.writer_fence` to
-`bypass` for their own transaction: account erasure, and (step 7) the replica
-writes that copy Convex's state back.
-
-The jobs skip owners Postgres does not ingest for, so no provider budget is
-spent on work the fence would refuse: summary reconciliation, the activity
-sync, the stream and photo backfills and the place matcher all select only
-owners whose writer is `postgres`. Stored place results stay readable for
-any owner. Webhook events of such an owner are still recorded, but the drain
-does not select them and the immediate attempt cannot claim them; they wait,
-in `handoff` until the owner has a writer again. Athlete events
-(deauthorization) are always processed in Postgres, where accounts and tokens
-live. Edits, refreshes, imports and on-demand stream fetches are not
-filtered: for an owner Postgres does not write for they are refused by the
-fence until step 8 routes them to Convex.
-
-One cost: the share lock is taken after the row being written is locked,
-while erasure locks the user row first. The two can deadlock; Postgres ends
-one of them with an error and the job retries. `pnpm db:test-writer-fence`
-proves the behaviour against a real database.
-
-### In Convex
-
-The Convex owner carries the same field: `owners.writer` (absent means
-`postgres`) and `owners.writerEpoch`, changed only by `owners.setWriter` with
-a compare-and-set on the epoch. It is separate from `owners.backend` and the
-routing `epoch`, which say who serves reads: a handoff of the writer changes
-no client cursor and no read setting.
+Who writes an owner's library is recorded on the owner: `owners.writer`
+(`postgres`, `handoff` or `convex`; absent means `postgres`) and
+`owners.writerEpoch`, changed only by `owners.setWriter` with a
+compare-and-set on the epoch. It is separate from `owners.backend` and the
+routing `epoch`, which say who serves reads. Every library is written by
+Convex. The other two values remain from the move off Postgres, when a
+library was copied here and then handed over.
 
 Every write to an owner's library calls `requireWritableOwner` in its own
-transaction, naming who is writing. The shadow mirror and the importer write
-as `postgres` (the default), so once an owner is `handoff` or `convex` each
-of their writes is refused, including one from a run that started before the
-handoff. A mirror run also stops up front when it sees the owner is not
-written by Postgres, and the scheduled mirror skips an owner whose Postgres
-writer is `convex`. During a handoff from Postgres the Postgres side is
-`handoff` while Convex is still `postgres`, so the mirror can reach the head.
-Convex ingestion writes as `convex`.
-
-Scheduled continuations are fenced the same way. A catalogue invalidation
+transaction, naming who is writing; Convex ingestion writes as `convex`.
+Scheduled continuations are fenced the same way: a catalogue walk
 (`catalogue.next`) works for the writer it was queued under and checks it in
-every transaction, so a writer change makes queued continuations no-ops and
-leaves the cursor where it is. Nothing runs during a handoff; `setWriter`
-queues the rest for the store that writes next.
+every transaction.
 
-The two sides are changed one after the other by the handoff (step 9), not
-in one transaction. Until both agree, at most one side accepts writes.
+## Webhook events
 
-### Webhook events for an owner Convex writes
-
-Strava is acknowledged once an event is in the Postgres inbox, for every
-owner. For an owner whose writer is `convex`, the drain leaves activity
-events alone and `src/server/strava/webhook-dispatch.ts` passes them on:
-right after the delivery, and again in each drain run for what is still
-due. The write bridge operation `recordEvents` stores the event in
-`providerEvents` (`convex/providerEvents.ts`), once per inbox event ID, and
-only when Convex is the owner's writer. The inbox row is marked done after
-that mutation has committed, so one of the two stores always holds the
-event. A refused or undelivered event goes back to the inbox for five
-minutes and is never dead-lettered. That includes a dispatcher that dies
-between claim and delivery: the dispatch claim marks its lease in
-`last_error`, and stale-lease recovery returns a marked row without counting
-an attempt.
-
-Each new event asks Convex ingestion for its activity in the same
-transaction as the receipt.
-
-## Moving an account
-
-`src/server/convex-mirror/handoff.ts` moves one account's library between the
-two stores. An admin runs it from the admin page (Webhooks, "Library
-writer"): for their own account, or for every connected account in two
-steps (`src/server/convex-mirror/accounts.ts`).
-
-- **Prepare all** gives each account Postgres still writes a library in
-  Convex (the write bridge operation `provision`, for a new owner only) and
-  records its routing epoch in `users.convex_epoch`. From then on the mirror
-  copies the account, a time slice per run, until Convex holds the whole
-  library. Nothing changes for the account.
-- **Move ready accounts** runs the handoff below for each prepared account
-  whose copy has finished. An account that stops stays with Postgres and
-  does not hold up the others.
-- **All accounts** lists who writes each account and how far its copy is.
-
-Routing follows the account row, not settings. The mirror copies an account
-that has an epoch while Postgres writes it. Once Convex writes it, its v1
-reads and the web client's live queries come from Convex under that epoch,
-and Convex decides which activities it has; Postgres is still asked whether
-the provider account may read at all. The three owner lists
-(`ACTIVITYMAP_CONVEX_SHADOW_OWNERS`, `_READ_OWNERS`, `_LIVE_OWNERS`) keep
-working for accounts that are read from Convex while Postgres writes.
-
-**To Convex**
-
-1. Postgres stops writing for the account (`handoff`). The change waits for
-   writes already under way; webhook events stay in the inbox.
-2. The mirror copies what is left and the parity check compares the two
-   stores. If the copy does not finish within 40 seconds or the check finds
-   drift, the account goes back to Postgres and nothing else has changed.
-3. Convex becomes the writer, then Postgres records the same.
-4. The events kept in step 1 are sent to Convex, which also starts a
-   reconciliation sweep for the account.
-
-**Back to Postgres**
-
-Convex stops (`handoff`), Postgres becomes the writer again, Convex records
-the same, and Postgres reconciliation is made due at once. Nothing is copied
-back: Postgres fetches from Strava what changed while Convex wrote, which can
-take hours for a long absence, and the mirror then carries it to Convex.
-
-Every step is a compare-and-set on a writer epoch, and each run starts from
-the two writers as they are. Running either direction again after an
-interruption continues it, and handing back also recovers a move to Convex
-that stopped half way.
-
-What an account needs before it can move:
-
-- it has a library in Convex that the mirror has copied ("Prepare all", or
-  a listed shadow owner);
-- the provider gateway key is set in the app and in the Convex environment;
-- the place catalogue rowset its matching version names has been copied.
-
-What changes for the account afterwards: the mirror and the hourly parity
-check skip it, and features that still read Postgres (place debugging and
-the admin views) show its library as it was at the move.
+The app records each Strava activity event here before answering Strava
+(`src/server/strava/convex-webhook.ts`): the write bridge operation
+`recordEvents` stores it in `providerEvents` (`convex/providerEvents.ts`),
+once per delivery, and asks Convex ingestion for its activity in the same
+transaction. An event that cannot be recorded is answered with an error, so
+Strava delivers it again; the reconciliation sweep finds what is still
+missed.
 
 ## New accounts
 
-With `ACTIVITYMAP_CONVEX_NEW_ACCOUNTS=enabled` in the app, a new account
-starts on Convex (`src/server/convex-mirror/new-accounts.ts`). The decision
-is made at the account's first request for activities, the client's fetch
-after sign-up: an account with nothing in Postgres and no library in Convex
-is given one, handed to Convex at once (there is nothing to copy), and its
-reconciliation sweep fills the library from the provider's list. The
-request answers when the sweep has read two pages or finished, after at
-most fifteen seconds; the rest arrives through sync.
-
-If the handover stops, the account stays with Postgres and the request is
-served by the usual first fetch. Accounts that already have activities in
-Postgres are not touched by this; they move through the admin page. The
-Postgres sign-up warmup is skipped for an account served from Convex.
+An account gets its library on its first request for activities
+(`startLibrary` in `src/server/library/index.ts`): the write bridge's
+`provision` creates the owner under the newest catalogue, `setWriter` hands
+it to Convex, and the routing epoch is stored on the user. The first fetch
+then starts the reconciliation sweep, which fills the library from the
+provider's list, and answers when the sweep has read two pages or finished,
+after at most fifteen seconds; the rest arrives through sync.
 
 ## Sign-in store
 
-The app's auth library (Better Auth) can keep its records here instead of in
-Postgres: users, linked provider accounts with their tokens, sessions,
+The app's auth library (Better Auth) keeps its records here: users, linked
+provider accounts with their tokens, sessions,
 verification values and signing keys. `convex/authStore.ts` holds one
 document per record in `authRecords` and implements what the library asks
 of a database: create, find, count, update and delete by a list of
@@ -508,23 +379,22 @@ provider gateway and never holds a provider credential:
 
 1. **Claim.** The run takes a five-minute lease and a new source revision:
    the larger of the current time in milliseconds and one more than every
-   revision already used for the activity, the mirror's included.
+   revision already used for the activity.
 2. **Source.** It reads the activity, and its photos when the activity has
-   any, converts them with the code Postgres ingestion uses
+   any, converts them with the app's provider mapping
    (`backend/ingestion/provider.ts`), and writes the activity and its photo
    set in one transaction. When the provider answers that the activity does
    not exist, it writes the deletion. The event's own aspect is not trusted.
 3. **Recording.** Only when the activity has no current recording (a new
    activity, or a change to the fields samples depend on): it reads the
-   streams, stores the file and publishes it through the same fenced path
-   the mirror uses. An activity without samples (one typed in by hand,
+   streams, stores the file and publishes it through the fenced recording
+   path (`convex/recordingWorker.ts`). An activity without samples (one typed in by hand,
    which is not asked for streams, or one whose streams the provider does
    not have) gets an empty recording: that is how "nothing to fetch" is
    remembered, and why such an activity does not stay pending.
 4. **Match.** When the activity has a current recording without a match
    for the owner's catalogue, the worker matches it against the copied
-   place catalogue with the matcher the shadow runs use
-   (`backend/matching/activity-match.ts`) and publishes the result. A title
+   place catalogue (`backend/matching/activity-match.ts`) and publishes the result. A title
    edit keeps recording and match; a new recording is matched again. If no
    complete rowset is the one the owner's matching version names, the
    activity is finished without a match.
@@ -565,12 +435,11 @@ that are waiting, blocked or failed.
 
 ### Edit and refresh
 
-For an account Convex writes for, the v1 edit and refresh routes still make
-the Strava call in the app, with the account's credential and the shared
-request budget. The result goes to Convex in one signed write
-(`applyActivity` on the write bridge, `ingestion.apply`) and the response is
-what Convex then serves; nothing of the account's activities is read from or
-written to Postgres (`src/server/application/convex-activity-commands.ts`).
+The v1 edit and refresh routes make the Strava call in the app, with the
+account's credential and the shared request budget. The result goes to
+Convex in one signed write (`applyActivity` on the write bridge,
+`ingestion.apply`) and the response is what Convex then serves
+(`src/server/application/convex-activity-commands.ts`).
 
 - A command acts only on an activity that is in the library, and that is
   checked (`activityKnown`) before anything is changed at Strava.
@@ -584,37 +453,26 @@ written to Postgres (`src/server/application/convex-activity-commands.ts`).
 - While the account is in `handoff`, both routes answer 503 and ask to try
   again: nobody could record the result.
 
-The legacy server actions for edit, refresh and delete only know the
-Postgres path and refuse such an account before calling Strava.
-
 ### Sync status and "Fetch from Strava"
 
-For an account Convex writes for, `GET /api/v1/ingestion-status` is built
-from Convex: one read of the counts kept with every write
+`GET /api/v1/ingestion-status` is built from Convex: one read of the counts kept with every write
 (`sync.read` operation `statusSummary`, `convex/stats.ts`) plus the sweep's
 state, with the library walked page by page only while those counts are
 being rebuilt. Outstanding details, photos and recordings are reported as
 scheduled, since the sweep fetches them.
 
-"Fetch from Strava" (`/api/v1/strava-import`) has no import run to start for
-such an account. It starts the reconciliation sweep now (`sweepNow`), unless
+"Fetch from Strava" (`/api/v1/strava-import`) starts the reconciliation sweep now (`sweepNow`), unless
 one is under way or finished within the last five minutes, and its status is
 the sweep's (`src/server/application/convex-import.ts`).
 
 ### Share links and export
 
-Links live where the library is written. For an account Convex writes for,
-a new share link is created in Convex (`convex/shares.ts`): Postgres does not
-know the account's newer activities, and its share table references
-Postgres activities. The app still creates the token and stores only its
-hash. Links the account made before it moved stay in Postgres until they
-expire. The list shows both, revoking finds either, and a token is looked up
-in Postgres first and then in Convex. What a recipient sees is assembled in
-Convex by the same allow-list (`src/contracts/share/activity.ts`). Whether
-the athlete's provider connection is revoked is still asked of Postgres.
+Share links live in Convex (`convex/shares.ts`). The app creates the token
+and stores only its hash. What a recipient sees is assembled in Convex by
+the allow-list in `src/contracts/share/activity.ts`.
 
-The CSV export reads the whole library from Convex for such an account,
-page by page through the read bridge.
+The CSV export reads the whole library from Convex, page by page through
+the read bridge.
 
 ### Reconciliation
 
@@ -638,8 +496,7 @@ full.
   as deleted. The sweep asks for each such activity, and the job's detail
   read decides. The same walk asks for activities that are in the list but
   incomplete here: never read in full, photos out of date, or no recording.
-  That is how a library copied from Postgres in the middle of its backfill
-  is finished. At most 20 are asked for per hour in total, so neither a
+  At most 20 are asked for per hour in total, so neither a
   wrong list nor a large backlog can spend the request budget at once. The
   walk goes from the newest activity to the oldest, so what an account
   looks at most is completed first. Activities that started after the sweep
@@ -657,67 +514,7 @@ A daily job removes `providerEvents` receipts after 30 days. Jobs are kept:
 there is one per activity, and it holds the fingerprint the next sweep
 compares with.
 
-### Not built yet
-
-- **Rematching after a catalogue change.** A job matches the recording it
-  publishes. Nothing yet selects a new catalogue for an owner, or matches
-  the whole library again after one. Until that exists, a newly published
-  catalogue is copied here but existing matches keep the old one.
-- **Publishing a catalogue without Postgres.** Place IDs are assigned in the
-  Postgres workspace, which keeps them stable from one catalogue to the next.
-
-## Shadow writes
-
-While Postgres remains the writer, `src/server/convex-mirror/mirror.ts` copies
-an owner's changes into this package. Postgres records every visible
-activity, stream and match change in `sync_change`, so the mirror needs no
-hooks in ingestion code:
-
-- A run reads the activities with changes after its checkpoint, re-reads their
-  current Postgres state and writes it through the fenced batch functions in
-  `convex/importer.ts`. Writes are labelled with a run revision that only ever
-  increases, so out-of-order or repeated runs cannot regress Convex.
-- The stream trigger inserts `sync_change` rows without the per-athlete lock,
-  so a lower sequence can commit after a higher one was read. Each run also
-  replays the last 15 minutes of changes. Re-applying identical state only
-  advances the revision fence and publishes no change.
-- Stream refreshes replace a recording only with a strictly newer revision;
-  match results are published under the catalogue selected from the Postgres
-  matching version, which the mirror switches before publishing.
-- The checkpoint (`ownerHeads.mirror`) only moves forward, per chunk, so a run
-  that stops early (time budget, catalogue change) continues next time. The
-  importer is the same code in full mode.
-
-Photos are provider metadata, one document per photo (`convex/photos.ts`).
-The mirror sends the current photo set of every activity it copies. A photo
-change on its own copies the set of that photo's activity, or deletes the
-photo here when Postgres no longer has it. Photo changes appear in the change
-feed as `photo` entries; deleting an activity removes its photos without
-separate entries, as clients drop them with the activity. Each activity's
-photo set carries a source revision (`photoSets`, also for an empty set), so a
-stale writer can neither replace nor delete newer photos. Photo changes have
-their own position in the checkpoint (`mirror.photoSequence`), separate from
-the activity position. A library copied
-before photos were mirrored is caught up by a resumable pass over all
-activities, tracked in the checkpoint (`mirror.photos`, `null` when done).
-Deploy this package before the app version that mirrors photos or reads them
-live: an older deployment rejects the new write operations and has no
-`library.photos`.
-
-`POST /api/cron/mirror-convex-shadow` runs the mirror for the users listed in
-`ACTIVITYMAP_CONVEX_SHADOW_OWNERS` (a JSON array of application user IDs). It is
-off unless that list is set and `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`, and it
-requires `CRON_SECRET` plus the writer settings above in the app's
-environment. The Cloudflare cron worker calls it every ten minutes.
-
-Shadow owners are also mirrored right after a write: once a Strava webhook
-event has been processed and once an activity edit has been answered
-(`src/server/convex-mirror/shadow-run.ts`). These runs have a 20-second
-budget and can overlap the scheduled one; fenced writes make that safe, and
-the scheduled run remains the safety net for everything else (hourly
-ingestion, stream and match jobs, and any trigger that failed).
-
-### Place catalogue
+## Place catalogue
 
 A place catalogue is built from OpenStreetMap extracts
 (`pnpm places:prepare`, `places:combine`) and published here with
@@ -759,87 +556,13 @@ changes the matching recipe.
 The script reports progress after each minute of sending and can be stopped
 and run again. The eight-country catalogue has about 176,000 such rows.
 
-### Shadow matching
+## Retired data
 
-With a complete catalogue rowset, matching can run here without any client
-seeing the results (`convex/shadowMatching.ts`):
-
-```sh
-pnpm exec convex run shadowMatching:start '{"userId":"<userId>"}'
-pnpm exec convex run shadowMatching:status '{"userId":"<userId>"}'
-```
-
-A run walks the owner's library in activity-key order. Each step is a Node
-action (`convex/shadowMatchingWorker.ts`) that takes a small group of
-recordings (at most 12 activities, 25,000 GPS samples and 4 MiB of raw
-recording), reads their files, prepares the tracks with the application's own
-code, reads candidate places by tile and runs the matcher the Postgres worker
-uses. The worker refuses a rowset or recipe other than the one the owner's
-copied results were computed with. Results go to `shadowMatches`; a result
-whose recording changed meanwhile is dropped. A group that exceeds the tile,
-page or result budget is retried as its first activity alone, and an activity
-that still fails is listed on the run.
-
-When the walk ends, the run compares every activity's shadow result with the
-result the mirror copied from Postgres, ignoring `matchingVersion` and
-`resultRevision` (both are added by whoever serves a result), and keeps
-the counts (`same`, `different`, only one side, neither) and up to 20
-differing examples (status, place count and the names of the differing
-fields) under `comparison`. A run that stopped with an error continues with
-`shadowMatching:resume`; `shadowMatching:recompare` repeats the comparison of
-a finished run.
-
-### Production parity check
-
-`pnpm convex:verify-owner` compares a whole library but reads only the local
-database. In production, `POST /api/cron/convex-shadow-parity` checks the same
-shadow owners once an hour (Cloudflare cron `5 * * * *`), with the same switch
-as the shadow writes. For each owner it compares a bounded sample:
-
-- a window of the owner's activity IDs that rotates every hour, 200 at a time,
-  so a 4,600-activity library is covered in about a day, plus
-- up to 200 activities changed in the last 24 hours, including deletions.
-
-For the sample it builds what the v1 handlers serve from Postgres (bootstrap
-items with place matches, and stream summaries) and reads the same through
-the signed read bridge (`activityIds` and `summaries` in `convex/sync.ts`,
-mapped by the preview adapter). The comparison is shared with the local
-verifier (`src/server/convex-mirror/compare.ts`);
-`placeMatches.resultRevision` is an expected difference.
-
-Photos are compared as the whole photo set of each sampled activity (the
-`activityPhotos` read), so a photo Convex should have deleted is found as
-well as a missing or differing one. A set is skipped while one of its photos,
-on either side, has a `sync_change` above the mirror's photo position
-(`mirror.photoSequence`, or `mirror.sequence` before the first photo change)
-or less than 15 minutes old. During the one-time photo catch-up only
-activities up to `mirror.photos` are compared.
-
-The mirror's checkpoint (`importer:mirrorState`, the write bridge's `state`
-operation) decides what must already match. An activity is skipped as in
-flight when its latest `sync_change` is above `mirror.sequence` or less than
-15 minutes old (the mirror's replay window for late commits). The change log
-is read after both backends, so a change that reached either side is visible
-to the check. While a full copy is running (`mirror.full`), the report says
-`copy: "in-progress"`, the checkpoint is `full.through`, and only activities
-up to `full.after` are compared. Before the first copy nothing is compared.
-
-The result is logged per owner (`Convex shadow parity`, or
-`Convex shadow parity drift` at error level with counts and an example per
-differing field; route, coordinate and description values, photo captions,
-locations and image URLs are replaced by their length, also inside a parent
-object that is shown). Drift or a failed check answers 500. The response carries the
-counts and field names only.
-
-Besides the writer settings, the check needs the read bridge's
-`ACTIVITYMAP_CONVEX_KEY_ID` and `ACTIVITYMAP_CONVEX_SIGNING_KEY` in the app's
-environment and the matching key in `ACTIVITYMAP_BRIDGE_SIGNING_KEYS` on the
-Convex deployment. Postgres stream summaries are read through the same
-repository as the v1 route, which may store a summary recomputed for a newer
-summary algorithm, exactly as a client request would.
-
-Coordinated provider cutover, Convex authentication and reactive web
-subscriptions remain implementation-plan work.
+`shadowMatchRuns`, `shadowMatches` and `ownerHeads.mirror` hold what the
+move off Postgres left behind: the shadow matcher's comparison runs and the
+position of the copy from Postgres. Nothing writes them. Run
+`pnpm exec convex run maintenance:clearRetired` once; when it reports
+`done`, the two tables and the field can be removed from the schema.
 
 ## Recordings and publication
 
@@ -850,7 +573,7 @@ mutation boundaries also enforce their semantic refinements.
 
 The coordinator supplies monotonically increasing `sourceRevision` values.
 `streamSourceRevision` records the first revision of the current stream source,
-using the same `STREAM_SOURCE_FIELDS` as Postgres. It stays stable across names
+using `STREAM_SOURCE_FIELDS` (`src/server/strava/stream-policy.ts`). It stays stable across names
 and kudos, but advances on geometry, privacy or sensor changes and deletion.
 A recording fetched at revision N can publish when N lies between that stream
 revision and the current metadata revision. Reverting source values or deleting
@@ -901,11 +624,3 @@ The app on Vercel and this package deploy independently, a minute or so
 apart, in no fixed order. Keep changes to the bridges and the schema
 additive: add an operation or a field in one change, and remove what it
 replaces only after both sides run the new code.
-
-## Schema migration
-
-The head-table/index changes and required `activities.streamSourceRevision`
-target this undeployed foundation. Do not apply this schema over an existing
-backend dataset without migrating owner heads, initializing stream revisions
-conservatively to each row's current source revision, and rebuilding the changed
-index. The lab schema and retained data are separate and untouched.

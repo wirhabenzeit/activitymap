@@ -22,22 +22,21 @@ import { api, internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
 import { encodeWhole } from '../recording/codec';
 import { previewFixtureActivity } from './fixtures';
+import { seedModule, testWrites } from './seed-api';
 
 // Scheduled rebuild steps run only when a test drives them explicitly.
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
 after(() => mock.timers.reset());
 
 const modules = {
+  ...seedModule,
   './_generated/api.js': () => import('../convex/_generated/api.js'),
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './catalogue.ts': () => import('../convex/catalogue'),
-  './importer.ts': () => import('../convex/importer'),
   './library.ts': () => import('../convex/library'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
   './places.ts': () => import('../convex/places'),
-  './shadowMatching.ts': () => import('../convex/shadowMatching'),
-  './shadowMatchingWorker.ts': () => import('../convex/shadowMatchingWorker'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
   './stats.ts': () => import('../convex/stats'),
   './sync.ts': () => import('../convex/sync'),
@@ -115,7 +114,7 @@ async function setup(count: number, { large = false } = {}) {
   );
   const batch = large ? 16 : 64;
   for (let i = 0; i < items.length; i += batch)
-    await convex.mutation(internal.importer.applySources, {
+    await convex.mutation(testWrites.applySources, {
       scope,
       generation,
       sourceRevision: 10,
@@ -143,7 +142,7 @@ async function record(
     })),
   );
   for (let i = 0; i < items.length; i += 16)
-    await convex.action(internal.importer.prepareRecordings, {
+    await convex.action(testWrites.prepareRecordings, {
       scope,
       generation,
       sourceRevision: 10,
@@ -225,7 +224,7 @@ void test('write paths keep counts equal to a full recount, also during a rebuil
     return status.counts;
   };
   const apply = (id: string, index: number, extra: object, revision: number) =>
-    convex.mutation(internal.activityWrites.applySource, {
+    convex.mutation(testWrites.applySource, {
       scope,
       id,
       generation,
@@ -238,7 +237,7 @@ void test('write paths keep counts equal to a full recount, also during a rebuil
   await apply('1001', 1, { name: 'Renamed' }, 11);
   await apply('1002', 2, { geometry_state: 'detailed' }, 11);
   await apply('1003', 3, { distance: 1234 }, 11);
-  await convex.mutation(internal.importer.deleteSources, {
+  await convex.mutation(testWrites.deleteSources, {
     scope,
     generation,
     sourceRevision: 11,
@@ -261,7 +260,7 @@ void test('write paths keep counts equal to a full recount, also during a rebuil
   );
   await convex.mutation(internal.stats.rebuildStep, { owner });
   // Counted already (behind the cursor) and not yet counted (ahead of it).
-  await convex.mutation(internal.importer.deleteSources, {
+  await convex.mutation(testWrites.deleteSources, {
     scope,
     generation,
     sourceRevision: 12,
@@ -334,7 +333,7 @@ void test('changes resumes from a sequence with current cards and deletions', as
   const convex = await setup(3);
   const viewer = convex.withIdentity(identity);
   const apply = (id: string, index: number, extra: object, revision: number) =>
-    convex.mutation(internal.activityWrites.applySource, {
+    convex.mutation(testWrites.applySource, {
       scope,
       id,
       generation,
@@ -363,7 +362,7 @@ void test('changes resumes from a sequence with current cards and deletions', as
   // Two writes to one activity collapse into its current card.
   await apply('1001', 1, { name: 'First' }, 11);
   await apply('1001', 1, { name: 'Second' }, 12);
-  await convex.mutation(internal.importer.deleteSources, {
+  await convex.mutation(testWrites.deleteSources, {
     scope,
     generation,
     sourceRevision: 12,
@@ -440,7 +439,7 @@ void test('stored photos are counted, listed and announced in the feed', async (
     resource_state: 2,
   });
   const apply = (id: string, index: number, extra: object, revision: number) =>
-    convex.mutation(internal.activityWrites.applySource, {
+    convex.mutation(testWrites.applySource, {
       scope,
       id,
       generation,
@@ -451,7 +450,7 @@ void test('stored photos are counted, listed and announced in the feed', async (
     revision: number,
     items: { activityId: string; photos: ReturnType<typeof photo>[] }[],
   ) =>
-    convex.mutation(internal.importer.applyPhotoSets, {
+    convex.mutation(testWrites.applyPhotoSets, {
       scope,
       generation,
       sourceRevision: revision,
@@ -534,7 +533,7 @@ void test('stored photos are counted, listed and announced in the feed', async (
     activitiesWithPhotos: 2,
     activitiesWithStoredPhotos: 1,
   });
-  await convex.mutation(internal.importer.deletePhotos, {
+  await convex.mutation(testWrites.deletePhotos, {
     scope,
     generation,
     sourceRevision: 22,
@@ -546,7 +545,7 @@ void test('stored photos are counted, listed and announced in the feed', async (
     activitiesWithPhotos: 3,
     activitiesWithStoredPhotos: 1,
   });
-  await convex.mutation(internal.importer.deleteSources, {
+  await convex.mutation(testWrites.deleteSources, {
     scope,
     generation,
     sourceRevision: 23,
@@ -576,200 +575,60 @@ void test('stored photos are counted, listed and announced in the feed', async (
   assert.deepEqual(await paged(), before);
 });
 
-void test('the shadow matcher computes the results Postgres would and compares them', async () => {
-  const convex = await setup(4);
-  const synthetic = createSyntheticCatalogue();
-  const snapshotId = synthetic.manifest.catalogue_snapshot_id;
-  const revision = '7';
-  const version = versionFor({ snapshotId, revision });
-  const catalogueIdentity = createHash('sha256')
-    .update(JSON.stringify({ postgresMatchingVersion: version }))
-    .digest('hex');
-  await convex.mutation(internal.catalogue.select, {
-    scope,
-    catalogue: catalogueIdentity,
-    matchingVersion: version,
-  });
-
-  // The copied catalogue: one peak inside the synthetic coverage.
-  const peak: PlaceRow = {
-    id: '11111111-1111-4111-8111-111111111111',
-    displayName: 'Synthetic',
-    kinds: ['peak'],
-    subtypes: ['peak'],
-    location: { longitude: 8.123456789, latitude: 46.987654321 },
-    elevationM: 100,
-  };
-  const dataset = await datasetFor(snapshotId, revision);
-  const metadata = await convex.run((ctx) =>
-    ctx.storage.store(
-      new Blob([
-        JSON.stringify({
-          manifest: synthetic.manifest,
-          coverage: synthetic.coverage,
-        }),
-      ]),
-    ),
+void test('the data the move from Postgres left behind is removed', async () => {
+  const convex = await setup(1);
+  await record(convex, ['1000']);
+  const recording = await convex.run(
+    async (ctx) => (await ctx.db.query('recordings').first())!._id,
   );
-  await convex.mutation(internal.places.begin, {
-    dataset,
-    snapshotId,
-    revision,
-    count: 1,
-    metadata,
-  });
-  const imported = await convex.mutation(internal.places.importBatch, {
-    dataset,
-    after: '',
-    places: [peak],
-  });
-
-  // 1000 passes the peak, 1001 is elsewhere in coverage, 1002 has no GPS and
-  // 1003 has no recording.
-  const stream = (data: unknown[]) => ({
-    data,
-    original_size: data.length,
-    resolution: 'high',
-    series_type: 'time',
-  });
-  const track = (latitude: number, longitude: number) =>
-    ({
-      latlng: stream(
-        [-0.0001, 0, 0.0001].map((dx) => [latitude, longitude + dx]),
-      ),
-      time: stream([0, 10, 20]),
-      distance: stream([0, 10, 20]),
-      altitude: stream([100, 100, 100]),
-    }) as RawActivityStreams;
-  const recorded: Record<string, RawActivityStreams> = {
-    '1000': track(peak.location.latitude, peak.location.longitude),
-    '1001': track(46.5, 8.5),
-    '1002': streams,
-  };
-  for (const [id, payload] of Object.entries(recorded))
-    await record(convex, [id], payload);
-
-  // What Postgres would have stored: the same matcher over the catalogue.
-  const reference = createBatchActivityPlaceMatcher({
-    snapshot: {
-      catalogue: synthetic,
-      places: [peak as CandidatePlace],
-      revision,
-    },
-    policy: SERVER_MATCHER_POLICY,
-  });
-  const expected = [];
-  for (const [id, payload] of Object.entries(recorded))
-    expected.push(
-      activityPlacesResponseSchema.parse(
-        await reference.match({
-          userId: scope.userId,
-          activityId: id,
-          input: {
-            payload: payload.latlng ? payload : { ...payload, latlng: null },
-            generation: 'pg-generation',
-            revision: '1',
-          },
-        } as Parameters<typeof reference.match>[0]),
-      ),
-    );
-  assert.deepEqual(
-    expected.map((result) => [result.status, result.places.length]),
-    [
-      ['complete', 1],
-      ['complete', 0],
-      // An absent GPS channel reaches the matcher as null, as in Postgres.
-      ['partial', 0],
-    ],
-  );
-  // 1001's copied result is tampered with, to prove a difference is found.
-  const copied = expected.map((result) =>
-    result.activityId === '1001'
-      ? { ...result, status: 'partial' as const }
-      : result,
-  );
-  assert.equal(
-    await convex.mutation(internal.importer.publishMatches, {
-      scope,
-      generation,
-      sourceRevision: 10,
-      catalogue: catalogueIdentity,
-      // As the mirror copies them: Postgres serves each result with the
-      // matching version and its own result revision added.
-      items: copied.map((result) => ({
-        ...result,
-        matchingVersion: version,
-        resultRevision: '41',
-      })),
-    }),
-    3,
-  );
-
-  // An incomplete rowset cannot be matched against.
-  await assert.rejects(
-    convex.mutation(internal.shadowMatching.start, { userId: scope.userId }),
-    /No complete place catalogue/,
-  );
-  await convex.mutation(internal.places.complete, {
-    dataset,
-    digest: imported.digest,
-  });
-  const run = await convex.mutation(internal.shadowMatching.start, {
-    userId: scope.userId,
-  });
-  const status = async () =>
-    (
-      await convex.query(internal.shadowMatching.status, {
+  await convex.run(async (ctx) => {
+    const owner = (await ctx.db.query('owners').first())!._id;
+    const head = (await ctx.db.query('ownerHeads').first())!;
+    await ctx.db.patch('ownerHeads', head._id, {
+      mirror: { sequence: 5, revision: 10 },
+    });
+    await ctx.db.insert('shadowMatchRuns', {
+      owner,
+      dataset: 'old',
+      after: '',
+      done: true,
+      matched: 0,
+      skipped: 0,
+      stale: 0,
+      failed: [],
+    });
+    const result = await ctx.db.query('activities').first();
+    await ctx.db.insert('shadowMatches', {
+      owner,
+      activity: result!.key,
+      recording,
+      dataset: 'old',
+      result: {
+        activityId: '1000',
         userId: scope.userId,
-      })
-    )[0]!;
-  for (let step = 0; step < 10 && !(await status()).done; step++)
-    await convex.action(internal.shadowMatchingWorker.run, { run });
-  const finished = await status();
-  assert.equal(finished.error, undefined);
-  assert.equal(finished.done, true);
-  assert.equal(finished.matched, 3);
-  assert.equal(finished.skipped, 1);
-  assert.deepEqual(finished.failed, []);
-
-  for (let step = 0; step < 10 && !(await status()).comparison?.done; step++)
-    await convex.mutation(internal.shadowMatching.compareStep, { run });
-  const { comparison } = await status();
-  assert(comparison?.done);
-  assert.equal(comparison.same, 2);
-  assert.equal(comparison.different, 1);
-  assert.equal(comparison.neither, 1);
-  assert.equal(comparison.examples.length, 1);
-  assert.equal(
-    comparison.examples[0]!.postgres,
-    'partial, 0 places; differs in status',
-  );
-  assert.equal(
-    comparison.examples[0]!.shadow,
-    'complete, 0 places; differs in status',
-  );
-
-  // A finished run can be compared again from the start.
-  await convex.mutation(internal.shadowMatching.recompare, { run });
-  assert.equal((await status()).comparison, undefined);
-  for (let step = 0; step < 10 && !(await status()).comparison?.done; step++)
-    await convex.mutation(internal.shadowMatching.compareStep, { run });
-  assert.equal((await status()).comparison?.same, 2);
-
-  // Shadow results never reach clients: 1001 still serves the copied one.
-  const viewer = convex.withIdentity(identity);
-  const served = await viewer.query(api.library.activity, { id: '1001' });
-  assert.equal(served?.placeMatches?.status, 'partial');
-
-  // A run against a rowset the owner's results were not computed with stops.
-  await convex.mutation(internal.catalogue.select, {
-    scope,
-    catalogue: 'a'.repeat(64),
-    matchingVersion: 'b'.repeat(64),
+        status: 'complete',
+        streamGeneration: 'pg-generation',
+        streamRevision: '1',
+        catalogueSnapshotId: catalogue,
+        matcherVersion: 'test',
+        places: [],
+      },
+    });
   });
-  const mismatched = await convex.mutation(internal.shadowMatching.start, {
-    userId: scope.userId,
+  assert.deepEqual(
+    await convex.mutation(internal.maintenance.clearRetired, {}),
+    { removed: 3, done: false },
+  );
+  assert.deepEqual(
+    await convex.mutation(internal.maintenance.clearRetired, {}),
+    { removed: 0, done: true },
+  );
+  await convex.run(async (ctx) => {
+    assert.equal((await ctx.db.query('shadowMatches').collect()).length, 0);
+    assert.equal((await ctx.db.query('shadowMatchRuns').collect()).length, 0);
+    const head = (await ctx.db.query('ownerHeads').first())!;
+    assert.equal(head.mirror, undefined);
+    // The library itself is untouched.
+    assert.equal((await ctx.db.query('activities').collect()).length, 1);
   });
-  await convex.action(internal.shadowMatchingWorker.run, { run: mismatched });
-  assert.match((await status()).error ?? '', /differs from the owner/);
 });

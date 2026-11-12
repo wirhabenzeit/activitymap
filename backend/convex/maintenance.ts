@@ -80,3 +80,34 @@ export const expireProviderEvents = internalMutation({
     return rows.length;
   },
 });
+
+/**
+ * Empty what the move from Postgres left behind: the shadow matcher's runs
+ * and results, and the mirror position on owner heads. Nothing writes them
+ * any more; once this reports `done`, the tables and the field can leave the
+ * schema. Run with `convex run maintenance:clearRetired`; it continues by
+ * itself until everything is gone.
+ */
+export const clearRetired = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<{ removed: number; done: boolean }> => {
+    let removed = 0;
+    for (const doc of await ctx.db.query('shadowMatches').take(PAGE_SIZE)) {
+      await ctx.db.delete('shadowMatches', doc._id);
+      removed++;
+    }
+    for (const doc of await ctx.db.query('shadowMatchRuns').take(PAGE_SIZE)) {
+      await ctx.db.delete('shadowMatchRuns', doc._id);
+      removed++;
+    }
+    for (const head of await ctx.db.query('ownerHeads').collect())
+      if (head.mirror !== undefined) {
+        await ctx.db.patch('ownerHeads', head._id, { mirror: undefined });
+        removed++;
+      }
+    const done = removed === 0;
+    if (!done)
+      await ctx.scheduler.runAfter(0, internal.maintenance.clearRetired, {});
+    return { removed, done };
+  },
+});

@@ -193,3 +193,15 @@ export const tilePage = internalQuery({
     };
   },
 });
+
+/** Upload URLs for a catalogue's stored files (its manifest and coverage). */
+export const uploadUrls = internalMutation({
+  args: { count: v.number() },
+  handler: async (ctx, { count }) => {
+    if (!Number.isSafeInteger(count) || count < 1 || count > 64)
+      throw new Error('Upload URL batches hold 1-64 items');
+    return Promise.all(
+      Array.from({ length: count }, () => ctx.storage.generateUploadUrl()),
+    );
+  },
+});

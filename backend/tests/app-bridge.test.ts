@@ -12,22 +12,23 @@ import { internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
 import { encodeWhole } from '../recording/codec';
 import { previewFixtureActivity } from './fixtures';
+import { seedModule, testWrites } from './seed-api';
 
 /**
  * End to end through the real v1 route handlers, the preview adapter's app
  * transport, the signed HTTP bridge and backend/convex, with data written by
- * the importer's batch functions.
+ * the test-only seed functions (`./seed.ts`).
  */
 
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
 after(() => mock.timers.reset());
 
 const modules = {
+  ...seedModule,
   './_generated/api.js': () => import('../convex/_generated/api.js'),
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './catalogue.ts': () => import('../convex/catalogue'),
   './http.ts': () => import('../convex/http'),
-  './importer.ts': () => import('../convex/importer'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
@@ -84,7 +85,7 @@ async function seed() {
     matchingVersion,
   });
   const common = { scope, generation, sourceRevision: 10 };
-  const applied = await convex.mutation(internal.importer.applySources, {
+  const applied = await convex.mutation(testWrites.applySources, {
     ...common,
     items: ids.map((id, index) =>
       previewFixtureActivity(id, scope.athleteId, `Ride ${index}`, Date.now()),
@@ -102,7 +103,7 @@ async function seed() {
     ctx.storage.store(new Blob([new Uint8Array(file)])),
   );
   assert.equal(
-    await convex.action(internal.importer.prepareRecordings, {
+    await convex.action(testWrites.prepareRecordings, {
       ...common,
       items: [
         {
@@ -118,7 +119,7 @@ async function seed() {
     1,
   );
   assert.equal(
-    await convex.mutation(internal.importer.publishMatches, {
+    await convex.mutation(testWrites.publishMatches, {
       ...common,
       catalogue,
       items: [
@@ -233,7 +234,7 @@ void test('v1 sync, summaries, streams, lists and status are served by backend/'
   assert.equal(rest.nextCursor, null);
 
   // A metadata-only change arrives through the change feed.
-  await convex.mutation(internal.activityWrites.applySource, {
+  await convex.mutation(testWrites.applySource, {
     scope,
     id: ids[0]!,
     generation,
@@ -354,7 +355,7 @@ void test('re-imports replace a refreshed recording with a newer revision only',
     Date.now(),
   );
   const reimport = (revision: string) =>
-    convex.mutation(internal.importer.applySources, {
+    convex.mutation(testWrites.applySources, {
       ...common,
       sourceRevision: common.sourceRevision + Number(revision),
       items: [fixture],
@@ -362,7 +363,7 @@ void test('re-imports replace a refreshed recording with a newer revision only',
     });
   // Unchanged identity: nothing to upload or rematch.
   assert.deepEqual(
-    await convex.mutation(internal.importer.applySources, {
+    await convex.mutation(testWrites.applySources, {
       ...common,
       items: [fixture],
       recordings: [{ id: ids[0]!, generation: 'pg-generation', revision: '7' }],
@@ -385,7 +386,7 @@ void test('re-imports replace a refreshed recording with a newer revision only',
     };
   };
   const prepare = async (revision: string) =>
-    convex.action(internal.importer.prepareRecordings, {
+    convex.action(testWrites.prepareRecordings, {
       ...common,
       sourceRevision: common.sourceRevision + 8,
       items: [
