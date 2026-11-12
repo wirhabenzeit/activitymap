@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 
 import { test } from 'node:test';
 
+import type { Account, User } from '~/server/records';
 import type { InitialAuth } from '~/store/auth';
 
-import { toCurrentUserDTO } from './dto';
-import type { Account, User } from './schema';
+import { toCurrentUserDTO } from './current-user';
 
 const SENSITIVE = 'super-secret-strava-credential';
 

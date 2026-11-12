@@ -4,8 +4,8 @@ import {
   type ResolvedAccountTokens,
   accountTokenColumnsNeedNormalization,
   resolveAccountTokens,
-} from '~/server/db/account-token-normalization';
-import type { Account } from '~/server/db/schema';
+} from '~/server/auth/account-tokens';
+import type { Account } from '~/server/records';
 import type {
   AccountIdentity,
   AccountsRepository,

@@ -1,19 +1,20 @@
+import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import {
+  STREAM_SUMMARY_PREFETCH_BATCH,
+  type StreamSummaryResult,
+  StreamSummarySupersededError,
   captureStreamSummaryFence,
   fetchActivityStreamSummary,
   fetchStoredStreamSummaryBatch,
   isStreamSummaryFenceCurrent,
   rememberInitialMetadata,
-  STREAM_SUMMARY_PREFETCH_BATCH,
-  StreamSummarySupersededError,
-  type StreamSummaryResult,
 } from '~/lib/activity-stream-summary';
-import type { StreamMetadata } from '~/contracts/v1/activity-streams';
 import { hasCompactElevationProfile } from '~/lib/streams/compact-summary';
 import {
-  canReuseCachedStreamSummary,
   type CachedStreamSummary,
+  canReuseCachedStreamSummary,
 } from '~/lib/streams/summary-cache-record';
+
 import * as defaultStore from './v1-store';
 
 const missingSummaries = new Map<
@@ -26,7 +27,6 @@ const metadataKey = (metadata: StreamMetadata | undefined) =>
 
 export function clearStreamSummarySyncAttempts(userId: string) {
   for (const key of missingSummaries.keys()) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
     if (key.startsWith(`${userId}\u0000`)) missingSummaries.delete(key);
   }
 }
@@ -154,7 +154,6 @@ export async function loadStoredStreamSummaryBatch(
     await store.putCachedStreamSummaries(scope, records, isCurrent);
   }
   for (const id of results.keys()) {
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
     if (!isCurrent(id)) results.delete(id);
   }
   return results;
@@ -185,7 +184,6 @@ export async function syncStoredStreamSummaries(options: {
   );
   for (const key of missingSummaries.keys()) {
     if (key.startsWith(`${options.userId}\u0000`) && !present.has(key)) {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
       missingSummaries.delete(key);
     }
   }
@@ -228,7 +226,6 @@ export async function syncStoredStreamSummaries(options: {
     for (const id of batch) {
       const key = `${options.userId}\u0000${id}`;
       if (results.get(id)?.summary) {
-        // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
         missingSummaries.delete(key);
       } else {
         missingSummaries.set(key, {

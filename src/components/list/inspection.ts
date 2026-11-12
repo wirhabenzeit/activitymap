@@ -17,7 +17,6 @@ export function activityURL(url: string, id: number) {
   const next = new URL(url);
   if (id) next.searchParams.set('activity', String(id));
   // URLSearchParams is unrelated to a database delete.
-  // eslint-disable-next-line drizzle/enforce-delete-with-where
   else next.searchParams.delete('activity');
   return `${next.pathname}${next.search}${next.hash}`;
 }

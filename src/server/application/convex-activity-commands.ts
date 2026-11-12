@@ -4,8 +4,8 @@ import { type ActivityDTO, toActivityDTO } from '~/contracts/v1/activity';
 import { type PhotoDTO, toPhotoDTO } from '~/contracts/v1/photo';
 import type { Actor } from '~/server/auth/actor';
 import { getAccountInternal } from '~/server/auth/users';
-import type { Activity } from '~/server/db/schema';
 import { logger } from '~/server/logging/logger';
+import type { Activity } from '~/server/records';
 import {
   StravaClient,
   isStravaActivityNotFoundError,

@@ -10,7 +10,7 @@ import { useListInspection } from '~/hooks/use-list-inspection';
 import { useShowOnMap } from '~/hooks/use-show-on-map';
 import type { Activity } from '~/lib/activity';
 import { groupBy } from '~/lib/utils';
-import type { Photo } from '~/server/db/schema';
+import type { Photo } from '~/server/records';
 import { useShallowStore } from '~/store';
 
 export function ActivityListView({

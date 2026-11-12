@@ -9,8 +9,6 @@ export const env = createEnv({
   server: {
     ACTIVITYMAP_EXTERNAL_EFFECTS: z.literal('enabled').optional(),
     CRON_SECRET: z.string().optional(),
-    NEON_DATABASE_URL: z.string().url().optional(),
-    DATABASE_URL: z.string().url().optional(),
     AUTH_SECRET: z.string(),
     BETTER_AUTH_SECRET: z.string().optional(),
     AUTH_STRAVA_ID: z.string().optional(),
@@ -51,8 +49,6 @@ export const env = createEnv({
     CRON_SECRET: process.env.CRON_SECRET,
     STRAVA_WEBHOOK_VERIFY_TOKEN: process.env.STRAVA_WEBHOOK_VERIFY_TOKEN,
     STRAVA_WEBHOOK_CALLBACK_SECRET: process.env.STRAVA_WEBHOOK_CALLBACK_SECRET,
-    NEON_DATABASE_URL: process.env.NEON_DATABASE_URL,
-    DATABASE_URL: process.env.DATABASE_URL,
     NODE_ENV: process.env.NODE_ENV,
     VERCEL: process.env.VERCEL,
     VERCEL_ENV: process.env.VERCEL_ENV,

@@ -1,7 +1,7 @@
 import { type StateCreator } from 'zustand';
 
 import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
-import type { CurrentUserDTO } from '~/server/db/dto';
+import type { CurrentUserDTO } from '~/server/auth/current-user';
 
 import { resetActivityPlaceFocus } from './activity-place-focus';
 import { resetBrowsingContext } from './browsing';

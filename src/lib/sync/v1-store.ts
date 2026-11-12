@@ -1,4 +1,3 @@
-/* eslint-disable drizzle/enforce-delete-with-where -- This module uses IndexedDB, never Drizzle. */
 'use client';
 
 /**

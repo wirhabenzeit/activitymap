@@ -38,9 +38,7 @@ export async function compressSyncResponse(
   let body = response.body;
   if (quality > 0 && quality <= 1) {
     headers.set('content-encoding', 'gzip');
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Web Headers API.
     headers.delete('content-length');
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- Web Headers API.
     headers.delete('etag');
     body = body.pipeThrough(new CompressionStream('gzip'));
   }

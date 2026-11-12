@@ -1,5 +1,5 @@
 import type { SportType } from '~/contracts/sport';
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/server/records';
 
 export { sportTypes, type SportType } from '~/contracts/sport';
 

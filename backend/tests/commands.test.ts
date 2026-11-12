@@ -23,7 +23,7 @@ import {
   revokeShareLinkForActor,
 } from '../../src/server/application/share-links';
 import type { Actor } from '../../src/server/auth/actor';
-import type { Activity, Photo } from '../../src/server/db/schema';
+import type { Activity, Photo } from '../../src/server/records';
 import { StravaApiError } from '../../src/server/strava/client';
 import {
   transformStravaActivity,

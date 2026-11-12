@@ -144,7 +144,6 @@ export class LibraryOwner {
     this.listeners.add(listener);
     const release = this.retain();
     return () => {
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Set
       this.listeners.delete(listener);
       release();
     };
@@ -265,7 +264,6 @@ export function getLibraryOwner(client: QueryClient, scope: string) {
 export function disposeLibraryScope(client: QueryClient, scope: string) {
   const scoped = owners.get(client);
   scoped?.get(scope)?.dispose();
-  // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
   scoped?.delete(scope);
   client.removeQueries({ queryKey: libraryQueryKeys.root(scope) });
 }

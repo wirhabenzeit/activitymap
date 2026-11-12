@@ -153,9 +153,6 @@ URLProtocol, alongside the existing sync/auth compatibility tests.
   Independent raw loading/persistence remains #216. The web elevation chart
   consumes server-generated summaries; native chart presentation remains #217.
 
-Follow [the migration deployment sequence](database-migrations.md) before
-enabling a production consumer.
-
 ## Verification
 
 `pnpm test` covers runtime validation, large string IDs, one multi-key request,

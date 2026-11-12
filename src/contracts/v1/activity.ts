@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { activityPlacesResponseSchema } from '~/contracts/activity-places';
 import { sportTypes } from '~/contracts/sport';
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/server/records';
 
 import { type StreamMetadata, streamMetadataSchema } from './activity-streams';
 import { idString, isoDateTime, toIdString, toIsoDateTime } from './primitives';

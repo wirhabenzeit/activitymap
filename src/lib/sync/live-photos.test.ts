@@ -23,7 +23,6 @@ function harness(held: PhotoDTO[], pages: PhotoDTO[][]) {
     },
     deletePhotoDTOsByIds: async (_scope: string, ids: string[]) => {
       if (ids.length) log.push(`delete ${ids.join(',')}`);
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
       for (const id of ids) rows.delete(id);
     },
   };

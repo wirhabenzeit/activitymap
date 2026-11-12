@@ -1,7 +1,7 @@
 import 'server-only';
 
 import { createAccountCredentialsService } from '~/server/application/account-credentials';
-import type { User } from '~/server/db/schema';
+import type { User } from '~/server/records';
 import type { AccountIdentity } from '~/server/repositories/accounts';
 import { StravaClient } from '~/server/strava/client';
 

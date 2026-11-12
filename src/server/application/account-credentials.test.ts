@@ -5,8 +5,8 @@ import test from 'node:test';
 import {
   buildAccountTokenColumnUpdate,
   resolveAccountTokens,
-} from '~/server/db/account-token-normalization';
-import type { Account } from '~/server/db/schema';
+} from '~/server/auth/account-tokens';
+import type { Account } from '~/server/records';
 import type { AccountsRepository } from '~/server/repositories/accounts';
 import { StravaApiError, type StravaTokens } from '~/server/strava/client';
 import { StravaBudgetExceededError } from '~/server/strava/request-budget';

@@ -14,7 +14,6 @@ export function setLiveDetailLoader(
   loader: DetailLoader | null,
 ) {
   if (loader) loaders.set(scope, loader);
-  // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
   else loaders.delete(scope);
 }
 

@@ -1,9 +1,0 @@
-CREATE TABLE "jwks" (
-	"id" text PRIMARY KEY NOT NULL,
-	"publicKey" text NOT NULL,
-	"privateKey" text NOT NULL,
-	"createdAt" timestamp NOT NULL,
-	"expiresAt" timestamp,
-	"alg" text,
-	"crv" text
-);

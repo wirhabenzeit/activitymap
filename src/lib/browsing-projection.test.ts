@@ -4,7 +4,7 @@ import test from 'node:test';
 import { immer } from 'zustand/middleware/immer';
 import { createStore } from 'zustand/vanilla';
 
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/server/records';
 import type { RootState } from '~/store';
 import { createFilterSlice } from '~/store/filter';
 

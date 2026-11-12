@@ -1,11 +1,10 @@
 import 'server-only';
 
+import { resolveAccountTokens } from '~/server/auth/account-tokens';
 import type { Actor } from '~/server/auth/actor';
 import { findStravaAccountInternal } from '~/server/auth/users';
-import { resolveAccountTokens } from '~/server/db/account-token-normalization';
-import type { activityStreams } from '~/server/db/schema';
+import type { StoredStreams } from '~/server/records';
 
-type StoredStreams = typeof activityStreams.$inferSelect;
 export type StreamSnapshot = Omit<StoredStreams, 'activityId' | 'revision'> & {
   activityId: string;
   revision: string;

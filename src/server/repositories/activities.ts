@@ -1,4 +1,4 @@
-import type { Activity } from '~/server/db/schema';
+import type { Activity } from '~/server/records';
 
 /** Reads of an account's activities, as the sync routes need them. */
 export interface ActivitiesRepository {

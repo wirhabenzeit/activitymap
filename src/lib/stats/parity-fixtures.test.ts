@@ -1,22 +1,25 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+
 import test from 'node:test';
 import { type z } from 'zod';
-import { statsParitySchema } from '../../../scripts/lib/stats-parity-schema';
+
+import { type Activity } from '~/server/records';
 import { aliasMap } from '~/settings/category';
-import { type Activity } from '~/server/db/schema';
 import {
-  initializeSportType,
-  initializeSportGroup,
-  initializeValues,
-  initializeBinary,
   type FilterState,
+  initializeBinary,
+  initializeSportGroup,
+  initializeSportType,
+  initializeValues,
 } from '~/store/filter';
+
+import { statsParitySchema } from '../../../scripts/lib/stats-parity-schema';
+import { filterStatsActivities } from './filter-scope';
+import { calendarDays, periodComparisons, volumeHistory } from './history';
+import { monthActivityRhythm, yearMonthlyRhythm } from './period-rhythm';
 import * as data from './tile-data';
 import * as series from './tile-series';
-import { calendarDays, volumeHistory, periodComparisons } from './history';
-import { monthActivityRhythm, yearMonthlyRhythm } from './period-rhythm';
-import { filterStatsActivities } from './filter-scope';
 
 const corpus = statsParitySchema.parse(
   JSON.parse(readFileSync('shared/stats-parity-fixtures.v1.json', 'utf8')),

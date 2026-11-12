@@ -72,7 +72,6 @@ export function registerLibrarySync(
     stop(registration);
     if (registry.scopes.get(scope) === registration) {
       // An old effect cleanup must never remove the next session's registration.
-      // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory registry
       registry.scopes.delete(scope);
       registry.cleanup = Promise.allSettled([
         registry.cleanup,
@@ -156,7 +155,6 @@ export function retireLibrarySync(
   const previous = registry.scopes.get(scope);
   if (previous) {
     stop(previous);
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory registry
     registry.scopes.delete(scope);
   }
   const task = Promise.allSettled([registry.cleanup, previous?.running]).then(

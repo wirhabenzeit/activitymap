@@ -7,8 +7,8 @@ import { parseMutationActivityId } from '~/server/api/activity-id';
 import { withApiV1RateLimit } from '~/server/api/rate-limit-boundary';
 import { ActivityMutationError } from '~/server/application/activities';
 import type { Actor } from '~/server/auth/actor';
-import type { Activity } from '~/server/db/schema';
 import { userKeyFor } from '~/server/http/rate-limit';
+import type { Activity } from '~/server/records';
 
 import {
   createFetchActivitySummariesHandler,
