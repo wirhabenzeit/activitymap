@@ -8,7 +8,7 @@ import syncFixtures from '../../shared/sync-integrity-fixtures.v1.json';
 import { createSyncChangesHandler } from '../../src/app/api/v1/sync/changes/handler';
 import { responseEnvelope } from '../../src/contracts/v1/envelope';
 import { syncChangesPageDTOSchema } from '../../src/contracts/v1/sync';
-import { convexAppAdapter } from '../../src/server/preview/convex';
+import { convexAppAdapter } from '../../src/server/library/convex';
 import { convexSyncBridge } from '../../src/server/sync/convex-bridge';
 import { encodeSyncCursor } from '../../src/server/sync/cursor';
 import { SyncRebootstrapRequiredError } from '../../src/server/sync/errors';

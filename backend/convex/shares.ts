@@ -15,8 +15,7 @@ import { idKey, requireWritableOwner } from './owners';
  * creates the token and keeps the plaintext out of every store; this file
  * sees only its SHA-256.
  *
- * What a recipient gets is assembled here by the same allow-list the
- * Postgres path uses (`src/contracts/share/activity.ts`): route, name,
+ * What a recipient gets is assembled here by the shared allow-list (`src/contracts/share/activity.ts`): route, name,
  * sport, date and the basic summary, never health, power or social fields.
  */
 

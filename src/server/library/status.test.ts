@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import { COUNT_FIELDS } from '../../../backend/convex/statsShape';
-import { previewIngestionStatus } from './status';
+import { convexIngestionStatus } from './status';
 
 const counts = (values: Record<string, number> = {}) => ({
   ...Object.fromEntries(COUNT_FIELDS.map((field) => [field, 0])),
@@ -22,8 +22,8 @@ const page = (overrides: object = {}) =>
     ...overrides,
   }) as never;
 
-void test('a copy that Postgres writes has no jobs of its own', async () => {
-  const status = await previewIngestionStatus(async () => page(), observedAt);
+void test('an inactive owner has no scheduled jobs', async () => {
+  const status = await convexIngestionStatus(async () => page(), observedAt);
   assert.deepEqual(
     [
       status.history.scheduling,
@@ -45,7 +45,7 @@ void test('a copy that Postgres writes has no jobs of its own', async () => {
 void test('for an account Convex writes, the status shows its jobs and its sweep', async () => {
   const completedAt = Date.parse('2026-11-11T10:00:00Z');
   const dueAt = Date.parse('2026-11-17T10:00:00Z');
-  const idle = await previewIngestionStatus(
+  const idle = await convexIngestionStatus(
     async () =>
       page({
         active: true,
@@ -82,7 +82,7 @@ void test('for an account Convex writes, the status shows its jobs and its sweep
     ],
   );
 
-  const scanning = await previewIngestionStatus(
+  const scanning = await convexIngestionStatus(
     async () =>
       page({
         active: true,
@@ -116,7 +116,7 @@ void test('for an account Convex writes, the status shows its jobs and its sweep
   );
 
   // Nothing outstanding is idle, whoever writes.
-  const done = await previewIngestionStatus(
+  const done = await convexIngestionStatus(
     async () =>
       page({
         active: true,

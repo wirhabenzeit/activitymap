@@ -66,15 +66,11 @@ Encoders reject extra precision rather than quietly introducing quantization.
 
 ## Storage and APIs
 
-`activity_streams.summary` remains JSONB and accepts either legacy arrays or the
-tagged compact envelope. New ingestion and lazy regeneration write legacy JSON
-by default. Set `ACTIVITYMAP_STREAM_SUMMARY_STORAGE_FORMAT=polyline-v1` to opt
-into compact writes after old servers have drained. An unset value or `json`
-keeps legacy writes for the reader-only rollout or rollback; both formats remain readable.
-There is no DDL migration and no second copy of every summary. Raw JSONB is
-untouched. Legacy summaries can be converted directly without loading raw data
-or making Strava requests. Lazy generation for a previously missing/outdated
-summary retains its existing behavior of reading stored raw data.
+Convex stores each recording's summary alongside its metadata. Publication uses
+`backend/recording/summary.ts` to encode the compact envelope; when valid summary
+values cannot be represented by the compact codec, it preserves the legacy array
+format. Readers accept both. Raw recordings stay in Convex file storage and are
+unchanged by summary encoding. There is no application-side storage-format flag.
 
 Existing `/activities/{id}/streams/summary` and `/stream-summaries?ids=…`
 endpoints retain their exact JSON-array contract. New opt-in endpoints:

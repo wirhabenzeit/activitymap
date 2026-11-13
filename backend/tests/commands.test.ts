@@ -482,7 +482,7 @@ void test('the app erases an account in Convex through the bridge', async (t) =>
   });
   assert.equal((await state()).activities.length, 0);
   assert.equal(await bridge.write({ kind: 'state' }), null);
-  // Asked again, for example after the Postgres side failed: nothing to do.
+  // Asked again, for example after sign-in record deletion failed: nothing to do.
   assert.equal(await bridge.write({ kind: 'eraseOwner' }), false);
 });
 
@@ -490,7 +490,7 @@ void test('share links of an account Convex writes for are made, shown and revok
   const { convex, seed } = await setup(t, 'convex');
   const fetcher: typeof fetch = (url, init) =>
     convex.fetch(new URL(String(url)).pathname, init);
-  const writer: Actor = { ...actor, convexWrites: true };
+  const writer: Actor = actor;
   await seed(
     manual(7, 'Shared ride', {
       description: 'must never be shared',
@@ -502,7 +502,7 @@ void test('share links of an account Convex writes for are made, shown and revok
   // Convex checks expiry against its own clock.
   let clock = Date.now();
   let accountRevoked = false;
-  // Postgres holds no link and no activity of this account.
+  // The app holds no plaintext link token or duplicate activity for this account.
   const deps: ShareLinksServiceDeps = {
     isAthleteRevoked: async () => accountRevoked,
     now: () => new Date(clock),
@@ -559,7 +559,7 @@ void test('share links of an account Convex writes for are made, shown and revok
     ShareLinkUnavailableError,
   );
 
-  // A revoked provider connection closes the link, as for Postgres links.
+  // A revoked provider connection closes the link, as required by the share contract.
   accountRevoked = true;
   await assert.rejects(
     getShareView(link.token, deps),

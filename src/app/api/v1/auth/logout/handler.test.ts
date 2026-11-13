@@ -8,15 +8,8 @@ import { createLogoutHandler } from './handler.ts';
 
 const now = new Date('2026-09-20T12:00:00.000Z');
 
-/**
- * A minimal in-memory session store standing in for Better Auth's real
- * one (`session` table + `auth.api.getSession`/`revokeSession`), just
- * enough to exercise the contract this handler depends on: revoking a
- * session token makes it stop resolving. This sandbox has no live
- * Postgres to run the real Better Auth + Drizzle adapter against, so this
- * is a fake, not an integration test against Better Auth itself - Better
- * Auth's own revoke-then-fail-to-resolve behavior is its own tested
- * behavior, not something this PR re-implements.
+/** Minimal session-store double for the logout contract: revoking a token
+ * makes it stop resolving. Backend tests cover the real Convex sign-in store.
  */
 function createFakeSessionStore() {
   const activeTokens = new Map<string, { userId: string }>();

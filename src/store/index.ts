@@ -235,8 +235,7 @@ export const store = create<RootState>()(
             binary: sanitizePersistedBinary(persisted.binary),
             place:
               !currentState.isInitialized ||
-              ((currentState.user?.stravaConnected ||
-                currentState.user?.storedLibraryPreview) &&
+              (currentState.user?.stravaConnected &&
                 place?.userId === currentState.user?.id)
                 ? place
                 : undefined,

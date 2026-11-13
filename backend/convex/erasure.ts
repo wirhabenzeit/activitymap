@@ -9,9 +9,8 @@ import { ownerFor } from './owners';
 /**
  * Erasing an account's library here. The app decides that an account is to
  * be erased (the owner deleted it, or its provider access was revoked and
- * the retention period is over) and calls `start` in the same transaction
- * that deletes the account in Postgres; if this call fails, that
- * transaction is rolled back and tried again later.
+ * the retention period is over). It completes library erasure before deleting
+ * the sign-in records, so a failed erasure leaves the identity needed to retry.
  *
  * `start` revokes the owner, which fences everything at once: no read,
  * write, job or sweep works for a revoked owner, and nothing can recreate

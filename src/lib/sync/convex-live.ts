@@ -7,8 +7,8 @@ import type { ActivityDTO } from '~/contracts/v1/activity';
 import type { PhotoDTO } from '~/contracts/v1/photo';
 
 /**
- * Live library reads from the Convex application backend for `live` preview
- * owners (docs/convex-reactive-reads.md).
+ * Live library reads for authenticated application accounts
+ * (backend/README.md, "Live library queries").
  *
  * The browser library store is the cache. It remembers the change-feed
  * position its cards were brought up to (`LiveCursor`). A load resumes from

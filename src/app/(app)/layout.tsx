@@ -18,8 +18,7 @@ import { auth } from '~/lib/auth';
 import { QueryProvider } from '~/providers/query-provider';
 import { toCurrentUserDTO } from '~/server/auth/current-user';
 import { getAccountInternal, getUserInternal } from '~/server/auth/users';
-import { convexLiveUrlFor } from '~/server/convex-live-owners';
-import { previewSelection } from '~/server/preview/selection';
+import { convexLiveUrlFor } from '~/server/library/live-configuration';
 import type { InitialAuth } from '~/store/auth';
 
 /**
@@ -49,28 +48,11 @@ export default async function AppShellLayout({
   // issue #116.
   if (session?.user?.id) {
     const user = await getUserInternal(session.user.id);
-    // Fixture owners browse stored Convex data without a live provider account.
-    // Avoid credential refresh/reconnection while rendering their preview.
-    const preview = user ? previewSelection({ userId: user.id }) : null;
-    const account =
-      user && !preview ? await getAccountInternal({ userId: user.id }) : null;
-    // Live library reads: a `live` preview owner, or an ordinary account
-    // listed as a live owner (only its library download moves to Convex).
-    const previewLiveUrl =
-      preview && 'transport' in preview && preview.live
-        ? process.env.ACTIVITYMAP_CONVEX_URL
-        : undefined;
-    const liveUrl = !user
-      ? null
-      : preview
-        ? previewLiveUrl
-        : convexLiveUrlFor(user);
+    const account = user ? await getAccountInternal({ userId: user.id }) : null;
+    const liveUrl = user ? convexLiveUrlFor(user) : null;
     initialAuth.currentUser = user
       ? {
           ...toCurrentUserDTO(user, account),
-          ...(preview && {
-            storedLibraryPreview: true,
-          }),
           ...(liveUrl && { convexLive: { url: liveUrl } }),
         }
       : null;

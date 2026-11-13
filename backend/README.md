@@ -26,10 +26,10 @@ reaches them through the signed bridges described below. A place catalogue
 is built from OpenStreetMap extracts on disk and published here (see "Place
 catalogue").
 
-The sections "Serving preview owners", "Live owners" and "Read owners in
-production" describe per-account settings from the move off Postgres that
-the app still reads (`src/server/preview/selection.ts`,
-`src/server/convex-live-owners.ts`, `src/server/convex-read-owners.ts`).
+Web and iOS clients use authenticated live queries for library sync; the HTTP
+API reads and writes the same Convex library through signed bridges. Live sync
+uses each account's stored writer assignment and epoch, without per-owner
+migration allowlists. See "Client and API reads" below.
 
 ## Deployment boundary
 
@@ -52,34 +52,7 @@ after in-flight requests expire. Use different keys for each environment.
 Requests can be replayed within the time window; a single-use nonce is required
 before adding any write operation.
 
-## Serving preview owners from this package
-
-Preview owners are listed in `ACTIVITYMAP_CONVEX_PREVIEW_OWNERS`, keyed by
-application user ID. An entry selects its data source:
-
-- `{ "epoch": "…", "transport": "app" }` reads this package through the signed
-  bridge. The epoch must be the owner's current Convex assignment; any other
-  epoch fails closed. Requires the three `ACTIVITYMAP_CONVEX_*` bridge settings.
-- `{ "epoch": "…", "key": "…" }` reads the isolated lab deployment from #495
-  and requires `ACTIVITYMAP_CONVEX_PREVIEW_SITE`.
-- `{ "epoch": "…", "transport": "app", "live": true }` additionally moves the
-  web client's library onto live Convex queries (`src/lib/sync/convex-live.ts`):
-  it subscribes to `library.list` instead of running the REST sync, commits
-  pages into the browser library store, and fetches `library.activity` for the
-  detailed polyline (GPX export). Requires `ACTIVITYMAP_CONVEX_URL` (the
-  deployment's `.convex.cloud` URL), an app issuer
-  (`ACTIVITYMAP_AUTH_JWT_ISSUER`) and the matching Convex auth settings. If the
-  token is rejected, a query fails or no page arrives within 20 seconds, the
-  client falls back to the REST sync. Chart summaries and the status panel
-  still use their REST routes.
-
-Both use the same adapter (`src/server/preview/convex.ts`), so the v1 sync,
-list, summary, stream, places and status routes behave identically. This
-package serves activity metadata, photos, streams, recordings, summaries and
-matches. Ingestion status reports stored data only, because provider
-ingestion does not run here.
-
-## Development deployment and import
+## Development configuration
 
 The development project is `activitymap-backend-dev` (team
 `dominik-schroder`). `convex dev --configure` writes its deployment to
@@ -163,71 +136,31 @@ counts existed needs one recount too:
 pnpm exec convex run stats:rebuild '{"userId":"<userId>"}'
 ```
 
-### Live owners in production
+### Client and API reads
 
-Preview owners exist only outside Vercel Production. To load an ordinary
-production account's library through these queries, list it as a live owner in
-the app:
+Configure `ACTIVITYMAP_CONVEX_URL=https://<deployment>.convex.cloud` and the JWT
+issuer/JWKS settings above. An account with a stored `writer: convex` assignment
+and routing epoch can use live library queries. Authorization always comes from
+the JWT subject; a deployment URL does not grant access to another account.
+Vercel Preview uses its own sign-in records and Convex deployment through the
+same application paths (see `../docs/preview-strava-login.md`).
 
-```sh
-ACTIVITYMAP_CONVEX_URL=https://<deployment>.convex.cloud
-ACTIVITYMAP_CONVEX_LIVE_OWNERS='["<userId>"]'
-```
+The browser subscribes to activity cards and fetches detailed routes on demand.
+Photo changes wake its paginated photo reader and reconcile the local store.
+iOS uses the native SDK to supply full activity/photo pages to SwiftData; see
+`../docs/ios-native-convex-sync.md` for retries, account isolation and lifecycle.
 
-Only the library download changes for such an account
-(`src/server/convex-live-owners.ts`): edits, charts and status keep their
-Postgres routes. Photos come from here as well: `library.changes` sets
-`photos` when a read passed photo changes, and the client then reads the
-whole list through `library.photos` (500 a page) and reconciles its store
-(`src/lib/sync/live-photos.ts`). The account must also be a
-shadow owner, so the mirror keeps this deployment current, and its counts need
-one `stats:rebuild`. Library changes reach the browser after the next mirror
-run. Remove the account from the list to return it to the REST sync.
-
-### Read owners in production
-
-A live owner's browser loads its library from here, but the app's v1 routes
-still answer from Postgres, and so does the iOS app. A read owner moves those
-reads as well, while Postgres stays the writer (step 2 of
-`docs/convex-writer-cutover.md`):
-
-```sh
-ACTIVITYMAP_CONVEX_READ_OWNERS='{"<userId>":"<epoch>"}'
-```
-
-The value maps application user IDs to the owner's current Convex epoch
-(`src/server/convex-read-owners.ts`); the read bridge settings
-(`ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_KEY_ID`,
-`ACTIVITYMAP_CONVEX_SIGNING_KEY`) must be present. For such an account these
-routes read through the signed bridge: sync bootstrap and changes, the
-activity and photo lists, stream summaries and the activity places route.
-Unlike a preview owner, the account keeps every write: edits, refreshes,
-imports, sharing and deletion run on Postgres and reach Convex through the
-mirror.
-
-- **Cursors.** A sync cursor belongs to one backend and epoch. The first
-  request after the switch, in either direction, answers that a new bootstrap
-  is required, and the client downloads the library once.
-- **Streams of one activity.** Convex answers when it holds a current
-  recording. Otherwise, and for an explicit refresh or when the bridge fails,
-  the request takes the Postgres path, which can still fetch from Strava.
-- **Stream access.** Postgres decides who may read streams. Every stream or
-  summary read from Convex is released only after Postgres confirms that the
-  account is still eligible and owns the activity
-  (`src/server/preview/authorized-streams.ts`), so a deauthorized account or
-  a deleted activity gets nothing from the copy, whatever the mirror has
-  done.
-- **Ingestion status** stays on Postgres: it describes the jobs of the store
-  that writes.
-- **Failure.** The list and sync routes do not fall back, because a cursor
-  cannot move between backends mid-download. If the bridge is unreachable or
-  the epoch is no longer current they fail, and removing the account from the
-  setting returns it to Postgres.
+All v1 HTTP routes use `src/server/library/convex.ts` and the account's stored
+epoch. They support older clients and native/web compatibility fallback. Edits,
+refreshes, summaries, imports, sharing and deletion also use Convex. No mirror or
+alternate database participates in these reads or writes. HTTP cursor identities
+continue to bind the bridge deployment, owner, athlete and epoch; changing the
+stored assignment fences the previous position.
 
 ## Provider gateway
 
 A Convex worker that needs provider data asks the app for it
-(`docs/convex-writer-cutover.md`, decision 1): the app keeps the Strava
+through the provider gateway: the app keeps the Strava
 tokens and the request budget that all accounts share, and this package never
 holds a provider credential.
 
@@ -261,8 +194,8 @@ ACTIVITYMAP_PROVIDER_GATEWAY_KEYS='{"<keyId>":"<64 hex characters>"}'
 ```
 
 Which accounts it reads for is not a setting: it serves exactly the accounts
-whose library Convex writes (`users.writer`), so a handoff switches it on for
-an account and a hand-back switches it off. The caller is the Convex
+whose library has an active Convex writer assignment (`users.writer`). The
+stored assignment and epoch are checked on every request. The caller is the Convex
 ingestion worker ([Convex ingestion](#convex-ingestion)), through
 `src/server/provider-gateway/client.ts`.
 
@@ -370,7 +303,7 @@ nothing. A user Convex never knew is answered `false`.
 ## Convex ingestion
 
 For an owner Convex writes for, activities come in through jobs in this
-package (`docs/convex-writer-cutover.md`, step 5; `convex/ingestion.ts`).
+package (`convex/ingestion.ts`).
 There is one job per owner and activity. A provider event counts a request
 on the job and schedules a run for the job's due time; nothing polls.
 

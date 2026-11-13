@@ -61,7 +61,7 @@ export async function prepareRecording(
           state: 'current',
           fetch_status: 'succeeded',
           // Convex stores object fields sorted by name; keep the canonical
-          // stream order that Postgres and the clients use.
+          // stream order defined by the shared client contracts.
           available_types: ACTIVITY_STREAM_TYPES.filter(
             (type) => args.manifest.counts[type] !== undefined,
           ),

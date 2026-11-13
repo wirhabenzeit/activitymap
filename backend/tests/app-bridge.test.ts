@@ -6,7 +6,7 @@ import test, { after, mock } from 'node:test';
 import { createStreamSummariesHandler } from '../../src/app/api/v1/stream-summaries/handler';
 import { createSyncBootstrapHandler } from '../../src/app/api/v1/sync/bootstrap/handler';
 import { createSyncChangesHandler } from '../../src/app/api/v1/sync/changes/handler';
-import { convexPreviewFor } from '../../src/server/preview/convex';
+import { convexAppAdapter } from '../../src/server/library/convex';
 import type { RawActivityStreams } from '../../src/server/strava/streams';
 import { internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
@@ -15,7 +15,7 @@ import { previewFixtureActivity } from './fixtures';
 import { seedModule, testWrites } from './seed-api';
 
 /**
- * End to end through the real v1 route handlers, the preview adapter's app
+ * End to end through the real v1 route handlers, the application adapter's
  * transport, the signed HTTP bridge and backend/convex, with data written by
  * the test-only seed functions (`./seed.ts`).
  */
@@ -147,16 +147,12 @@ function adapter(
 ) {
   const secret = 'e'.repeat(64);
   setEnv(t, {
-    ACTIVITYMAP_CLIENT_BACKEND: 'convex-preview',
-    ACTIVITYMAP_CONVEX_PREVIEW_OWNERS: JSON.stringify({
-      [actor.userId]: { epoch, transport: 'app' },
-    }),
     ACTIVITYMAP_CONVEX_SITE: 'https://convex.invalid',
     ACTIVITYMAP_CONVEX_KEY_ID: 'test',
     ACTIVITYMAP_CONVEX_SIGNING_KEY: secret,
     ACTIVITYMAP_BRIDGE_SIGNING_KEYS: JSON.stringify({ test: secret }),
   });
-  const preview = convexPreviewFor(actor, (url, init) =>
+  const preview = convexAppAdapter(actor, epoch, (url, init) =>
     convex.fetch(new URL(String(url)).pathname, init),
   );
   assert(preview);

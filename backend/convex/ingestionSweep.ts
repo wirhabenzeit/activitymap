@@ -22,7 +22,7 @@ import { idKey, ownerFor } from './owners';
 
 /**
  * Reconciliation for an owner Convex writes for: the backstop for provider
- * events that never arrive (docs/convex-writer-cutover.md, step 5).
+ * events that never arrive (backend/README.md, "Reconciliation").
  *
  * Each owner has one sweep row. A sweep is due when Convex becomes the
  * owner's writer and then every `SWEEP_INTERVAL_MS` after the last one

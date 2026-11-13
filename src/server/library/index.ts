@@ -5,18 +5,18 @@ import { randomBytes } from 'node:crypto';
 import { errorEnvelope } from '~/contracts/v1/error';
 import type { Actor } from '~/server/auth/actor';
 import { updateUserInternal } from '~/server/auth/users';
+import { convexAppAdapter } from '~/server/library/convex';
 import {
   catalogueIdentity,
   matchingVersion,
 } from '~/server/places/matching-version';
-import { convexAppAdapter } from '~/server/preview/convex';
 import { convexWriteBridge } from '~/server/sync/convex-writer';
 
 /**
  * An account's library: its activities, recordings, photos and place
  * matches. It lives in the Convex backend (`backend/`), which also fetches
  * it from the provider. The app reaches it through two signed bridges: reads
- * (`~/server/preview/convex.ts`) and changes (`~/server/sync/convex-writer.ts`).
+ * (`~/server/library/convex.ts`) and changes (`~/server/sync/convex-writer.ts`).
  */
 
 function bridge(actor: Actor) {

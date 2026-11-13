@@ -31,7 +31,7 @@ import { applyPhotoSet, photosOfActivities } from './photos';
 
 /**
  * Convex ingestion for an owner Convex writes for
- * (docs/convex-writer-cutover.md, step 5).
+ * (backend/README.md, "Convex ingestion").
  *
  * There is one job per owner and activity. A provider event (or anything
  * else that wants the activity brought up to date) calls `requestIngestion`,

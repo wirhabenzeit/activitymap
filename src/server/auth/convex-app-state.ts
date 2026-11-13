@@ -11,8 +11,8 @@ import { convexAuthStore } from './convex-adapter';
 
 /**
  * The app's rate limit counters and the provider's shared request budget,
- * kept in Convex (backend/convex/appState.ts) instead of Postgres. Same
- * interfaces as the Postgres repositories, so callers do not change.
+ * kept in Convex (backend/convex/appState.ts) behind the shared repository
+ * interfaces used by API boundaries and provider calls.
  */
 
 type Call = ReturnType<typeof convexAuthStore>;

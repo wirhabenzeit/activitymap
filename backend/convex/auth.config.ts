@@ -2,7 +2,7 @@ import type { AuthConfig } from 'convex/server';
 
 /**
  * Tokens issued by the app's Better Auth `jwt` plugin
- * (`src/lib/auth-jwt.ts`, docs/convex-reactive-reads.md).
+ * (`src/lib/auth-jwt.ts`, backend/README.md, "Authenticated clients").
  *
  * Convex refuses to deploy an auth config that reads an unset environment
  * variable, so every deployment sets `ACTIVITYMAP_AUTH_JWT_ISSUER`:

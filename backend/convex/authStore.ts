@@ -9,7 +9,7 @@ import {
 
 /**
  * The sign-in store: the records the app's auth library (Better Auth) keeps,
- * held here as documents instead of Postgres rows. The library addresses a
+ * held here as documents. The library addresses a
  * record by model and a list of conditions on its fields, and this file
  * implements exactly that: create, find, count, update and delete.
  *

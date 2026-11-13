@@ -3,8 +3,8 @@ import { nativeSyncConfigurationSchema } from '~/contracts/v1/sync';
 import { convexJwtOptions } from '~/lib/auth-jwt';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { findUserInternal } from '~/server/auth/users';
-import { convexLiveUrlFor } from '~/server/convex-live-owners';
 import { notAuthenticated } from '~/server/library';
+import { convexLiveUrlFor } from '~/server/library/live-configuration';
 
 /** Discovery only. The existing bearer-authenticated /api/auth/token issues
  * short-lived JWTs; no signing secrets are ever sent to the phone. A client

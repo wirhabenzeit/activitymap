@@ -58,11 +58,9 @@ export interface RateLimitBoundaryOptions {
 /**
  * Wraps a `/api/v1/*` Route Handler with a rate-limit check (issue #127).
  *
- * Self-hosted and Postgres-backed (`~/server/repositories/rate-limit.ts`'s
- * fixed-window counters) rather than a new managed service - this stack has
- * no Redis in its dependency tree. See
- * docs/api-compatibility-and-deprecation.md for the full design and its
- * documented limitations.
+ * Fixed-window counters are stored in Convex through the shared repository
+ * (`~/server/repositories/rate-limit.ts`). See
+ * docs/api-compatibility-and-deprecation.md for the public API policy.
  *
  * Three independent limits apply to authenticated routes, any of which can
  * reject a request:

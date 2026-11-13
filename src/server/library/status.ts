@@ -50,7 +50,7 @@ export const statusPageSchema = z.object({
     .nullish(),
 });
 
-export async function previewIngestionStatus(
+export async function convexIngestionStatus(
   load: (after: number | null) => Promise<z.infer<typeof statusPageSchema>>,
   observedAt: Date,
 ): Promise<IngestionStatusDTO> {
@@ -81,7 +81,7 @@ export async function previewIngestionStatus(
     retryAt: null,
   });
   // With jobs running in Convex, what is missing is fetched without anyone
-  // asking; for a copy that Postgres writes, nothing here does.
+  // asking; an inactive owner has no scheduled ingestion.
   const pending = (outstanding: boolean): IngestionScheduling =>
     !outstanding ? 'idle' : head.active ? 'scheduled' : 'not_scheduled';
   const sweep = head.sweep ?? null;

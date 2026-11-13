@@ -18,7 +18,6 @@ import { compactStreamSummarySchema } from '~/lib/streams/compact-summary';
 import { placeMatchesFor } from '~/lib/sync/place-matches';
 import { ActivityPlacesUnavailableError } from '~/server/application/match-activity-places';
 import type { Actor } from '~/server/auth/actor';
-import { convexReadEpoch } from '~/server/convex-read-owners';
 import type { Activity, Photo } from '~/server/records';
 import {
   ActivityStreamsUnavailableError,
@@ -34,8 +33,7 @@ import { warnBridgeFallback } from '~/server/sync/bridge-fallback-warning';
 import { BridgeResponseError } from '~/server/sync/bridge-response-error';
 import { convexSyncBridge } from '~/server/sync/convex-bridge';
 
-import { previewSelection } from './selection';
-import { previewIngestionStatus, statusPageSchema } from './status';
+import { convexIngestionStatus, statusPageSchema } from './status';
 
 const maxBridgePage = 128;
 const headSchema = z.object({
@@ -150,57 +148,11 @@ type Transport = {
   /** Largest list page one call returns; a shorter page ends the list. */
   pageSize: number;
   summaryBatch: number;
-  atomicChanges?: boolean;
   send: (operation: Operation) => Promise<Response>;
 };
 
 function scopeHash(parts: unknown[]) {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex');
-}
-
-/** The isolated lab deployment (#495), authenticated with a per-owner key. */
-function labTransport(
-  { userId, athleteId }: Actor,
-  { epoch, key }: { epoch: string; key: string },
-  fetcher: typeof fetch,
-): Transport {
-  const configuredSite = process.env.ACTIVITYMAP_CONVEX_PREVIEW_SITE;
-  if (!configuredSite) throw new Error('Convex preview site is required');
-  const site = new URL(configuredSite);
-  if (
-    site.protocol !== 'https:' ||
-    site.username ||
-    site.password ||
-    site.pathname !== '/' ||
-    site.search ||
-    site.hash
-  )
-    throw new Error('Invalid Convex preview site');
-  const bridge = new URL('/existing-client-preview', site).href;
-  return {
-    cursorBackend: scopeHash([bridge, userId, athleteId, epoch]),
-    pageSize: maxBridgePage,
-    summaryBatch: maxBridgePage,
-    send: async (operation) => {
-      const response = await fetcher(bridge, {
-        method: 'POST',
-        cache: 'no-store',
-        redirect: 'error',
-        signal: AbortSignal.timeout(15_000),
-        headers: {
-          Authorization: `Bearer ${key}`,
-          'Content-Type': 'application/json',
-          'X-Preview-User': userId,
-        },
-        body: JSON.stringify({ athleteId, epoch, operation }),
-      }).catch(() => {
-        throw new Error('Preview bridge unavailable');
-      });
-      if (!response.ok)
-        throw new Error(`Preview bridge returned ${response.status}`);
-      return response;
-    },
-  };
 }
 
 /** `backend/` keeps 64-bit-safe string IDs and takes no retention cutoff. */
@@ -241,9 +193,7 @@ function appTransport(
 ): Transport {
   const bridge = convexSyncBridge(actor, fetcher);
   if (!bridge)
-    throw new Error(
-      'ACTIVITYMAP_CONVEX_SITE is required for app preview and read owners',
-    );
+    throw new Error('ACTIVITYMAP_CONVEX_SITE is required for library reads');
   return {
     cursorBackend: scopeHash([
       'app',
@@ -255,52 +205,12 @@ function appTransport(
     // Mirrors the list and summary limits in backend/convex/sync.ts.
     pageSize: 32,
     summaryBatch: 48,
-    atomicChanges: true,
     send: (operation) => bridge.send(appOperation(operation), epoch),
   };
 }
 
-export function convexPreviewFor(
-  actor: Actor | null,
-  fetcher: typeof fetch = fetch,
-) {
-  const config = previewSelection(actor);
-  if (!actor || !config) return null;
-  return convexAdapter(
-    actor,
-    'key' in config
-      ? labTransport(actor, config, fetcher)
-      : appTransport(actor, config.epoch, fetcher),
-  );
-}
-
-/** The adapter for a production read owner (`convex-read-owners.ts`), else
- * null. Preview owners are never read owners: their selection decides. */
-export function convexReadOwnerFor(
-  actor: Actor | null,
-  fetcher: typeof fetch = fetch,
-) {
-  if (!actor || previewSelection(actor)) return null;
-  // An account Convex writes for is read from Convex; the setting covers
-  // accounts that are read from Convex while Postgres still writes.
-  const epoch = actor.convexEpoch ?? convexReadEpoch(actor.userId);
-  return epoch
-    ? convexAdapter(actor, appTransport(actor, epoch, fetcher))
-    : null;
-}
-
-/** Where an actor's v1 reads come from when it is not Postgres: a preview
- * owner's backend, or Convex for a production read owner. */
-export function convexReadsFor(
-  actor: Actor | null,
-  fetcher: typeof fetch = fetch,
-) {
-  return convexPreviewFor(actor, fetcher) ?? convexReadOwnerFor(actor, fetcher);
-}
-
-/** The adapter over `backend/` for an owner's current Convex epoch, outside
- * preview selection. For server jobs such as the shadow parity check; the
- * v1 routes select their backend through `convexPreviewFor`. */
+/** The application library adapter for an authenticated owner and its stored
+ * Convex epoch. Transport selection never depends on migration allowlists. */
 export function convexAppAdapter(
   actor: Actor,
   epoch: string,
@@ -353,10 +263,10 @@ function convexAdapter(actor: Actor, transport: Transport) {
   }
 
   const assertAthlete = (candidate: number) => {
-    if (candidate !== athleteId) throw new Error('Preview athlete mismatch');
+    if (candidate !== athleteId) throw new Error('Convex athlete mismatch');
   };
   const assertActor = (candidate: Actor) => {
-    if (candidate.userId !== userId) throw new Error('Preview actor mismatch');
+    if (candidate.userId !== userId) throw new Error('Convex actor mismatch');
     assertAthlete(candidate.athleteId);
   };
   let head: Promise<z.infer<typeof headSchema>> | undefined;
@@ -371,14 +281,14 @@ function convexAdapter(actor: Actor, transport: Transport) {
         row.athlete !== String(athleteId) ||
         (row.placeMatches && row.placeMatches.userId !== userId)
       )
-        throw new Error('Preview activity scope mismatch');
+        throw new Error('Convex activity scope mismatch');
       projected.set(row.id, row);
       return activityRow(row);
     });
   const capturePhotos = (rows: PhotoDTO[]) =>
     rows.map((row) => {
       if (row.athlete_id !== String(athleteId))
-        throw new Error('Preview photo scope mismatch');
+        throw new Error('Convex photo scope mismatch');
       return photoRow(row);
     });
   const loadActivityIds = (ids: number[]) =>
@@ -393,60 +303,58 @@ function convexAdapter(actor: Actor, transport: Transport) {
 
   return {
     cursorBackend,
-    changesPage: transport.atomicChanges
-      ? async (
-          candidate: Actor,
-          args: { after: number; limit: number },
-        ): Promise<ChangesSnapshot | null> => {
-          assertActor(candidate);
-          const result = await query(
-            { kind: 'changesPage', ...args },
-            changesSnapshotSchema,
-          ).catch((error: unknown) => {
-            // Older deployments reject the new operation with 400. The route
-            // then uses the existing, fully fenced repository read path.
-            if (error instanceof BridgeResponseError && error.status === 400) {
-              warnBridgeFallback('changesPage');
-              return null;
-            }
-            throw error;
-          });
-          if (result === null) return null;
-          if (
-            result.lastSequence < args.after ||
-            result.lastSequence > result.head.sequence
-          )
-            throw new Error('Invalid changes snapshot sequence');
-          const version = result.head.matchingVersion ?? cursorBackend;
-          let previous = args.after;
-          for (const item of result.items) {
-            const sequence = Number(item.sequence);
-            if (
-              !Number.isSafeInteger(sequence) ||
-              sequence <= previous ||
-              sequence > result.lastSequence
-            )
-              throw new Error('Invalid changes snapshot order');
-            previous = sequence;
-            if (item.activity) {
-              captureActivities([item.activity]);
-              item.activity.placeMatches = matchFor(item.activity, version);
-            }
-            if (item.photo) capturePhotos([item.photo]);
-          }
-          return {
-            items: result.items,
-            lastSequence: result.lastSequence,
-            freshness: {
-              lastSummaryReconciledAt:
-                result.head.lastSummaryReconciledAt === null
-                  ? null
-                  : new Date(result.head.lastSummaryReconciledAt).toISOString(),
-              placeMatchingVersion: version,
-            },
-          };
+    changesPage: async (
+      candidate: Actor,
+      args: { after: number; limit: number },
+    ): Promise<ChangesSnapshot | null> => {
+      assertActor(candidate);
+      const result = await query(
+        { kind: 'changesPage', ...args },
+        changesSnapshotSchema,
+      ).catch((error: unknown) => {
+        // Older deployments reject the new operation with 400. The route
+        // then uses the existing, fully fenced repository read path.
+        if (error instanceof BridgeResponseError && error.status === 400) {
+          warnBridgeFallback('changesPage');
+          return null;
         }
-      : undefined,
+        throw error;
+      });
+      if (result === null) return null;
+      if (
+        result.lastSequence < args.after ||
+        result.lastSequence > result.head.sequence
+      )
+        throw new Error('Invalid changes snapshot sequence');
+      const version = result.head.matchingVersion ?? cursorBackend;
+      let previous = args.after;
+      for (const item of result.items) {
+        const sequence = Number(item.sequence);
+        if (
+          !Number.isSafeInteger(sequence) ||
+          sequence <= previous ||
+          sequence > result.lastSequence
+        )
+          throw new Error('Invalid changes snapshot order');
+        previous = sequence;
+        if (item.activity) {
+          captureActivities([item.activity]);
+          item.activity.placeMatches = matchFor(item.activity, version);
+        }
+        if (item.photo) capturePhotos([item.photo]);
+      }
+      return {
+        items: result.items,
+        lastSequence: result.lastSequence,
+        freshness: {
+          lastSummaryReconciledAt:
+            result.head.lastSummaryReconciledAt === null
+              ? null
+              : new Date(result.head.lastSummaryReconciledAt).toISOString(),
+          placeMatchingVersion: version,
+        },
+      };
+    },
     bootstrapPage: async (
       candidate: Actor,
       args: {
@@ -466,7 +374,7 @@ function convexAdapter(actor: Actor, transport: Transport) {
         bootstrapSchema,
       );
       if (result.resource !== args.resource)
-        throw new Error('Preview bootstrap resource mismatch');
+        throw new Error('Convex bootstrap resource mismatch');
       const version = result.head.matchingVersion ?? cursorBackend;
       if (result.resource === 'activities') captureActivities(result.items);
       else capturePhotos(result.items);
@@ -661,6 +569,7 @@ function convexAdapter(actor: Actor, transport: Transport) {
         if (!Number.isSafeInteger(Number(id)))
           throw new ActivityStreamsUnavailableError();
         const response = await send({ kind: 'raw', id: Number(id) });
+        // Retain the historical header for compatibility with deployed bridges.
         const binaryMetadata =
           response.headers.get('x-stream-metadata') ??
           response.headers.get('x-preview-stream-metadata');
@@ -672,7 +581,7 @@ function convexAdapter(actor: Actor, transport: Transport) {
             maxOutputLength: 64 * 1024 * 1024,
           });
           const row = summaryRow(id, metadata, null);
-          if (!row) throw new Error('Preview stream metadata unavailable');
+          if (!row) throw new Error('Convex stream metadata unavailable');
           return {
             ...row,
             payload: rawActivityStreamsSchema.parse(JSON.parse(raw.toString())),
@@ -695,7 +604,7 @@ function convexAdapter(actor: Actor, transport: Transport) {
         { kind: 'statusSummary' },
         statusPageSchema.nullable(),
       ).catch(() => null);
-      return previewIngestionStatus(
+      return convexIngestionStatus(
         (after) =>
           summary && after === null
             ? Promise.resolve(summary)

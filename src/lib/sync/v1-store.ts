@@ -5,7 +5,7 @@
  *
  * Every row stored here is the wire DTO itself (`~/contracts/v1/activity.ts`'s
  * `ActivityDTO` / `~/contracts/v1/photo.ts`'s `PhotoDTO`) — decimal-string
- * ids, ISO-string timestamps — never a Drizzle row type. That is the
+ * ids, ISO-string timestamps — never a backend storage type. That is the
  * acceptance criterion this module exists to satisfy: the local store's own
  * types come from `~/contracts/v1/*`, not `~/server/db/schema`. Callers that
  * need the app-wide `Activity`/`Photo` view-model shape convert at the

@@ -98,8 +98,8 @@ export async function applySourceRecord(
     )
   )
     return false;
-  // Match the Postgres stream-source trigger: social/label changes cannot
-  // invalidate sensor samples, but privacy, geometry and sensor changes can.
+  // Social/label changes cannot invalidate sensor samples, but privacy,
+  // geometry and sensor changes can.
   const preserve = !!(
     args.dto &&
     prior?.dto &&

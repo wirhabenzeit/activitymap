@@ -10,7 +10,7 @@ import { idString, isoDateTime, toIdString, toIsoDateTime } from './primitives';
 /**
  * The v1 wire shape of an activity. Every potentially-large numeric id is a
  * string and every timestamp is a UTC ISO 8601 string — this is never the
- * Drizzle `Activity` row itself (see issue #119/#116). Field names are kept
+ * backend `Activity` record itself (see issue #119/#116). Field names are kept
  * snake_case to match the existing web client and Strava's own vocabulary;
  * only the transport encoding (ids, dates) changes.
  *
@@ -116,7 +116,7 @@ export const activityDTOSchema = z
 
 export type ActivityDTO = z.infer<typeof activityDTOSchema>;
 
-/** Maps a Drizzle `Activity` row to the v1 wire contract. Validates its own
+/** Maps an application `Activity` record to the v1 wire contract. Validates its own
  * output, so a future schema.ts change that breaks the contract fails loud
  * here instead of silently changing the wire shape. */
 export function toActivityDTO(

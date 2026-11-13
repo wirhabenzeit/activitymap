@@ -14,8 +14,8 @@ import type {
 import { convexAuthStore } from './convex-adapter';
 
 /**
- * Users and linked accounts in the Convex sign-in store, in the shapes the
- * rest of the app already works with (the Postgres row types). A record
+ * Users and linked accounts in the Convex sign-in store, exposed through
+ * the shared application record types (`~/server/records.ts`). A record
  * there is a JSON document: dates are ISO strings, and a field that was
  * never set is absent.
  */
