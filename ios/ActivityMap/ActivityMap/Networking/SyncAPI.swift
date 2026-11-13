@@ -1,8 +1,13 @@
 import Foundation
 
 nonisolated protocol SyncPageSource: Sendable {
+    func accepts(cursor: String) -> Bool
     func bootstrap(resource: ActivityMapAPI.SyncResource, cursor: String?) async throws -> ActivityMapAPI.SyncBootstrapPage
     func changes(cursor: String) async throws -> ActivityMapAPI.SyncChangesPage
+}
+
+nonisolated extension SyncPageSource {
+    func accepts(cursor: String) -> Bool { true }
 }
 
 /// Credentials and deployment are captured for a whole sync pass, never read
@@ -11,6 +16,8 @@ nonisolated struct SyncAPI: SyncPageSource {
     let baseURL: URL
     let token: String
     var session: URLSession = .shared
+
+    func accepts(cursor: String) -> Bool { !cursor.hasPrefix("ios-convex-") }
 
     func bootstrap(resource: ActivityMapAPI.SyncResource, cursor: String?) async throws -> ActivityMapAPI.SyncBootstrapPage {
         var query = [URLQueryItem(name: "resource", value: resource.rawValue)]

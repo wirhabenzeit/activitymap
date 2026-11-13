@@ -638,6 +638,11 @@ nonisolated extension ActivityMapAPI {
         }
     }
 
+    struct NativeSyncConfiguration: Codable, Hashable, Sendable {
+        let url: String
+        let version: Int
+    }
+
     struct SyncChangesPage: Codable, Hashable, Sendable {
         let items: [SyncChangeItem]
         let nextCursor: String

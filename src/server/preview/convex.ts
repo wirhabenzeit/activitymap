@@ -15,10 +15,10 @@ import {
 import { type PhotoDTO, photoDTOSchema } from '~/contracts/v1/photo';
 import { syncChangeItemDTOSchema } from '~/contracts/v1/sync';
 import { compactStreamSummarySchema } from '~/lib/streams/compact-summary';
+import { placeMatchesFor } from '~/lib/sync/place-matches';
 import { ActivityPlacesUnavailableError } from '~/server/application/match-activity-places';
 import type { Actor } from '~/server/auth/actor';
 import { convexReadEpoch } from '~/server/convex-read-owners';
-import { MATCHING_RECIPE } from '~/server/places/matching-version';
 import type { Activity, Photo } from '~/server/records';
 import {
   ActivityStreamsUnavailableError,
@@ -389,21 +389,7 @@ function convexAdapter(actor: Actor, transport: Transport) {
       8,
     );
   const matchFor = (row: ActivityDTO, version: string) =>
-    row.placeMatches ?? {
-      activityId: row.id,
-      userId,
-      status:
-        row.streams?.state === 'current'
-          ? ('pending' as const)
-          : ('missing_streams' as const),
-      streamGeneration: row.streams?.generation ?? null,
-      streamRevision: row.streams?.revision ?? '0',
-      catalogueSnapshotId: null,
-      matcherVersion: MATCHING_RECIPE.matcherVersion,
-      matchingVersion: version,
-      resultRevision: null,
-      places: [],
-    };
+    placeMatchesFor(row, userId, version);
 
   return {
     cursorBackend,

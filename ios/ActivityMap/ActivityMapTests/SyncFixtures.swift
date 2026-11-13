@@ -31,6 +31,7 @@ actor ScriptedSyncSource: SyncPageSource {
 /// Holds the first delta request so rendered tests can inspect an active sync.
 actor GatedChangesSource: SyncPageSource {
     let unchanged: ActivityMapAPI.SyncChangesPage
+    private(set) var calls = 0
     private var response: CheckedContinuation<ActivityMapAPI.SyncChangesPage, Never>?
     private var requested: CheckedContinuation<Void, Never>?
     private var started = false
@@ -45,6 +46,7 @@ actor GatedChangesSource: SyncPageSource {
         throw ScriptedSyncSource.ScriptError.unexpectedRequest
     }
     func changes(cursor: String) async -> ActivityMapAPI.SyncChangesPage {
+        calls += 1
         if started { return unchanged }
         return await withCheckedContinuation { continuation in
             response = continuation

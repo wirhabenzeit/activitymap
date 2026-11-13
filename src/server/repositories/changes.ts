@@ -16,4 +16,4 @@ export interface ChangesRepository {
  * How long a change stays in the feed. A cursor older than this is refused,
  * and the client starts again from a bootstrap.
  */
-export const DEFAULT_RETENTION_DAYS = 90;
+export { SYNC_RETENTION_DAYS as DEFAULT_RETENTION_DAYS } from '~/contracts/v1/sync-policy';

@@ -5,7 +5,7 @@ import type { SyncChangeItemDTO } from '~/contracts/v1/sync';
 
 import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, internalQuery } from './_generated/server';
-import { MAX_PAGE_BYTES } from './activityProjection';
+import { MAX_ACTIVITY_BYTES, MAX_PAGE_BYTES } from './activityProjection';
 import { activityFor } from './activityWrites';
 import { boundary } from './library';
 import { currentRecording, liveRows, project } from './liveProjection';
@@ -62,10 +62,11 @@ const utf8 = new TextEncoder();
 /** One bootstrap page of activities, bounded by `op.limit` and MAX_PAGE_BYTES.
  * Each item is serialized once: `json` holds the exact text of `items`, so the
  * HTTP bridge can send the page without re-serializing it. */
-async function bootstrapPage(
+export async function bootstrapPage(
   ctx: QueryCtx,
   owner: Doc<'owners'>,
   op: { after: string | null; limit: number },
+  budget = MAX_PAGE_BYTES,
 ) {
   let after = op.after === null ? '' : idKey(op.after);
   const items: ActivityDTO[] = [];
@@ -73,7 +74,10 @@ async function bootstrapPage(
   let size = 2;
   // Each `take` is a sequential index read, so size the next batch from the
   // remaining byte budget instead of reading a fixed 32 rows at a time.
-  let batch = 64;
+  let batch =
+    budget === MAX_PAGE_BYTES
+      ? 64
+      : Math.max(1, Math.floor(budget / MAX_ACTIVITY_BYTES));
   while (items.length < op.limit) {
     const count = Math.min(batch, op.limit - items.length);
     const rows = await liveRows(ctx, owner, after, count);
@@ -85,7 +89,7 @@ async function bootstrapPage(
       }
       const text = JSON.stringify(item);
       size += utf8.encode(text).length + Number(items.length > 0);
-      if (size > MAX_PAGE_BYTES) return { items, json, more: true };
+      if (items.length > 0 && size > budget) return { items, json, more: true };
       items.push(item);
       json.push(text);
       after = row.key;
@@ -95,10 +99,12 @@ async function bootstrapPage(
     batch =
       average > 0
         ? Math.min(
-            256,
-            Math.max(8, Math.ceil((MAX_PAGE_BYTES - size) / average) + 1),
+            budget === MAX_PAGE_BYTES ? 256 : 8,
+            Math.max(8, Math.ceil((budget - size) / average) + 1),
           )
-        : 256;
+        : budget === MAX_PAGE_BYTES
+          ? 256
+          : 8;
   }
   return { items, json, more: true };
 }
@@ -134,6 +140,66 @@ export async function summariesFor(
   return summaries.filter((summary) => summary !== null);
 }
 
+/** Resolve a bounded feed page in the same snapshot as its head. */
+export async function resolvedChangesPage(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  rows: Doc<'changes'>[],
+  after: number,
+  budget = MAX_PAGE_BYTES,
+) {
+  // Resolve the feed and its current entities in ONE snapshot. Small
+  // local batches bound read work when a page reaches its byte budget.
+  const items: SyncChangeItemDTO[] = [];
+  let lastSequence = after;
+  let bytes = 2;
+  for (let offset = 0; offset < rows.length; offset += 8) {
+    const batch = rows.slice(offset, offset + 8);
+    const resolved = await Promise.all(
+      batch.map(async (change) => {
+        const base = {
+          sequence: String(change.sequence),
+          entityType: change.entityType,
+          operation: change.operation,
+          id: change.entityId,
+        };
+        if (change.operation === 'delete') return base;
+        if (change.entityType === 'activity') {
+          const row = await activityFor(ctx, owner._id, idKey(change.entityId));
+          const activity = row && project(row, owner);
+          return activity ? { ...base, activity } : null;
+        }
+        const [photo] = await photosByIds(ctx, owner, [change.entityId]);
+        return photo ? { ...base, photo } : null;
+      }),
+    );
+    for (let i = 0; i < batch.length; i++) {
+      const item = resolved[i];
+      if (item) {
+        const size =
+          utf8.encode(JSON.stringify(item)).length + Number(items.length > 0);
+        // Always admit the first item; individual DTOs are bounded at
+        // publication. Do not acknowledge the first deferred event.
+        if (items.length > 0 && bytes + size > budget)
+          return { items, lastSequence };
+        bytes += size;
+        items.push(item);
+      }
+      // Superseded upserts still advance, even on an empty page.
+      lastSequence = batch[i]!.sequence;
+    }
+  }
+  return { items, lastSequence };
+}
+
+export async function lastReconciledAt(ctx: QueryCtx, owner: Doc<'owners'>) {
+  const sweep = await ctx.db
+    .query('ingestionSweeps')
+    .withIndex('by_owner', (q) => q.eq('owner', owner._id))
+    .unique();
+  return sweep?.completedAt ?? null;
+}
+
 export const read = internalQuery({
   args: { ...scopeFields, operation },
   handler: async (ctx, { operation: op, ...scope }) => {
@@ -151,7 +217,7 @@ export const read = internalQuery({
     const head = {
       sequence: feed?.sequence ?? 0,
       matchingVersion: owner.matchingVersion,
-      lastSummaryReconciledAt: null,
+      lastSummaryReconciledAt: feed ? await lastReconciledAt(ctx, owner) : null,
     };
     if (
       'limit' in op &&
@@ -189,55 +255,10 @@ export const read = internalQuery({
           )
           .take(op.limit);
         if (op.kind === 'changesPage') {
-          // Resolve the feed and its current entities in ONE snapshot. Small
-          // local batches bound read work when a page reaches its byte budget.
-          const items: SyncChangeItemDTO[] = [];
-          let lastSequence = op.after;
-          let bytes = 2;
-          for (let offset = 0; offset < rows.length; offset += 8) {
-            const batch = rows.slice(offset, offset + 8);
-            const resolved = await Promise.all(
-              batch.map(async (change) => {
-                const base = {
-                  sequence: String(change.sequence),
-                  entityType: change.entityType,
-                  operation: change.operation,
-                  id: change.entityId,
-                };
-                if (change.operation === 'delete') return base;
-                if (change.entityType === 'activity') {
-                  const row = await activityFor(
-                    ctx,
-                    owner._id,
-                    idKey(change.entityId),
-                  );
-                  const activity = row && project(row, owner);
-                  return activity ? { ...base, activity } : null;
-                }
-                const [photo] = await photosByIds(ctx, owner, [
-                  change.entityId,
-                ]);
-                return photo ? { ...base, photo } : null;
-              }),
-            );
-            for (let i = 0; i < batch.length; i++) {
-              const item = resolved[i];
-              if (item) {
-                const size =
-                  utf8.encode(JSON.stringify(item)).length +
-                  Number(items.length > 0);
-                // Always admit the first item; individual DTOs are bounded at
-                // publication. Do not acknowledge the first deferred event.
-                if (items.length > 0 && bytes + size > MAX_PAGE_BYTES)
-                  return { head, items, lastSequence };
-                bytes += size;
-                items.push(item);
-              }
-              // Superseded upserts still advance, even on an empty page.
-              lastSequence = batch[i]!.sequence;
-            }
-          }
-          return { head, items, lastSequence };
+          return {
+            head,
+            ...(await resolvedChangesPage(ctx, owner, rows, op.after)),
+          };
         }
         return rows.map(
           ({ sequence, entityType, entityId, operation, changedAt }) => ({
@@ -433,7 +454,7 @@ export const bootstrapJson = internalQuery({
     const head = JSON.stringify({
       sequence: feed.sequence,
       matchingVersion: owner.matchingVersion,
-      lastSummaryReconciledAt: null,
+      lastSummaryReconciledAt: await lastReconciledAt(ctx, owner),
     });
     if (!Number.isInteger(op.limit) || op.limit < 1 || op.limit > 500)
       throw new Error('Invalid sync page limit');

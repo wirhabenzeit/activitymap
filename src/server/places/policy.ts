@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 import { canonicalJson, sha256 } from './catalogue-artifact';
 
-export const MATCHER_VERSION = 'activity-places-matcher-v5';
+export { MATCHER_VERSION } from './matcher-version';
 const metres = z.number().finite().positive().max(2_000);
 const policySchema = z
   .strictObject({

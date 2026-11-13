@@ -97,6 +97,7 @@ struct AppShell: View {
             guard let localStore else { return } // Xcode previews stay offline.
             if sync == nil {
                 sync = SyncController(activities: store,
+                                      nativeFactory: { try await ConvexSyncConnection.connect($0) },
                                       fetchInitialSummaries: { session in
                                           try await APIClient.post("/api/v1/activities", bearerToken: session.token,
                                                                    baseURL: session.deployment, as: Int.self)
@@ -133,13 +134,13 @@ struct AppShell: View {
             }
         }
         .task(id: scenePhase) {
-            guard scenePhase == .active else { sync?.pause(); return }
+            guard scenePhase == .active else { await sync?.pauseAndWait(); return }
             store.stats.refreshToday()
             if sync != nil { await refresh() }
             while !Task.isCancelled {
                 do { try await Task.sleep(for: .seconds(60)) } catch { return }
                 store.stats.refreshToday()
-                await refresh()
+                await refreshSession(syncLibrary: sync?.usesNativeSync != true || sync?.status != .ready)
             }
         }
         // The presenter belongs to the stationary shell, so Settings can
@@ -473,6 +474,10 @@ struct AppShell: View {
     }
 
     private func refresh() async {
+        await refreshSession(syncLibrary: true)
+    }
+
+    private func refreshSession(syncLibrary: Bool) async {
         guard let localStore else { return }
         if let sync, let retry = sync.retryNotBefore, retry > Date() {
             // The controller still applies expiry/disconnection cleanup during
@@ -482,7 +487,7 @@ struct AppShell: View {
         }
         await auth.restoreSession()
         sync?.setSession(auth.syncSession, storage: localStore)
-        await sync?.refresh()
+        if syncLibrary { await sync?.refresh() }
     }
 
     private var filterButtonLabel: String { FilterCountBadge.label(count: activeFilterCount) }

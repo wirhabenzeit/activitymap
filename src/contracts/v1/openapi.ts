@@ -1,35 +1,49 @@
-import { createShareLinkRequestSchema, createdShareLinkDTOSchema, shareLinkListDTOSchema, revokeShareLinkRequestSchema, revokeShareLinkResultSchema } from './share-links';
-import {
-  activityCompactStreamSummaryDTOSchema,
-  activityCompactStreamSummariesDTOSchema,
-  activityStreamSummariesDTOSchema,
-  activityStreamSummaryDTOSchema,
-  activityStreamsDTOSchema,
-} from './activity-streams';
 import { z } from 'zod';
-import { deleteAccountRequestSchema, deleteAccountResultSchema } from './account-deletion';
-import { SCHEMA_VERSION } from './primitives';
-import { authenticationDTOSchema } from './auth';
+
+import {
+  deleteAccountRequestSchema,
+  deleteAccountResultSchema,
+} from './account-deletion';
 import { activityDTOSchema } from './activity';
 import {
   activityRefreshResultSchema,
   activitySummaryFetchResultSchema,
   updateActivityRequestSchema,
 } from './activity-mutations';
-import { photoDTOSchema } from './photo';
-import { currentUserDTOSchema } from './user';
-import { syncBootstrapPageDTOSchema, syncChangesPageDTOSchema } from './sync';
+import {
+  activityCompactStreamSummariesDTOSchema,
+  activityCompactStreamSummaryDTOSchema,
+  activityStreamSummariesDTOSchema,
+  activityStreamSummaryDTOSchema,
+  activityStreamsDTOSchema,
+} from './activity-streams';
+import { authenticationDTOSchema } from './auth';
+import { responseEnvelope } from './envelope';
 import { errorEnvelopeSchema } from './error';
 import { ingestionStatusDTOSchema } from './ingestion-status';
-import { stravaImportDTOSchema } from './strava-import';
-import { responseEnvelope } from './envelope';
-import { paginatedSchema, MAX_PAGE_SIZE } from './pagination';
 import {
   mobileExchangeRequestSchema,
   mobileExchangeResponseDTOSchema,
   mobileSessionListDTOSchema,
   revokeSessionRequestSchema,
 } from './mobile-auth';
+import { MAX_PAGE_SIZE, paginatedSchema } from './pagination';
+import { photoDTOSchema } from './photo';
+import { SCHEMA_VERSION } from './primitives';
+import {
+  createShareLinkRequestSchema,
+  createdShareLinkDTOSchema,
+  revokeShareLinkRequestSchema,
+  revokeShareLinkResultSchema,
+  shareLinkListDTOSchema,
+} from './share-links';
+import { stravaImportDTOSchema } from './strava-import';
+import {
+  nativeSyncConfigurationSchema,
+  syncBootstrapPageDTOSchema,
+  syncChangesPageDTOSchema,
+} from './sync';
+import { currentUserDTOSchema } from './user';
 
 /**
  * Builds the v1 OpenAPI 3.1 document from the same Zod schemas the route
@@ -42,10 +56,16 @@ import {
 export function buildOpenApiDocument() {
   const registry = z.registry<{ id: string }>();
   registry.add(createShareLinkRequestSchema, { id: 'CreateShareLinkRequest' });
-  registry.add(responseEnvelope(createdShareLinkDTOSchema), { id: 'CreatedShareLinkResponse' });
-  registry.add(responseEnvelope(shareLinkListDTOSchema), { id: 'ShareLinkListResponse' });
+  registry.add(responseEnvelope(createdShareLinkDTOSchema), {
+    id: 'CreatedShareLinkResponse',
+  });
+  registry.add(responseEnvelope(shareLinkListDTOSchema), {
+    id: 'ShareLinkListResponse',
+  });
   registry.add(revokeShareLinkRequestSchema, { id: 'RevokeShareLinkRequest' });
-  registry.add(responseEnvelope(revokeShareLinkResultSchema), { id: 'RevokeShareLinkResponse' });
+  registry.add(responseEnvelope(revokeShareLinkResultSchema), {
+    id: 'RevokeShareLinkResponse',
+  });
   registry.add(authenticationDTOSchema, { id: 'Authentication' });
   registry.add(currentUserDTOSchema, { id: 'CurrentUser' });
   registry.add(activityDTOSchema, { id: 'Activity' });
@@ -54,17 +74,28 @@ export function buildOpenApiDocument() {
   registry.add(responseEnvelope(activityRefreshResultSchema), {
     id: 'RefreshActivityResponse',
   });
-  registry.add(responseEnvelope(activitySummaryFetchResultSchema), { id: 'ActivitySummaryFetchResponse' });
-  registry.add(responseEnvelope(activityStreamsDTOSchema), { id: 'ActivityStreamsResponse' });
+  registry.add(responseEnvelope(activitySummaryFetchResultSchema), {
+    id: 'ActivitySummaryFetchResponse',
+  });
+  registry.add(responseEnvelope(activityStreamsDTOSchema), {
+    id: 'ActivityStreamsResponse',
+  });
   registry.add(responseEnvelope(activityStreamSummaryDTOSchema), {
     id: 'ActivityStreamSummaryResponse',
   });
   registry.add(responseEnvelope(activityStreamSummariesDTOSchema), {
     id: 'ActivityStreamSummariesResponse',
   });
-  registry.add(responseEnvelope(activityCompactStreamSummaryDTOSchema), { id: 'ActivityCompactStreamSummaryResponse' });
-  registry.add(responseEnvelope(activityCompactStreamSummariesDTOSchema), { id: 'ActivityCompactStreamSummariesResponse' });
+  registry.add(responseEnvelope(activityCompactStreamSummaryDTOSchema), {
+    id: 'ActivityCompactStreamSummaryResponse',
+  });
+  registry.add(responseEnvelope(activityCompactStreamSummariesDTOSchema), {
+    id: 'ActivityCompactStreamSummariesResponse',
+  });
   registry.add(photoDTOSchema, { id: 'Photo' });
+  registry.add(responseEnvelope(nativeSyncConfigurationSchema.nullable()), {
+    id: 'NativeSyncConfigurationResponse',
+  });
   registry.add(responseEnvelope(syncBootstrapPageDTOSchema), {
     id: 'SyncBootstrapPageResponse',
   });
@@ -75,7 +106,9 @@ export function buildOpenApiDocument() {
     id: 'IngestionStatusResponse',
   });
   registry.add(errorEnvelopeSchema, { id: 'FailureResponse' });
-  registry.add(responseEnvelope(stravaImportDTOSchema), { id: 'StravaImportResponse' });
+  registry.add(responseEnvelope(stravaImportDTOSchema), {
+    id: 'StravaImportResponse',
+  });
   registry.add(responseEnvelope(currentUserDTOSchema), {
     id: 'CurrentUserResponse',
   });
@@ -94,7 +127,9 @@ export function buildOpenApiDocument() {
   });
   registry.add(revokeSessionRequestSchema, { id: 'RevokeSessionRequest' });
   registry.add(deleteAccountRequestSchema, { id: 'DeleteAccountRequest' });
-  registry.add(responseEnvelope(deleteAccountResultSchema), { id: 'DeleteAccountResponse' });
+  registry.add(responseEnvelope(deleteAccountResultSchema), {
+    id: 'DeleteAccountResponse',
+  });
 
   const { schemas: rawSchemas } = z.toJSONSchema(registry, {
     target: 'draft-2020-12',
@@ -148,33 +183,71 @@ export function buildOpenApiDocument() {
     paths: {
       '/api/v1/share-links': {
         get: {
-          operationId: 'listShareLinks', summary: 'List the caller’s links without capability tokens', security,
+          operationId: 'listShareLinks',
+          summary: 'List the caller’s links without capability tokens',
+          security,
           responses: {
-            '200': { description: 'Share links', content: { 'application/json': { schema: ref('ShareLinkListResponse') } } },
-            '401': errorResponse('Authentication required'), '429': errorResponse('Rate limited'),
+            '200': {
+              description: 'Share links',
+              content: {
+                'application/json': { schema: ref('ShareLinkListResponse') },
+              },
+            },
+            '401': errorResponse('Authentication required'),
+            '429': errorResponse('Rate limited'),
             '500': errorResponse('Share request failed'),
           },
         },
         post: {
-          operationId: 'createShareLink', summary: 'Create an explicitly confirmed, expiring activity share', security,
-          requestBody: { required: true, content: { 'application/json': { schema: ref('CreateShareLinkRequest') } } },
+          operationId: 'createShareLink',
+          summary: 'Create an explicitly confirmed, expiring activity share',
+          security,
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('CreateShareLinkRequest') },
+            },
+          },
           responses: {
-            '201': { description: 'Capability token returned once; open /share/{token} on this deployment', content: { 'application/json': { schema: ref('CreatedShareLinkResponse') } } },
-            '400': errorResponse('Invalid activity subset or expiry'), '401': errorResponse('Authentication required'),
-            '403': errorResponse('Activity ownership or origin denied'), '429': errorResponse('Rate limited'),
+            '201': {
+              description:
+                'Capability token returned once; open /share/{token} on this deployment',
+              content: {
+                'application/json': { schema: ref('CreatedShareLinkResponse') },
+              },
+            },
+            '400': errorResponse('Invalid activity subset or expiry'),
+            '401': errorResponse('Authentication required'),
+            '403': errorResponse('Activity ownership or origin denied'),
+            '429': errorResponse('Rate limited'),
             '500': errorResponse('Share request failed'),
           },
         },
       },
       '/api/v1/share-links/revoke': {
         post: {
-          operationId: 'revokeShareLink', summary: 'Immediately revoke one of the caller’s links', security,
-          requestBody: { required: true, content: { 'application/json': { schema: ref('RevokeShareLinkRequest') } } },
+          operationId: 'revokeShareLink',
+          summary: 'Immediately revoke one of the caller’s links',
+          security,
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('RevokeShareLinkRequest') },
+            },
+          },
           responses: {
-            '200': { description: 'Revoked', content: { 'application/json': { schema: ref('RevokeShareLinkResponse') } } },
-            '400': errorResponse('Invalid link ID'), '401': errorResponse('Authentication required'),
-            '403': errorResponse('Origin denied'), '404': errorResponse('Link not found'),
-            '429': errorResponse('Rate limited'), '500': errorResponse('Share request failed'),
+            '200': {
+              description: 'Revoked',
+              content: {
+                'application/json': { schema: ref('RevokeShareLinkResponse') },
+              },
+            },
+            '400': errorResponse('Invalid link ID'),
+            '401': errorResponse('Authentication required'),
+            '403': errorResponse('Origin denied'),
+            '404': errorResponse('Link not found'),
+            '429': errorResponse('Rate limited'),
+            '500': errorResponse('Share request failed'),
           },
         },
       },
@@ -182,17 +255,31 @@ export function buildOpenApiDocument() {
       '/api/v1/account/delete': {
         post: {
           operationId: 'deleteAccount',
-          summary: 'Permanently delete the authenticated ActivityMap account and its data',
-          description: 'Deletes immediately and revokes every session. Original Strava activities are unaffected. Cookie clients must send the deployment Origin; native clients use signed bearer authentication. No target user ID is accepted.',
+          summary:
+            'Permanently delete the authenticated ActivityMap account and its data',
+          description:
+            'Deletes immediately and revokes every session. Original Strava activities are unaffected. Cookie clients must send the deployment Origin; native clients use signed bearer authentication. No target user ID is accepted.',
           security,
-          requestBody: { required: true, content: { 'application/json': { schema: ref('DeleteAccountRequest') } } },
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('DeleteAccountRequest') },
+            },
+          },
           responses: {
-            '200': { description: 'Account and data deleted', content: { 'application/json': { schema: ref('DeleteAccountResponse') } } },
+            '200': {
+              description: 'Account and data deleted',
+              content: {
+                'application/json': { schema: ref('DeleteAccountResponse') },
+              },
+            },
             '400': errorResponse('Missing or invalid deletion confirmation'),
             '401': errorResponse('No valid session'),
             '403': errorResponse('Invalid or missing browser Origin'),
             '429': errorResponse('Rate limited'),
-            '500': errorResponse('Deletion failed; the transaction was rolled back'),
+            '500': errorResponse(
+              'Deletion failed; the transaction was rolled back',
+            ),
           },
         },
       },
@@ -220,21 +307,50 @@ export function buildOpenApiDocument() {
       },
       '/api/v1/strava-import': {
         get: {
-          operationId: 'getStravaImport', summary: 'Read the caller’s manual Strava fetch status', security,
-          description: 'Read-only run status. Poll every three seconds while a run is active and Settings is visible. Expired leases report interruption.',
+          operationId: 'getStravaImport',
+          summary: 'Read the caller’s manual Strava fetch status',
+          security,
+          description:
+            'Read-only run status. Poll every three seconds while a run is active and Settings is visible. Expired leases report interruption.',
           responses: {
-            '200': { description: 'Current run and cooldown', content: { 'application/json': { schema: ref('StravaImportResponse') } } },
-            '401': errorResponse('Authentication required'), '429': errorResponse('Too many requests; honor Retry-After'), '500': errorResponse('Status unavailable'),
+            '200': {
+              description: 'Current run and cooldown',
+              content: {
+                'application/json': { schema: ref('StravaImportResponse') },
+              },
+            },
+            '401': errorResponse('Authentication required'),
+            '429': errorResponse('Too many requests; honor Retry-After'),
+            '500': errorResponse('Status unavailable'),
           },
         },
         post: {
-          operationId: 'startStravaImport', summary: 'Fetch more Strava data in the background', security,
-          description: 'Starts a bounded background fetch of recent summaries, pending details/photos and older history. Existing runs and five-minute cooldowns are shared across devices. Progress checkpoints survive later runs; shared Strava quotas still apply. This operation never fetches activity streams.',
+          operationId: 'startStravaImport',
+          summary: 'Fetch more Strava data in the background',
+          security,
+          description:
+            'Starts a bounded background fetch of recent summaries, pending details/photos and older history. Existing runs and five-minute cooldowns are shared across devices. Progress checkpoints survive later runs; shared Strava quotas still apply. This operation never fetches activity streams.',
           responses: {
-            '202': { description: 'Background run accepted', content: { 'application/json': { schema: ref('StravaImportResponse') } } },
-            '200': { description: 'An existing run or cooldown is returned without dispatching more work', content: { 'application/json': { schema: ref('StravaImportResponse') } } },
-            '401': errorResponse('Authentication required'), '403': errorResponse('Origin rejected or external effects disabled'),
-            '409': errorResponse('Reconnect Strava'), '429': errorResponse('Too many requests; honor Retry-After'), '500': errorResponse('Could not start the run'),
+            '202': {
+              description: 'Background run accepted',
+              content: {
+                'application/json': { schema: ref('StravaImportResponse') },
+              },
+            },
+            '200': {
+              description:
+                'An existing run or cooldown is returned without dispatching more work',
+              content: {
+                'application/json': { schema: ref('StravaImportResponse') },
+              },
+            },
+            '401': errorResponse('Authentication required'),
+            '403': errorResponse(
+              'Origin rejected or external effects disabled',
+            ),
+            '409': errorResponse('Reconnect Strava'),
+            '429': errorResponse('Too many requests; honor Retry-After'),
+            '500': errorResponse('Could not start the run'),
           },
         },
       },
@@ -243,7 +359,7 @@ export function buildOpenApiDocument() {
           operationId: 'getIngestionStatus',
           summary: "The caller's Strava import coverage and progress",
           description:
-            'Read-only, account-scoped status of what ActivityMap has imported from Strava (history, details, photo metadata and streams) and whether automatic work will continue. It never reflects a client\'s own local sync state, never calls Strava, and is privately cacheable for `max-age`; clients should not poll faster. See docs/ingestion-status.md.',
+            "Read-only, account-scoped status of what ActivityMap has imported from Strava (history, details, photo metadata and streams) and whether automatic work will continue. It never reflects a client's own local sync state, never calls Strava, and is privately cacheable for `max-age`; clients should not poll faster. See docs/ingestion-status.md.",
           security,
           responses: {
             '200': {
@@ -273,7 +389,8 @@ export function buildOpenApiDocument() {
               in: 'query',
               required: false,
               schema: { type: 'string', enum: ['activities', 'photos'] },
-              description: 'Which entity type to page through (default `activities`)',
+              description:
+                'Which entity type to page through (default `activities`)',
             },
             {
               name: 'cursor',
@@ -298,7 +415,9 @@ export function buildOpenApiDocument() {
             '200': {
               description: 'A page of the bootstrap snapshot',
               content: {
-                'application/json': { schema: ref('SyncBootstrapPageResponse') },
+                'application/json': {
+                  schema: ref('SyncBootstrapPageResponse'),
+                },
               },
             },
             '400': errorResponse(
@@ -311,10 +430,31 @@ export function buildOpenApiDocument() {
           },
         },
       },
+      '/api/v1/sync/native': {
+        get: {
+          operationId: 'nativeSyncConfiguration',
+          summary: 'Discover the account’s native Convex library transport',
+          description:
+            'Returns a Convex deployment URL and protocol version, or null when unavailable. Authenticate /api/auth/token with the same bearer session to obtain a short-lived JWT. Clients fall back to HTTP sync if the native queries are unavailable.',
+          responses: {
+            '200': {
+              description: 'Native sync configuration or null',
+              content: {
+                'application/json': {
+                  schema: ref('NativeSyncConfigurationResponse'),
+                },
+              },
+            },
+            '401': errorResponse('Authentication is required'),
+            '429': errorResponse('Too many requests; see Retry-After'),
+          },
+        },
+      },
       '/api/v1/sync/changes': {
         get: {
           operationId: 'syncChanges',
-          summary: 'Ordered activity/photo upserts and deletions after a cursor',
+          summary:
+            'Ordered activity/photo upserts and deletions after a cursor',
           description:
             'Never driven by `changed_at` - always by `sync_change.sequence` - so no change can be skipped or duplicated at a page boundary. See docs/swiftui-backend-preparation-plan.md, "Delta synchronization". Safe to replay: applying the same page twice, or resuming after an interruption with the last cursor a client actually committed, produces the same end state.',
           security,
@@ -346,7 +486,9 @@ export function buildOpenApiDocument() {
                 'application/json': { schema: ref('SyncChangesPageResponse') },
               },
             },
-            '400': errorResponse('The `cursor` or `limit` parameter is invalid'),
+            '400': errorResponse(
+              'The `cursor` or `limit` parameter is invalid',
+            ),
             '401': errorResponse(
               'No valid session or bearer credential was presented',
             ),
@@ -359,55 +501,164 @@ export function buildOpenApiDocument() {
       },
       '/api/v1/activities/{id}/streams': {
         get: {
-          operationId: 'getActivityStreams', summary: 'Get raw streams for an owned activity', security,
-          description: 'By default, a cache miss or stale generation fetches synchronously with a 20-second upstream deadline. A concurrent fetch returns 202; poll after Retry-After. fetch=none only inspects local state. Missing/inaccessible activities and disconnected accounts return 404 without availability information. Successful empty or partial streams return 200; absent keys denote unavailable sensors only when metadata.state is current. Invalidated samples are withheld. Activity tombstones invalidate the entire local stream cache. Stored sets have no age limit; expires_at is always null and kept for compatibility.',
+          operationId: 'getActivityStreams',
+          summary: 'Get raw streams for an owned activity',
+          security,
+          description:
+            'By default, a cache miss or stale generation fetches synchronously with a 20-second upstream deadline. A concurrent fetch returns 202; poll after Retry-After. fetch=none only inspects local state. Missing/inaccessible activities and disconnected accounts return 404 without availability information. Successful empty or partial streams return 200; absent keys denote unavailable sensors only when metadata.state is current. Invalidated samples are withheld. Activity tombstones invalidate the entire local stream cache. Stored sets have no age limit; expires_at is always null and kept for compatibility.',
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string', pattern: '^[1-9][0-9]*$' }, description: 'Decimal activity ID, never a floating-point number' },
-            { name: 'fetch', in: 'query', schema: { type: 'string', enum: ['auto', 'none'], default: 'auto' } },
-            { name: 'refresh', in: 'query', schema: { type: 'string', enum: ['true', 'false'], default: 'false' }, description: 'Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none.' },
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', pattern: '^[1-9][0-9]*$' },
+              description: 'Decimal activity ID, never a floating-point number',
+            },
+            {
+              name: 'fetch',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['auto', 'none'],
+                default: 'auto',
+              },
+            },
+            {
+              name: 'refresh',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['true', 'false'],
+                default: 'false',
+              },
+              description:
+                'Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none.',
+            },
           ],
           responses: {
-            '200': { description: 'Stored streams and explicit availability/freshness; fetch=none may return not_fetched or failed state', content: { 'application/json': { schema: ref('ActivityStreamsResponse') } } },
-            '202': { description: 'Fetch already in progress or invalidated during this request; see Retry-After', content: { 'application/json': { schema: ref('ActivityStreamsResponse') } } },
+            '200': {
+              description:
+                'Stored streams and explicit availability/freshness; fetch=none may return not_fetched or failed state',
+              content: {
+                'application/json': { schema: ref('ActivityStreamsResponse') },
+              },
+            },
+            '202': {
+              description:
+                'Fetch already in progress or invalidated during this request; see Retry-After',
+              content: {
+                'application/json': { schema: ref('ActivityStreamsResponse') },
+              },
+            },
             '400': errorResponse('Invalid activity ID or query parameters'),
             '401': errorResponse('Authentication is required'),
             '404': errorResponse('Activity or connected account unavailable'),
-            '429': errorResponse('Per-user/API or shared Strava budget exhausted; see Retry-After'),
+            '429': errorResponse(
+              'Per-user/API or shared Strava budget exhausted; see Retry-After',
+            ),
             '500': errorResponse('Unexpected database or internal failure'),
-            '503': errorResponse('Stream fetch failed; retryability is explicit. No empty success is synthesized from errors.'),
+            '503': errorResponse(
+              'Stream fetch failed; retryability is explicit. No empty success is synthesized from errors.',
+            ),
           },
         },
       },
       '/api/v1/activities/{id}/streams/summary': {
         get: {
-          operationId: 'getActivityStreamSummary', summary: 'Get downsampled streams for an owned activity', security,
-          description: 'Same fetch, freshness and error semantics as /api/v1/activities/{id}/streams, but returns up to 300 aligned points instead of the raw samples. Points come from equal-width distance/time buckets, omitting empty buckets and retaining actual irregular axis values; each present series has one value per point. Streams sampled differently from that axis are omitted. summary is null unless metadata.state is current.',
+          operationId: 'getActivityStreamSummary',
+          summary: 'Get downsampled streams for an owned activity',
+          security,
+          description:
+            'Same fetch, freshness and error semantics as /api/v1/activities/{id}/streams, but returns up to 300 aligned points instead of the raw samples. Points come from equal-width distance/time buckets, omitting empty buckets and retaining actual irregular axis values; each present series has one value per point. Streams sampled differently from that axis are omitted. summary is null unless metadata.state is current.',
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string', pattern: '^[1-9][0-9]*$' }, description: 'Decimal activity ID, never a floating-point number' },
-            { name: 'fetch', in: 'query', schema: { type: 'string', enum: ['auto', 'none'], default: 'auto' } },
-            { name: 'refresh', in: 'query', schema: { type: 'string', enum: ['true', 'false'], default: 'false' }, description: 'Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none.' },
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', pattern: '^[1-9][0-9]*$' },
+              description: 'Decimal activity ID, never a floating-point number',
+            },
+            {
+              name: 'fetch',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['auto', 'none'],
+                default: 'auto',
+              },
+            },
+            {
+              name: 'refresh',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['true', 'false'],
+                default: 'false',
+              },
+              description:
+                'Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none.',
+            },
           ],
           responses: {
-            '200': { description: 'Stored summary and explicit availability/freshness', content: { 'application/json': { schema: ref('ActivityStreamSummaryResponse') } } },
-            '202': { description: 'Fetch already in progress or invalidated during this request; see Retry-After', content: { 'application/json': { schema: ref('ActivityStreamSummaryResponse') } } },
+            '200': {
+              description: 'Stored summary and explicit availability/freshness',
+              content: {
+                'application/json': {
+                  schema: ref('ActivityStreamSummaryResponse'),
+                },
+              },
+            },
+            '202': {
+              description:
+                'Fetch already in progress or invalidated during this request; see Retry-After',
+              content: {
+                'application/json': {
+                  schema: ref('ActivityStreamSummaryResponse'),
+                },
+              },
+            },
             '400': errorResponse('Invalid activity ID or query parameters'),
             '401': errorResponse('Authentication is required'),
             '404': errorResponse('Activity or connected account unavailable'),
-            '429': errorResponse('Per-user/API or shared Strava budget exhausted; see Retry-After'),
+            '429': errorResponse(
+              'Per-user/API or shared Strava budget exhausted; see Retry-After',
+            ),
             '500': errorResponse('Unexpected database or internal failure'),
-            '503': errorResponse('Stream fetch failed; retryability is explicit.'),
+            '503': errorResponse(
+              'Stream fetch failed; retryability is explicit.',
+            ),
           },
         },
       },
       '/api/v1/stream-summaries': {
         get: {
-          operationId: 'getStreamSummaries', summary: 'Get stored downsampled streams for several owned activities', security,
-          description: 'Never contacts Strava. Returns one entry per owned activity among ids, in no particular order; IDs of other athletes are omitted. Activities without a current stored set have summary null; load them through /api/v1/activities/{id}/streams/summary.',
+          operationId: 'getStreamSummaries',
+          summary:
+            'Get stored downsampled streams for several owned activities',
+          security,
+          description:
+            'Never contacts Strava. Returns one entry per owned activity among ids, in no particular order; IDs of other athletes are omitted. Activities without a current stored set have summary null; load them through /api/v1/activities/{id}/streams/summary.',
           parameters: [
-            { name: 'ids', in: 'query', required: true, schema: { type: 'string', pattern: '^[1-9][0-9]*(,[1-9][0-9]*)*$' }, description: 'Up to 100 comma-separated decimal activity IDs' },
+            {
+              name: 'ids',
+              in: 'query',
+              required: true,
+              schema: {
+                type: 'string',
+                pattern: '^[1-9][0-9]*(,[1-9][0-9]*)*$',
+              },
+              description: 'Up to 100 comma-separated decimal activity IDs',
+            },
           ],
           responses: {
-            '200': { description: 'Summaries for the owned activities among ids', content: { 'application/json': { schema: ref('ActivityStreamSummariesResponse') } } },
+            '200': {
+              description: 'Summaries for the owned activities among ids',
+              content: {
+                'application/json': {
+                  schema: ref('ActivityStreamSummariesResponse'),
+                },
+              },
+            },
             '400': errorResponse('Missing, malformed or too many IDs'),
             '401': errorResponse('Authentication is required'),
             '404': errorResponse('Connected account unavailable'),
@@ -418,34 +669,100 @@ export function buildOpenApiDocument() {
       },
       '/api/v1/activities/{id}/streams/summary/compact': {
         get: {
-          operationId: 'getActivityCompactStreamSummary', summary: 'Get downsampled streams for an owned activity', security,
-          description: 'Opt-in polyline-v1 encoding, preserving current rounded samples. Codec scales are fixed: time/HR/power 1, distance/altitude 10, GPS 100000. Decode only for display; codec and sampling version are separate. Same fetch, freshness and error semantics as /api/v1/activities/{id}/streams, but returns up to 300 aligned points instead of the raw samples. Points come from equal-width distance/time buckets, omitting empty buckets and retaining actual irregular axis values; each present series has one value per point. Streams sampled differently from that axis are omitted. summary is null unless metadata.state is current.',
+          operationId: 'getActivityCompactStreamSummary',
+          summary: 'Get downsampled streams for an owned activity',
+          security,
+          description:
+            'Opt-in polyline-v1 encoding, preserving current rounded samples. Codec scales are fixed: time/HR/power 1, distance/altitude 10, GPS 100000. Decode only for display; codec and sampling version are separate. Same fetch, freshness and error semantics as /api/v1/activities/{id}/streams, but returns up to 300 aligned points instead of the raw samples. Points come from equal-width distance/time buckets, omitting empty buckets and retaining actual irregular axis values; each present series has one value per point. Streams sampled differently from that axis are omitted. summary is null unless metadata.state is current.',
           parameters: [
-            { name: 'id', in: 'path', required: true, schema: { type: 'string', pattern: '^[1-9][0-9]*$' }, description: 'Decimal activity ID, never a floating-point number' },
-            { name: 'fetch', in: 'query', schema: { type: 'string', enum: ['auto', 'none'], default: 'auto' } },
-            { name: 'refresh', in: 'query', schema: { type: 'string', enum: ['true', 'false'], default: 'false' }, description: 'Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none.' },
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', pattern: '^[1-9][0-9]*$' },
+              description: 'Decimal activity ID, never a floating-point number',
+            },
+            {
+              name: 'fetch',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['auto', 'none'],
+                default: 'auto',
+              },
+            },
+            {
+              name: 'refresh',
+              in: 'query',
+              schema: {
+                type: 'string',
+                enum: ['true', 'false'],
+                default: 'false',
+              },
+              description:
+                'Request a refresh; deduplicated and limited to once per minute per activity. Incompatible with fetch=none.',
+            },
           ],
           responses: {
-            '200': { description: 'Stored summary and explicit availability/freshness', content: { 'application/json': { schema: ref('ActivityCompactStreamSummaryResponse') } } },
-            '202': { description: 'Fetch already in progress or invalidated during this request; see Retry-After', content: { 'application/json': { schema: ref('ActivityCompactStreamSummaryResponse') } } },
+            '200': {
+              description: 'Stored summary and explicit availability/freshness',
+              content: {
+                'application/json': {
+                  schema: ref('ActivityCompactStreamSummaryResponse'),
+                },
+              },
+            },
+            '202': {
+              description:
+                'Fetch already in progress or invalidated during this request; see Retry-After',
+              content: {
+                'application/json': {
+                  schema: ref('ActivityCompactStreamSummaryResponse'),
+                },
+              },
+            },
             '400': errorResponse('Invalid activity ID or query parameters'),
             '401': errorResponse('Authentication is required'),
             '404': errorResponse('Activity or connected account unavailable'),
-            '429': errorResponse('Per-user/API or shared Strava budget exhausted; see Retry-After'),
+            '429': errorResponse(
+              'Per-user/API or shared Strava budget exhausted; see Retry-After',
+            ),
             '500': errorResponse('Unexpected database or internal failure'),
-            '503': errorResponse('Stream fetch failed; retryability is explicit.'),
+            '503': errorResponse(
+              'Stream fetch failed; retryability is explicit.',
+            ),
           },
         },
       },
       '/api/v1/stream-summaries/compact': {
         get: {
-          operationId: 'getCompactStreamSummaries', summary: 'Get stored downsampled streams for several owned activities', security,
-          description: 'Opt-in polyline-v1 encoded summaries. Never contacts Strava. Returns one entry per owned activity among ids, in no particular order; IDs of other athletes are omitted. Activities without a current stored set have summary null; load them through /api/v1/activities/{id}/streams/summary.',
+          operationId: 'getCompactStreamSummaries',
+          summary:
+            'Get stored downsampled streams for several owned activities',
+          security,
+          description:
+            'Opt-in polyline-v1 encoded summaries. Never contacts Strava. Returns one entry per owned activity among ids, in no particular order; IDs of other athletes are omitted. Activities without a current stored set have summary null; load them through /api/v1/activities/{id}/streams/summary.',
           parameters: [
-            { name: 'ids', in: 'query', required: true, schema: { type: 'string', pattern: '^[1-9][0-9]*(,[1-9][0-9]*)*$' }, description: 'Up to 100 comma-separated decimal activity IDs' },
+            {
+              name: 'ids',
+              in: 'query',
+              required: true,
+              schema: {
+                type: 'string',
+                pattern: '^[1-9][0-9]*(,[1-9][0-9]*)*$',
+              },
+              description: 'Up to 100 comma-separated decimal activity IDs',
+            },
           ],
           responses: {
-            '200': { description: 'Summaries for the owned activities among ids', content: { 'application/json': { schema: ref('ActivityCompactStreamSummariesResponse') } } },
+            '200': {
+              description: 'Summaries for the owned activities among ids',
+              content: {
+                'application/json': {
+                  schema: ref('ActivityCompactStreamSummariesResponse'),
+                },
+              },
+            },
             '400': errorResponse('Missing, malformed or too many IDs'),
             '401': errorResponse('Authentication is required'),
             '404': errorResponse('Connected account unavailable'),
@@ -458,17 +775,27 @@ export function buildOpenApiDocument() {
         post: {
           operationId: 'fetchInitialActivitySummaries',
           summary: 'Fetch and persist up to 200 recent Strava summaries',
-          description: 'One blocking first-page fetch through the existing Strava activity service. Returns the saved count; no request body.',
+          description:
+            'One blocking first-page fetch through the existing Strava activity service. Returns the saved count; no request body.',
           security,
           responses: {
-            '200': { description: 'Number of summaries fetched and persisted', content: { 'application/json': { schema: ref('ActivitySummaryFetchResponse') } } },
+            '200': {
+              description: 'Number of summaries fetched and persisted',
+              content: {
+                'application/json': {
+                  schema: ref('ActivitySummaryFetchResponse'),
+                },
+              },
+            },
             '401': errorResponse('Authentication required'),
             '403': errorResponse('Cross-origin request rejected'),
             '409': errorResponse('Strava account unavailable'),
             '429': errorResponse('Too many requests; see Retry-After'),
             '500': errorResponse('Persistence or internal failure'),
             '502': errorResponse('Upstream request failed'),
-            '503': errorResponse('External effects disabled or service unavailable'),
+            '503': errorResponse(
+              'External effects disabled or service unavailable',
+            ),
           },
         },
         get: {
@@ -655,7 +982,8 @@ export function buildOpenApiDocument() {
               in: 'query',
               required: true,
               schema: { type: 'string' },
-              description: 'Client-generated CSRF state, echoed back on the final redirect',
+              description:
+                'Client-generated CSRF state, echoed back on the final redirect',
             },
             {
               name: 'code_challenge',
@@ -669,7 +997,8 @@ export function buildOpenApiDocument() {
               in: 'query',
               required: true,
               schema: { type: 'string' },
-              description: 'The allow-listed universal link to redirect to once sign-in completes',
+              description:
+                'The allow-listed universal link to redirect to once sign-in completes',
             },
           ],
           responses: {
@@ -685,17 +1014,21 @@ export function buildOpenApiDocument() {
       '/api/v1/auth/mobile/callback': {
         get: {
           operationId: 'mobileAuthCallback',
-          summary: "Strava's OAuth callback, redirected here for a mobile sign-in",
+          summary:
+            "Strava's OAuth callback, redirected here for a mobile sign-in",
           description:
             'Not called directly by a client. Mints a one-time login code bound to the just-completed browser session and redirects to the mobile universal link with that code and the original `state`.',
           responses: {
             '302': {
-              description: 'Redirect to the mobile universal link with a one-time code',
+              description:
+                'Redirect to the mobile universal link with a one-time code',
             },
             '400': errorResponse(
               'A required parameter is missing, or `redirect_uri` is not allow-listed',
             ),
-            '401': errorResponse('The Strava sign-in did not produce a session'),
+            '401': errorResponse(
+              'The Strava sign-in did not produce a session',
+            ),
             '429': errorResponse('Too many requests; see `Retry-After`'),
             '500': errorResponse('The request could not be completed'),
           },
@@ -704,7 +1037,8 @@ export function buildOpenApiDocument() {
       '/api/v1/auth/mobile/exchange': {
         post: {
           operationId: 'exchangeMobileLoginCode',
-          summary: 'Exchange a one-time mobile login code for a bearer session token',
+          summary:
+            'Exchange a one-time mobile login code for a bearer session token',
           requestBody: {
             required: true,
             content: {
@@ -749,7 +1083,9 @@ export function buildOpenApiDocument() {
             '200': {
               description: 'The active sessions for the current user',
               content: {
-                'application/json': { schema: ref('MobileSessionListResponse') },
+                'application/json': {
+                  schema: ref('MobileSessionListResponse'),
+                },
               },
             },
             '401': errorResponse(
@@ -762,7 +1098,8 @@ export function buildOpenApiDocument() {
       '/api/v1/auth/sessions/revoke': {
         post: {
           operationId: 'revokeSession',
-          summary: 'Revoke one of the caller\'s own sessions by token (per-device sign-out)',
+          summary:
+            "Revoke one of the caller's own sessions by token (per-device sign-out)",
           security,
           requestBody: {
             required: true,
