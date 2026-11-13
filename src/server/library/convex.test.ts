@@ -7,7 +7,7 @@ import { BridgeResponseError } from '../sync/bridge-response-error';
 import { SyncRebootstrapRequiredError } from '../sync/errors';
 import { convexAppAdapter } from './convex';
 
-void test('delta compatibility distinguishes an old backend from auth, cursor and server failures', async (t) => {
+void test('delta errors including genuine 400 responses propagate without fallback reads', async (t) => {
   for (const [name, value] of Object.entries({
     ACTIVITYMAP_CONVEX_SITE: 'https://backend.example.com',
     ACTIVITYMAP_CONVEX_KEY_ID: 'current',
@@ -36,13 +36,11 @@ void test('delta compatibility distinguishes an old backend from auth, cursor an
       },
     );
     const result = adapter.changesPage(actor, { after: 0, limit: 500 });
-    if (status === 400) assert.equal(await result, null);
-    else
-      await assert.rejects(
-        result,
-        (error: unknown) =>
-          error instanceof BridgeResponseError && error.status === status,
-      );
+    await assert.rejects(
+      result,
+      (error: unknown) =>
+        error instanceof BridgeResponseError && error.status === status,
+    );
     assert.equal(calls, 1);
   }
   const expired = convexAppAdapter(actor, 'epoch-1234567890123456', async () =>

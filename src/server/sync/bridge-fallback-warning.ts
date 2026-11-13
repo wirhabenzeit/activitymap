@@ -1,10 +1,10 @@
 import { logger } from '~/server/logging/logger';
 
-type Operation = 'rateLimits' | 'changesPage';
+type Operation = 'rateLimits';
 type Warning = { operation: Operation; status: 400; suppressed: number };
 
-/** Bounded to two operation names, with at most one warning per minute per
- * operation and server process. Never accept user data or bridge bodies. */
+/** At most one warning per minute for the remaining rate-limit compatibility
+ * path and server process. Never accept user data or bridge bodies. */
 export function createBridgeFallbackWarning(
   warn: (message: string, details: Warning) => void = logger.warn,
   now: () => number = () => performance.now(),

@@ -29,8 +29,6 @@ import {
   ACTIVITY_STREAM_TYPES,
   rawActivityStreamsSchema,
 } from '~/server/strava/streams';
-import { warnBridgeFallback } from '~/server/sync/bridge-fallback-warning';
-import { BridgeResponseError } from '~/server/sync/bridge-response-error';
 import { convexSyncBridge } from '~/server/sync/convex-bridge';
 
 import { convexIngestionStatus, statusPageSchema } from './status';
@@ -306,21 +304,12 @@ function convexAdapter(actor: Actor, transport: Transport) {
     changesPage: async (
       candidate: Actor,
       args: { after: number; limit: number },
-    ): Promise<ChangesSnapshot | null> => {
+    ): Promise<ChangesSnapshot> => {
       assertActor(candidate);
       const result = await query(
         { kind: 'changesPage', ...args },
         changesSnapshotSchema,
-      ).catch((error: unknown) => {
-        // Older deployments reject the new operation with 400. The route
-        // then uses the existing, fully fenced repository read path.
-        if (error instanceof BridgeResponseError && error.status === 400) {
-          warnBridgeFallback('changesPage');
-          return null;
-        }
-        throw error;
-      });
-      if (result === null) return null;
+      );
       if (
         result.lastSequence < args.after ||
         result.lastSequence > result.head.sequence
@@ -569,10 +558,7 @@ function convexAdapter(actor: Actor, transport: Transport) {
         if (!Number.isSafeInteger(Number(id)))
           throw new ActivityStreamsUnavailableError();
         const response = await send({ kind: 'raw', id: Number(id) });
-        // Retain the historical header for compatibility with deployed bridges.
-        const binaryMetadata =
-          response.headers.get('x-stream-metadata') ??
-          response.headers.get('x-preview-stream-metadata');
+        const binaryMetadata = response.headers.get('x-stream-metadata');
         if (binaryMetadata) {
           const metadata = streamMetadataSchema.parse(
             JSON.parse(binaryMetadata),

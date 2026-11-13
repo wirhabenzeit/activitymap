@@ -97,7 +97,7 @@ const fixture = previewFixtureActivity(
   Date.now(),
 );
 
-void test('new delta API works before and after a backend upgrade without changing its cursor', async (t) => {
+void test('production delta requires one atomic bridge read and propagates 400 instead of hiding it', async (t) => {
   const convex = convexTest(schema, modules);
   await convex.mutation(internal.owners.provision, config);
   const id = '1234';
@@ -121,14 +121,14 @@ void test('new delta API works before and after a backend upgrade without changi
     });
   }
   const candidate = { ...actor, authentication: 'bearer' as const };
-  let upgraded = false;
+  let rejectDelta = false;
   const operations: string[] = [];
   const fetcher: typeof fetch = (url, init) => {
     const { operation } = JSON.parse(String(init?.body)) as {
       operation: { kind: string };
     };
     operations.push(operation.kind);
-    if (!upgraded && operation.kind === 'changesPage')
+    if (rejectDelta && operation.kind === 'changesPage')
       return Promise.resolve(new Response(null, { status: 400 }));
     return convex.fetch(new URL(String(url)).pathname, init);
   };
@@ -157,32 +157,16 @@ void test('new delta API works before and after a backend upgrade without changi
     issuedAt: new Date(),
     backend: convexAppAdapter(candidate, scope.epoch, fetcher).cursorBackend,
   });
-  const old = await read(cursor);
-  assert.equal(old.items[0]!.activity!.id, id);
-  assert.deepEqual(operations, [
-    'changesPage',
-    'retention',
-    'head',
-    'changes',
-    'activityIds',
-  ]);
-  const empty = await read(old.nextCursor);
-  assert.deepEqual(empty.items, []);
-  assert.equal(empty.nextCursor, old.nextCursor);
-  upgraded = true;
-  operations.length = 0;
-  const fast = await read(cursor);
-  assert.deepEqual(fast, old);
+  const page = await read(cursor);
+  assert.equal(page.items[0]!.activity!.id, id);
   assert.deepEqual(operations, ['changesPage']);
-  upgraded = false;
+  const empty = await read(page.nextCursor);
+  assert.deepEqual(empty.items, []);
+  assert.equal(empty.nextCursor, page.nextCursor);
+  rejectDelta = true;
   operations.length = 0;
-  assert.deepEqual(
-    await read(cursor),
-    old,
-    'backend rollback must restore the legacy path automatically',
-  );
-  assert.equal(operations[0], 'changesPage');
-  assert(operations.includes('retention'));
+  await assert.rejects(read(cursor), /400/);
+  assert.deepEqual(operations, ['changesPage']);
 });
 
 void test('atomic delta includes current photo metadata and its deletion', async () => {

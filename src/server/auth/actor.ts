@@ -85,7 +85,8 @@ export async function resolveActor(
   try {
     const user = await getUser(session.user.id);
     athleteId = user?.athlete_id ?? null;
-    if (user?.writer === 'convex') convexEpoch = user.convexEpoch ?? null;
+    if (user?.writer === 'convex' || user?.writer === 'handoff')
+      convexEpoch = user.convexEpoch ?? null;
   } catch (error) {
     if (error instanceof UserNotFoundError) {
       // No local user row for this session - treat as unauthenticated

@@ -1,21 +1,25 @@
 import { makeEnvelope } from '~/contracts/v1/envelope';
 import { nativeSyncConfigurationSchema } from '~/contracts/v1/sync';
-import { convexJwtOptions } from '~/lib/auth-jwt';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { findUserInternal } from '~/server/auth/users';
 import { notAuthenticated } from '~/server/library';
 import { convexLiveUrlFor } from '~/server/library/live-configuration';
 
-/** Discovery only. The existing bearer-authenticated /api/auth/token issues
+/** Initialize an eligible account before advertising native sync. The existing
+ * bearer-authenticated /api/auth/token issues
  * short-lived JWTs; no signing secrets are ever sent to the phone. A client
  * falls back to HTTP if discovery or the native query isn't deployed yet. */
 export const GET = withAuthenticatedApiV1(
-  async (_request, context) => {
+  async (request, context) => {
     const userId = await context.userId();
     if (!userId) return notAuthenticated(context.requestId);
     const user = await findUserInternal(userId);
     if (!user) return notAuthenticated(context.requestId);
-    const url = convexJwtOptions() ? convexLiveUrlFor(user) : null;
+    const url = await convexLiveUrlFor(user, {
+      authentication: request.headers.has('authorization')
+        ? 'bearer'
+        : 'cookie',
+    });
     return Response.json(
       makeEnvelope(
         nativeSyncConfigurationSchema

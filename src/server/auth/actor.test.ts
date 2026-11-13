@@ -122,7 +122,7 @@ void test('resolveActor exposes only the stored Convex assignment', async () => 
   );
   assert.deepEqual(
     await resolve({ writer: 'handoff', convexEpoch: 'epoch-0123456789ab' }),
-    base,
+    { ...base, convexEpoch: 'epoch-0123456789ab' },
   );
   assert.deepEqual(
     await resolve({ writer: 'convex', convexEpoch: 'epoch-0123456789ab' }),

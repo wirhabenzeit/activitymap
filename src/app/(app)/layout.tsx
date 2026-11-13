@@ -49,7 +49,7 @@ export default async function AppShellLayout({
   if (session?.user?.id) {
     const user = await getUserInternal(session.user.id);
     const account = user ? await getAccountInternal({ userId: user.id }) : null;
-    const liveUrl = user ? convexLiveUrlFor(user) : null;
+    const liveUrl = user ? await convexLiveUrlFor(user) : null;
     initialAuth.currentUser = user
       ? {
           ...toCurrentUserDTO(user, account),
