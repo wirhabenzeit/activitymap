@@ -39,5 +39,12 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", ".quality", "output", "public/sw.js", "backend"]
+  "exclude": [
+    "node_modules",
+    ".quality",
+    "output",
+    "public/sw.js",
+    "scripts/investigations/convex-geo/lab",
+    "backend"
+  ]
 }
