@@ -34,6 +34,7 @@ const modules = {
   './activityWrites.ts': () => import('../convex/activityWrites'),
   './catalogue.ts': () => import('../convex/catalogue'),
   './library.ts': () => import('../convex/library'),
+  './nativeSync.ts': () => import('../convex/nativeSync'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
   './places.ts': () => import('../convex/places'),
@@ -573,4 +574,176 @@ void test('stored photos are counted, listed and announced in the feed', async (
   await convex.mutation(internal.stats.rebuildStep, { owner });
   assert.deepEqual(await counts(), before);
   assert.deepEqual(await paged(), before);
+});
+
+void test('native bootstrap and deltas carry full DTOs, photo tombstones and transport-scoped cursors', async () => {
+  const convex = await setup(3);
+  const client = convex.withIdentity(identity);
+  const bootstrap = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'activities',
+      cursor: null,
+    }),
+  );
+  assert.equal(bootstrap.items.length, 3);
+  assert.equal(bootstrap.items[0].map_polyline, 'detailed-1000');
+  assert(bootstrap.snapshotCursor.startsWith('ios-convex-v1:'));
+  assert.equal(bootstrap.nextCursor, null);
+  const { syncBootstrapPageDTOSchema, syncChangesPageDTOSchema } =
+    await import('../../src/contracts/v1/sync');
+  syncBootstrapPageDTOSchema.parse(bootstrap);
+  const cursor = bootstrap.snapshotCursor;
+  await convex.run(async (ctx) => {
+    const owner = (await ctx.db.query('owners').first())!;
+    const row = (await ctx.db.query('activities').first())!;
+    await ctx.db.patch('activities', row._id, { deleted: true });
+    const { publishChange } = await import('../convex/activityWrites');
+    await publishChange(ctx, owner, row.dto!.id, 'delete');
+    await publishChange(ctx, owner, 'removed-photo', 'delete', 'photo');
+  });
+  const delta = JSON.parse(
+    await client.query(api.nativeSync.read, { resource: 'changes', cursor }),
+  );
+  syncChangesPageDTOSchema.parse(delta);
+  assert.deepEqual(
+    delta.items.map((item: { entityType: string; operation: string }) => [
+      item.entityType,
+      item.operation,
+    ]),
+    [
+      ['activity', 'delete'],
+      ['photo', 'delete'],
+    ],
+  );
+  const caughtUp = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'changes',
+      cursor: delta.nextCursor,
+    }),
+  );
+  assert.equal(caughtUp.nextCursor, delta.nextCursor);
+  assert.deepEqual(caughtUp.items, []);
+  assert.equal(
+    (await client.query(api.nativeSync.head, {})).sequence,
+    JSON.parse(delta.nextCursor.slice('ios-convex-v1:'.length)).sequence,
+  );
+});
+
+void test('native reads reject anonymous, other owners, expired positions, changed versions and HTTP cursors', async () => {
+  const convex = await setup(1);
+  const client = convex.withIdentity(identity);
+  const page = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'activities',
+      cursor: null,
+    }),
+  );
+  await assert.rejects(convex.query(api.nativeSync.head, {}), /not_authorized/);
+  await assert.rejects(
+    convex
+      .withIdentity({ ...identity, subject: 'someone-else' })
+      .query(api.nativeSync.read, {
+        resource: 'changes',
+        cursor: page.snapshotCursor,
+      }),
+    /not_authorized/,
+  );
+  await convex.mutation(internal.owners.provision, {
+    ...scope,
+    userId: 'second-served-owner',
+    athleteId: '43',
+    backend: 'convex',
+    generation,
+    catalogue,
+    matchingVersion,
+  });
+  await assert.rejects(
+    convex
+      .withIdentity({ ...identity, subject: 'second-served-owner' })
+      .query(api.nativeSync.read, {
+        resource: 'changes',
+        cursor: page.snapshotCursor,
+      }),
+    /sync_rebootstrap_required/,
+  );
+  await assert.rejects(
+    client.query(api.nativeSync.read, {
+      resource: 'changes',
+      cursor: 'HTTP-cursor',
+    }),
+    /sync_rebootstrap_required/,
+  );
+  await convex.run(async (ctx) => {
+    const head = (await ctx.db.query('ownerHeads').first())!;
+    await ctx.db.patch('ownerHeads', head._id, {
+      retentionFloor: head.sequence + 1,
+    });
+  });
+  await assert.rejects(
+    client.query(api.nativeSync.read, {
+      resource: 'changes',
+      cursor: page.snapshotCursor,
+    }),
+    /sync_rebootstrap_required/,
+  );
+  await convex.run(async (ctx) => {
+    const owner = (await ctx.db.query('owners').first())!;
+    await ctx.db.patch('owners', owner._id, {
+      generation: 'replacement-generation',
+    });
+  });
+  await assert.rejects(
+    client.query(api.nativeSync.read, {
+      resource: 'changes',
+      cursor: page.snapshotCursor,
+    }),
+    /sync_rebootstrap_required/,
+  );
+});
+
+void test('native large-route pages stay bounded and reconcile writes during bootstrap from the first head', async () => {
+  const convex = await setup(20, { large: true });
+  const client = convex.withIdentity(identity);
+  let page = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'activities',
+      cursor: null,
+    }),
+  );
+  const snapshot = page.snapshotCursor;
+  // Insert behind the first page's key boundary: only catch-up can see it.
+  await convex.mutation(testWrites.applySources, {
+    scope,
+    generation,
+    sourceRevision: 11,
+    items: [activity('999', 30)],
+    recordings: [],
+  });
+  const seen = new Set<string>();
+  do {
+    assert(Buffer.byteLength(JSON.stringify(page)) < 600 * 1024);
+    for (const item of page.items) {
+      assert(!seen.has(item.id));
+      seen.add(item.id);
+    }
+    if (!page.nextCursor) break;
+    const before = page.nextCursor;
+    page = JSON.parse(
+      await client.query(api.nativeSync.read, {
+        resource: 'activities',
+        cursor: before,
+      }),
+    );
+    assert.equal(page.snapshotCursor, null);
+    assert.notEqual(page.nextCursor, before);
+  } while (true);
+  assert.equal(seen.size, 20);
+  const delta = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'changes',
+      cursor: snapshot,
+    }),
+  );
+  assert.equal(delta.items[0].activity.id, '999');
+  assert.equal(delta.items[0].activity.map_polyline, 'detailed-999');
 });

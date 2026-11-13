@@ -1,6 +1,15 @@
 {
-  "originHash" : "c48d77ebe93e854e8e2b4bbddf1d5fe4977e5a87efa4e14ea29c90b3e5919e31",
+  "originHash" : "bb5e1da90783f1ca5e8075142e5cf54b5859baa093322af17e54fc1bd5e0994b",
   "pins" : [
+    {
+      "identity" : "convex-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/convex/convex-swift.git",
+      "state" : {
+        "revision" : "1c69cdd9723ffb5857f48aa360d079ed09d614fd",
+        "version" : "0.8.2"
+      }
+    },
     {
       "identity" : "mapbox-common-ios",
       "kind" : "remoteSourceControl",

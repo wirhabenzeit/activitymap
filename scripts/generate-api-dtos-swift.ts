@@ -105,6 +105,7 @@ import {
   stravaImportStatusSchema,
 } from '../src/contracts/v1/strava-import';
 import {
+  nativeSyncConfigurationSchema,
   syncBootstrapPageDTOSchema,
   syncChangeItemDTOSchema,
   syncChangesPageDTOSchema,
@@ -172,6 +173,7 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['SyncFreshnessMeta', syncFreshnessMetaSchema],
   ['SyncChangeItem', syncChangeItemDTOSchema],
   ['SyncBootstrapPage', syncBootstrapPageDTOSchema],
+  ['NativeSyncConfiguration', nativeSyncConfigurationSchema],
   ['SyncChangesPage', syncChangesPageDTOSchema],
   ['IngestionProgress', ingestionProgressSchema],
   ['IngestionScheduling', ingestionSchedulingSchema],
@@ -473,6 +475,9 @@ function swiftType(schema: JSONSchema, path: string): string {
   // A `const` is only reached for non-discriminator positions; the wire value
   // is still just its underlying primitive.
   if (schema.const !== undefined) {
+    if (typeof schema.const === 'number') {
+      return Number.isInteger(schema.const) ? 'Int' : 'Double';
+    }
     return typeof schema.const === 'string' ? 'String' : 'JSONValue';
   }
 

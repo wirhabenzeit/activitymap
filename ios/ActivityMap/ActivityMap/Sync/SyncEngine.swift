@@ -13,7 +13,8 @@ nonisolated struct SyncEngine: Sendable {
     func run() async throws -> SyncCheckpoint {
         do {
             let checkpoint = try await store.syncMetadata(scope: scope).checkpoint
-            if let checkpoint, checkpoint.bootstrapComplete, let cursor = checkpoint.changesCursor, !cursor.isEmpty {
+            if let checkpoint, checkpoint.bootstrapComplete, let cursor = checkpoint.changesCursor,
+               !cursor.isEmpty, source.accepts(cursor: cursor) {
                 return try await catchUp(checkpoint)
             }
             return try await bootstrap()

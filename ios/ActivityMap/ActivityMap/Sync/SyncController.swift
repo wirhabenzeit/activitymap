@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import OSLog
 
 nonisolated struct SyncSession: Equatable, Sendable {
     let user: ActivityMapAPI.CurrentUser
@@ -13,6 +14,7 @@ nonisolated struct SyncSession: Equatable, Sendable {
 @MainActor
 @Observable
 final class SyncController {
+    private static let syncLog = Logger(subsystem: "cc.activitymap", category: "Sync")
     enum Status: Equatable {
         case signedOut, syncing, ready, offline, expired, disconnected, paused
         case failed(String)
@@ -60,6 +62,12 @@ final class SyncController {
     private var storage: LocalStore?
     private var work: Task<Void, Never>?
     private var generation = 0
+    @ObservationIgnored private var native: (any NativeLibraryConnection)?
+    @ObservationIgnored private var nativeMonitor: Task<Void, Never>?
+    private var nativeAttempted = false
+    private var nativeDirty = false
+    private let nativeFactory: ((SyncSession) async throws -> (any NativeLibraryConnection)?)?
+    var usesNativeSync: Bool { native != nil }
     private var retryAt: Date?
     private var retryIsRateLimit = true
     // Checkpoint timestamps/cursors can advance without any visible data change.
@@ -97,6 +105,7 @@ final class SyncController {
         activities: ActivityStore,
         now: @escaping () -> Date = Date.init,
         source: @escaping (SyncSession) -> any SyncPageSource = { SyncAPI(baseURL: $0.deployment, token: $0.token) },
+        nativeFactory: ((SyncSession) async throws -> (any NativeLibraryConnection)?)? = nil,
         summarySource: @escaping (SyncSession) -> any CompactSummarySource = {
             StreamsAPI(baseURL: $0.deployment, token: $0.token)
         },
@@ -117,6 +126,7 @@ final class SyncController {
         self.activities = activities
         self.now = now
         self.source = source
+        self.nativeFactory = nativeFactory
         self.fetchInitialSummaries = fetchInitialSummaries
         self.invalidate = invalidate
         self.editSource = editSource
@@ -139,6 +149,7 @@ final class SyncController {
         let current = generation
         let previous = work
         previous?.cancel()
+        stopNative()
         // Verification and profile metadata may change during normal refresh.
         // Keep browsing state for the same usable credential; actual scope,
         // expiry and connection transitions still clear it immediately.
@@ -207,6 +218,7 @@ final class SyncController {
 
     func pause() {
         work?.cancel()
+        stopNative()
         summarySync.pause()
         summaries.pause()
         if status == .syncing { status = .paused }
@@ -283,8 +295,7 @@ final class SyncController {
             if importing { firstSummaryError = nil }
             importingInitialSummaries = importing
             status = .syncing
-            let engine = SyncEngine(source: source(session), store: storage, scope: session.scope)
-            _ = try await engine.run()
+            try await syncLibrary(session, storage: storage, generation: current)
             guard current == generation, !Task.isCancelled else { return }
             try await loadCache(session, storage: storage, generation: current)
             if activities.activities.isEmpty, !fetchedInitialSummaries,
@@ -299,7 +310,7 @@ final class SyncController {
                 guard current == generation, !Task.isCancelled else { return }
                 fetchedInitialSummaries = true
                 pendingFirstSummaryCount = count
-                _ = try await engine.run()
+                try await syncLibrary(session, storage: storage, generation: current)
                 guard current == generation, !Task.isCancelled else { return }
                 try await loadCache(session, storage: storage, generation: current)
             }
@@ -357,6 +368,87 @@ final class SyncController {
                 firstSummaryRetryable = facts.serverRetryable ?? true
             }
         }
+    }
+
+    private func syncLibrary(_ session: SyncSession, storage: LocalStore, generation current: Int) async throws {
+        if !nativeAttempted, let nativeFactory {
+            nativeAttempted = true
+            do {
+                let connection = try await nativeFactory(session)
+                guard current == generation, !Task.isCancelled else {
+                    connection?.close()
+                    throw CancellationError()
+                }
+                native = connection
+                if connection != nil { Self.syncLog.info("Library transport: native Convex") }
+                if let connection { watchNative(connection, generation: current) }
+            } catch {
+                try Task.checkCancellation()
+                guard current == generation else { throw CancellationError() }
+                if AuthController.isExplicitlyUnauthenticated(error) { throw error }
+                if case .rateLimited = error as? APIClient.RequestError { throw error }
+                if Self.serverRetryDelay(error) != nil { throw error }
+                // HTTP remains authoritative for session expiry/revocation and
+                // retry guards, including native auth or deployment mismatch.
+                Self.syncLog.notice("Native Convex unavailable; using HTTP sync")
+            }
+        }
+        if let native {
+            nativeDirty = false
+            do {
+                _ = try await SyncEngine(source: native.pages, store: storage, scope: session.scope).run()
+                return
+            } catch {
+                try Task.checkCancellation()
+                guard current == generation else { throw CancellationError() }
+                stopNative()
+                nativeAttempted = true // Retry native on the next foreground session.
+                Self.syncLog.notice("Native Convex read failed; recovering through HTTP sync")
+            }
+        }
+        _ = try await SyncEngine(source: source(session), store: storage, scope: session.scope).run()
+    }
+
+    private func watchNative(_ connection: any NativeLibraryConnection, generation current: Int) {
+        nativeMonitor = Task { [weak self] in
+            do {
+                for try await _ in connection.updates() {
+                    guard let self, current == generation, !Task.isCancelled else { return }
+                    nativeDirty = true
+                    // A notification received during a read/edit must cause a
+                    // subsequent pass, even when refresh first joins that work.
+                    while nativeDirty, current == generation, !Task.isCancelled {
+                        if editingInProgress {
+                            try await Task.sleep(for: .milliseconds(100))
+                            continue
+                        }
+                        await refresh()
+                        if retryAt != nil || !usesNativeSync { break }
+                    }
+                }
+                throw APIClient.RequestError.transport("Native update subscription ended")
+            } catch {
+                guard let self, current == generation, !Task.isCancelled else { return }
+                native?.close()
+                native = nil
+                nativeAttempted = true
+                nativeDirty = false
+                // Await any current writer, then start HTTP recovery. No two
+                // transports can write the library concurrently.
+                await work?.value
+                guard current == generation, !Task.isCancelled else { return }
+                await refresh()
+            }
+        }
+    }
+
+    private func stopNative() {
+        nativeMonitor?.cancel()
+        nativeMonitor = nil
+        native?.close()
+        native = nil
+        nativeAttempted = false
+        nativeDirty = false
     }
 
     private static func summaryErrorMessage(_ error: Error) -> PresentationText {

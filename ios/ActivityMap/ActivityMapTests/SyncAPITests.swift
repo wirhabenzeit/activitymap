@@ -28,6 +28,26 @@ nonisolated final class SyncURLProtocol: URLProtocol, @unchecked Sendable {
 @Suite(.serialized)
 @MainActor
 struct SyncAPITests {
+    @Test func nativeJWTRefreshUsesTheAppBearerWithoutCookies() async throws {
+        SyncURLProtocol.setHandler { request in
+            #expect(request.url?.path == "/api/auth/token")
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-token-alice")
+            #expect(!request.httpShouldHandleCookies)
+            #expect(request.timeoutInterval == 8)
+            return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!,
+                    Data("{\"token\":\"short-lived-test-jwt\"}".utf8))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SyncURLProtocol.self]
+        let http = URLSession(configuration: configuration)
+        defer { http.invalidateAndCancel() }
+        let provider = ConvexTokenProvider(session: SyncFixtures.session(), http: http)
+        let initial = try await provider.login(onIdToken: { _ in })
+        let refreshed = try await provider.loginFromCache(onIdToken: { _ in })
+        #expect(provider.extractIdToken(from: initial) == "short-lived-test-jwt")
+        #expect(provider.extractIdToken(from: refreshed) == "short-lived-test-jwt")
+    }
+
     @Test func realHTTPClientEscapesCursorsAndUnwrapsContractEnvelope() async throws {
         let cursor = "opaque+/=&? cursor"
         SyncURLProtocol.setHandler { request in

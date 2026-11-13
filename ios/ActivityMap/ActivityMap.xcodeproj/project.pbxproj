@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		C00000000000000000000001 /* ConvexMobile in Frameworks */ = {isa = PBXBuildFile; productRef = C00000000000000000000003 /* ConvexMobile */; };
 		B458E4E1306084C900861B04 /* MapboxMaps in Frameworks */ = {isa = PBXBuildFile; productRef = B458E4E0306084C900861B04 /* MapboxMaps */; };
 /* End PBXBuildFile section */
 
@@ -59,6 +60,7 @@
 			isa = PBXFrameworksBuildPhase;
 			files = (
 				B458E4E1306084C900861B04 /* MapboxMaps in Frameworks */,
+				C00000000000000000000001 /* ConvexMobile in Frameworks */,
 			);
 		};
 		C0DE00000000000000000003 /* Frameworks */ = {
@@ -118,6 +120,7 @@
 			name = ActivityMap;
 			packageProductDependencies = (
 				B458E4E0306084C900861B04 /* MapboxMaps */,
+				C00000000000000000000003 /* ConvexMobile */,
 			);
 			productName = ActivityMap;
 			productReference = 000000000000000000000120 /* ActivityMap.app */;
@@ -186,6 +189,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				B458E4DF306084C900861B04 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */,
+				C00000000000000000000002 /* XCRemoteSwiftPackageReference "convex-swift" */,
 			);
 			preferredProjectObjectVersion = 90;
 			productRefGroup = 000000000000000000000020 /* Products */;
@@ -573,6 +577,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		C00000000000000000000002 /* XCRemoteSwiftPackageReference "convex-swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/convex/convex-swift.git";
+			requirement = {
+				kind = exactVersion;
+				version = 0.8.2;
+			};
+		};
 		B458E4DF306084C900861B04 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/mapbox/mapbox-maps-ios.git";
@@ -584,6 +596,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		C00000000000000000000003 /* ConvexMobile */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C00000000000000000000002 /* XCRemoteSwiftPackageReference "convex-swift" */;
+			productName = ConvexMobile;
+		};
 		B458E4E0306084C900861B04 /* MapboxMaps */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B458E4DF306084C900861B04 /* XCRemoteSwiftPackageReference "mapbox-maps-ios" */;

@@ -2604,6 +2604,44 @@
         ],
         "additionalProperties": false
       },
+      "NativeSyncConfigurationResponse": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "1"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "data": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri"
+                  },
+                  "version": {
+                    "type": "number",
+                    "const": 1
+                  }
+                },
+                "required": ["url", "version"],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["schemaVersion", "serverTime", "data"],
+        "additionalProperties": false
+      },
       "SyncBootstrapPageResponse": {
         "type": "object",
         "properties": {
@@ -4642,6 +4680,45 @@
           },
           "429": {
             "description": "Too many requests; see `Retry-After`",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/sync/native": {
+      "get": {
+        "operationId": "nativeSyncConfiguration",
+        "summary": "Discover the account’s native Convex library transport",
+        "description": "Returns a Convex deployment URL and protocol version, or null when unavailable. Authenticate /api/auth/token with the same bearer session to obtain a short-lived JWT. Clients fall back to HTTP sync if the native queries are unavailable.",
+        "responses": {
+          "200": {
+            "description": "Native sync configuration or null",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NativeSyncConfigurationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests; see Retry-After",
             "content": {
               "application/json": {
                 "schema": {

@@ -14,6 +14,12 @@ import { idString, isoDateTime } from './primitives';
 export const syncResourceSchema = z.enum(['activities', 'photos']);
 export type SyncResource = z.infer<typeof syncResourceSchema>;
 
+/** Native transport discovery. Null means this account uses the HTTP sync. */
+export const nativeSyncConfigurationSchema = z.object({
+  url: z.string().url(),
+  version: z.literal(1),
+});
+
 /**
  * Retention/expiry metadata included on every bootstrap/changes response so
  * a client can tell how long the cursor it just received (`snapshotCursor`

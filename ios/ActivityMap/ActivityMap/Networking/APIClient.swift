@@ -72,11 +72,12 @@ nonisolated enum APIClient {
         bearerToken: String? = nil,
         baseURL: URL = APIConfiguration.baseURL,
         session: URLSession = .shared,
+        timeout: TimeInterval = 30,
         as payloadType: Payload.Type
     ) async throws -> Payload {
         try await getResponse(
             path, query: query, bearerToken: bearerToken, baseURL: baseURL,
-            session: session, as: payloadType
+            session: session, timeout: timeout, as: payloadType
         ).payload
     }
 
@@ -89,11 +90,12 @@ nonisolated enum APIClient {
         bearerToken: String? = nil,
         baseURL: URL = APIConfiguration.baseURL,
         session: URLSession = .shared,
+        timeout: TimeInterval = 30,
         as payloadType: Payload.Type
     ) async throws -> Response<Payload> {
         var components = URLComponents(url: baseURL.appending(path: path), resolvingAgainstBaseURL: false)!
         components.queryItems = query.isEmpty ? nil : query
-        var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+        var request = URLRequest(url: components.url!, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
         request.httpMethod = "GET"
         applyCommonHeaders(&request, bearerToken: bearerToken)
         return try await performResponse(request, session: session, as: payloadType)
@@ -103,10 +105,11 @@ nonisolated enum APIClient {
     /// Error mapping, bearer authentication and cancellation remain shared.
     static func getUnwrapped<Payload: Decodable & Sendable>(
         _ path: String, bearerToken: String, baseURL: URL, session: URLSession = .shared,
+        timeout: TimeInterval = 30,
         as payloadType: Payload.Type
     ) async throws -> Payload {
         var request = URLRequest(url: baseURL.appending(path: path),
-            cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 30)
+            cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
         request.httpMethod = "GET"
         applyCommonHeaders(&request, bearerToken: bearerToken)
         return try await performResponse(request, session: session, as: payloadType, unwrapped: true).payload
