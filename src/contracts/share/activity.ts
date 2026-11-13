@@ -135,7 +135,7 @@ function sharedElevationProfile(
 }
 
 /**
- * Maps a Drizzle `Activity` row to the share-link recipient view. Validates
+ * Maps an application `Activity` record to the share-link recipient view. Validates
  * its own output against the allow-list schema above, so a call site that
  * accidentally spreads extra keys into the object literal is stripped here
  * instead of silently widening what a recipient sees.

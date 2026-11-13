@@ -48,7 +48,7 @@ export async function requireOwner(
   return owner;
 }
 
-/** Who writes the owner's library; Postgres until a handoff says otherwise. */
+/** The stored writer; absent legacy fields retain their original meaning. */
 export function writerOf(owner: Doc<'owners'>): Writer {
   return owner.writer ?? 'postgres';
 }
@@ -170,7 +170,7 @@ export const provision = internalMutation({
 /**
  * Move an owner to another writer if it is still at `expectedEpoch` (0 for
  * an owner that was never handed off). Returns the new epoch, or null when
- * the epoch has moved on. Mirrors `setWriter` on the Postgres user.
+ * the epoch has moved on. New library provisioning assigns the Convex writer.
  */
 export const setWriter = internalMutation({
   args: {

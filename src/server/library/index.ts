@@ -5,18 +5,21 @@ import { randomBytes } from 'node:crypto';
 import { errorEnvelope } from '~/contracts/v1/error';
 import type { Actor } from '~/server/auth/actor';
 import { updateUserInternal } from '~/server/auth/users';
+import { convexAppAdapter } from '~/server/library/convex';
 import {
   catalogueIdentity,
   matchingVersion,
 } from '~/server/places/matching-version';
-import { convexAppAdapter } from '~/server/preview/convex';
-import { convexWriteBridge } from '~/server/sync/convex-writer';
+import {
+  type ConvexWriter,
+  convexWriteBridge,
+} from '~/server/sync/convex-writer';
 
 /**
  * An account's library: its activities, recordings, photos and place
  * matches. It lives in the Convex backend (`backend/`), which also fetches
  * it from the provider. The app reaches it through two signed bridges: reads
- * (`~/server/preview/convex.ts`) and changes (`~/server/sync/convex-writer.ts`).
+ * (`~/server/library/convex.ts`) and changes (`~/server/sync/convex-writer.ts`).
  */
 
 function bridge(actor: Actor) {
@@ -29,9 +32,23 @@ function bridge(actor: Actor) {
  * Give an account its library, if it has none, and record the library's
  * routing epoch on the user. Safe to repeat. Returns the epoch.
  */
-export async function startLibrary(actor: Actor): Promise<string> {
-  const writer = bridge(actor);
-  type State = { epoch: string; writer: string; writerEpoch: number };
+export async function startLibrary(
+  actor: Actor,
+  deps: {
+    writer?: ConvexWriter;
+    recordAssignment?: (
+      userId: string,
+      assignment: { writer: 'convex'; convexEpoch: string },
+    ) => Promise<unknown>;
+  } = {},
+): Promise<string> {
+  const writer = deps.writer ?? bridge(actor);
+  type State = {
+    epoch: string;
+    writer: string;
+    writerEpoch: number;
+    revoked: boolean;
+  };
   let state = await writer.write<State | null>({ kind: 'state' });
   if (!state) {
     const rowset = await writer.write<{
@@ -41,25 +58,36 @@ export async function startLibrary(actor: Actor): Promise<string> {
     const version = matchingVersion(
       rowset ?? { snapshotId: null, revision: '0' },
     );
-    await writer.write({
-      kind: 'provision',
-      epoch: randomBytes(24).toString('base64url'),
-      generation: randomBytes(24).toString('base64url'),
-      catalogue: catalogueIdentity(version),
-      matchingVersion: version,
-    });
-    state = await writer.write<State | null>({ kind: 'state' });
+    try {
+      await writer.write({
+        kind: 'provision',
+        epoch: randomBytes(24).toString('base64url'),
+        generation: randomBytes(24).toString('base64url'),
+        catalogue: catalogueIdentity(version),
+        matchingVersion: version,
+      });
+    } catch (error) {
+      // Concurrent first-use requests may race to provision. Only an owner
+      // now confirmed through the same fenced bridge satisfies this request.
+      state = await writer.write<State | null>({ kind: 'state' });
+      if (!state) throw error;
+    }
+    state ??= await writer.write<State | null>({ kind: 'state' });
     if (!state) throw new Error('The library could not be started');
   }
-  // An owner starts as a copy that something else writes; here Convex
-  // writes it from the start.
-  if (state.writer !== 'convex')
-    await writer.write({
+  if (state.revoked || state.writer === 'handoff')
+    throw new Error(
+      'Library assignment is unavailable during revocation or handoff',
+    );
+  if (state.writer !== 'convex') {
+    const assigned = await writer.write<number | null>({
       kind: 'setWriter',
       writer: 'convex',
       expectedEpoch: state.writerEpoch,
     });
-  await updateUserInternal(actor.userId, {
+    if (assigned === null) throw new Error('Library assignment changed; retry');
+  }
+  await (deps.recordAssignment ?? updateUserInternal)(actor.userId, {
     writer: 'convex',
     convexEpoch: state.epoch,
   });

@@ -33,5 +33,6 @@ export function matchingVersion(
  * and match results name it. It changes exactly when the published catalogue
  * or the matching recipe changes. */
 export function catalogueIdentity(version: string): string {
+  // Historical key is part of the persisted catalogue identity; keep it stable.
   return sha256(JSON.stringify({ postgresMatchingVersion: version }));
 }

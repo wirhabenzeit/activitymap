@@ -73,7 +73,6 @@ export const createAuthSlice: StateCreator<
         !state.isInitialized ||
         accountChanged ||
         state.user?.stravaConnected !== nextUser?.stravaConnected ||
-        state.user?.storedLibraryPreview !== nextUser?.storedLibraryPreview ||
         state.user?.convexLive?.url !== nextUser?.convexLive?.url
       ) {
         resetActivityPlaceFocus();

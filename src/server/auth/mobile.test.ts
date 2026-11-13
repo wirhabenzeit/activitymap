@@ -15,13 +15,8 @@ import {
   issueMobileLoginCode,
 } from './mobile.ts';
 
-/**
- * An in-memory fake of `MobileLoginCodesRepository`, in the same spirit as
- * the fakes in `~/server/application/activities.test.ts`: this sandbox has
- * no live Postgres, so the replay/expiry/state/PKCE behavior below is
- * proven against a fake that implements the same atomic-consume contract
- * the real Drizzle repository does (see that repository's
- * `consumeByCodeHash` doc comment), not against a real database.
+/** In-memory repository double for replay/expiry/state/PKCE behavior.
+ * Backend tests separately exercise atomic code consumption in Convex.
  */
 function createFakeRepository(): MobileLoginCodesRepository {
   const rows = new Map<string, MobileLoginCode>();

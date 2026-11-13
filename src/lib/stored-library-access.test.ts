@@ -5,9 +5,9 @@ import test from 'node:test';
 import { activityMutationAvailability } from './activity-mutation-availability';
 import { hasStoredLibraryAccess } from './stored-library-access';
 
-void test('stored preview grants read access without provider mutation permission', () => {
-  const user = { stravaConnected: false, storedLibraryPreview: true };
-  assert.equal(hasStoredLibraryAccess(user), true);
+void test('disconnected accounts cannot read stored provider data or mutate it', () => {
+  const user = { stravaConnected: false };
+  assert.equal(hasStoredLibraryAccess(user), false);
   const permissions = activityMutationAvailability({ isGuest: false, user });
   assert.equal(permissions.canEdit, false);
   assert.equal(permissions.canRefresh, false);

@@ -223,7 +223,7 @@ async function match(ctx: ActionCtx, step: IngestionStep & { phase: 'match' }) {
     job,
     claim,
     recording: step.recording.id,
-    // As Postgres serves it: the result names its matching version.
+    // Published match results name the current matching version.
     result: { ...matched!.result, matchingVersion: step.matchingVersion },
   });
   return null;

@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 /**
  * The provider gateway: how a Convex worker gets provider data without
- * holding a provider credential (docs/convex-writer-cutover.md, decision 1).
+ * holding a provider credential (backend/README.md, "Provider gateway").
  * The worker signs a request for one owner and one read; the app resolves
  * the owner's account, refreshes its token if needed, reserves from the
  * shared request budget, asks the provider and answers with the payload or a

@@ -122,7 +122,7 @@ void test('toActivityDTO serializes real component freshness when present', () =
   assert.equal(dto.last_detailed_fetched_at, '2024-01-31T10:00:00.000Z');
 });
 
-void test('activityDTOSchema rejects a raw Drizzle row (numeric id) passed through unmapped', () => {
+void test('activityDTOSchema rejects a raw application record (numeric id) passed through unmapped', () => {
   const result = activityDTOSchema.safeParse({
     ...fixtureActivity,
     start_date: fixtureActivity.start_date.toISOString(),

@@ -4,7 +4,7 @@ export const CONVEX_TOKEN_AUDIENCE = 'convex';
 
 /**
  * Options for Better Auth's `jwt` plugin, which issues the short-lived tokens
- * the Convex application backend accepts (docs/convex-reactive-reads.md).
+ * the Convex application backend accepts (backend/README.md, "Authenticated clients").
  *
  * Off unless `ACTIVITYMAP_AUTH_JWT_ISSUER` is set. The issuer is fixed per
  * environment: preview deployments run on changing hosts, and Convex matches

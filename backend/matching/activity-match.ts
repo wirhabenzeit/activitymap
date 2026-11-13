@@ -26,9 +26,8 @@ import { readMatchingTiles } from './tiles';
 
 /**
  * Place matching for recordings held here, for Node actions: the application
- * matcher, coverage and track preparation the Postgres worker uses, reading
- * recordings from file storage and candidate places from the copied
- * catalogue by tile. The shadow matcher and the ingestion worker both use it.
+ * matcher, coverage and track preparation, reading recordings from file
+ * storage and published candidate places by tile for the ingestion worker.
  */
 
 const policy = SERVER_MATCHER_POLICY;
@@ -94,7 +93,7 @@ export async function prepareActivity(
     recording.manifest,
   );
   const tooLarge = (streams.latlng?.data.length ?? 0) > policy.maxSamples;
-  // The Postgres worker projects an absent GPS channel as JSON null, and the
+  // The shared stream contract represents an absent GPS channel as JSON null; the
   // matcher's answer depends on it.
   const payload = streams.latlng ? streams : { ...streams, latlng: null };
   return {

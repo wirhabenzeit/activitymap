@@ -43,7 +43,7 @@ export async function contribution(
     else counts.unknownPhotos = 1;
   }
   // Every stored photo counts; an activity counts as stored only while the
-  // provider reports photos for it, as the Postgres status does.
+  // provider reports photos for it, matching the application status contract.
   counts.photoCount = await storedPhotoCount(ctx, owner, row.key);
   if (counts.activitiesWithPhotos && counts.photoCount > 0)
     counts.activitiesWithStoredPhotos = 1;

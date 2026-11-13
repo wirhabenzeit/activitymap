@@ -11,7 +11,6 @@ const actor: Actor = {
   userId: 'owner',
   athleteId: 42,
   authentication: 'cookie',
-  convexWrites: true,
 };
 const item = (id: string) =>
   ({ id, start_date_local: '2026-11-01T09:00:00.000Z' }) as ActivityDTO;

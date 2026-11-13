@@ -4,7 +4,7 @@ import { internal } from './_generated/api';
 import { type MutationCtx, internalMutation } from './_generated/server';
 
 /**
- * Two counters the app keeps for itself, held here instead of in Postgres:
+ * Two counters the app keeps for itself, stored in Convex:
  * the per-caller request counters behind its API rate limit, and the shared
  * request budget for the provider. Both are small, and both must be exact
  * under concurrent requests, which a mutation is.
@@ -94,7 +94,7 @@ export const expireOldRateLimits = internalMutation({
  * The provider's request budget, shared by every account: a quarter-hour
  * and a daily window, for all requests and for reads. A request reserves
  * from each window that applies before it is sent and reports what the
- * provider said afterwards. The rules are the ones the Postgres ledger
+ * provider said afterwards. The rules are the shared request-budget policy the original ledger
  * applied (src/server/repositories/strava-budget.ts).
  */
 const WINDOWS = [

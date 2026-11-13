@@ -15,9 +15,7 @@ export type CurrentUserDTO = {
   image: string | null;
   athleteId: number | null;
   stravaConnected: boolean;
-  /** Server-selected web preview; enables stored-data reads, never provider writes. */
-  storedLibraryPreview?: boolean;
-  /** Live preview: the Convex deployment the client subscribes to. */
+  /** Convex deployment for the account's live library queries. */
   convexLive?: { url: string };
   /** What the approved Strava scopes allow; `null` when not yet known. */
   stravaPermissions: StravaPermissions | null;

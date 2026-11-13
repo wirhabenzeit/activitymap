@@ -18,8 +18,7 @@ const PAGE = 500;
 
 /**
  * The whole library of an account Convex writes for, in activity-ID order,
- * for the CSV export. Dates are `Date`s, as in the rows Postgres returns,
- * so both sources are written the same way.
+ * for the CSV export. Dates are `Date`s, matching the application record model.
  */
 export async function libraryFromConvex(convex: Pages, actor: Actor) {
   const rows: (Omit<ActivityDTO, 'start_date_local'> & {

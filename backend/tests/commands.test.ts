@@ -23,6 +23,8 @@ import {
   revokeShareLinkForActor,
 } from '../../src/server/application/share-links';
 import type { Actor } from '../../src/server/auth/actor';
+import { startLibrary } from '../../src/server/library';
+import { convexLiveUrlFor } from '../../src/server/library/live-configuration';
 import type { Activity, Photo } from '../../src/server/records';
 import { StravaApiError } from '../../src/server/strava/client';
 import {
@@ -39,7 +41,7 @@ import {
   convexShareView,
 } from '../../src/server/sync/convex-shares';
 import { convexWriteBridge } from '../../src/server/sync/convex-writer';
-import { internal } from '../convex/_generated/api';
+import { api, internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
 import { activitySource } from '../ingestion/provider';
 import { stravaDetail, stravaPhoto } from './fixtures';
@@ -63,6 +65,7 @@ const modules = {
   './ingestionSweep.ts': () => import('../convex/ingestionSweep'),
   './ingestionWorker.ts': () => import('../convex/ingestionWorker'),
   './maintenance.ts': () => import('../convex/maintenance'),
+  './nativeSync.ts': () => import('../convex/nativeSync'),
   './owners.ts': () => import('../convex/owners'),
   './places.ts': () => import('../convex/places'),
   './providerEvents.ts': () => import('../convex/providerEvents'),
@@ -482,7 +485,7 @@ void test('the app erases an account in Convex through the bridge', async (t) =>
   });
   assert.equal((await state()).activities.length, 0);
   assert.equal(await bridge.write({ kind: 'state' }), null);
-  // Asked again, for example after the Postgres side failed: nothing to do.
+  // Asked again, for example after sign-in record deletion failed: nothing to do.
   assert.equal(await bridge.write({ kind: 'eraseOwner' }), false);
 });
 
@@ -490,7 +493,7 @@ void test('share links of an account Convex writes for are made, shown and revok
   const { convex, seed } = await setup(t, 'convex');
   const fetcher: typeof fetch = (url, init) =>
     convex.fetch(new URL(String(url)).pathname, init);
-  const writer: Actor = { ...actor, convexWrites: true };
+  const writer: Actor = actor;
   await seed(
     manual(7, 'Shared ride', {
       description: 'must never be shared',
@@ -502,7 +505,7 @@ void test('share links of an account Convex writes for are made, shown and revok
   // Convex checks expiry against its own clock.
   let clock = Date.now();
   let accountRevoked = false;
-  // Postgres holds no link and no activity of this account.
+  // The app holds no plaintext link token or duplicate activity for this account.
   const deps: ShareLinksServiceDeps = {
     isAthleteRevoked: async () => accountRevoked,
     now: () => new Date(clock),
@@ -559,7 +562,7 @@ void test('share links of an account Convex writes for are made, shown and revok
     ShareLinkUnavailableError,
   );
 
-  // A revoked provider connection closes the link, as for Postgres links.
+  // A revoked provider connection closes the link, as required by the share contract.
   accountRevoked = true;
   await assert.rejects(
     getShareView(link.token, deps),
@@ -606,4 +609,46 @@ void test('share links of an account Convex writes for are made, shown and revok
     ShareLinkUnavailableError,
   );
   clock += 1;
+});
+
+void test('a new account can query native sync immediately after first discovery initializes its library', async (t) => {
+  const { convex } = await setup(t, 'convex');
+  const user = {
+    id: 'first-native-owner',
+    athlete_id: 43,
+    writer: 'postgres',
+    convexEpoch: null as string | null,
+  };
+  let recordedEpoch: string | null = null;
+  const fetcher: typeof fetch = (url, init) =>
+    convex.fetch(new URL(String(url)).pathname, init);
+  const url = await convexLiveUrlFor(user, {
+    authentication: 'bearer',
+    environment: {
+      ACTIVITYMAP_CONVEX_URL: 'https://example.convex.cloud',
+      ACTIVITYMAP_AUTH_JWT_ISSUER: 'https://app.example.test',
+    },
+    start: (candidate) =>
+      startLibrary(candidate, {
+        writer: convexWriteBridge(candidate, fetcher)!,
+        recordAssignment: async (id, assignment) => {
+          assert.equal(id, user.id);
+          recordedEpoch = assignment.convexEpoch;
+        },
+      }),
+  });
+  assert.equal(url, 'https://example.convex.cloud');
+  assert(recordedEpoch);
+  const owner = await convex.run((ctx) =>
+    ctx.db
+      .query('owners')
+      .withIndex('by_user', (q) => q.eq('userId', user.id))
+      .unique(),
+  );
+  assert.equal(owner?.writer, 'convex');
+  assert.equal(owner?.epoch, recordedEpoch);
+  const head = await convex
+    .withIdentity({ subject: user.id, issuer: 'https://app.example.test' })
+    .query(api.nativeSync.head, {});
+  assert.equal(head.sequence, 0);
 });

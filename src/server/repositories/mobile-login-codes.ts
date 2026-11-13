@@ -13,13 +13,9 @@ export type NewMobileLoginCode = {
   expiresAt: Date;
 };
 
-/**
- * Repository boundary for the `mobile_login_codes` table (issue #121). Kept
- * separate from `~/server/auth/mobile.ts`'s exchange logic for the same
- * reason `~/server/repositories/activities.ts` is separate from
- * `~/server/application/activities.ts`: it lets the replay/expiry/state
- * tests in `~/server/auth/mobile.test.ts` run against an in-memory fake
- * instead of a real Postgres connection, which this sandbox does not have.
+/** Atomic login-code repository boundary. Convex implements it in
+ * `~/server/auth/convex-mobile-login-codes.ts`; authentication unit tests
+ * use an in-memory implementation of the same consume-once contract.
  */
 export interface MobileLoginCodesRepository {
   create(record: NewMobileLoginCode): Promise<MobileLoginCode>;

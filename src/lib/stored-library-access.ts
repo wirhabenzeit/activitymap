@@ -1,9 +1,6 @@
-/** Reading an attached lab library does not grant provider refresh/edit access. */
+/** Stored Strava data is available while the account remains connected. */
 export function hasStoredLibraryAccess(
-  user:
-    | { stravaConnected: boolean; storedLibraryPreview?: boolean }
-    | null
-    | undefined,
+  user: { stravaConnected: boolean } | null | undefined,
 ) {
-  return user?.stravaConnected === true || user?.storedLibraryPreview === true;
+  return user?.stravaConnected === true;
 }

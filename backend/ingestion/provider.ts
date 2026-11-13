@@ -15,9 +15,8 @@ import type {
 } from '../../src/server/strava/types';
 
 /**
- * Provider payloads as the library stores them. The conversion is the one
- * Postgres ingestion uses (`src/server/strava/transforms.ts` and the v1
- * contracts), so both writers produce the same activity for the same payload.
+ * Provider payloads as the library stores them, using the shared transforms
+ * (`src/server/strava/transforms.ts`) and v1 contracts.
  */
 
 /** What the conversion reads without checking. The contracts validate the

@@ -1,6 +1,6 @@
 /**
  * The place rows of a catalogue as both sides of the catalogue import handle
- * them: the app, which reads them from Postgres, and the Convex functions,
+ * them: the app, which publishes them, and the Convex functions,
  * which store them. Plain TypeScript with Web Crypto only, so it runs in the
  * Convex runtime as well as in Node.
  */

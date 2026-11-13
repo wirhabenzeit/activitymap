@@ -108,29 +108,28 @@ void test('requireActor resolves the Actor for a valid session', async () => {
   assert.equal(actor.userId, 'user-1');
 });
 
-void test('resolveActor says when Convex writes the account, and under which epoch it is read', async () => {
+void test('resolveActor exposes only the stored Convex assignment', async () => {
   const resolve = (user: Record<string, unknown>) =>
     resolveActor(headersWith(), {
       getSession: async () => ({ user: { id: 'user-1' } }),
       getUser: async () => ({ athlete_id: 42, ...user }),
     });
   const base = { userId: 'user-1', athleteId: 42, authentication: 'cookie' };
-  // Being copied: the epoch is recorded, and Postgres still serves.
+  // Legacy/unassigned records must go through library provisioning first.
   assert.deepEqual(
     await resolve({ writer: 'postgres', convexEpoch: 'epoch-0123456789ab' }),
     base,
   );
   assert.deepEqual(
     await resolve({ writer: 'handoff', convexEpoch: 'epoch-0123456789ab' }),
-    base,
+    { ...base, convexEpoch: 'epoch-0123456789ab' },
   );
   assert.deepEqual(
     await resolve({ writer: 'convex', convexEpoch: 'epoch-0123456789ab' }),
-    { ...base, convexWrites: true, convexEpoch: 'epoch-0123456789ab' },
+    { ...base, convexEpoch: 'epoch-0123456789ab' },
   );
-  // Moved before epochs were recorded.
-  assert.deepEqual(await resolve({ writer: 'convex', convexEpoch: null }), {
-    ...base,
-    convexWrites: true,
-  });
+  assert.deepEqual(
+    await resolve({ writer: 'convex', convexEpoch: null }),
+    base,
+  );
 });

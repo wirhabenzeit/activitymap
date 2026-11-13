@@ -7,7 +7,7 @@
  * miss equal-timestamp mutations.
  *
  * This module only knows the v1 envelope/error/DTO shapes from
- * `~/contracts/v1/*` — it never imports Drizzle row types
+ * `~/contracts/v1/*` — it never imports backend storage types
  * (`~/server/db/schema`) and is not itself responsible for persisting
  * anything into IndexedDB; callers apply the pages it returns.
  */

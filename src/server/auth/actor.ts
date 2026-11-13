@@ -17,11 +17,7 @@ export type Actor = {
   userId: string;
   athleteId: number;
   authentication: 'cookie' | 'bearer';
-  /** Set when Convex writes the account's library. Convex then decides
-   * which activities the account has; Postgres no longer knows. */
-  convexWrites?: true;
-  /** The account's routing epoch in Convex, when Convex writes its library
-   * and the epoch is recorded: its reads are served from Convex under it. */
+  /** Current library assignment; the Convex bridge checks this epoch. */
   convexEpoch?: string;
 };
 
@@ -65,10 +61,8 @@ export type ActorDependencies = {
  * sending a signed `Authorization: Bearer <session-token>` header: Better
  * Auth's `bearer` plugin (configured with `requireSignature: true` in
  * `~/lib/auth.ts`) makes `auth.api.getSession` resolve either credential to
- * the same session object. What issue #121 still has to build is the mobile
- * OAuth one-time-code exchange that *issues* such a token to a native client
- * in the first place - see `~/server/auth/mobile.ts` for that extension
- * point. Resolution here does not need a separate "not implemented" branch.
+ * the same session object. The mobile OAuth one-time-code exchange issues
+ * that session token (`~/server/auth/mobile.ts`).
  */
 export async function resolveActor(
   headers: Headers,
@@ -87,13 +81,12 @@ export async function resolveActor(
   }
 
   let athleteId: number | null = null;
-  let convexWrites = false;
   let convexEpoch: string | null = null;
   try {
     const user = await getUser(session.user.id);
     athleteId = user?.athlete_id ?? null;
-    convexWrites = user?.writer === 'convex';
-    if (convexWrites) convexEpoch = user?.convexEpoch ?? null;
+    if (user?.writer === 'convex' || user?.writer === 'handoff')
+      convexEpoch = user.convexEpoch ?? null;
   } catch (error) {
     if (error instanceof UserNotFoundError) {
       // No local user row for this session - treat as unauthenticated
@@ -120,7 +113,6 @@ export async function resolveActor(
     userId: session.user.id,
     athleteId,
     authentication,
-    ...(convexWrites && { convexWrites }),
     ...(convexEpoch && { convexEpoch }),
   };
 }

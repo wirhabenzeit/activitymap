@@ -1,5 +1,9 @@
 # iOS refresh performance
 
+> Historical measurements of the HTTP sync path before native iOS sync shipped.
+> The current native transport and its HTTP fallback are described in
+> [iOS native Convex sync](ios-native-convex-sync.md).
+
 Measured on 12 November 2026 against the production revision `b601cab2`,
 served by `activitymap.cc` from the deployment created at 08:08 CET. The app
 uses Convex for authentication, request counters and library data. iOS still
