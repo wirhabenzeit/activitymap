@@ -1,3 +1,4 @@
+import SwiftData
 import Foundation
 import Combine
 @preconcurrency import ConvexMobile
@@ -7,10 +8,13 @@ import Testing
 @MainActor
 private final class TestNativeConnection: NativeLibraryConnection {
     let pages: any SyncPageSource
-    let events = AsyncThrowingStream<Void, Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
+    var events = AsyncThrowingStream<Void, Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
     private(set) var closed = false
     init(_ pages: any SyncPageSource) { self.pages = pages }
-    func updates() -> AsyncThrowingStream<Void, Error> { events.stream }
+    func updates() -> AsyncThrowingStream<Void, Error> {
+        events = AsyncThrowingStream<Void, Error>.makeStream(bufferingPolicy: .bufferingNewest(1))
+        return events.stream
+    }
     func close() { closed = true; events.continuation.finish() }
 }
 
@@ -122,23 +126,31 @@ struct NativeSyncTests {
         await controller.summarySync.stopAndWait()
     }
 
-    @Test func failedNativeAndHTTPReplacementPreserveTheCompletedLibrary() async throws {
+    @Test func nativeStallResumesWithoutEitherTransportBootstrapping() async throws {
         let storage = try await storage()
-        let native = ScriptedSyncSource([.changes(cursor, .failure(.transport("Offline")))])
-        let connection = TestNativeConnection(native)
-        let replacement = try Fixtures.activity(["name": "Uncommitted replacement"])
-        let http = ScriptedSyncSource([
-            .bootstrap(.activities, nil, .success(SyncFixtures.activities([replacement]))),
-            .bootstrap(.photos, nil, .failure(.transport("Offline")))
+        let native = ScriptedSyncSource([
+            .changes(cursor, .failure(.transport("Timed out"))),
+            .changes(cursor, .success(SyncFixtures.changes(next: cursor))),
+            .changes(cursor, .success(SyncFixtures.changes(next: cursor))),
         ])
-        let controller = SyncController(activities: ActivityStore(),
-            source: { _ in NamespacedPages(base: http, native: false) }, nativeFactory: { _ in connection }, invalidate: { _ in })
+        var connections: [TestNativeConnection] = []
+        let http = ScriptedSyncSource([])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in http }, nativeFactory: { _ in
+            let connection = TestNativeConnection(native); connections.append(connection); return connection
+        }, invalidate: { _ in })
         controller.setSession(SyncFixtures.session(), storage: storage)
         await controller.refresh()
-        #expect(controller.status == .offline && !controller.usesNativeSync && connection.closed)
-        let snapshot = try await storage.snapshot(scope: Fixtures.scope)
-        #expect(snapshot.activities == [try Fixtures.activity()])
-        #expect(snapshot.checkpoint?.changesCursor == cursor)
+        #expect(controller.status == .offline && controller.usesNativeSync)
+        #expect(await http.calls == 0)
+        #expect(try await storage.syncMetadata(scope: Fixtures.scope).checkpoint?.changesCursor == cursor)
+        await controller.refresh()
+        #expect(controller.status == .ready)
+        controller.pause()
+        await controller.refresh()
+        #expect(controller.status == .ready && connections.count == 2)
+        #expect(await native.calls == 3)
+        #expect(await http.calls == 0)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities == [try Fixtures.activity()])
         controller.pause()
         await controller.summarySync.stopAndWait()
     }
@@ -217,9 +229,14 @@ struct NativeSyncTests {
     @Test func nativeDiscoveryHonorsRetryAfterBeforeAnyFallback() async throws {
         let storage = try await storage()
         let http = ScriptedSyncSource([])
-        let date = Date()
+        let native = ScriptedSyncSource([.changes(cursor, .success(SyncFixtures.changes(next: cursor)))])
+        let connection = TestNativeConnection(native)
+        var date = Date()
+        var attempts = 0
         let controller = SyncController(activities: ActivityStore(), now: { date }, source: { _ in http }, nativeFactory: { _ in
-            throw APIClient.RequestError.rateLimited(retryAfter: 120, requestID: nil)
+            attempts += 1
+            if attempts == 1 { throw APIClient.RequestError.rateLimited(retryAfter: 120, requestID: nil) }
+            return connection
         }, invalidate: { _ in })
         controller.setSession(SyncFixtures.session(), storage: storage)
         await controller.refresh()
@@ -228,23 +245,180 @@ struct NativeSyncTests {
         #expect(controller.activities.activities.count == 1)
         await controller.refresh()
         #expect(await http.calls == 0)
-    }
-
-    @Test func failedSubscriptionHandsTheWriterToHTTP() async throws {
-        let storage = try await storage()
-        let source = ScriptedSyncSource([.changes(cursor, .success(SyncFixtures.changes(next: cursor)))])
-        let connection = TestNativeConnection(source)
-        let replacement = try Fixtures.activity(["name": "HTTP recovery"])
-        let http = SyncFixtures.complete([replacement])
-        let controller = SyncController(activities: ActivityStore(), source: { _ in NamespacedPages(base: http, native: false) },
-            nativeFactory: { _ in connection }, invalidate: { _ in })
-        controller.setSession(SyncFixtures.session(), storage: storage)
+        date = date.addingTimeInterval(121)
         await controller.refresh()
-        connection.events.continuation.finish(throwing: APIClient.RequestError.transport("Disconnected"))
-        try await eventually { controller.checkpoint?.changesCursor == "snapshot" && controller.status == .ready }
-        #expect(!controller.usesNativeSync && connection.closed)
-        #expect(try await storage.snapshot(scope: Fixtures.scope).activities.first?.name == "HTTP recovery")
+        #expect(controller.status == .ready && controller.usesNativeSync && attempts == 2)
+        #expect(await http.calls == 0)
         controller.pause()
         await controller.summarySync.stopAndWait()
     }
+
+    @Test func failedSubscriptionReconnectsFromTheNativePosition() async throws {
+        let storage = try await storage()
+        let source = ScriptedSyncSource([
+            .changes(cursor, .success(SyncFixtures.changes(next: cursor))),
+            .changes(cursor, .success(SyncFixtures.changes(next: cursor)))
+        ])
+        var connections: [TestNativeConnection] = []
+        let http = ScriptedSyncSource([])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in http }, nativeFactory: { _ in
+            let connection = TestNativeConnection(source); connections.append(connection); return connection
+        }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        connections[0].events.continuation.finish(throwing: APIClient.RequestError.transport("Disconnected"))
+        try await eventually { controller.status == .offline }
+        #expect(connections[0].closed && !controller.usesNativeSync)
+        await controller.refresh()
+        #expect(controller.status == .ready && controller.checkpoint?.changesCursor == cursor)
+        #expect(connections.count == 2 && controller.usesNativeSync)
+        #expect(await http.calls == 0)
+        controller.pause()
+        await controller.summarySync.stopAndWait()
+    }
+
+    @Test func transientDiscoveryFailureDoesNotMigrateANativeCache() async throws {
+        let storage = try await storage()
+        let http = ScriptedSyncSource([])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in http }, nativeFactory: { _ in
+            throw APIClient.RequestError.transport("Temporary outage")
+        }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        #expect(controller.status == .offline && controller.checkpoint?.changesCursor == cursor)
+        #expect(await http.calls == 0)
+        controller.pause()
+    }
+
+    @Test func unsupportedDeploymentCanStillFallBackToHTTP() async throws {
+        let storage = try await storage()
+        let http = SyncFixtures.complete([try Fixtures.activity()])
+        let controller = SyncController(activities: ActivityStore(), source: { _ in NamespacedPages(base: http, native: false) },
+            nativeFactory: { _ in throw NativeSyncCapabilityError.unavailable }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        #expect(controller.status == .ready && controller.checkpoint?.changesCursor == "snapshot")
+        controller.pause()
+        await controller.summarySync.stopAndWait()
+    }
+
+    @Test func cacheReadFailureConsumesTheWakeupWithoutSpinning() async throws {
+        let container = try LocalStore.makeContainer(inMemory: true)
+        let storage = LocalStore(container: container)
+        var checkpoint = Fixtures.checkpoint
+        checkpoint.changesCursor = cursor
+        try await storage.apply([.upsertActivity(try Fixtures.activity())], checkpoint: checkpoint, scope: Fixtures.scope)
+        let source = ScriptedSyncSource([.changes(cursor, .success(SyncFixtures.changes(next: cursor)))])
+        let connection = TestNativeConnection(source)
+        var clockReads = 0
+        let controller = SyncController(activities: ActivityStore(), now: { clockReads += 1; return Date() },
+            nativeFactory: { _ in connection }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        let context = ModelContext(container)
+        let state = try #require(context.fetch(FetchDescriptor<SyncState>()).first)
+        state.payload = Data("corrupt checkpoint".utf8)
+        try context.save()
+        let before = clockReads
+        connection.events.continuation.yield(())
+        try await eventually { if case .failed = controller.status { return true }; return false }
+        try await Task.sleep(for: .milliseconds(100))
+        #expect(clockReads - before < 10)
+        #expect(await source.calls == 1)
+        controller.pause()
+        await controller.summarySync.stopAndWait()
+    }
+
+    @Test func profileChangesKeepTheSDKConnection() async throws {
+        let storage = try await storage()
+        let source = ScriptedSyncSource([
+            .changes(cursor, .success(SyncFixtures.changes(next: cursor))),
+            .changes(cursor, .success(SyncFixtures.changes(next: cursor)))
+        ])
+        let connection = TestNativeConnection(source)
+        var connected = 0
+        let controller = SyncController(activities: ActivityStore(), nativeFactory: { _ in connected += 1; return connection }, invalidate: { _ in })
+        let initial = SyncFixtures.session()
+        controller.setSession(initial, storage: storage)
+        await controller.refresh()
+        let user = initial.user
+        let renamed = ActivityMapAPI.CurrentUser(id: user.id, name: "Renamed", email: user.email, image: user.image,
+            athleteID: user.athleteID, stravaConnected: user.stravaConnected, stravaPermissions: user.stravaPermissions,
+            authentication: user.authentication)
+        controller.setSession(SyncSession(user: renamed, token: initial.token, deployment: initial.deployment, verified: true), storage: storage)
+        await controller.refresh()
+        #expect(controller.status == .ready && connected == 1 && !connection.closed)
+        controller.pause()
+        await controller.summarySync.stopAndWait()
+    }
+
+    @Test func notificationWaitsForEditCompletionWithoutPolling() async throws {
+        let storage = try await storage()
+        let source = ScriptedSyncSource([
+            .changes(cursor, .success(SyncFixtures.changes(next: cursor))),
+            .changes(cursor, .success(SyncFixtures.changes(next: cursor)))
+        ])
+        let connection = TestNativeConnection(source)
+        let edit = GatedEditSource()
+        var clockReads = 0
+        let controller = SyncController(activities: ActivityStore(), now: { clockReads += 1; return Date() },
+            nativeFactory: { _ in connection }, editSource: { _ in edit }, invalidate: { _ in })
+        controller.setSession(SyncFixtures.session(), storage: storage)
+        await controller.refresh()
+        let dto = try Fixtures.activity(["name": "Saved edit"])
+        let save = Task { try await controller.updateActivity(activityID: Int(dto.id)!, fields: .init(name: "Saved edit", description: nil, sportType: nil)) }
+        await edit.waitForRequest()
+        connection.events.continuation.yield(())
+        let before = clockReads
+        try await Task.sleep(for: .milliseconds(250))
+        #expect(await source.calls == 1 && clockReads == before)
+        await edit.release(dto)
+        try await save.value
+        try await eventually { await source.calls == 2 && controller.status == .ready }
+        controller.pause()
+        await controller.summarySync.stopAndWait()
+    }
+
+    @Test func pageSlowerThanEightSecondsStillCompletesNatively() async throws {
+        let publisher = Just("slow page").setFailureType(to: ClientError.self)
+            .delay(for: .seconds(8.1), scheduler: DispatchQueue(label: "slow-native-page-test")).eraseToAnyPublisher()
+        #expect(try await ConvexSyncConnection.first(publisher) == "slow page")
+    }
+
+    @Test func closeCancelsPendingSubscriptionsAndReleasesTheSDK() async throws {
+        var client: ConvexClientWithAuth<ConvexTokenProvider.Token>? = ConvexClientWithAuth(
+            deploymentUrl: "https://example.convex.cloud", authProvider: ConvexTokenProvider(session: SyncFixtures.session()))
+        weak var released = client
+        let connection = ConvexSyncConnection(client: client!)
+        client = nil
+        let driver = NativePublisherDriver()
+        let cancelled = AsyncStream<Bool>.makeStream()
+        let publisher = driver.subject.handleEvents(receiveCancel: { @Sendable in
+            cancelled.continuation.yield(true); cancelled.continuation.finish()
+        }).eraseToAnyPublisher()
+        let values = ConvexSyncConnection.stream(publisher, subscriptions: connection.subscriptions)
+        let reader = Task { for try await _ in values {} }
+        connection.close()
+        await connection.closeAndWait()
+        _ = await reader.result
+        var unsubscribed = false
+        for await event in cancelled.stream { unsubscribed = event }
+        #expect(unsubscribed && released == nil)
+    }
+    @Test func matchingVersionUpdateInvalidatesPlacesWithoutDownloadingRoutesAgain() async throws {
+        let storage = try await storage()
+        var checkpoint = Fixtures.checkpoint
+        checkpoint.changesCursor = cursor
+        checkpoint.placesSyncReady = true
+        checkpoint.freshness = .init(lastSummaryReconciledAt: nil, placeMatchingVersion: String(repeating: "a", count: 64))
+        try await storage.apply([], checkpoint: checkpoint, scope: Fixtures.scope)
+        let freshness = ActivityMapAPI.SyncFreshnessMeta(lastSummaryReconciledAt: Date(timeIntervalSince1970: 1_700_000_000),
+            placeMatchingVersion: String(repeating: "b", count: 64))
+        let source = ScriptedSyncSource([.changes(cursor, .success(SyncFixtures.changes(next: cursor, freshness: freshness)))])
+        let result = try await SyncEngine(source: source, store: storage, scope: Fixtures.scope).run()
+        #expect(result.freshness == freshness)
+        #expect(await source.calls == 1)
+        #expect(try await storage.snapshot(scope: Fixtures.scope).activities == [try Fixtures.activity()])
+    }
+
 }

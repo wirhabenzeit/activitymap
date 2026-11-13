@@ -1,9 +1,9 @@
 import { v } from 'convex/values';
 
+import { SYNC_RETENTION_MS as RETENTION_MS } from '../../src/contracts/v1/sync-policy';
 import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
 
-const RETENTION_MS = 90 * 86_400_000;
 const PAGE_SIZE = 256;
 
 /** Delete bounded batches and retain the highest removed sequence per owner.

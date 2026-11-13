@@ -747,3 +747,169 @@ void test('native large-route pages stay bounded and reconcile writes during boo
   assert.equal(delta.items[0].activity.id, '999');
   assert.equal(delta.items[0].activity.map_polyline, 'detailed-999');
 });
+
+void test('native positions survive matching/projection updates just like HTTP positions', async () => {
+  const convex = await setup(20, { large: true });
+  const client = convex.withIdentity(identity);
+  const first = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'activities',
+      cursor: null,
+    }),
+  );
+  const before = await client.query(api.nativeSync.head, {});
+  const nextVersion = 'e'.repeat(64);
+  await convex.run(async (ctx) => {
+    const owner = (await ctx.db.query('owners').first())!;
+    await ctx.db.patch('owners', owner._id, {
+      matchingVersion: nextVersion,
+      catalogue: 'f'.repeat(64),
+      projectionVersion: 2,
+    });
+  });
+  const after = await client.query(api.nativeSync.head, {});
+  assert.equal(after.sequence, before.sequence);
+  assert.notEqual(after.version, before.version);
+  const continuation = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'activities',
+      cursor: first.nextCursor,
+    }),
+  );
+  assert.equal(continuation.freshness.placeMatchingVersion, nextVersion);
+  const changes = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'changes',
+      cursor: first.snapshotCursor,
+    }),
+  );
+  assert.equal(changes.nextCursor, first.snapshotCursor);
+  assert.equal(changes.freshness.placeMatchingVersion, nextVersion);
+  assert.deepEqual(changes.items, []);
+});
+
+void test('native and HTTP sync expose the stored reconciliation time, including metadata-only wakeups', async () => {
+  const convex = await setup(1);
+  const client = convex.withIdentity(identity);
+  const before = await client.query(api.nativeSync.head, {});
+  const completedAt = Date.now() - 60_000;
+  await convex.run(async (ctx) => {
+    const owner = (await ctx.db.query('owners').first())!;
+    await ctx.db.insert('ingestionSweeps', {
+      owner: owner._id,
+      number: 1,
+      phase: 'idle',
+      dueAt: Date.now() + day,
+      scanBefore: 0,
+      page: 1,
+      after: '',
+      attempt: 0,
+      claims: 0,
+      completedAt,
+    });
+  });
+  const head = await client.query(api.nativeSync.head, {});
+  assert.equal(head.sequence, before.sequence);
+  assert.equal(head.lastSummaryReconciledAt, completedAt);
+  const first = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'activities',
+      cursor: null,
+    }),
+  );
+  const changes = JSON.parse(
+    await client.query(api.nativeSync.read, {
+      resource: 'changes',
+      cursor: first.snapshotCursor,
+    }),
+  );
+  assert.equal(
+    first.freshness.lastSummaryReconciledAt,
+    new Date(completedAt).toISOString(),
+  );
+  assert.equal(
+    changes.freshness.lastSummaryReconciledAt,
+    first.freshness.lastSummaryReconciledAt,
+  );
+  const http = await convex.query(internal.sync.read, {
+    ...scope,
+    operation: { kind: 'head' },
+  });
+  assert.equal(http.lastSummaryReconciledAt, completedAt);
+  const httpBootstrap = JSON.parse(
+    await convex.query(internal.sync.bootstrapJson, {
+      ...scope,
+      operation: {
+        kind: 'bootstrap',
+        resource: 'activities',
+        after: null,
+        limit: 10,
+      },
+    }),
+  );
+  assert.equal(httpBootstrap.head.lastSummaryReconciledAt, completedAt);
+});
+
+void test('native cursor expiry does not slide on empty polls, renews on advancement and shares compactor policy', async () => {
+  const { SYNC_RETENTION_DAYS, SYNC_RETENTION_MS } =
+    await import('../../src/contracts/v1/sync-policy');
+  const original = Date.now();
+  try {
+    const convex = await setup(1);
+    const client = convex.withIdentity(identity);
+    const first = JSON.parse(
+      await client.query(api.nativeSync.read, {
+        resource: 'activities',
+        cursor: null,
+      }),
+    );
+    assert.equal(first.retention.retentionDays, SYNC_RETENTION_DAYS);
+    assert.equal(
+      Date.parse(first.retention.cursorValidUntil),
+      original + SYNC_RETENTION_MS,
+    );
+    mock.timers.setTime(original + day);
+    const empty = JSON.parse(
+      await client.query(api.nativeSync.read, {
+        resource: 'changes',
+        cursor: first.snapshotCursor,
+      }),
+    );
+    assert.equal(empty.nextCursor, first.snapshotCursor);
+    assert.deepEqual(empty.retention, first.retention);
+    await convex.mutation(testWrites.applySources, {
+      scope,
+      generation,
+      sourceRevision: 11,
+      items: [activity('2000', 30)],
+      recordings: [],
+    });
+    const advanced = JSON.parse(
+      await client.query(api.nativeSync.read, {
+        resource: 'changes',
+        cursor: first.snapshotCursor,
+      }),
+    );
+    assert.equal(
+      Date.parse(advanced.retention.cursorValidUntil),
+      original + day + SYNC_RETENTION_MS,
+    );
+    mock.timers.setTime(original + SYNC_RETENTION_MS);
+    await assert.rejects(
+      client.query(api.nativeSync.read, {
+        resource: 'changes',
+        cursor: first.snapshotCursor,
+      }),
+      /sync_rebootstrap_required/,
+    );
+    const valid = JSON.parse(
+      await client.query(api.nativeSync.read, {
+        resource: 'changes',
+        cursor: advanced.nextCursor,
+      }),
+    );
+    assert.equal(valid.nextCursor, advanced.nextCursor);
+  } finally {
+    mock.timers.setTime(original);
+  }
+});

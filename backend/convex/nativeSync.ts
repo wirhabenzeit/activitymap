@@ -1,13 +1,17 @@
 import { ConvexError, v } from 'convex/values';
 
 import type { ActivityDTO } from '../../src/contracts/v1/activity';
-import { MATCHER_VERSION } from '../../src/server/places/matcher-version';
+import {
+  SYNC_RETENTION_DAYS,
+  SYNC_RETENTION_MS,
+} from '../../src/contracts/v1/sync-policy';
+import { placeMatchesFor } from '../../src/lib/sync/place-matches';
 import type { Doc } from './_generated/dataModel';
 import { query } from './_generated/server';
 import { PROJECTION_VERSION } from './activityProjection';
 import { requireHead } from './owners';
 import { photoPage } from './photos';
-import { bootstrapPage, resolvedChangesPage } from './sync';
+import { bootstrapPage, lastReconciledAt, resolvedChangesPage } from './sync';
 import { requireViewer } from './viewer';
 
 // A separate cursor namespace prevents either transport acknowledging the
@@ -16,41 +20,29 @@ import { requireViewer } from './viewer';
 const PREFIX = 'ios-convex-v1:';
 const PAGE_BYTES = 384 * 1024;
 const LIMIT = 256;
-const DAYS = 90;
 
 /** Match the HTTP projection for rows awaiting derived place results. */
 function activity(item: ActivityDTO, owner: Doc<'owners'>): ActivityDTO {
   return {
     ...item,
-    placeMatches: item.placeMatches ?? {
-      activityId: item.id,
-      userId: owner.userId,
-      status: item.streams?.state === 'current' ? 'pending' : 'missing_streams',
-      streamGeneration: item.streams?.generation ?? null,
-      streamRevision: item.streams?.revision ?? '0',
-      catalogueSnapshotId: null,
-      matcherVersion: MATCHER_VERSION,
-      matchingVersion: owner.matchingVersion,
-      resultRevision: null,
-      places: [],
-    },
+    placeMatches: placeMatchesFor(item, owner.userId, owner.matchingVersion),
   };
 }
 
-function version(owner: Doc<'owners'>) {
-  return [
+function datasetVersion(owner: Doc<'owners'>) {
+  return JSON.stringify([
+    owner._id,
     owner.userId,
+    owner.athleteId,
     owner.epoch,
     owner.generation,
-    owner.matchingVersion,
-    owner.projectionVersion,
-    PROJECTION_VERSION,
-  ].join(':');
+  ]);
 }
 
 type Position = {
   version: string;
   sequence: number;
+  issuedAt: number;
   resource?: string;
   after?: string;
 };
@@ -65,6 +57,9 @@ function decode(cursor: string, identity: string): Position {
       value.version !== identity ||
       !Number.isSafeInteger(value.sequence) ||
       value.sequence < 0 ||
+      !Number.isSafeInteger(value.issuedAt) ||
+      value.issuedAt > Date.now() ||
+      value.issuedAt + SYNC_RETENTION_MS <= Date.now() ||
       (value.after !== undefined && typeof value.after !== 'string')
     )
       throw new Error();
@@ -80,7 +75,16 @@ export const head = query({
   handler: async (ctx) => {
     const owner = await requireViewer(ctx);
     const head = await requireHead(ctx, owner._id);
-    return { version: version(owner), sequence: head.sequence };
+    return {
+      version: [
+        datasetVersion(owner),
+        owner.matchingVersion,
+        owner.projectionVersion,
+        PROJECTION_VERSION,
+      ].join(':'),
+      sequence: head.sequence,
+      lastSummaryReconciledAt: await lastReconciledAt(ctx, owner),
+    };
   },
 });
 
@@ -100,16 +104,19 @@ export const read = query({
   handler: async (ctx, { resource, cursor }) => {
     const owner = await requireViewer(ctx);
     const head = await requireHead(ctx, owner._id);
-    const identity = version(owner);
+    const identity = datasetVersion(owner);
     const position = cursor === null ? null : decode(cursor, identity);
     const freshness = {
-      lastSummaryReconciledAt: null,
+      lastSummaryReconciledAt: await lastReconciledAt(ctx, owner).then(
+        (value) => (value === null ? null : new Date(value).toISOString()),
+      ),
       placeMatchingVersion: owner.matchingVersion,
     };
-    const retention = {
-      retentionDays: DAYS,
-      cursorValidUntil: new Date(Date.now() + DAYS * 86400000).toISOString(),
-    };
+    const issuedAt = position?.issuedAt ?? Date.now();
+    const retentionFor = (issuedAt: number) => ({
+      retentionDays: SYNC_RETENTION_DAYS,
+      cursorValidUntil: new Date(issuedAt + SYNC_RETENTION_MS).toISOString(),
+    });
     if (resource === 'changes') {
       if (
         !position ||
@@ -131,15 +138,21 @@ export const read = query({
         position.sequence,
         PAGE_BYTES,
       );
+      const nextIssuedAt =
+        page.lastSequence === position.sequence ? issuedAt : Date.now();
       return JSON.stringify({
         items: page.items.map((item) =>
           item.activity
             ? { ...item, activity: activity(item.activity, owner) }
             : item,
         ),
-        nextCursor: encode({ version: identity, sequence: page.lastSequence }),
+        nextCursor: encode({
+          version: identity,
+          sequence: page.lastSequence,
+          issuedAt: nextIssuedAt,
+        }),
         freshness,
-        retention,
+        retention: retentionFor(nextIssuedAt),
       });
     }
     if (position && position.resource !== resource)
@@ -180,14 +193,15 @@ export const read = query({
               sequence: position?.sequence ?? head.sequence,
               resource,
               after: next,
+              issuedAt,
             })
           : null,
       snapshotCursor:
         resource === 'activities' && cursor === null
-          ? encode({ version: identity, sequence: head.sequence })
+          ? encode({ version: identity, sequence: head.sequence, issuedAt })
           : null,
       freshness,
-      retention,
+      retention: retentionFor(issuedAt),
     });
   },
 });

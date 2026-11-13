@@ -64,8 +64,10 @@ final class SyncController {
     private var generation = 0
     @ObservationIgnored private var native: (any NativeLibraryConnection)?
     @ObservationIgnored private var nativeMonitor: Task<Void, Never>?
+    @ObservationIgnored private var nativeMonitorID: UUID?
     private var nativeAttempted = false
     private var nativeDirty = false
+    @ObservationIgnored private var editWaiters: [UUID: CheckedContinuation<Void, Never>] = [:]
     private let nativeFactory: ((SyncSession) async throws -> (any NativeLibraryConnection)?)?
     var usesNativeSync: Bool { native != nil }
     private var retryAt: Date?
@@ -146,10 +148,18 @@ final class SyncController {
         summarySync.configure(next)
         generation += 1
         editingInProgress = false
+        resumeEditWaiters()
         let current = generation
         let previous = work
         previous?.cancel()
-        stopNative()
+        let keepConnection = sameCredential && next.map {
+            $0.verified && $0.user.stravaConnected && $0.user.authentication.sessionExpiresAt > now()
+        } == true
+        if keepConnection {
+            nativeMonitor?.cancel()
+            nativeMonitor = nil
+            nativeMonitorID = nil
+        } else { stopNative() }
         // Verification and profile metadata may change during normal refresh.
         // Keep browsing state for the same usable credential; actual scope,
         // expiry and connection transitions still clear it immediately.
@@ -224,6 +234,12 @@ final class SyncController {
         if status == .syncing { status = .paused }
     }
 
+    func pauseAndWait() async {
+        let connection = native
+        pause()
+        await connection?.closeAndWait()
+    }
+
     func updateActivity(activityID: Int, fields: ActivityMapAPI.UpdateActivityRequest) async throws {
         if let reason = editing.unavailableReason { throw ActivityEditingError.unavailable(reason) }
         guard !editingInProgress, let session, let storage else {
@@ -231,7 +247,12 @@ final class SyncController {
         }
         let current = generation
         editingInProgress = true
-        defer { if current == generation { editingInProgress = false } }
+        defer {
+            if current == generation {
+                editingInProgress = false
+                resumeEditWaiters()
+            }
+        }
         await work?.value
         try Task.checkCancellation()
         guard current == generation, self.session == session else { throw CancellationError() }
@@ -276,6 +297,9 @@ final class SyncController {
 
 
     private func perform(_ session: SyncSession, storage: LocalStore, generation current: Int) async {
+        // Consume the wakeup before cache reads or any other fallible step.
+        // A new notification during this pass can schedule one further pass.
+        nativeDirty = false
         var importing = pendingFirstSummaryCount != nil
         defer { if current == generation { importingInitialSummaries = false } }
         do {
@@ -371,6 +395,8 @@ final class SyncController {
     }
 
     private func syncLibrary(_ session: SyncSession, storage: LocalStore, generation current: Int) async throws {
+        let nativeCheckpoint = checkpoint?.changesCursor?.hasPrefix("ios-convex-") == true
+            || checkpoint?.bootstrapCursor?.hasPrefix("ios-convex-") == true
         if !nativeAttempted, let nativeFactory {
             nativeAttempted = true
             do {
@@ -381,70 +407,90 @@ final class SyncController {
                 }
                 native = connection
                 if connection != nil { Self.syncLog.info("Library transport: native Convex") }
-                if let connection { watchNative(connection, generation: current) }
+                // A nil result explicitly means this deployment does not offer native sync.
             } catch {
                 try Task.checkCancellation()
                 guard current == generation else { throw CancellationError() }
+                nativeAttempted = error is NativeSyncCapabilityError
                 if AuthController.isExplicitlyUnauthenticated(error) { throw error }
                 if case .rateLimited = error as? APIClient.RequestError { throw error }
                 if Self.serverRetryDelay(error) != nil { throw error }
-                // HTTP remains authoritative for session expiry/revocation and
-                // retry guards, including native auth or deployment mismatch.
-                Self.syncLog.notice("Native Convex unavailable; using HTTP sync")
+                if !(error is NativeSyncCapabilityError) {
+                    // A temporary outage must not migrate an existing native cache
+                    // to HTTP and force another full download on reconnect.
+                    if nativeCheckpoint { throw error }
+                }
+                Self.syncLog.notice("Native Convex unavailable; continuing HTTP sync")
             }
         }
         if let native {
-            nativeDirty = false
-            do {
-                _ = try await SyncEngine(source: native.pages, store: storage, scope: session.scope).run()
-                return
-            } catch {
-                try Task.checkCancellation()
-                guard current == generation else { throw CancellationError() }
-                stopNative()
-                nativeAttempted = true // Retry native on the next foreground session.
-                Self.syncLog.notice("Native Convex read failed; recovering through HTTP sync")
-            }
+            if nativeMonitor == nil { watchNative(native, generation: current) }
+            // Errors preserve the native checkpoint and connection. The SDK can
+            // reconnect; manual/periodic refresh resumes from the saved position.
+            _ = try await SyncEngine(source: native.pages, store: storage, scope: session.scope).run()
+            return
         }
         _ = try await SyncEngine(source: source(session), store: storage, scope: session.scope).run()
     }
 
     private func watchNative(_ connection: any NativeLibraryConnection, generation current: Int) {
+        let monitorID = UUID()
+        nativeMonitorID = monitorID
         nativeMonitor = Task { [weak self] in
             do {
                 for try await _ in connection.updates() {
                     guard let self, current == generation, !Task.isCancelled else { return }
                     nativeDirty = true
-                    // A notification received during a read/edit must cause a
-                    // subsequent pass, even when refresh first joins that work.
                     while nativeDirty, current == generation, !Task.isCancelled {
-                        if editingInProgress {
-                            try await Task.sleep(for: .milliseconds(100))
-                            continue
-                        }
+                        await waitForEdit()
+                        guard current == generation, !Task.isCancelled else { return }
                         await refresh()
-                        if retryAt != nil || !usesNativeSync { break }
+                        // A failed pass waits for another external wakeup or a
+                        // user/periodic retry, including failures before sync began.
+                        if status != .ready || retryAt != nil || !usesNativeSync { break }
                     }
                 }
                 throw APIClient.RequestError.transport("Native update subscription ended")
             } catch {
-                guard let self, current == generation, !Task.isCancelled else { return }
+                guard let self, current == generation, nativeMonitorID == monitorID, !Task.isCancelled else { return }
                 native?.close()
                 native = nil
-                nativeAttempted = true
+                nativeMonitor = nil
+                nativeAttempted = false
                 nativeDirty = false
-                // Await any current writer, then start HTTP recovery. No two
-                // transports can write the library concurrently.
                 await work?.value
-                guard current == generation, !Task.isCancelled else { return }
-                await refresh()
+                guard current == generation, nativeMonitorID == monitorID, !Task.isCancelled else { return }
+                // Do not switch transports for a subscription/network error.
+                // The next refresh reconnects and resumes the native position.
+                summarySync.pause()
+                status = .offline
             }
         }
+    }
+
+    private func waitForEdit() async {
+        guard editingInProgress else { return }
+        let id = UUID()
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if editingInProgress && !Task.isCancelled { editWaiters[id] = continuation }
+                else { continuation.resume() }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in self?.editWaiters.removeValue(forKey: id)?.resume() }
+        }
+    }
+
+    private func resumeEditWaiters() {
+        let pending = Array(editWaiters.values)
+        editWaiters.removeAll()
+        pending.forEach { $0.resume() }
     }
 
     private func stopNative() {
         nativeMonitor?.cancel()
         nativeMonitor = nil
+        nativeMonitorID = nil
         native?.close()
         native = nil
         nativeAttempted = false

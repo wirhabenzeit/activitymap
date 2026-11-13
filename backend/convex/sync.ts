@@ -192,6 +192,14 @@ export async function resolvedChangesPage(
   return { items, lastSequence };
 }
 
+export async function lastReconciledAt(ctx: QueryCtx, owner: Doc<'owners'>) {
+  const sweep = await ctx.db
+    .query('ingestionSweeps')
+    .withIndex('by_owner', (q) => q.eq('owner', owner._id))
+    .unique();
+  return sweep?.completedAt ?? null;
+}
+
 export const read = internalQuery({
   args: { ...scopeFields, operation },
   handler: async (ctx, { operation: op, ...scope }) => {
@@ -209,7 +217,7 @@ export const read = internalQuery({
     const head = {
       sequence: feed?.sequence ?? 0,
       matchingVersion: owner.matchingVersion,
-      lastSummaryReconciledAt: null,
+      lastSummaryReconciledAt: feed ? await lastReconciledAt(ctx, owner) : null,
     };
     if (
       'limit' in op &&
@@ -446,7 +454,7 @@ export const bootstrapJson = internalQuery({
     const head = JSON.stringify({
       sequence: feed.sequence,
       matchingVersion: owner.matchingVersion,
-      lastSummaryReconciledAt: null,
+      lastSummaryReconciledAt: await lastReconciledAt(ctx, owner),
     });
     if (!Number.isInteger(op.limit) || op.limit < 1 || op.limit > 500)
       throw new Error('Invalid sync page limit');
