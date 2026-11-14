@@ -1,12 +1,13 @@
 import { z } from 'zod';
 
-import { isoDateTime } from './primitives';
 import {
   MAX_SHARE_LINK_ACTIVITIES,
   MAX_SHARE_LINK_TTL_MS,
   MIN_SHARE_LINK_TTL_MS,
   shareLinkFieldOptionsSchema,
 } from '~/server/sharing/validators';
+
+import { isoDateTime } from './primitives';
 
 // The service stores numeric IDs; reject strings that cannot round-trip safely.
 export const createShareLinkRequestSchema = z
@@ -32,14 +33,18 @@ export const createShareLinkRequestSchema = z
   })
   .strict();
 
+// IDs belong to the backing store: Convex IDs and legacy UUIDs are opaque
+// strings to clients. Ownership and existence are checked by the backend.
+const shareLinkIdSchema = z.string().min(1).max(128);
+
 export const createdShareLinkDTOSchema = z.object({
-  id: z.string().uuid(),
+  id: shareLinkIdSchema,
   token: z.string().min(1),
   expiresAt: isoDateTime,
 });
 
 export const shareLinkSummaryDTOSchema = z.object({
-  id: z.string().uuid(),
+  id: shareLinkIdSchema,
   createdAt: isoDateTime,
   expiresAt: isoDateTime,
   revokedAt: isoDateTime.nullable(),
@@ -51,7 +56,7 @@ export const shareLinkListDTOSchema = z.object({
   links: z.array(shareLinkSummaryDTOSchema),
 });
 export const revokeShareLinkRequestSchema = z
-  .object({ id: z.string().uuid() })
+  .object({ id: shareLinkIdSchema })
   .strict();
 export const revokeShareLinkResultSchema = z.object({
   status: z.literal('revoked'),

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 
 import test from 'node:test';
+import { z } from 'zod';
 
 import { toActivityDTO } from '~/contracts/v1/activity';
 import { parseMutationActivityId } from '~/server/api/activity-id';
@@ -252,6 +253,55 @@ void test('POST refresh reports the activity, its photos and how complete they a
     ).data.photos_error,
     { code: 'rate_limited', retryable: true, retry_after_seconds: 90 },
   );
+});
+
+void test('edit and refresh log wrapped persistence diagnostics with the request ID', async () => {
+  const parsed = z
+    .object({ average_watts: z.number().nullable() })
+    .safeParse({});
+  assert.equal(parsed.success, false);
+  const cause = new Error('provider values must not be logged', {
+    cause: parsed.error,
+  });
+  const error = new ActivityMutationError(
+    'local_persistence_failed',
+    'Local save failed.',
+    503,
+    true,
+    undefined,
+    { upstreamSucceeded: true },
+    { cause },
+  );
+  const reports: unknown[] = [];
+  const deps = {
+    resolveActor: async () => actor,
+    updateThroughConvex: async () => {
+      throw error;
+    },
+    refreshThroughConvex: async () => {
+      throw error;
+    },
+    onError: (diagnostic: unknown, requestId: string) =>
+      reports.push({ diagnostic, requestId }),
+  };
+  for (const handler of [
+    createUpdateActivityHandler(deps),
+    createRefreshActivityHandler(deps),
+  ]) {
+    const response = await handler(
+      new Request('https://app.test/api/v1/activities/7', {
+        method: 'PATCH',
+        headers: { 'x-request-id': 'persistence-request' },
+        body: JSON.stringify({ name: 'Updated' }),
+      }),
+      7,
+    );
+    assert.equal(response.status, 503);
+  }
+  assert.equal(reports.length, 2);
+  assert.match(JSON.stringify(reports), /average_watts/);
+  assert.match(JSON.stringify(reports), /persistence-request/);
+  assert.doesNotMatch(JSON.stringify(reports), /provider values/);
 });
 
 void test('every mutation requires an actor before anything is asked of the library', async () => {
