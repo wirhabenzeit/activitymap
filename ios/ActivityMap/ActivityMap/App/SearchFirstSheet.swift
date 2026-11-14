@@ -69,6 +69,8 @@ struct SearchFirstSheet: View {
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always),
                         prompt: "Activities or places")
             .searchFocused($focused)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
             }
