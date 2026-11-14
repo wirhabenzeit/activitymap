@@ -305,7 +305,8 @@ struct AppShell: View {
     }
 
     private func shellRequest(sidebarAvailable: Bool) -> ShellSheet? {
-        sheets.showsFilters && !sidebarAvailable ? .filters : sheets.accountDestination.map(ShellSheet.account)
+        if sheets.showsSearch { return .search }
+        return sheets.showsFilters && !sidebarAvailable ? .filters : sheets.accountDestination.map(ShellSheet.account)
     }
 
     private var filterSidebarAvailable: Bool { filterSidebarAvailable(width: shellSize.width) }
@@ -330,7 +331,7 @@ struct AppShell: View {
     }
 
     private func filterPanel(floating: Bool) -> some View {
-        FilterPanel(store: store, scope: filterScope)
+        FilterPanel(store: store, scope: filterScope, account: filterPanelAccount)
             .frame(width: BrowsePaneLayout.filterWidth)
             .frame(maxHeight: .infinity)
             .background(Color(uiColor: .secondarySystemBackground))
@@ -347,13 +348,17 @@ struct AppShell: View {
 
     private func clearShellRequest() {
         sheets.showsFilters = false
+        sheets.showsSearch = false
         sheets.accountDestination = nil
     }
 
     @ViewBuilder private func shellSheet(_ destination: ShellSheet) -> some View {
         switch destination {
         case .filters:
-            FilterSheet(store: store, scope: filterScope) { sheets.showsFilters = false }
+            FilterSheet(store: store, scope: filterScope, account: filterPanelAccount) { sheets.showsFilters = false }
+        case .search:
+            SearchFirstSheet(store: store)
+                .presentationDetents([.large])
         case .account(let account):
             AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
         }
@@ -386,7 +391,7 @@ struct AppShell: View {
             if toolbarLayout.packsListControls && store.selectedTab == .list { SelectionBar(store: store, includesTotal: true, onNavigationBar: true) }
         }), principal: AnyView(destinationPicker), trailing: AnyView(HStack(spacing: 8) {
             if toolbarLayout.packsListControls && store.selectedTab == .list { ListControls(presentation: store.listPresentation, store: store, iconOnly: true, onNavigationBar: true) }
-            accountButton
+            searchButton
         }), identifier: "browse-header")
     }
 
@@ -435,6 +440,30 @@ struct AppShell: View {
             .accessibilityLabel(Text(AppMessages.navigationCurrentView(store.selectedTab.title, locale: locale)))
             .accessibilityIdentifier("browse-destination-menu")
         }
+    }
+
+    /// PROTOTYPE: the account entry moves to the filter panel's footer.
+    private var filterPanelAccount: FilterPanelAccount {
+        FilterPanelAccount(name: auth.currentUser?.name, imageURL: auth.currentUser?.image.flatMap(URL.init(string:)),
+                           syncing: syncing) {
+            sheets.showsFilters = false
+            sheets.accountDestination = .settings
+        }
+    }
+
+    /// PROTOTYPE: search-first header entry.
+    private var searchButton: some View {
+        Button { sheets.showsSearch = true } label: {
+            Image(systemName: "magnifyingglass")
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(.white)
+        .frame(width: 44, height: 44)
+        .accessibilityLabel("Search activities and places")
+        .accessibilityIdentifier("browse-search")
     }
 
     private var accountButton: some View {
@@ -543,8 +572,10 @@ enum AccountDestination: String, Identifiable {
 enum ShellSheet: Identifiable {
     case filters
     case account(AccountDestination)
+    case search
     var id: String {
         switch self {
+        case .search: "search"
         case .filters: "filters"
         case .account(let destination): "account-\(destination.rawValue)"
         }
@@ -575,6 +606,7 @@ struct FilterCountBadge: View {
 final class BrowseSheetPresentation {
     /// Filters are open: the sheet on narrow windows, the overlay sidebar on wide ones.
     var showsFilters = false
+    var showsSearch = false
     var accountDestination: AccountDestination?
     var mapResultsPresented = false
     var shellSheetPresented = false

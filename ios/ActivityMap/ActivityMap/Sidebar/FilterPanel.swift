@@ -8,6 +8,7 @@ import SwiftUI
 struct FilterSheet: View {
     @Bindable var store: ActivityStore
     var scope: FilterScope
+    var account: FilterPanelAccount? = nil
     let onDismiss: () -> Void
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -16,7 +17,7 @@ struct FilterSheet: View {
 
     var body: some View {
         NavigationStack {
-            FilterPanel(store: store, scope: scope, inNavigationStack: true, onDismiss: onDismiss)
+            FilterPanel(store: store, scope: scope, inNavigationStack: true, onDismiss: onDismiss, account: account)
         }
         .environment(\.mapSheetFraction, fullHeight ? 0 : Self.restingFraction)
         .presentationDetents(fullHeight ? [.large] : [.fraction(Self.restingFraction)])
@@ -76,6 +77,8 @@ struct FilterPanel: View {
     /// title and toolbar, and search is the form's first row.
     var inNavigationStack = false
     var onDismiss: (() -> Void)? = nil
+    /// PROTOTYPE: profile footer opening the account sheet.
+    var account: FilterPanelAccount? = nil
     @State private var editingCustomDates = false
     @State private var contentScrolled = false
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -149,6 +152,32 @@ struct FilterPanel: View {
         if scope != .stats { dateSection }
         metricsSection([.distance, .duration, .elevation]).id(store.filterResetRevision)
         binarySection
+        if let account { accountFooter(account) }
+    }
+
+    private func accountFooter(_ account: FilterPanelAccount) -> some View {
+        Section {
+            Button(action: account.open) {
+                HStack(spacing: 12) {
+                    AsyncImage(url: account.imageURL) { phase in
+                        if let image = phase.image { image.resizable().scaledToFill() }
+                        else { Image(systemName: "person.crop.circle.fill").resizable().foregroundStyle(.secondary) }
+                    }
+                    .frame(width: 36, height: 36)
+                    .clipShape(Circle())
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(account.name ?? "Account").foregroundStyle(.primary)
+                        Text(account.syncing ? "Syncing activities…" : "Settings, sync & Strava")
+                            .font(.caption).foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
+                }
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("filter-panel-account")
+        }
     }
 
     private var summaryHeader: some View {
@@ -471,3 +500,10 @@ struct FilterResetButton: View {
 }
 
 
+/// PROTOTYPE: what the filter panel's profile footer shows.
+struct FilterPanelAccount {
+    var name: String?
+    var imageURL: URL?
+    var syncing: Bool
+    var open: () -> Void
+}
