@@ -945,6 +945,7 @@ export default function InteractiveMap() {
           {
             <SelectionBar
               filterIDs={filterIDs}
+              activities={activities}
               showShare={detailId === 0}
               backButton={
                 detailId > 0 ? (

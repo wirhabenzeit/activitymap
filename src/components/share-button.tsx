@@ -8,7 +8,6 @@ import { CreateShareDialog } from '~/components/share/create-share-dialog';
 import { ManageSharesDialog } from '~/components/share/manage-shares-dialog';
 import { Button } from '~/components/ui/button';
 import { Dialog, DialogTrigger } from '~/components/ui/dialog';
-import { useActivities } from '~/hooks/use-activities';
 import type { Activity } from '~/lib/activity';
 import { useShallowStore } from '~/store';
 
@@ -95,13 +94,16 @@ export function ActivityShareButton({
 }
 
 /** Group sharing belongs beside the explicit selection controls. */
-export function SelectionShareButton() {
+export function SelectionShareButton({
+  activities,
+}: {
+  activities: readonly Activity[];
+}) {
   const { isGuest, selected, combine } = useShallowStore((state) => ({
     isGuest: state.isGuest,
     selected: state.selected,
     combine: state.combineSelections,
   }));
-  const { data: activities = [] } = useActivities();
   if (isGuest || !combine || selected.length === 0) return null;
   const selectedIDs = new Set(selected);
   const scope = activities.filter((activity) => selectedIDs.has(activity.id));

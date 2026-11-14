@@ -62,8 +62,12 @@ try {
     name: 'Activity without route',
     exact: true,
   });
-  const more = (region) =>
-    region.getByRole('button', { name: copy('actions.more'), exact: true });
+  const activityAction = (region, action) =>
+    region
+      .getByRole('region', { name: 'Activity actions', exact: true })
+      .getByRole('button', { name: new RegExp(`^${copy(action)}`) });
+  const refresh = (region) =>
+    region.getByRole('button', { name: copy('action.refresh'), exact: true });
   const dismissMenu = async (trigger) => {
     await page.keyboard.press('Escape');
     await page.getByRole('menu').waitFor({ state: 'hidden' });
@@ -76,23 +80,8 @@ try {
     await page.waitForFunction(
       () => !document.body.hasAttribute('data-scroll-locked'),
     );
-    const direct = recorded.getByRole('button', {
-      name: copy('action.edit'),
-      exact: true,
-    });
-    if (await direct.count()) {
-      await direct.focus();
-      await page.keyboard.press('Enter');
-    } else {
-      await more(recorded).focus();
-      await page.keyboard.press('Enter');
-      const edit = page.getByRole('menuitem', {
-        name: copy('action.edit'),
-        exact: true,
-      });
-      await edit.focus();
-      await page.keyboard.press('Enter');
-    }
+    await activityAction(recorded, 'action.edit').focus();
+    await page.keyboard.press('Enter');
     const dialog = page.getByRole('dialog', {
       name: copy('activity.edit.title'),
       exact: true,
@@ -133,7 +122,18 @@ try {
           requestAnimationFrame(() => requestAnimationFrame(resolve)),
         ),
     );
-    await target(more(recorded));
+    await target(refresh(recorded));
+    for (const action of [
+      'action.edit',
+      'action.shareActivity',
+      'action.exportGPX',
+    ])
+      await target(activityAction(recorded, action));
+    await target(
+      recorded.getByRole('link', {
+        name: new RegExp(`^${copy('action.openInStrava')}`),
+      }),
+    );
     const map = recorded.getByRole('button', { name: /^Show on map:/ });
     await target(map);
     const titleBounds = await recorded
@@ -143,7 +143,7 @@ try {
       titleBounds && titleBounds.width >= 120,
       `Activity title compressed by actions: ${JSON.stringify(titleBounds)}`,
     );
-    for (const action of [map, more(recorded)]) {
+    for (const action of [map, refresh(recorded)]) {
       const bounds = await action.boundingBox();
       assert(
         bounds &&
@@ -158,41 +158,26 @@ try {
     assert(
       await indoor.getByRole('button', { name: /^Show on map:/ }).isDisabled(),
     );
-    await more(recorded).focus();
-    await page.keyboard.press('Enter');
-    const membership = await page.getByRole('menuitem').allTextContents();
-    assert(membership.some((label) => label.includes(copy('action.refresh'))));
-    assert(
-      membership.some((label) => label.includes(copy('action.exportGPX'))),
+    const membership = await recorded
+      .getByRole('region', { name: 'Activity actions', exact: true })
+      .getByRole('button')
+      .allTextContents();
+    assert.equal(await activityAction(recorded, 'action.edit').count(), 1);
+    assert.equal(
+      await activityAction(recorded, 'action.shareActivity').count(),
+      1,
     );
-    assert(
-      membership.some((label) => label.includes(copy('action.openInStrava'))),
+    assert.equal(
+      await refresh(indoor).count(),
+      0,
+      'Read-only activities hide Refresh',
     );
-    const hasMenuEdit = membership.some(
-      (label) => label.trim() === copy('action.edit'),
+    assert.equal(
+      await activityAction(indoor, 'action.shareActivity').count(),
+      0,
     );
-    assert.notEqual(
-      hasMenuEdit,
-      (await recorded
-        .getByRole('button', { name: copy('action.edit'), exact: true })
-        .count()) > 0,
-      'Edit is present once, directly or in overflow',
-    );
-    await dismissMenu(more(recorded));
-    await more(indoor).click();
-    assert(
-      await page
-        .getByRole('menuitem', { name: copy('action.refresh'), exact: true })
-        .isDisabled(),
-    );
-    assert(
-      await page
-        .getByRole('menuitem', {
-          name: new RegExp(`^${copy('action.exportGPX')}`),
-        })
-        .isDisabled(),
-    );
-    await dismissMenu(more(indoor));
+    assert(await activityAction(indoor, 'action.edit').isDisabled());
+    assert(await activityAction(indoor, 'action.exportGPX').isDisabled());
     const dialog = await openEdit();
     const bounds = await dialog.boundingBox();
     assert(
@@ -254,60 +239,25 @@ try {
     await page
       .getByRole('button', { name: 'Deny editing permission', exact: true })
       .evaluate((element) => element.click());
-    const editButton = recorded.getByRole('button', { name: /^Edit/ });
-    if (width > 520) {
-      await editButton.waitFor();
-      assert(await editButton.isDisabled());
-      assert.equal(
-        await editButton.getAttribute('title'),
-        `${copy('permission.edit')} ${copy('permission.reconnect')}`,
-      );
-      assert.match(
-        await editButton.getAttribute('aria-label'),
-        /Editing isn’t allowed/,
-      );
-    } else await editButton.waitFor({ state: 'hidden' });
-    await more(recorded).click();
-    if (width < 520) {
-      const editItem = page.getByRole('menuitem', { name: /^Edit/ });
-      assert(await editItem.isDisabled());
-      assert.equal(
-        await editItem.getAttribute('title'),
-        `${copy('permission.edit')} ${copy('permission.reconnect')}`,
-      );
-      assert.match(
-        await editItem.getAttribute('aria-label'),
-        /Editing isn’t allowed/,
-      );
-    }
+    const editButton = activityAction(recorded, 'action.edit');
+    await editButton.waitFor();
+    assert(await editButton.isDisabled());
+    assert.equal(
+      await editButton.getAttribute('title'),
+      `${copy('permission.edit')} ${copy('permission.reconnect')}`,
+    );
+    assert.match(await editButton.textContent(), /Editing isn’t allowed/);
     assert(
-      await page
-        .getByRole('menuitem', { name: copy('action.refresh'), exact: true })
-        .isEnabled(),
+      await refresh(recorded).isEnabled(),
       'Read access keeps Refresh available when write permission is denied',
     );
-    await dismissMenu(more(recorded));
     await page
       .getByRole('button', { name: 'Restore unknown permissions', exact: true })
       .evaluate((element) => element.click());
-    if (width > 520)
-      assert(
-        await recorded
-          .getByRole('button', { name: copy('action.edit'), exact: true })
-          .isEnabled(),
-      );
-    else {
-      await more(recorded).click();
-      assert(
-        await page
-          .getByRole('menuitem', { name: copy('action.edit'), exact: true })
-          .isEnabled(),
-      );
-      await dismissMenu(more(recorded));
-    }
+    assert(await editButton.isEnabled());
   }
   console.log(
-    'PASS denied write permission explains disabled direct/overflow Edit while Refresh remains available',
+    'PASS denied write permission explains disabled Edit at all widths while Refresh remains available',
   );
   const combine = page.getByRole('button', {
     name: 'Combine selections',
@@ -371,7 +321,7 @@ try {
     'Mixed selection has a visible non-color indicator',
   );
   console.log(
-    'PASS layout matrix, menu availability, keyboard focus and selected/mixed filter states',
+    'PASS layout matrix, activity action availability, keyboard focus and selected/mixed filter states',
   );
   let release;
   const writes = [];
@@ -489,10 +439,7 @@ try {
       }),
     });
   });
-  await more(recorded).click();
-  await page
-    .getByRole('menuitem', { name: copy('action.refresh'), exact: true })
-    .click();
+  await refresh(recorded).click();
   await page
     .getByText(copy('mutation.partial.title'), { exact: true })
     .waitFor();
@@ -715,8 +662,8 @@ try {
         writes,
         checks: [
           'keyboard focus containment/restoration',
-          'menu membership/disabled state and denied-edit/read-refresh permission parity',
-          '44px map/menu/dismiss targets',
+          'visible activity actions, disabled state and denied-edit/read-refresh permission parity',
+          '44px map/activity-action/dismiss targets',
           'landscape/tablet/Split View/200% text/RTL preview',
           'Combine and sport filter non-color/mixed state',
           'pending single submission and dismissal guard',

@@ -110,6 +110,8 @@ interface DataTableProps<TData extends RowData> extends ListState, ListActions {
   detailStepping?: boolean;
   /** Travels with the retained list during the detail transition. */
   listHeader?: React.ReactNode;
+  /** Actions scoped by the host's complete activity library. */
+  selectionActions?: React.ReactNode;
   /** Fade the bottom edge while more rows are hidden below the fold. */
   scrollHint?: boolean;
   /** Report whether the list has hidden rows, independent of its scroll position. */
@@ -147,6 +149,7 @@ export const DataTable = React.memo(function DataTable<
   detailPresentation = 'push',
   detailStepping = false,
   listHeader,
+  selectionActions,
   scrollHint = false,
   onOverflowChange,
   setSorting,
@@ -785,7 +788,11 @@ export const DataTable = React.memo(function DataTable<
         )}
       </ListDetailTransition>
       {paginationControl && (
-        <DataTablePagination table={table} hiddenByFit={hiddenByFit} />
+        <DataTablePagination
+          table={table}
+          hiddenByFit={hiddenByFit}
+          selectionActions={selectionActions}
+        />
       )}
     </div>
   );

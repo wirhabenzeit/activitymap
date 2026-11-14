@@ -5,6 +5,7 @@ import type { ReactNode } from 'react';
 
 import { SelectionShareButton } from '~/components/share-button';
 import { Button } from '~/components/ui/button';
+import type { Activity } from '~/lib/activity';
 import { store, useShallowStore } from '~/store';
 
 export function SelectionCount({
@@ -99,14 +100,16 @@ export function ClearSelectionButton() {
 export function SelectionActions({
   controls,
   showShare = true,
+  activities,
 }: {
   controls?: ReactNode;
   showShare?: boolean;
+  activities: readonly Activity[];
 }) {
   return (
     <div className="flex shrink-0 items-center">
       {controls}
-      {showShare && <SelectionShareButton />}
+      {showShare && <SelectionShareButton activities={activities} />}
       <ClearSelectionButton />
     </div>
   );
@@ -117,8 +120,10 @@ export function SelectionBar({
   controls,
   backButton,
   showShare = true,
+  activities,
 }: {
   filterIDs: number[];
+  activities: readonly Activity[];
   controls?: ReactNode;
   backButton?: ReactNode;
   showShare?: boolean;
@@ -135,7 +140,11 @@ export function SelectionBar({
         <SelectionCount filterIDs={filterIDs} />
         {backButton && <CombineSelectionButton />}
       </div>
-      <SelectionActions controls={controls} showShare={showShare} />
+      <SelectionActions
+        controls={controls}
+        showShare={showShare}
+        activities={activities}
+      />
     </div>
   );
 }

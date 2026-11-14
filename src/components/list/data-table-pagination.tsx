@@ -7,13 +7,13 @@ import {
   DoubleArrowRightIcon,
 } from '@radix-ui/react-icons';
 import { type RowData, type Table } from '@tanstack/react-table';
+import type { ReactNode } from 'react';
 
 import {
   ClearSelectionButton,
   CombineSelectionButton,
   SelectionCount,
 } from '~/components/activity-selection-controls';
-import { SelectionShareButton } from '~/components/share-button';
 import { Button } from '~/components/ui/button';
 import { cn } from '~/lib/utils';
 
@@ -25,12 +25,14 @@ interface DataTablePaginationProps<TData extends RowData> {
   className?: string;
   /** Visible columns that fit-to-width mode is currently leaving out. */
   hiddenByFit?: Set<string>;
+  selectionActions?: ReactNode;
 }
 
 export function DataTablePagination<TData extends RowData>({
   table,
   className,
   hiddenByFit,
+  selectionActions,
 }: DataTablePaginationProps<TData>) {
   const filtered = table.getFilteredRowModel().rows.length;
   const selected = table.getSelectedRowModel().rows.length;
@@ -50,7 +52,7 @@ export function DataTablePagination<TData extends RowData>({
         <CombineSelectionButton />
         <SelectionCount filteredCount={filtered} hiddenCount={hiddenSelected} />
       </div>
-      <SelectionShareButton />
+      {selectionActions}
       <ClearSelectionButton />
       <DataTableViewOptions table={table} hiddenByFit={hiddenByFit} />
       {table.getPageCount() > 1 && (

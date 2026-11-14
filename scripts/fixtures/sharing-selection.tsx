@@ -36,6 +36,7 @@ function MapResults({ detailID }: { detailID: number }) {
     <>
       <SelectionBar
         filterIDs={activities.map((activity) => activity.id)}
+        activities={activities}
         showShare={!detail}
       />
       {detail ? (
