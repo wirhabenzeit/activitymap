@@ -1,17 +1,20 @@
-import { encodeStreamSummary } from './streams/compact-summary';
 import assert from 'node:assert/strict';
-import test from 'node:test';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import type * as ReactQuery from '@tanstack/react-query';
 
-import { makeEnvelope } from '~/contracts/v1/envelope';
+import type * as ReactQuery from '@tanstack/react-query';
+import test from 'node:test';
+
 import type {
   ActivityCompactStreamSummaryDTO,
   StreamMetadata,
 } from '~/contracts/v1/activity-streams';
+import { makeEnvelope } from '~/contracts/v1/envelope';
+
 import {
+  type FetchLike,
+  type StreamSummaryResult,
   canManuallyRetryStreamSummary,
   captureStreamSummaryFence,
   fenceStreamSummaryActivity,
@@ -24,9 +27,8 @@ import {
   streamSummaryQueryKey,
   streamSummaryRefetchInterval,
   toElevationProfile,
-  type FetchLike,
-  type StreamSummaryResult,
 } from './activity-stream-summary.ts';
+import { encodeStreamSummary } from './streams/compact-summary';
 
 // The repository's test command enables the `react-server` condition, under
 // which React intentionally has no createContext. Resolve react-query's
@@ -617,3 +619,48 @@ for (const [name, distance, ready] of [
     assert.equal(batch.get('42')?.retryAt, null);
   });
 }
+
+void test('a successful stored-summary read without imported samples keeps waiting instead of declaring elevation unavailable', async () => {
+  for (const state of ['not_fetched', 'stale'] as const) {
+    const result = await fetchActivityStreamSummary({
+      activityId: '42',
+      userId: `waiting-for-import-${state}`,
+      signal: new AbortController().signal,
+      fetchImpl: async () =>
+        success(
+          summary({
+            summary: null,
+            metadata: metadata({
+              state,
+              fetch_status: 'not_fetched',
+              fetched_at: null,
+              available_types: [],
+            }),
+          }),
+        ),
+      now: () => NOW,
+    });
+    assert.equal(result.status, 'pending');
+    assert.equal(result.retryAt, NOW + 3000);
+    assert.equal(result.summary, null);
+  }
+});
+
+void test('waiting for background elevation samples preserves the server retry deadline', async () => {
+  const result = await fetchActivityStreamSummary({
+    activityId: '42',
+    userId: 'waiting-for-import-cooldown',
+    signal: new AbortController().signal,
+    fetchImpl: async () =>
+      success(
+        summary({
+          summary: null,
+          metadata: metadata({ state: 'not_fetched' }),
+          next_retry_at: new Date(NOW + 90_000).toISOString(),
+        }),
+      ),
+    now: () => NOW,
+  });
+  assert.equal(result.status, 'pending');
+  assert.equal(result.retryAt, NOW + 90_000);
+});
