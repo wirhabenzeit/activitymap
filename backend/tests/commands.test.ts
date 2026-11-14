@@ -4,9 +4,11 @@ import { convexTest } from 'convex-test';
 import test, { mock } from 'node:test';
 
 import {
-  type ActivitiesServiceDeps,
-  ActivityMutationError,
-} from '../../src/server/application/activities';
+  createRefreshActivityHandler,
+  createUpdateActivityHandler,
+} from '../../src/app/api/v1/activities/[id]/mutation-handler';
+import { createShareLinksHandler } from '../../src/app/api/v1/share-links/handler';
+import { ActivityMutationError } from '../../src/server/application/activities';
 import {
   type ConvexActivityCommandDeps,
   refreshActivityThroughConvex,
@@ -196,7 +198,7 @@ async function setup(t: test.TestContext, writer: 'convex' | 'postgres') {
           ? []
           : [{ activityId: id, error: new StravaApiError('down', 503) }],
       };
-    }) as NonNullable<ActivitiesServiceDeps['fetchActivities']>,
+    }) as NonNullable<ConvexActivityCommandDeps['fetchActivities']>,
   };
   const state = () =>
     convex.run(async (ctx) => ({
@@ -248,6 +250,149 @@ void test('an edit is sent to Strava and its result is written to Convex', async
     after.jobs.map((job) => [job.status, job.phase]),
     [['queued', 'recording']],
   );
+});
+
+void test('HTTP edit and refresh persist omitted provider fields and return the committed Convex activity', async (t) => {
+  const { seed, strava, deps, state } = await setup(t, 'convex');
+  const sparse = manual(7, 'Sparse ride');
+  // Strava omits fields that do not apply instead of sending JSON nulls.
+  for (const field of [
+    'average_watts',
+    'device_watts',
+    'max_watts',
+    'weighted_average_watts',
+    'kilojoules',
+    'calories',
+    'hide_from_home',
+    'upload_id',
+    'workout_type',
+    'gear_id',
+  ])
+    delete (sparse as unknown as Record<string, unknown>)[field];
+  strava.activities.set(7, sparse);
+  await seed(sparse);
+  const handlers = {
+    resolveActor: async () => actor,
+    updateThroughConvex: (
+      owner: Actor,
+      input: Parameters<typeof updateActivityThroughConvex>[1],
+    ) => updateActivityThroughConvex(owner, input, deps),
+    refreshThroughConvex: (owner: Actor, id: number) =>
+      refreshActivityThroughConvex(owner, id, deps),
+  };
+  const edited = await createUpdateActivityHandler(handlers)(
+    new Request('https://app.test/api/v1/activities/7', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'Edited sparse ride' }),
+    }),
+    7,
+  );
+  assert.equal(edited.status, 200);
+  assert.equal((await edited.json()).data.average_watts, null);
+  const refreshed = await createRefreshActivityHandler(handlers)(
+    new Request('https://app.test/api/v1/activities/7/refresh', {
+      method: 'POST',
+    }),
+    7,
+  );
+  assert.equal(refreshed.status, 200);
+  const body = await refreshed.json();
+  assert.equal(body.data.activity.name, 'Edited sparse ride');
+  assert.equal(body.data.activity.calories, null);
+  assert.equal(body.data.activity.commute, false);
+  assert.equal(body.data.activity.photo_count, 0);
+  assert.equal((await state()).activities[0]!.dto?.name, 'Edited sparse ride');
+});
+
+void test('HTTP refresh persists photos whose optional provider fields are omitted', async (t) => {
+  const { seed, strava, deps } = await setup(t, 'convex');
+  const activity = manual(7, 'Ride with photo', {
+    photo_count: 1,
+    total_photo_count: 1,
+  });
+  await seed(activity);
+  strava.activities.set(7, activity);
+  const photo = stravaPhoto('photo-7', 7);
+  for (const field of [
+    'activity_name',
+    'caption',
+    'source',
+    'post_id',
+    'resource_state',
+  ])
+    delete (photo as unknown as Record<string, unknown>)[field];
+  strava.photos.set(7, [photo as StravaPhoto]);
+  const response = await createRefreshActivityHandler({
+    resolveActor: async () => actor,
+    refreshThroughConvex: (owner, id) =>
+      refreshActivityThroughConvex(owner, id, deps),
+  })(
+    new Request('https://app.test/api/v1/activities/7/refresh', {
+      method: 'POST',
+    }),
+    7,
+  );
+  assert.equal(response.status, 200);
+  const { data } = await response.json();
+  assert.equal(data.photos_status, 'complete');
+  assert.equal(data.photos.length, 1);
+  assert.equal(data.photos[0].unique_id, 'photo-7');
+  assert.equal(data.photos[0].caption, null);
+  assert.equal(data.photos[0].resource_state, null);
+});
+
+void test('HTTP share create, list and revoke accept the actual ID returned by Convex', async (t) => {
+  const { convex, seed } = await setup(t, 'convex');
+  await seed(manual(7, 'Shared ride'));
+  const deps: ShareLinksServiceDeps = {
+    links: (owner) =>
+      convexShareLinks(owner, (url, init) =>
+        convex.fetch(new URL(String(url)).pathname, init),
+      ),
+  };
+  const handlers = {
+    resolveActor: async () => actor,
+    create: (
+      owner: Actor,
+      input: Parameters<typeof createShareLinkForActor>[1],
+    ) => createShareLinkForActor(owner, input, deps),
+    list: (owner: Actor) => listShareLinksForActor(owner, deps),
+    revoke: (owner: Actor, id: string) =>
+      revokeShareLinkForActor(owner, id, deps),
+  };
+  const request = (body?: unknown) =>
+    new Request('https://app.test/api/v1/share-links', {
+      method: body ? 'POST' : 'GET',
+      ...(body && {
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    });
+  const created = await createShareLinksHandler(
+    handlers,
+    'create',
+  )(
+    request({
+      activityIds: ['7'],
+      expiresInMs: 3_600_000,
+      fields: { showRouteEnds: false },
+    }),
+  );
+  assert.equal(created.status, 201);
+  const { data: link } = await created.json();
+  const listed = await createShareLinksHandler(handlers, 'list')(request());
+  assert.equal(listed.status, 200);
+  const text = await listed.text();
+  assert.equal(JSON.parse(text).data.links[0].id, link.id);
+  assert.equal(text.includes(link.token), false);
+  const revoked = await createShareLinksHandler(
+    handlers,
+    'revoke',
+  )(request({ id: link.id }));
+  assert.equal(revoked.status, 200);
+  const after = await createShareLinksHandler(handlers, 'list')(request());
+  assert.equal((await after.json()).data.links[0].status, 'revoked');
 });
 
 void test('a command for an activity outside the library changes nothing at Strava', async (t) => {

@@ -19,6 +19,7 @@ import {
 } from '~/server/application/convex-activity-commands';
 import type { Actor } from '~/server/auth/actor';
 import { requestIdFor } from '~/server/http/request-id';
+import { errorDiagnostic } from '~/server/logging/error-diagnostic';
 
 type MutationHandlerDependencies = {
   resolveActor: (request: Request) => Promise<Actor | null>;
@@ -30,7 +31,13 @@ type MutationHandlerDependencies = {
 
 /** Who writes the actor's library. During a handoff nobody does, and a
  * command would change Strava without anywhere to record the result. */
-function mutationFailure(error: ActivityMutationError, requestId: string) {
+function mutationFailure(
+  error: ActivityMutationError,
+  requestId: string,
+  onError?: MutationHandlerDependencies['onError'],
+) {
+  if (error.status >= 500)
+    onError?.({ code: error.code, ...errorDiagnostic(error) }, requestId);
   return failure(requestId, error.status, error.code, error.message, {
     retryable: error.retryable,
     retryAfterSeconds: error.retryAfterSeconds,
@@ -72,7 +79,7 @@ export function createFetchActivitySummariesHandler(
       );
     } catch (error) {
       if (error instanceof ActivityMutationError)
-        return mutationFailure(error, requestId);
+        return mutationFailure(error, requestId, deps.onError);
       deps.onError?.(error, requestId);
       return failure(
         requestId,
@@ -120,7 +127,7 @@ export function createUpdateActivityHandler(deps: MutationHandlerDependencies) {
       );
     } catch (error) {
       if (error instanceof ActivityMutationError)
-        return mutationFailure(error, requestId);
+        return mutationFailure(error, requestId, deps.onError);
       if (error instanceof ZodError || error instanceof SyntaxError)
         return failure(
           requestId,
@@ -199,7 +206,7 @@ export function createRefreshActivityHandler(
       );
     } catch (error) {
       if (error instanceof ActivityMutationError)
-        return mutationFailure(error, requestId);
+        return mutationFailure(error, requestId, deps.onError);
       deps.onError?.(error, requestId);
       return failure(
         requestId,

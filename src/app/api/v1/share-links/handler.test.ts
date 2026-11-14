@@ -1,12 +1,15 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
 
-import { createShareLinksHandler } from './handler';
+import { test } from 'node:test';
+import { z } from 'zod';
+
 import {
   ForbiddenError,
   ShareLinkNotFoundError,
 } from '~/server/application/share-links';
 import type { Actor } from '~/server/auth/actor';
+
+import { createShareLinksHandler } from './handler';
 
 const actor: Actor = {
   userId: 'owner',
@@ -167,4 +170,30 @@ void test('ownership/not-found failures map to private errors; unexpected errors
   )(request());
   assert.equal(response.status, 500);
   assert.ok(!(await response.text()).includes('secret-capability'));
+});
+
+void test('share validation failures log safe diagnostics and their request ID', async () => {
+  const reports: unknown[] = [];
+  const parsed = z
+    .object({ token: z.enum(['expected']) })
+    .safeParse({ token: 'secret-capability' });
+  assert(!parsed.success);
+  const { deps } = setup({
+    create: async () => {
+      throw parsed.error;
+    },
+    onError: (diagnostic, requestId) => reports.push({ diagnostic, requestId }),
+  });
+  const response = await createShareLinksHandler(
+    deps,
+    'create',
+  )(
+    request(input, {
+      'x-request-id': 'share-request',
+    }),
+  );
+  assert.equal(response.status, 500);
+  assert.equal(reports.length, 1);
+  assert.match(JSON.stringify(reports), /share-request/);
+  assert.doesNotMatch(JSON.stringify(reports), /secret-capability/);
 });

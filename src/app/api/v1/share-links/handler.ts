@@ -22,12 +22,14 @@ import {
 } from '~/server/application/share-links';
 import type { Actor } from '~/server/auth/actor';
 import { requestIdFor } from '~/server/http/request-id';
+import { errorDiagnostic } from '~/server/logging/error-diagnostic';
 
 type Dependencies = {
   resolveActor: (request: Request) => Promise<Actor | null>;
   create: typeof createShareLinkForActor;
   list: typeof listShareLinksForActor;
   revoke: typeof revokeShareLinkForActor;
+  onError?: (error: object, requestId: string) => void;
 };
 
 const headers = {
@@ -115,6 +117,7 @@ export function createShareLinksHandler(
         return failure(403, 'forbidden', error.message);
       if (error instanceof ShareLinkNotFoundError)
         return failure(404, 'not_found', error.message);
+      deps.onError?.(errorDiagnostic(error), requestId);
       if (error instanceof ZodError)
         return failure(
           500,
