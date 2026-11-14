@@ -26,7 +26,7 @@ import {
   PreferenceMenuSubContent,
 } from '~/components/preference-menu';
 import { SettingsDialog } from '~/components/settings/settings-dialog';
-import { ShareButton } from '~/components/share-button';
+import { ActivityShareButton } from '~/components/share-button';
 import { Dialog, DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import {
   DropdownMenu,
@@ -165,7 +165,7 @@ function Content() {
             </DropdownMenuItem>
           </PreferenceMenuContent>
         </DropdownMenu>
-        <ShareButton />
+        <ActivityShareButton activities={[first]} />
         <LayerSwitcher />
         <button
           onClick={() => {

@@ -7,7 +7,6 @@ import { Separator } from '~/components/ui/separator';
 import { SidebarTrigger } from '~/components/ui/sidebar';
 import { store } from '~/store';
 
-import { ShareButton } from '../share-button';
 import { MainNav } from './main-nav';
 
 export const AppHeader = () => {
@@ -26,11 +25,6 @@ export const AppHeader = () => {
           className="mx-2 h-8 bg-header-foreground"
         />
         <MainNav />
-        <div className="flex flex-1 items-center justify-end space-x-2">
-          <nav className="flex items-center text-header-foreground">
-            <ShareButton />
-          </nav>
-        </div>
       </div>
     </header>
   );

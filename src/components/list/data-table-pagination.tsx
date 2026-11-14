@@ -1,20 +1,23 @@
 'use client';
 
 import {
-  SelectionCount,
-  CombineSelectionButton,
-  ClearSelectionButton,
-} from '~/components/activity-selection-controls';
-import { type Table, type RowData } from '@tanstack/react-table';
-import {
   ChevronLeftIcon,
   ChevronRightIcon,
   DoubleArrowLeftIcon,
   DoubleArrowRightIcon,
 } from '@radix-ui/react-icons';
+import { type RowData, type Table } from '@tanstack/react-table';
+
+import {
+  ClearSelectionButton,
+  CombineSelectionButton,
+  SelectionCount,
+} from '~/components/activity-selection-controls';
+import { SelectionShareButton } from '~/components/share-button';
 import { Button } from '~/components/ui/button';
-import { DataTableViewOptions } from './data-table-view-options';
 import { cn } from '~/lib/utils';
+
+import { DataTableViewOptions } from './data-table-view-options';
 import { type Features } from './table-extensions';
 
 interface DataTablePaginationProps<TData extends RowData> {
@@ -39,7 +42,7 @@ export function DataTablePagination<TData extends RowData>({
       data-selection-bar
       data-selection-footer
       className={cn(
-        '@container/list-pagination flex items-center justify-between gap-2 p-2 border-t border-border bg-muted',
+        '@container/list-pagination flex items-center justify-between gap-2 border-t border-border bg-muted p-2',
         className,
       )}
     >
@@ -47,6 +50,7 @@ export function DataTablePagination<TData extends RowData>({
         <CombineSelectionButton />
         <SelectionCount filteredCount={filtered} hiddenCount={hiddenSelected} />
       </div>
+      <SelectionShareButton />
       <ClearSelectionButton />
       <DataTableViewOptions table={table} hiddenByFit={hiddenByFit} />
       {table.getPageCount() > 1 && (
@@ -70,7 +74,7 @@ export function DataTablePagination<TData extends RowData>({
               <span className="sr-only">Go to previous page</span>
               <ChevronLeftIcon className="h-4 w-4" />
             </Button>
-            <span className="whitespace-nowrap px-1 text-sm font-medium">
+            <span className="px-1 text-sm font-medium whitespace-nowrap">
               {`${table.store.state.pagination.pageIndex + 1}/${table.getPageCount()}`}
             </span>
             <Button
