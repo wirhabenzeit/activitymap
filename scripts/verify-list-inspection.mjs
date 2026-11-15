@@ -661,8 +661,11 @@ try {
     .getByRole('button', { name: /^(Select|Deselect) Activity 205$/ })
     .click();
   const selectedBefore = await row(205).getAttribute('data-state');
-  const search = page.getByRole('combobox', {
-    name: 'Search activity names or choose a place',
+  // Header search narrows the rows as you type, like a text filter, and
+  // stays open while a detail is inspected.
+  await page.getByTestId('header-search-button').click();
+  const search = page.getByLabel('Find activities or places', {
+    exact: true,
   });
   await search.fill('Activity 00');
   await row(9).waitFor();

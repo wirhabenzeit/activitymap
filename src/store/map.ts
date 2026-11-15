@@ -1,6 +1,7 @@
 import { type LngLatBounds, type ViewState } from 'react-map-gl/mapbox';
 import { type StateCreator } from 'zustand';
 
+import type { PlaceFilter } from '~/lib/place-library';
 import {
   baseMaps,
   defaultMapBounds,
@@ -21,6 +22,9 @@ export type MapState = {
   uploadedGeoJson: GeoJSON.FeatureCollection | null;
   routeFitRequest: { id: string; activityIDs: number[] } | null;
   placeFlyRequest: { id: string; latitude: number; longitude: number } | null;
+  /** A place picked in header search: pinned on the map until the next pick,
+   * without filtering anything (the place filter has its own pin). */
+  searchPlace: PlaceFilter | null;
 };
 
 export type MapActions = {
@@ -48,6 +52,7 @@ export type MapActions = {
   completeRouteFit: (id: string) => void;
   requestPlaceFly: (latitude: number, longitude: number) => void;
   completePlaceFly: (id: string) => void;
+  setSearchPlace: (place: PlaceFilter | null) => void;
 };
 
 export type MapSlice = MapState & MapActions;
@@ -72,6 +77,7 @@ export const createMapSlice: StateCreator<
   uploadedGeoJson: null,
   routeFitRequest: null,
   placeFlyRequest: null,
+  searchPlace: null,
 
   // Actions
   requestRouteFit: (activityIDs) =>
@@ -92,6 +98,10 @@ export const createMapSlice: StateCreator<
   completePlaceFly: (id) =>
     set((state) => {
       if (state.placeFlyRequest?.id === id) state.placeFlyRequest = null;
+    }),
+  setSearchPlace: (place) =>
+    set((state) => {
+      state.searchPlace = place;
     }),
   togglePhotos: () =>
     set((state: RootState) => {

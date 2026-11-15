@@ -52,16 +52,23 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
     selectedIds,
     showAllPlaces ? visibleIds : noActivityIds,
   );
-  const filterPlaceId = useShallowStore((state) =>
-    state.place?.userId === query.userId ? state.place?.id : undefined,
-  );
-  // The place filter has its own pin.
+  const { filterPlaceId, searchPlaceId } = useShallowStore((state) => ({
+    filterPlaceId:
+      state.place?.userId === query.userId ? state.place?.id : undefined,
+    searchPlaceId:
+      state.searchPlace?.userId === query.userId
+        ? state.searchPlace?.id
+        : undefined,
+  }));
+  // The place filter and a place found in header search have their own pins.
   const places = useMemo(
     () =>
-      filterPlaceId
-        ? query.places.filter((place) => place.id !== filterPlaceId)
+      filterPlaceId || searchPlaceId
+        ? query.places.filter(
+            (place) => place.id !== filterPlaceId && place.id !== searchPlaceId,
+          )
         : query.places,
-    [query.places, filterPlaceId],
+    [query.places, filterPlaceId, searchPlaceId],
   );
   const { focus, setFocus } = useActivityPlaceFocus();
   const { current: map } = useMap();
