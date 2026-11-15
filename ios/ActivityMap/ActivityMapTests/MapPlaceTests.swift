@@ -50,7 +50,7 @@ struct MapPlaceTests {
         store.activeSportTypes.remove(.ride)
         #expect(store.mapPlacesActivityIDs == [1])
         store.mapContext.clearScope()
-        #expect(!store.mapContext.showPlaces)
+        #expect(store.mapContext.showPlaces, "Clearing an account keeps device map-layer preferences")
     }
     @Test func placePickingPreservesVisitedActivityDetailAndUsesChooserElsewhere() {
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1), ActivityStoreSelectionTests.activity(2)])

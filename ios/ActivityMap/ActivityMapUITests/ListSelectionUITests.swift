@@ -13,6 +13,98 @@ final class ListSelectionUITests: XCTestCase {
         try journey(standalone: true)
     }
 
+    func testSummaryOptionsAndShareFollowCombineMode() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--list-selection-ui-testing", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+        let share = listControl(in: app, label: "Share selected activities", identifier: "share-selection")
+        XCTAssertTrue(share.waitForExistence(timeout: 10), app.debugDescription)
+        listControl(in: app, label: "Combine selections", identifier: "combine-selection").tap()
+        XCTAssertTrue(share.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(listControl(in: app, label: "Clear selection", identifier: "clear-selection").exists)
+        listControl(in: app, label: "Combine selections", identifier: "combine-selection").tap()
+        XCTAssertTrue(share.waitForExistence(timeout: 5))
+        app.buttons["List view options"].tap()
+        app.buttons["Show summary"].tap()
+        let filteredHeading = app.buttons.matching(NSPredicate(format: "label IN %@", ["Expand summary", "Collapse summary"])).firstMatch
+        XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
+        let scope = app.buttons["activity-summary-scope-selected"]
+        let filteredScope = app.buttons["activity-summary-scope-filtered"]
+        XCTAssertTrue(scope.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(scope.label, "2 selected")
+        XCTAssertTrue(filteredScope.isSelected)
+        XCTAssertEqual(scope.frame.midY, filteredHeading.frame.midY, accuracy: 1, "Scope controls stay inline with the summary header")
+        scope.tap()
+        XCTAssertTrue(scope.isSelected)
+        XCTAssertFalse(filteredScope.isSelected)
+        filteredScope.tap()
+        XCTAssertTrue(filteredScope.isSelected)
+        XCTAssertFalse(scope.isSelected)
+        scope.tap()
+        XCTAssertTrue(scope.isSelected)
+        XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "Selected summary and Combine share"
+        capture.lifetime = .keepAlways
+        add(capture)
+        let heading = filteredHeading
+        let headingY = heading.frame.minY
+        let disclosure = filteredHeading
+        let detail = app.otherElements.matching(NSPredicate(format: "label == %@", "Moving time")).firstMatch
+        for _ in 0..<3 {
+            disclosure.tap()
+            XCTAssertTrue(detail.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertEqual(heading.frame.minY, headingY, accuracy: 1, "Expansion keeps the summary header anchored")
+            disclosure.tap()
+            XCTAssertTrue(detail.waitForNonExistence(timeout: 5), app.debugDescription)
+            XCTAssertEqual(heading.frame.minY, headingY, accuracy: 1, "Collapse keeps the summary header anchored")
+        }
+        listControl(in: app, label: "Clear selection", identifier: "clear-selection").tap()
+        XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(scope.waitForNonExistence(timeout: 5), app.debugDescription)
+        app.buttons["List view options"].tap()
+        app.buttons["Show summary"].tap()
+        XCTAssertTrue(filteredHeading.waitForNonExistence(timeout: 5))
+        app.buttons["List view options"].tap()
+        app.buttons["Show summary"].tap()
+        XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5))
+        XCTAssertFalse(scope.exists)
+        app.buttons["List view options"].tap()
+        app.buttons["Show summary"].tap()
+        XCTAssertTrue(filteredHeading.waitForNonExistence(timeout: 5))
+    }
+
+    func testExpandedSummaryKeepsLargeValuesInsideProductionList() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--list-selection-ui-testing", "--summary-layout-ui-testing",
+                               "-AppleLanguages", "(en)", "-AppleLocale", "en_CH"]
+        app.launch()
+        defer { app.terminate() }
+        let disclosure = app.buttons["activity-summary-toggle"]
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<2 {
+            disclosure.tap()
+            let moving = app.otherElements["Moving time"]
+            XCTAssertTrue(moving.waitForExistence(timeout: 5), app.debugDescription)
+            for label in ["Moving time", "Average speed", "Minimum and maximum elevation",
+                          "Average power", "Weighted avg. power", "Max power", "Average heart rate", "Max heart rate"] {
+                let metric = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label)).firstMatch
+                XCTAssertTrue(metric.exists, "Missing \(label): \(app.debugDescription)")
+                XCTAssertGreaterThanOrEqual(metric.frame.minX, 16, "\(label) overflows the card's leading edge")
+                XCTAssertLessThanOrEqual(metric.frame.maxX, app.frame.maxX - 16, "\(label) overflows the card's trailing edge")
+            }
+            let capture = XCTAttachment(screenshot: app.screenshot())
+            capture.name = "Expanded production summary with large totals"
+            capture.lifetime = .keepAlways
+            add(capture)
+            disclosure.tap()
+            XCTAssertTrue(moving.waitForNonExistence(timeout: 5))
+        }
+    }
+
     func testDetailScrollReachesBottomAndKeepsLastActionVisible() throws {
         continueAfterFailure = false
         defer { XCUIDevice.shared.orientation = .portrait }

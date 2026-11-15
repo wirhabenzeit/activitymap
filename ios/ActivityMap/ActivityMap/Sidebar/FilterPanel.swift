@@ -153,12 +153,12 @@ struct FilterPanel: View {
     private var summaryHeader: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("\(count) of \(store.activities.count) activities")
+                Text(AppMessages.filtersResultCount(count, store.activities.count, locale: locale))
                     .font(.subheadline.weight(.semibold))
-                    .accessibilityValue("\(activeCount) active filters")
+                    .accessibilityValue(Text(AppMessages.filtersActiveCount(activeCount, locale: locale)))
                     .accessibilityIdentifier("filter-result-count")
                 if activeCount > 0 {
-                    Text("\(activeCount) active filters")
+                    Text(AppMessages.filtersActiveCount(activeCount, locale: locale))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -177,7 +177,7 @@ struct FilterPanel: View {
     }
 
     private var resultSummary: String {
-        let total = "\(count) of \(store.activities.count) activities"
+        let total = String(localized: AppMessages.filtersResultCount(count, store.activities.count, locale: locale))
         return activeCount > 0 ? "\(total) · \(activeCount) active" : total
     }
 
@@ -240,7 +240,7 @@ struct FilterPanel: View {
             DisclosureGroup("Specific sport types") {
                 ForEach(ActivityCategory.allCases) { category in
                     DisclosureGroup {
-                        Button("Only \(category.name)") { store.isolateCategory(category) }
+                        Button(String(localized: AppMessages.filtersOnlyGroup(category.name, locale: locale))) { store.isolateCategory(category) }
                             .buttonStyle(.borderless)
                             .frame(minHeight: 44)
                         ForEach(category.sportTypes) { sport in
@@ -296,7 +296,7 @@ struct FilterPanel: View {
         .accessibilityAddTraits(state == .all ? .isSelected : [])
         .accessibilityIdentifier("sport-group-\(category.rawValue)")
         .contextMenu {
-            Button("Only \(category.name)") { store.isolateCategory(category) }
+            Button(String(localized: AppMessages.filtersOnlyGroup(category.name, locale: locale))) { store.isolateCategory(category) }
         }
     }
 

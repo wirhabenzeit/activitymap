@@ -43,7 +43,7 @@ final class StatsUITests: XCTestCase {
             XCTAssertTrue(history.isHittable, "Explicit expansion must expose period history")
             capture("Expanded comparison \(title)")
             let back = app.buttons["stats-detail-back"]
-            reveal(back, in: detail, app: app)
+            reveal(back, in: detail, app: app, fixedControl: true)
             back.tap()
             XCTAssertTrue(detail.waitForNonExistence(timeout: 10), app.debugDescription)
         }
@@ -316,15 +316,14 @@ final class StatsUITests: XCTestCase {
         start.press(forDuration: 0.05, thenDragTo: end, withVelocity: .fast, thenHoldForDuration: 0.1)
     }
 
-    private func reveal(_ element: XCUIElement, in scroll: XCUIElement, app: XCUIApplication) {
-        let visibility = scrollVisibility(in: scroll, app: app)
-        let viewport = visibility.viewport.insetBy(dx: -1, dy: -1)
+    private func reveal(_ element: XCUIElement, in scroll: XCUIElement, app: XCUIApplication, fixedControl: Bool = false) {
+        let viewport = scrollViewport(in: scroll, app: app).insetBy(dx: -1, dy: -1)
         for _ in 0..<18 {
             if element.exists {
                 let frame = element.frame
                 // Offscreen lazy cells can throw when queried for hittability.
                 // Establish a real visible frame before asking for a hit point.
-                if !frame.isEmpty, (viewport.contains(frame) || visibility.chrome.contains(where: { $0.contains(frame) })),
+                if !frame.isEmpty, (viewport.contains(frame) || fixedControl),
                    element.isHittable { return }
                 if !frame.isEmpty, frame.minY < viewport.minY { scroll.swipeDown(); continue }
             }
@@ -333,16 +332,14 @@ final class StatsUITests: XCTestCase {
         XCTFail("Stats content was not reachable in visible viewport \(viewport): \(app.debugDescription)")
     }
 
-    private func scrollVisibility(in scroll: XCUIElement, app: XCUIApplication) -> (viewport: CGRect, chrome: [CGRect]) {
+    private func scrollViewport(in scroll: XCUIElement, app: XCUIApplication) -> CGRect {
         var viewport = scroll.frame.intersection(app.frame)
-        var chrome: [CGRect] = []
         // SwiftUI's scroll AX frame includes the area behind stationary chrome.
         // A control hidden there needs a downward swipe, even if its y is positive.
         let topBars = app.navigationBars.allElementsBoundByIndex
-            + app.otherElements.matching(identifier: "app-toolbar").allElementsBoundByIndex
+            + app.otherElements.matching(NSPredicate(format: "identifier IN %@", ["app-toolbar", "browse-header"])).allElementsBoundByIndex
         for bar in topBars where bar.isHittable {
             let frame = bar.frame
-            chrome.append(frame)
             if frame.intersects(viewport), frame.midY < viewport.midY {
                 let top = max(viewport.minY, frame.maxY)
                 viewport = CGRect(x: viewport.minX, y: top, width: viewport.width,
@@ -351,14 +348,13 @@ final class StatsUITests: XCTestCase {
         }
         for bar in app.tabBars.allElementsBoundByIndex where bar.isHittable {
             let frame = bar.frame
-            chrome.append(frame)
             if frame.intersects(viewport), frame.midY > viewport.midY {
                 viewport.size.height = max(0, min(viewport.maxY, frame.minY) - viewport.minY)
             }
         }
-        // Fixed toolbar actions such as native Back are already reachable in
-        // chrome, while scroll content must fit below/above those same bars.
-        return (viewport, chrome)
+        // Only explicitly identified fixed controls may bypass these bounds;
+        // a scrolled content button underneath the header is still occluded.
+        return viewport
     }
 
     private func capture(_ name: String) {

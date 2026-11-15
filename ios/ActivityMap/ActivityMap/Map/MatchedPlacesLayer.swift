@@ -56,7 +56,12 @@ struct MatchedPlacesLayer: MapContent {
                     MatchedPlaceCard(place: entry.place, routeCount: entry.activityIDs.count, overview: overview) { loader.focus = nil }
                         .padding(.bottom, 16)
                 }
-                .variableAnchors([ViewAnnotationAnchorConfig(anchor: .bottom)])
+                // Prefer extending left of the marker so Close stays clear
+                // of the map tools on the right. Flip at the map's left edge.
+                .variableAnchors([ViewAnnotationAnchorConfig(anchor: .bottomRight),
+                                  ViewAnnotationAnchorConfig(anchor: .bottomLeft),
+                                  ViewAnnotationAnchorConfig(anchor: .topRight),
+                                  ViewAnnotationAnchorConfig(anchor: .topLeft)])
                 .allowOverlap(true)
                 .ignoreCameraPadding(true)
                 .priority(2)

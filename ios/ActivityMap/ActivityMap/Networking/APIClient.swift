@@ -140,12 +140,14 @@ nonisolated enum APIClient {
         _ path: String,
         bearerToken: String? = nil,
         baseURL: URL = APIConfiguration.baseURL,
+        session: URLSession = .shared,
+        timeout: TimeInterval = 30,
         as payloadType: Payload.Type
     ) async throws -> Payload {
-        var request = URLRequest(url: baseURL.appending(path: path))
+        var request = URLRequest(url: baseURL.appending(path: path), cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: timeout)
         request.httpMethod = "POST"
         applyCommonHeaders(&request, bearerToken: bearerToken)
-        return try await perform(request, as: payloadType)
+        return try await perform(request, session: session, as: payloadType)
     }
 
     static func patch<Body: Encodable, Payload: Decodable & Sendable>(

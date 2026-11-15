@@ -101,6 +101,7 @@ final class SyncController {
     private let now: () -> Date
     private let source: (SyncSession) -> any SyncPageSource
     private let invalidate: (String) -> Void
+    private let refreshSource: (SyncSession) -> any ActivityRefreshSource
     private let editSource: (SyncSession) -> any ActivityEditSource
 
     init(
@@ -115,6 +116,9 @@ final class SyncController {
             StreamsAPI(baseURL: $0.deployment, token: $0.token)
         },
         fetchInitialSummaries: ((SyncSession) async throws -> Int)? = nil,
+        refreshSource: @escaping (SyncSession) -> any ActivityRefreshSource = {
+            ActivityEditsAPI(baseURL: $0.deployment, token: $0.token)
+        },
         editSource: @escaping (SyncSession) -> any ActivityEditSource = {
             ActivityEditsAPI(baseURL: $0.deployment, token: $0.token)
         },
@@ -132,6 +136,7 @@ final class SyncController {
         self.fetchInitialSummaries = fetchInitialSummaries
         self.invalidate = invalidate
         self.editSource = editSource
+        self.refreshSource = refreshSource
         editing.coordinator = self
         activities.activityEditing = editing
         sharing.session = { [weak self] in self?.session }
@@ -166,7 +171,12 @@ final class SyncController {
         let retainsVisibleState = sameCredential && next.map {
             $0.user.stravaConnected && $0.user.authentication.sessionExpiresAt > now()
         } == true
-        if !retainsVisibleState { clearVisible() }
+        if !retainsVisibleState {
+            editing.clearRefreshModels()
+            clearVisible()
+            let scope = next.flatMap { $0.user.stravaConnected && $0.user.authentication.sessionExpiresAt > now() ? $0.scope : nil }
+            activities.restoreBrowsingScope(scope)
+        }
         if !sameCredential { retryAt = nil }
         status = next.map { session in
             if !session.user.stravaConnected { return .disconnected }
@@ -241,9 +251,22 @@ final class SyncController {
     }
 
     func updateActivity(activityID: Int, fields: ActivityMapAPI.UpdateActivityRequest) async throws {
-        if let reason = editing.unavailableReason { throw ActivityEditingError.unavailable(reason) }
+        _ = try await changeActivity(activityID: activityID, fields: fields)
+    }
+
+    func refreshActivity(activityID: Int) async throws -> ActivityMapAPI.ActivityRefreshResult {
+        guard let result = try await changeActivity(activityID: activityID, fields: nil) else {
+            throw ActivityEditingError.reconciliation
+        }
+        return result
+    }
+
+    /// Edits and deliberate refreshes share the same sync fence and mutation lock.
+    private func changeActivity(activityID: Int, fields: ActivityMapAPI.UpdateActivityRequest?) async throws -> ActivityMapAPI.ActivityRefreshResult? {
+        let unavailable = { fields == nil ? self.editing.refreshUnavailableReason() : self.editing.unavailableReason }
+        if let reason = unavailable() { throw ActivityEditingError.unavailable(reason) }
         guard !editingInProgress, let session, let storage else {
-            throw ActivityEditingError.unavailable("Another save is in progress. Please wait.")
+            throw ActivityEditingError.unavailable(String(localized: AppMessages.activityRefreshBusy()))
         }
         let current = generation
         editingInProgress = true
@@ -256,24 +279,39 @@ final class SyncController {
         await work?.value
         try Task.checkCancellation()
         guard current == generation, self.session == session else { throw CancellationError() }
-        if let reason = editing.unavailableReason { throw ActivityEditingError.unavailable(reason) }
+        if let reason = unavailable() { throw ActivityEditingError.unavailable(reason) }
         let id = String(activityID)
         guard try await storage.summaryActivityExists(activityID: id, scope: session.scope) else {
-            throw ActivityEditingError.unavailable("This activity is no longer available. Sync to update your library.")
+            throw ActivityEditingError.unavailable(String(localized: AppMessages.activityRefreshUnavailable()))
         }
         let fence = await storage.streamFence()
         guard current == generation else { throw CancellationError() }
         do {
-            let updated = try await editSource(session).update(activityID: id, fields: fields)
+            let result: ActivityMapAPI.ActivityRefreshResult?
+            let updated: ActivityMapAPI.Activity
+            if let fields {
+                updated = try await editSource(session).update(activityID: id, fields: fields)
+                result = nil
+            } else {
+                let refreshed = try await refreshSource(session).refresh(activityID: id)
+                guard refreshed.photos.allSatisfy({ $0.activityID == id }),
+                      Set(refreshed.photos.map(\.uniqueID)).count == refreshed.photos.count else {
+                    throw ActivityEditingError.reconciliation
+                }
+                updated = refreshed.activity
+                result = refreshed
+            }
             try Task.checkCancellation()
             guard current == generation, self.session == session else { throw CancellationError() }
             guard updated.id == id else { throw ActivityEditingError.reconciliation }
             do {
                 try await storage.commitActivityEdit(updated, scope: session.scope, fence: fence,
-                    sessionExpiresAt: session.user.authentication.sessionExpiresAt, now: now())
+                    sessionExpiresAt: session.user.authentication.sessionExpiresAt, now: now(),
+                    photos: result.flatMap { $0.photosStatus == .complete ? $0.photos : nil })
                 try await loadCache(session, storage: storage, generation: current)
             } catch is CancellationError { throw CancellationError() }
             catch { throw ActivityEditingError.reconciliation }
+            return result
         } catch {
             guard current == generation else { throw CancellationError() }
             if AuthController.isExplicitlyUnauthenticated(error) {
@@ -288,7 +326,9 @@ final class SyncController {
 
     func clearAfterAccountDeletion() async throws {
         guard let storage else { return }
+        let deletedScope = session?.scope
         setSession(nil, storage: storage)
+        if let deletedScope { activities.forgetBrowsingPreferences(scope: deletedScope) }
         await work?.value
         await summarySync.stopAndWait()
         try await storage.clearExcept(scope: nil)

@@ -5,6 +5,14 @@ import Observation
 @MainActor @Observable
 final class ActivityEditingService {
     weak var coordinator: SyncController?
+    @ObservationIgnored private var refreshModels: [Int: ActivityRefreshModel] = [:]
+    func refreshModel(activityID: Int) -> ActivityRefreshModel {
+        if let model = refreshModels[activityID] { return model }
+        let model = ActivityRefreshModel()
+        refreshModels[activityID] = model
+        return model
+    }
+    func clearRefreshModels() { refreshModels.removeAll() }
 
     var unavailableReason: String? { unavailableReason(locale: .current) }
     func unavailableReason(locale: Locale) -> String? {
@@ -17,6 +25,24 @@ final class ActivityEditingService {
         }
         guard session.verified, coordinator.status != .offline else { return String(localized: AppMessages.errorEditReconnectAndSyncBeforeSavingToStravaYour(locale: locale)) }
         return nil
+    }
+
+    func refreshUnavailableReason(locale: Locale = .current) -> String? {
+        guard let coordinator, let session = coordinator.session, session.user.stravaConnected,
+              coordinator.status != .expired, session.user.authentication.sessionExpiresAt > Date() else {
+            return String(localized: AppMessages.activityRefreshSignIn(locale: locale))
+        }
+        guard session.verified, coordinator.status != .offline else {
+            return String(localized: AppMessages.activityRefreshReconnect(locale: locale))
+        }
+        return nil
+    }
+
+    var mutationInProgress: Bool { coordinator?.editingInProgress == true }
+
+    func refresh(activityID: Int) async throws -> ActivityMapAPI.ActivityRefreshResult {
+        guard let coordinator else { throw ActivityEditingError.unavailable(String(localized: AppMessages.activityRefreshSignIn())) }
+        return try await coordinator.refreshActivity(activityID: activityID)
     }
 
     func save(activityID: Int, fields: ActivityMapAPI.UpdateActivityRequest) async throws {

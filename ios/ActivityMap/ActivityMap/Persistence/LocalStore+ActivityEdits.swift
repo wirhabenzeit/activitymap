@@ -4,7 +4,7 @@ import SwiftData
 extension LocalStore {
     /// Direct writes never acknowledge unseen feed events or resurrect a tombstone.
     func commitActivityEdit(_ dto: ActivityMapAPI.Activity, scope: StoreScope,
-                            fence: StreamFence, sessionExpiresAt: Date, now: Date) throws {
+                            fence: StreamFence, sessionExpiresAt: Date, now: Date, photos: [ActivityMapAPI.Photo]? = nil) throws {
         try Task.checkCancellation()
         guard sessionExpiresAt > now, summaryFenceIsCurrent(fence, activityID: dto.id, scope: scope) else {
             throw CancellationError()
@@ -19,6 +19,22 @@ extension LocalStore {
             let invalidates = try reconcileSummaryUpsert(dto, previous: previous, scopeKey: scope.key, context: context)
             let placesChanged = try reconcilePlacesUpsert(dto, previous: previous, scopeKey: scope.key, context: context)
             row.payload = try StoreCodec.encode(dto)
+            if let photos {
+                guard photos.allSatisfy({ $0.activityID == dto.id }), Set(photos.map(\.uniqueID)).count == photos.count else {
+                    throw ActivityEditingError.reconciliation
+                }
+                let scopeKey = scope.key
+                let activityID = dto.id
+                let existing = try context.fetch(FetchDescriptor<StoredPhoto>(
+                    predicate: #Predicate { $0.scope == scopeKey && $0.activityID == activityID }))
+                let byID = Dictionary(uniqueKeysWithValues: existing.map { ($0.photoID, $0) })
+                let ids = Set(photos.map(\.uniqueID))
+                for photo in existing where !ids.contains(photo.photoID) { context.delete(photo) }
+                for photo in photos {
+                    if let saved = byID[photo.uniqueID] { saved.payload = try StoreCodec.encode(photo) }
+                    else { context.insert(try StoredPhoto(scope: scopeKey, dto: photo)) }
+                }
+            }
             try Task.checkCancellation()
             try save(context)
             libraryRevision += 1

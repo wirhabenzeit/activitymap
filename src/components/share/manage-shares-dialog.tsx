@@ -32,7 +32,7 @@ const STATUS_STYLE: Record<
 };
 
 export function formatActivityCount(count: number) {
-  return `${count} ${count === 1 ? 'activity' : 'activities'}`;
+  return message('selection.count', { count });
 }
 
 export function formatTimestamp(value: string) {
@@ -141,7 +141,9 @@ export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
             onClick={() => revokeMutation.mutate(confirming.id)}
             disabled={isRevoking}
           >
-            {isRevoking ? 'Revoking…' : message('sharing.revokeLink')}
+            {isRevoking
+              ? message('sharing.revoking')
+              : message('sharing.revokeLink')}
           </Button>
         </AppDialogFooter>
       </>
@@ -224,7 +226,9 @@ export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
                       onClick={() => setConfirmingId(share.id)}
                       disabled={revokingId === share.id}
                     >
-                      {revokingId === share.id ? 'Revoking…' : 'Revoke'}
+                      {revokingId === share.id
+                        ? message('sharing.revoking')
+                        : message('sharing.revoke')}
                     </Button>
                   )}
                 </li>

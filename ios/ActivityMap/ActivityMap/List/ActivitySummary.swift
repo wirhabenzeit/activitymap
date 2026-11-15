@@ -29,18 +29,18 @@ enum ActivitySummaryMetric: String, CaseIterable, Identifiable {
     }
     var title: String {
         switch self {
-        case .distance: "Total distance"
-        case .elapsedTime: "Total elapsed time"
-        case .elevationGain: "Total elevation gain"
-        case .movingTime: "Total moving time"
-        case .averageSpeed: "Mean average speed"
-        case .elevationHigh: "Maximum elevation"
-        case .elevationLow: "Minimum elevation"
-        case .averagePower: "Mean average power"
-        case .weightedPower: "Mean weighted average power"
-        case .averageHeartRate: "Mean average heart rate"
-        case .maxPower: "Maximum power"
-        case .maxHeartRate: "Maximum heart rate"
+        case .distance: "Distance"
+        case .elapsedTime: "Elapsed time"
+        case .elevationGain: "Elevation gain"
+        case .movingTime: "Moving time"
+        case .averageSpeed: "Average speed"
+        case .elevationHigh: "Highest elevation"
+        case .elevationLow: "Lowest elevation"
+        case .averagePower: "Average power"
+        case .weightedPower: "Weighted avg. power"
+        case .averageHeartRate: "Average heart rate"
+        case .maxPower: "Max power"
+        case .maxHeartRate: "Max heart rate"
         }
     }
     func measurement(in activity: Activity) -> Double? {

@@ -34,6 +34,11 @@ struct ListControls: View {
                 Label("View and metrics", systemImage: "rectangle.split.3x1")
             }
             .accessibilityIdentifier("list-display-control")
+            Toggle(isOn: Binding(get: { presentation.settings.summaryMode != .off },
+                                 set: { presentation.settings.summaryMode = $0 ? .filtered : .off })) {
+                Label("Show summary", systemImage: "sum")
+            }
+            .accessibilityIdentifier("list-summary-toggle")
         } label: {
             Group {
                 if iconOnly || typeSize.isAccessibilitySize {

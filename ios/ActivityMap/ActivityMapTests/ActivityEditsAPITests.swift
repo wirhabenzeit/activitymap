@@ -73,6 +73,24 @@ struct ActivityEditsAPITests {
         #expect(fields == ["description": ""])
     }
 
+    @Test func refreshUsesBodylessAuthenticatedPostAndValidatesIdentity() async throws {
+        let activity = try Fixtures.activity()
+        let result = ActivityMapAPI.ActivityRefreshResult(activity: activity, photos: [], photosStatus: .complete, photosError: nil)
+        let data = try ActivityMapAPI.makeEncoder().encode(result)
+        let body = StreamFixtures.envelope(String(data: data, encoding: .utf8)!)
+        ActivityEditsURLProtocol.configure { request in
+            (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!, body)
+        }
+        let (api, session) = api()
+        defer { session.invalidateAndCancel() }
+        _ = try await api.refresh(activityID: activity.id)
+        let request = try #require(ActivityEditsURLProtocol.requests.first)
+        #expect(request.httpMethod == "POST" && request.url?.path == "/api/v1/activities/\(activity.id)/refresh")
+        #expect(request.httpBody == nil && request.timeoutInterval == 60)
+        #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer edit-test-token" && !request.httpShouldHandleCookies)
+        await #expect(throws: APIClient.RequestError.self) { try await api.refresh(activityID: "2") }
+    }
+
     @Test func invalidIDAndMismatchedResponseNeverCommit() async throws {
         let json = String(data: try ActivityMapAPI.makeEncoder().encode(Fixtures.activity(["id": "2"])), encoding: .utf8)!
         let body = StreamFixtures.envelope(json)

@@ -43,6 +43,8 @@ struct ActivityDetailActions: View {
                         ActivityEditForm(activity: activity, service: editing)
                     }
                     Divider().padding(.leading, 44)
+                    ActivityRefreshAction(activityID: activity.id, service: editing)
+                    Divider().padding(.leading, 44)
                 }
                 if let showOnMap, !overMap {
                     Button { showOnMap(activity.id) } label: {
@@ -133,4 +135,47 @@ struct ActivityDetailActions: View {
         }
     }
 
+}
+
+private struct ActivityRefreshAction: View {
+    let activityID: Int
+    let service: ActivityEditingService
+    @Environment(\.locale) private var locale
+    private var model: ActivityRefreshModel { service.refreshModel(activityID: activityID) }
+
+    var body: some View {
+        TimelineView(.explicit(model.retryAt.map { [$0] } ?? [])) { clock in
+            VStack(alignment: .leading, spacing: 4) {
+                Button {
+                    Task { await model.refresh(activityID: activityID, using: service) }
+                } label: {
+                    HStack(spacing: 12) {
+                        Image(systemName: model.didRefresh ? "checkmark" : ActionPresentation.glyph(.refresh))
+                            .foregroundStyle(AppTheme.accent).frame(width: 22).accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(model.isRefreshing ? AppMessages.actionRefreshing(locale: locale) : AppMessages.actionRefresh(locale: locale))
+                                .font(.subheadline.weight(.medium))
+                            Text(AppMessages.activityRefreshHint(locale: locale)).font(.caption).foregroundStyle(.secondary)
+                        }.frame(maxWidth: .infinity, alignment: .leading)
+                        if model.isRefreshing { ProgressView() }
+                    }
+                    .padding(12).frame(minHeight: 44).contentShape(Rectangle())
+                }
+                .disabled(!model.canRefresh(now: clock.date) || service.mutationInProgress || service.refreshUnavailableReason(locale: locale) != nil)
+                .accessibilityIdentifier("activity-refresh")
+                .accessibilityValue(model.didRefresh ? String(localized: AppMessages.mutationRefreshDescription(locale: locale)) : "")
+                if let reason = service.refreshUnavailableReason(locale: locale) {
+                    Text(verbatim: reason).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
+                }
+                if let message = model.message {
+                    Text(verbatim: message.string(locale: locale)).font(.caption).padding(.horizontal, 12)
+                        .accessibilityIdentifier("activity-refresh-result")
+                }
+                if let retry = model.retryAt, retry > clock.date {
+                    Text(AppMessages.mutationRetryAfter(retry.formatted(date: .omitted, time: .standard), locale: locale))
+                        .font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
+                }
+            }
+        }
+    }
 }

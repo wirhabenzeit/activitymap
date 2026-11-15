@@ -73,6 +73,12 @@ struct ListScreen: View {
                 }
                 .listRowSeparator(.hidden)
             }
+            if store.listPresentation.settings.summaryMode != .off {
+                ActivitySummaryView(store: store, availableWidth: max(1, width - 32))
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    .listRowSeparator(.hidden)
+                    .listRowBackground(Color.clear)
+            }
             ForEach(activities) { activity in
                 ActivityRowView(store: store, activity: activity, availableWidth: width,
                                 isInspected: activity.id == inspectedID, speedDisplay: speedDisplay)

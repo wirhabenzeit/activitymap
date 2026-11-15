@@ -30,7 +30,7 @@ enum BinaryFilterMode: String, CaseIterable, Identifiable {
 /// Calendar-day keys are stable while travelling and across DST transitions.
 /// Picker dates use the supplied Gregorian calendar in the viewer's timezone;
 /// activities already provide their encoded local day via `localDayKey`.
-struct ActivityDayRange: Equatable, Hashable {
+struct ActivityDayRange: Codable, Equatable, Hashable {
     let start: String
     let end: String
 

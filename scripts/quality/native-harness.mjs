@@ -51,6 +51,8 @@ export const nativeSuites = [
   'ActivityMapTests/APIErrorFactsTests',
   'ActivityMapTests/AuthRecoveryTests',
   'ActivityMapTests/ActivityEditingTests',
+  'ActivityMapTests/ActivityRefreshTests',
+  'ActivityMapTests/BrowsingPreferencesTests',
   'ActivityMapTests/ActivitySharingTests',
   'ActivityMapTests/SyncControllerTests',
   'ActivityMapTests/NativeSyncTests',
@@ -84,6 +86,8 @@ export const nativeSuites = [
 ];
 
 export const nativePRUISelectors = [
+  'ActivityMapUITests/ListSelectionUITests/testSummaryOptionsAndShareFollowCombineMode',
+  'ActivityMapUITests/ListSelectionUITests/testExpandedSummaryKeepsLargeValuesInsideProductionList',
   'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
   'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
   'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
@@ -109,7 +113,7 @@ export function nativeTestProfile(name = 'full') {
           ]
         : [...nativeSuites],
     // Keep runtime separate from compilation; every selected UI journey must run.
-    // The PR suite now holds nine UI journeys (40-55s each on hosted runners)
+    // The PR suite now holds ten UI journeys (40-55s each on hosted runners)
     // and passed in 477-665s; a slow runner reached the old 12-minute limit
     // during the last journey with every test passing.
     runtimeTimeoutMs: (name === 'pr' ? 15 : 45) * 60 * 1000,

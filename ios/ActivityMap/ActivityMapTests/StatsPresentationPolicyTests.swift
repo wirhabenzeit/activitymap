@@ -3,6 +3,19 @@ import Testing
 @testable import ActivityMap
 
 @MainActor struct StatsPresentationPolicyTests {
+    @Test func loadingAndIncompleteHistoryHaveVisibleNoticesWithoutClaimingZero() {
+        let locale = Locale(identifier: "en_US")
+        let loading = StatsPresentation(activityCount: 0, matchingCount: 0, status: .syncing, hasCompletedCache: false, canRetry: false)
+        #expect(!loading.hasContent && loading.empty == nil && loading.notice(locale: locale) == "Loading activity history…")
+        let partial = StatsPresentation(activityCount: 10, matchingCount: 10, status: .syncing, hasCompletedCache: false, canRetry: false)
+        #expect(partial.hasContent && !partial.historyComplete)
+        #expect(partial.notice(locale: locale)?.contains("incomplete") == true)
+        let ready = StatsPresentation(activityCount: 10, matchingCount: 10, status: .ready, hasCompletedCache: true, canRetry: true)
+        #expect(ready.notice(locale: locale) == nil)
+        let cached = StatsPresentation(activityCount: 10, matchingCount: 10, status: .offline, hasCompletedCache: true, canRetry: true)
+        #expect(cached.hasContent && cached.notice(locale: locale) != nil)
+    }
+
     @Test func bothClientsUseSharedComparisonAxisAndKeyboardExamples() throws {
         let fixture = try StatsFixtureTests.json("stats-presentation-fixtures.v1.json")
         for row in fixture["percentages"] as! [[String: Any]] {
