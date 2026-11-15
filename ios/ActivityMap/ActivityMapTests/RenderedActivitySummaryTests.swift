@@ -57,7 +57,7 @@ extension RenderedRoutePickingTests {
         #expect(store.selectedActivityIDs.isEmpty)
     }
 
-    @Test(arguments: ["small-phone", "large-text", "tablet-expanded", "selected-hidden", "empty-filtered", "all-unknown"])
+    @Test(arguments: ["small-phone", "large-text", "tablet-expanded", "selected-hidden", "empty-filtered", "all-unknown", "reference", "reference-small", "reference-imperial"])
     func summariesAdaptAndDiscloseExactScope(scenario: String) async throws {
         let preferences = ActivityListPresentation(defaults: nil)
         preferences.settings.summaryMode = .filtered
@@ -73,7 +73,25 @@ extension RenderedRoutePickingTests {
         let second = try StoredModelMapper.activity(Fixtures.activity([
             "id": "2", "distance": 0, "elapsed_time": 0, "total_elevation_gain": 0, "sport_type": "Ride",
         ]))
-        let store = ActivityStore(activities: scenario == "all-unknown" ? [unknown] : [partial, second], listPresentation: preferences)
+        let isReference = scenario.hasPrefix("reference")
+        var models = scenario == "all-unknown" ? [unknown] : [partial, second]
+        if isReference {
+            models = (1...4634).map { id in
+                var activity = ActivityStoreSelectionTests.activity(id, route: false)
+                activity.distance = nil; activity.elapsedTime = nil; activity.movingTime = nil
+                activity.totalElevationGain = nil; activity.averageSpeed = nil
+                return activity
+            }
+            models[0].distance = 104_582_000
+            models[0].elapsedTime = 351 * 86400
+            models[0].movingTime = 278 * 86400 + 19 * 3600
+            models[0].totalElevationGain = 2_273_157
+            models[0].averageSpeed = 5
+            models[0].elevLow = -4755; models[0].elevHigh = 8395
+            models[0].averageWatts = 205; models[0].weightedAverageWatts = 295; models[0].maxWatts = 2309
+            models[0].averageHeartrate = 128; models[0].maxHeartrate = 227
+        }
+        let store = ActivityStore(activities: models, listPresentation: preferences)
         store.selectedTab = .list
         if scenario == "selected-hidden" {
             store.replaceSelection(with: [1, 2])
@@ -86,16 +104,32 @@ extension RenderedRoutePickingTests {
             #expect(store.activitySummary?.activityCount == 0 && store.activitySummary?[.distance].value == 0)
         }
         let tablet = scenario == "tablet-expanded"
-        let size = tablet ? CGSize(width: 768, height: 1024) : CGSize(width: 320, height: 700)
+        let size = tablet ? CGSize(width: 768, height: 1024)
+            : isReference && scenario != "reference-small" ? CGSize(width: 402, height: 874) : CGSize(width: 320, height: 700)
+        let display = DisplayPreferences(defaults: nil)
+        if scenario == "reference-imperial" { display.units = .imperial }
         let root = ScrollView {
-            ActivitySummaryView(store: store, allMetricsExpanded: tablet || scenario == "large-text").padding()
+            ActivitySummaryView(store: store, allMetricsExpanded: tablet || scenario == "large-text" || isReference).padding()
         }
+        .environment(display)
+        .environment(\.locale, isReference ? Locale(identifier: "en_CH") : .current)
         .environment(\.horizontalSizeClass, tablet ? .regular : .compact)
         .environment(\.dynamicTypeSize, scenario == "large-text" ? .accessibility3 : .large)
         let host = try SummaryHarness(root: NavigationStack { root.navigationTitle("Activities") }, size: size)
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(250))
         try host.save("summary-\(scenario)")
+        if scenario == "reference" || scenario == "reference-small" {
+            let request = VNRecognizeTextRequest()
+            request.recognitionLevel = .accurate
+            let image = UIGraphicsImageRenderer(bounds: host.host.view.bounds).image { _ in
+                host.host.view.drawHierarchy(in: host.host.view.bounds, afterScreenUpdates: true)
+            }
+            try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+            let digits = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }
+                .joined().filter(\.isNumber)
+            #expect(digits.contains("2273157"), "The full elevation total must remain visible, including on a narrow phone")
+        }
         if scenario == "large-text" {
             let scroll = try #require(host.descendants(of: UIScrollView.self).first { $0.contentSize.height > $0.bounds.height })
             scroll.setContentOffset(CGPoint(x: 0, y: min(700, scroll.contentSize.height - scroll.bounds.height)), animated: false)

@@ -28,20 +28,20 @@ final class ListSelectionUITests: XCTestCase {
         XCTAssertTrue(share.waitForExistence(timeout: 5))
         app.buttons["List view options"].tap()
         app.buttons["Show summary"].tap()
-        let filteredHeading = app.staticTexts["Summary"]
+        let filteredHeading = app.buttons.matching(NSPredicate(format: "label IN %@", ["Expand summary", "Collapse summary"])).firstMatch
         XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
         let scope = app.segmentedControls.containing(.button, identifier: "Selected").firstMatch
         XCTAssertTrue(scope.waitForExistence(timeout: 5), app.debugDescription)
         scope.buttons["Selected"].tap()
         XCTAssertTrue(scope.buttons["Selected"].isSelected)
-        XCTAssertTrue(app.staticTexts["Summary"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = "Selected summary and Combine share"
         capture.lifetime = .keepAlways
         add(capture)
-        let heading = app.staticTexts["Summary"]
+        let heading = filteredHeading
         let headingY = heading.frame.minY
-        let disclosure = app.buttons.matching(NSPredicate(format: "label == %@", "More metrics")).firstMatch
+        let disclosure = filteredHeading
         let detail = app.otherElements.matching(NSPredicate(format: "label == %@", "Moving time")).firstMatch
         for _ in 0..<3 {
             disclosure.tap()
@@ -61,7 +61,8 @@ final class ListSelectionUITests: XCTestCase {
         app.buttons["Show summary"].tap()
         XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5))
         XCTAssertFalse(scope.exists)
-        app.buttons["Turn off activity summary"].tap()
+        app.buttons["List view options"].tap()
+        app.buttons["Show summary"].tap()
         XCTAssertTrue(filteredHeading.waitForNonExistence(timeout: 5))
     }
 
