@@ -6,6 +6,7 @@ import Observation
 @MainActor @Observable
 final class ActivityRefreshModel {
     private(set) var isRefreshing = false
+    private(set) var didRefresh = false
     private(set) var message: PresentationText?
     private(set) var retryAt: Date?
 
@@ -15,6 +16,7 @@ final class ActivityRefreshModel {
 
     func refresh(activityID: Int, using service: ActivityEditingService, now: Date? = nil) async {
         guard canRefresh(now: now ?? .now), !service.mutationInProgress else { return }
+        didRefresh = false
         if let reason = service.refreshUnavailableReason() { message = .verbatim(reason); return }
         isRefreshing = true
         message = nil
@@ -22,8 +24,8 @@ final class ActivityRefreshModel {
         do {
             let result = try await service.refresh(activityID: activityID)
             retryAt = result.photosError?.retryAfterSeconds.map { (now ?? .now).addingTimeInterval(Double($0)) }
-            message = .localized(result.photosStatus == .complete
-                ? AppMessages.mutationRefreshDescription() : AppMessages.mutationPartialDescription())
+            didRefresh = result.photosStatus == .complete
+            if !didRefresh { message = .localized(AppMessages.mutationPartialDescription()) }
         } catch ActivityEditingError.unavailable(let reason) {
             message = .verbatim(reason)
         } catch ActivityEditingError.reconciliation {

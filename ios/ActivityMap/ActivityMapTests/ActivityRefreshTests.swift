@@ -62,7 +62,7 @@ struct ActivityRefreshTests {
         let after = try await storage.snapshot(scope: Fixtures.scope)
         #expect(after.activities == [updated] && after.photos == [photo] && after.checkpoint == before.checkpoint)
         #expect(controller.activities.activity(id: id)?.name == "Refreshed")
-        #expect(model.message?.string().contains("up to date") == true && !model.isRefreshing)
+        #expect(model.didRefresh && model.message == nil && !model.isRefreshing)
     }
 
     @Test func partialRefreshKeepsPhotosAndRetainsRetryDeadlineAcrossReopening() async throws {
@@ -81,7 +81,7 @@ struct ActivityRefreshTests {
         #expect(controller.editing.refreshModel(activityID: id) === model)
         await model.refresh(activityID: id, using: controller.editing, now: now)
         #expect(await source.calls == 1)
-        #expect(model.message?.string().contains("Photos could not") == true)
+        #expect(!model.didRefresh && model.message?.string().contains("Photos could not") == true)
     }
 
     @Test func rateLimitPreservesDataAndAllowsRetryAfterDeadline() async throws {
@@ -93,9 +93,9 @@ struct ActivityRefreshTests {
         let now = Date()
         await model.refresh(activityID: Int(original.id)!, using: controller.editing, now: now)
         #expect(try await storage.snapshot(scope: Fixtures.scope).activities == [original])
-        #expect(!model.canRefresh(now: now) && model.canRefresh(now: now.addingTimeInterval(60)))
+        #expect(!model.didRefresh && !model.canRefresh(now: now) && model.canRefresh(now: now.addingTimeInterval(60)))
         await model.refresh(activityID: Int(original.id)!, using: controller.editing, now: now.addingTimeInterval(61))
-        #expect(await source.calls == 2 && model.retryAt == nil)
+        #expect(await source.calls == 2 && model.retryAt == nil && model.didRefresh && model.message == nil)
     }
 
     @Test func repeatedRefreshAndEditDoNotSendConcurrentMutations() async throws {

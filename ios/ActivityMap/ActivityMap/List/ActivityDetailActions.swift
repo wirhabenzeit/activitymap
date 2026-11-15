@@ -150,7 +150,7 @@ private struct ActivityRefreshAction: View {
                     Task { await model.refresh(activityID: activityID, using: service) }
                 } label: {
                     HStack(spacing: 12) {
-                        Image(systemName: ActionPresentation.glyph(.refresh))
+                        Image(systemName: model.didRefresh ? "checkmark" : ActionPresentation.glyph(.refresh))
                             .foregroundStyle(AppTheme.accent).frame(width: 22).accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 4) {
                             Text(model.isRefreshing ? AppMessages.actionRefreshing(locale: locale) : AppMessages.actionRefresh(locale: locale))
@@ -163,6 +163,7 @@ private struct ActivityRefreshAction: View {
                 }
                 .disabled(!model.canRefresh(now: clock.date) || service.mutationInProgress || service.refreshUnavailableReason(locale: locale) != nil)
                 .accessibilityIdentifier("activity-refresh")
+                .accessibilityValue(model.didRefresh ? String(localized: AppMessages.mutationRefreshDescription(locale: locale)) : "")
                 if let reason = service.refreshUnavailableReason(locale: locale) {
                     Text(verbatim: reason).font(.caption).foregroundStyle(.secondary).padding(.horizontal, 12)
                 }
