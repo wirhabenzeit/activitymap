@@ -13,6 +13,35 @@ final class ListSelectionUITests: XCTestCase {
         try journey(standalone: true)
     }
 
+    func testSummaryOptionsAndShareFollowCombineMode() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--list-selection-ui-testing", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        app.launch()
+        defer { app.terminate() }
+        let share = listControl(in: app, label: "Share selected activities", identifier: "share-selection")
+        XCTAssertTrue(share.waitForExistence(timeout: 10), app.debugDescription)
+        listControl(in: app, label: "Combine selections", identifier: "combine-selection").tap()
+        XCTAssertTrue(share.waitForNonExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(listControl(in: app, label: "Clear selection", identifier: "clear-selection").exists)
+        listControl(in: app, label: "Combine selections", identifier: "combine-selection").tap()
+        XCTAssertTrue(share.waitForExistence(timeout: 5))
+        app.buttons["List view options"].tap()
+        app.buttons["list-display-control"].tap()
+        let picker = app.buttons["list-summary-mode"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 5), app.debugDescription)
+        picker.tap()
+        app.buttons["Selected activities"].tap()
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.staticTexts["Selected activities summary"].waitForExistence(timeout: 5), app.debugDescription)
+        let capture = XCTAttachment(screenshot: app.screenshot())
+        capture.name = "Selected summary and Combine share"
+        capture.lifetime = .keepAlways
+        add(capture)
+        app.buttons["Turn off activity summary"].tap()
+        XCTAssertTrue(app.staticTexts["Selected activities summary"].waitForNonExistence(timeout: 5))
+    }
+
     func testDetailScrollReachesBottomAndKeepsLastActionVisible() throws {
         continueAfterFailure = false
         defer { XCUIDevice.shared.orientation = .portrait }

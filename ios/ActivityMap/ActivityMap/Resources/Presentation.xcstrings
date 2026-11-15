@@ -6396,6 +6396,258 @@
           }
         }
       }
+    },
+    "filters.onlyGroup": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Only %@"
+          }
+        }
+      }
+    },
+    "filters.resultCount": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld activities"
+          }
+        }
+      }
+    },
+    "filters.activeCount": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld active filter"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld active filters"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "status.browsing.selectionHidden": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selection hidden"
+          }
+        }
+      }
+    },
+    "status.browsing.selectionHiddenDetail": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your selected activities are hidden by filters."
+          }
+        }
+      }
+    },
+    "stats.historyLoading": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Loading activity history…"
+          }
+        }
+      }
+    },
+    "stats.historyIncomplete": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "History is still loading. Comparisons may be incomplete."
+          }
+        }
+      }
+    },
+    "activity.refresh.hint": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload activity details and photos from Strava."
+          }
+        }
+      }
+    },
+    "activity.refresh.signIn": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in and connect to Strava to refresh this activity."
+          }
+        }
+      }
+    },
+    "activity.refresh.reconnect": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reconnect and sync before refreshing this activity."
+          }
+        }
+      }
+    },
+    "activity.refresh.busy": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Another activity change is in progress. Please wait."
+          }
+        }
+      }
+    },
+    "activity.refresh.unavailable": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This activity is no longer available. Sync to update your library."
+          }
+        }
+      }
+    },
+    "action.refreshing": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Refreshing from Strava…"
+          }
+        }
+      }
+    },
+    "sharing.createdAt": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Created %@"
+          }
+        }
+      }
+    },
+    "sharing.statusExpiry": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ · expires %@"
+          }
+        }
+      }
+    },
+    "sharing.status.active": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active"
+          }
+        }
+      }
+    },
+    "sharing.status.expired": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expired"
+          }
+        }
+      }
+    },
+    "sharing.status.revoked": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoked"
+          }
+        }
+      }
+    },
+    "sharing.revoking": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoking…"
+          }
+        }
+      }
+    },
+    "sharing.revoke": {
+      "comment": "Shared browsing and activity command presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Revoke"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

@@ -103,6 +103,7 @@ test('native profiles retain all unit suites and select exactly the intended PR 
     suite.startsWith('ActivityMapTests/'),
   );
   const expectedUI = [
+    'ActivityMapUITests/ListSelectionUITests/testSummaryOptionsAndShareFollowCombineMode',
     'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
     'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
     'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
@@ -113,14 +114,14 @@ test('native profiles retain all unit suites and select exactly the intended PR 
     'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
     'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
   ];
-  assert.equal(unitSuites.length, 34);
+  assert.equal(unitSuites.length, 36);
   assert.deepEqual(nativePRUISelectors, expectedUI);
   assert.deepEqual(pr.suites, [...unitSuites, ...expectedUI]);
-  assert.equal(new Set(pr.suites).size, 43);
+  assert.equal(new Set(pr.suites).size, 46);
   assert.equal(pr.name, 'pr');
   assert.equal(pr.runtimeTimeoutMs, 15 * 60 * 1000);
   assert.deepEqual(full.suites, nativeSuites);
-  assert.equal(full.suites.length, 42);
+  assert.equal(full.suites.length, 44);
   assert.equal(full.name, 'full');
   assert.equal(full.runtimeTimeoutMs, 45 * 60 * 1000);
   assert.deepEqual(nativeTestProfile('full'), full);
@@ -152,7 +153,7 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
       (item) => item.actual === '26.2' && item.requires === 'iOS 27+',
     ),
   );
-  assert.equal(result.suites.length, 38);
+  assert.equal(result.suites.length, 41);
   assert(
     result.suites.includes(
       'ActivityMapTests/StatsCalendarScrollRenderingTests',
@@ -165,7 +166,8 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
       (selector) =>
         selector.includes('/ActivityPlacesUITests/') ||
         selector.includes('/FilterPanelUITests/') ||
-        selector.includes('/ActivityActionUITests/'),
+        selector.includes('/ActivityActionUITests/') ||
+        selector.includes('/ListSelectionUITests/'),
     ),
   );
   assert.deepEqual(nativeSuiteEligibility('27.0', 'pr'), {

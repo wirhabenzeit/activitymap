@@ -34,6 +34,15 @@ struct StatsPresentation: Equatable {
     let retryAllowed: Bool
     let empty: BrowsingPresentation.EmptyState?
 
+    func notice(locale: Locale) -> String? {
+        switch state {
+        case .loading: String(localized: AppMessages.statsHistoryLoading(locale: locale))
+        case .incomplete: String(localized: AppMessages.statsHistoryIncomplete(locale: locale))
+        case .cached, .error: message
+        default: nil
+        }
+    }
+
     /// Offline fixture/preview hosts have no sync controller. Production waits
     /// for its controller instead of flashing an empty completed library.
     init(store: ActivityStore, preparing: Bool) {

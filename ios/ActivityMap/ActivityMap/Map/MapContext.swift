@@ -22,10 +22,40 @@ struct MapCamera {
 @Observable
 final class MapContext {
     @ObservationIgnored private(set) var camera = MapCamera.initial
-    var showPhotos = false
-    var showPlaces = false
-    var baseStyle = BaseStyle.standard
-    var activeOverlays = Set(SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault))
+    @ObservationIgnored private let defaults: UserDefaults?
+    @ObservationIgnored var saveCamera: (() -> Void)?
+    var showPhotos = false { didSet { saveAppearance() } }
+    var showPlaces = false { didSet { saveAppearance() } }
+    var baseStyle = BaseStyle.standard { didSet { saveAppearance() } }
+    var activeOverlays = Set(SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault)) { didSet { saveAppearance() } }
+
+    private struct Appearance: Codable {
+        var baseStyle: String
+        var overlays: [String]
+        var photos: Bool
+        var places: Bool
+    }
+    private let appearanceKey = "browsing.v1.mapAppearance"
+    init(defaults: UserDefaults? = nil) {
+        self.defaults = defaults
+        if let data = defaults?.data(forKey: appearanceKey),
+           let saved = try? JSONDecoder().decode(Appearance.self, from: data) {
+            baseStyle = BaseStyle.all.first { $0.id == saved.baseStyle } ?? .standard
+            activeOverlays = Set(SharedMapCatalog.rasterOverlays.filter { saved.overlays.contains($0.id) })
+            showPhotos = saved.photos
+            showPlaces = saved.places
+        }
+    }
+    private func saveAppearance() {
+        guard let defaults, let data = try? JSONEncoder().encode(Appearance(baseStyle: baseStyle.id,
+            overlays: activeOverlays.map(\.id).sorted(), photos: showPhotos, places: showPlaces)) else { return }
+        defaults.set(data, forKey: appearanceKey)
+    }
+    func restoreCamera(_ saved: MapCamera?) {
+        camera = saved ?? .initial
+        isPitched = camera.pitch > 1
+        scopeRevision += 1
+    }
     private(set) var isPitched = false
     private(set) var scopeRevision = 0
     private(set) var pendingRequest: Request?
@@ -74,13 +104,12 @@ final class MapContext {
     }
 
     func clearScope() {
-        showPhotos = false
-        showPlaces = false
         camera = .initial
         locatedPosition = nil
         isPitched = false
         pendingRequest = nil
         hiddenTargetID = nil
+        highlightedPlaceID = nil
         navigationError = nil
         scopeRevision += 1
         // Basemap and overlay preferences are device presentation settings.

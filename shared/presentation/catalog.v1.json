@@ -145,7 +145,7 @@
     "exportGPX": {
       "message": "action.exportGPX",
       "webGlyph": "Download",
-      "iosGlyph": "square.and.arrow.up",
+      "iosGlyph": "arrow.down.document",
       "mirrorsInRTL": false,
       "intent": "Export route data: browser downloads a file; iOS presents the system share sheet.",
       "colorToken": "foreground",
@@ -3150,6 +3150,123 @@
         "one": "{count} activity fetched. Older history, details and photos continue in the background.",
         "other": "{count} activities fetched. Older history, details and photos continue in the background."
       }
+    },
+    "filters.onlyGroup": {
+      "source": "Only {group}",
+      "arguments": {
+        "group": "string"
+      },
+      "context": "Shared browsing and activity command presentation."
+    },
+    "filters.resultCount": {
+      "source": "{shown} of {total} activities",
+      "arguments": {
+        "shown": "number",
+        "total": "number"
+      },
+      "context": "Shared browsing and activity command presentation."
+    },
+    "filters.activeCount": {
+      "source": "{count} active filters",
+      "arguments": {
+        "count": "number"
+      },
+      "context": "Shared browsing and activity command presentation.",
+      "plural": {
+        "argument": "count",
+        "one": "{count} active filter",
+        "other": "{count} active filters"
+      }
+    },
+    "status.browsing.selectionHidden": {
+      "source": "Selection hidden",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "status.browsing.selectionHiddenDetail": {
+      "source": "Your selected activities are hidden by filters.",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "stats.historyLoading": {
+      "source": "Loading activity history…",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "stats.historyIncomplete": {
+      "source": "History is still loading. Comparisons may be incomplete.",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "activity.refresh.hint": {
+      "source": "Reload activity details and photos from Strava.",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "activity.refresh.signIn": {
+      "source": "Sign in and connect to Strava to refresh this activity.",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "activity.refresh.reconnect": {
+      "source": "Reconnect and sync before refreshing this activity.",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "activity.refresh.busy": {
+      "source": "Another activity change is in progress. Please wait.",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "activity.refresh.unavailable": {
+      "source": "This activity is no longer available. Sync to update your library.",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "action.refreshing": {
+      "source": "Refreshing from Strava…",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "sharing.createdAt": {
+      "source": "Created {date}",
+      "arguments": {
+        "date": "string"
+      },
+      "context": "Shared browsing and activity command presentation."
+    },
+    "sharing.statusExpiry": {
+      "source": "{status} · expires {date}",
+      "arguments": {
+        "status": "string",
+        "date": "string"
+      },
+      "context": "Shared browsing and activity command presentation."
+    },
+    "sharing.status.active": {
+      "source": "Active",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "sharing.status.expired": {
+      "source": "Expired",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "sharing.status.revoked": {
+      "source": "Revoked",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "sharing.revoking": {
+      "source": "Revoking…",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
+    },
+    "sharing.revoke": {
+      "source": "Revoke",
+      "arguments": {},
+      "context": "Shared browsing and activity command presentation."
     }
   }
 }

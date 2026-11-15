@@ -2,7 +2,7 @@ import SwiftUI
 import UIKit
 
 struct AppShell: View {
-    @State private var store = ActivityStore()
+    @State private var store: ActivityStore
     @State private var auth = AuthController()
     @State private var sync: SyncController?
     @Environment(\.localStore) private var localStore
@@ -26,8 +26,8 @@ struct AppShell: View {
     // Real dashboard content stays mounted with Map/List through switches.
     private let statsContent: BrowseStatsDestination?
 
-    init(activities: [Activity] = []) {
-        self.init(store: ActivityStore(activities: activities))
+    init(activities: [Activity] = [], browsingDefaults: UserDefaults? = nil) {
+        self.init(store: ActivityStore(activities: activities, browsingDefaults: browsingDefaults))
     }
 
     init(store: ActivityStore, mapPicker: RoutePicker? = nil, sheets: BrowseSheetPresentation = BrowseSheetPresentation(),
@@ -515,7 +515,7 @@ struct AppShell: View {
                         .clipShape(Circle())
                         .overlay { Circle().strokeBorder(.white.opacity(0.65), lineWidth: 1) }
                 } else {
-                    Image(systemName: "person.crop.circle")
+                    Image(systemName: "gearshape")
                         .font(.body.weight(.semibold))
                         .foregroundStyle(.white)
                 }

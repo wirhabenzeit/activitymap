@@ -20,7 +20,7 @@ struct SelectionShareButton: View {
     let store: ActivityStore
     var onNavigationBar = false
     var body: some View {
-        if !store.selectedActivityIDs.isEmpty {
+        if store.isCombining && !store.selectedActivityIDs.isEmpty {
             ActivityShareButton(activities: { store.activities.filter { store.selectedActivityIDs.contains($0.id) } }) {
                 Image(systemName: "square.and.arrow.up")
                     .frame(width: 44, height: 44).contentShape(Rectangle())
@@ -183,9 +183,9 @@ struct ShareLinksListView: View {
                 if links.isEmpty { Text(String(localized: AppMessages.sharingYouHaveNoShareLinks(locale: locale))).foregroundStyle(.secondary) }
                 ForEach(links, id: \.id) { link in
                     VStack(alignment: .leading, spacing: 6) {
-                        Text("\(link.activityCount) activities").font(.headline)
-                        Text("Created \(link.createdAt.formatted(date: .abbreviated, time: .shortened))").font(.caption)
-                        Text("\(link.status.rawValue.capitalized) · expires \(link.expiresAt.formatted(date: .abbreviated, time: .shortened))")
+                        Text(AppMessages.selectionCount(link.activityCount, locale: locale)).font(.headline)
+                        Text(AppMessages.sharingCreatedAt(link.createdAt.formatted(date: .abbreviated, time: .shortened), locale: locale)).font(.caption)
+                        Text(AppMessages.sharingStatusExpiry(statusLabel(link.status), link.expiresAt.formatted(date: .abbreviated, time: .shortened), locale: locale))
                             .font(.caption).foregroundStyle(.secondary)
                         if link.status == .active && link.expiresAt > .now {
                             Button(String(localized: AppMessages.sharingRevokeLink(locale: locale)), role: .destructive) { pendingRevocation = link }.disabled(busy)
@@ -203,6 +203,14 @@ struct ShareLinksListView: View {
                     Button(String(localized: AppMessages.sharingRevokeLink(locale: locale)), role: .destructive) { Task { await revoke(link) } }
                 }
         } message: { Text(String(localized: AppMessages.sharingAnyoneWithThisLinkWillLoseAccessImmediately(locale: locale))) }
+    }
+
+    private func statusLabel(_ status: ActivityMapAPI.ShareLinkStatus) -> String {
+        switch status {
+        case .active: String(localized: AppMessages.sharingStatusActive(locale: locale))
+        case .expired: String(localized: AppMessages.sharingStatusExpired(locale: locale))
+        case .revoked: String(localized: AppMessages.sharingStatusRevoked(locale: locale))
+        }
     }
 
     private func load() async {

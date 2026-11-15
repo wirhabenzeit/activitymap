@@ -205,7 +205,7 @@ export function CategoryFilter() {
                     )
                   }
                 >
-                  Only {name}
+                  {message('filters.onlyGroup', { group: name })}
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 {(
@@ -769,12 +769,14 @@ function FilterSummaryContent() {
     >
       <div className="min-w-0">
         <p className="text-sm font-semibold">
-          {result.shown.toLocaleString()} of {result.total.toLocaleString()}{' '}
-          activities
+          {message('filters.resultCount', {
+            shown: result.shown,
+            total: result.total,
+          })}
         </p>
         {active > 0 && (
           <p className="text-xs text-muted-foreground">
-            {active} active {active === 1 ? 'filter' : 'filters'}
+            {message('filters.activeCount', { count: active })}
           </p>
         )}
       </div>

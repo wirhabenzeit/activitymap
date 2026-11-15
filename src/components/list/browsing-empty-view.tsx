@@ -20,10 +20,6 @@ export function browsingEmptyKind({
   return selectionHidden ? 'selection-hidden' : 'filtered-out';
 }
 
-// The native picker's wording; there is no catalog entry for it yet.
-const selectionHiddenTitle = 'Selection hidden';
-const selectionHiddenDetail = 'Your selected activities are hidden by filters.';
-
 export function BrowsingEmptyView({
   kind,
   canClear,
@@ -40,11 +36,11 @@ export function BrowsingEmptyView({
     kind === 'library-empty'
       ? message('status.browsing.noActivitiesInYourLibrary')
       : kind === 'selection-hidden'
-        ? selectionHiddenTitle
+        ? message('status.browsing.selectionHidden')
         : message('status.browsing.noActivitiesMatchYourFilters');
   const detail =
     kind === 'selection-hidden'
-      ? selectionHiddenDetail
+      ? message('status.browsing.selectionHiddenDetail')
       : kind === 'filtered-out'
         ? message('status.browsing.yourLibraryIsStillSavedClearFiltersOrChange')
         : undefined;

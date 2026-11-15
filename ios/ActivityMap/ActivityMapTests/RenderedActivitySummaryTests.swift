@@ -1,10 +1,31 @@
 import SwiftUI
 import Testing
 import UIKit
+import Vision
 @testable import ActivityMap
 
 extension RenderedRoutePickingTests {
-    @Test func removedListSummaryDoesNotRestoreFromSavedPreferences() async throws {
+    @Test func statsPreparingHistoryRendersLoadingInsteadOfBlankDashboard() async throws {
+        let store = ActivityStore()
+        store.selectedTab = .stats
+        let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
+        let host = try SummaryHarness(root: StatsScreen(store: store).environment(\.localStore, storage),
+                                      size: CGSize(width: 390, height: 844))
+        defer { host.close() }
+        try await Task.sleep(for: .milliseconds(250))
+        let request = VNRecognizeTextRequest()
+        request.recognitionLevel = .accurate
+        let image = UIGraphicsImageRenderer(bounds: host.host.view.bounds).image { _ in
+            host.host.view.drawHierarchy(in: host.host.view.bounds, afterScreenUpdates: true)
+        }
+        try VNImageRequestHandler(cgImage: try #require(image.cgImage)).perform([request])
+        let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+        #expect(text.contains("Loading activity history"), "The actual Stats screen explains its initial loading state: \(text)")
+        #expect(!text.contains("No activity history"))
+        try host.save("stats-history-loading")
+    }
+
+    @Test func savedListSummaryRestoresWithoutBreakingLazyRows() async throws {
         let preferences = ActivityListPresentation(defaults: nil)
         preferences.settings.summaryMode = .filtered
         let models = (1...2000).map { id in
@@ -22,8 +43,8 @@ extension RenderedRoutePickingTests {
         let original = try #require(store.activitySummary)
         #expect(original.activityCount == 2000 && original[.distance].value == 2_001_000)
         #expect(list.visibleCells.count < 100)
-        #expect((0..<list.numberOfSections).reduce(0) { $0 + list.numberOfItems(inSection: $1) } == 2000,
-                "Saved filtered totals do not add a summary row to the List")
+        #expect((0..<list.numberOfSections).reduce(0) { $0 + list.numberOfItems(inSection: $1) } == 2001,
+                "Saved filtered totals add one scrollable summary before the lazy activity rows")
         try host.save("summary-tablet-filtered")
         list.setContentOffset(CGPoint(x: 0, y: 2400), animated: false)
         try await Task.sleep(for: .milliseconds(120))

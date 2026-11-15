@@ -734,7 +734,7 @@ extension RenderedRoutePickingTests {
 
     @Test func largeListNavigationReusesBrowsingSnapshots() async throws {
         let presentation = ActivityListPresentation(defaults: nil)
-        // Persisted totals preferences cannot reinsert the removed summary UI.
+        // Restored totals occupy one scrollable row and retain the warm browsing snapshots.
         presentation.settings.summaryMode = .filtered
         let store = ActivityStore(activities: (1...4575).map { ActivityStoreSelectionTests.activity($0) },
                                   listPresentation: presentation)
@@ -745,8 +745,8 @@ extension RenderedRoutePickingTests {
         defer { host.close() }
         try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false }
         let list = try #require(host.descendants(of: UICollectionView.self).first)
-        #expect((0..<list.numberOfSections).reduce(0) { $0 + list.numberOfItems(inSection: $1) } == 4575,
-                "The List contains activities only, even with a saved summary preference")
+        #expect((0..<list.numberOfSections).reduce(0) { $0 + list.numberOfItems(inSection: $1) } == 4576,
+                "The List includes one summary row when its saved preference is enabled")
         list.setContentOffset(CGPoint(x: 0, y: 617), animated: false)
         try await Task.sleep(for: .milliseconds(100))
         let offset = list.contentOffset
@@ -763,7 +763,7 @@ extension RenderedRoutePickingTests {
             #expect(store.filterBuildCount == filters && store.sortBuildCount == sorts,
                     "Native push/pop uses warm browsing snapshots instead of sorting all 4,575 activities")
         }
-        try host.save("list-glass-no-summary")
+        try host.save("list-with-summary")
     }
 
     @Test func listPushedDetailSurvivesWindowResizing() async throws {

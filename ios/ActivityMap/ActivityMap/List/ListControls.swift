@@ -121,6 +121,12 @@ struct ListOptionsSheets: ViewModifier {
                              ? "Columns aligns values under sortable headers. Details wraps labelled metrics beneath each activity."
                              : "These metrics need Details at this window width. Choose fewer metrics to use Columns.")
                     }
+                    Section("Summary") {
+                        Picker("Summary", selection: $presentation.settings.summaryMode) {
+                            ForEach(ActivitySummaryMode.allCases) { Text($0.title).tag($0) }
+                        }
+                        .accessibilityIdentifier("list-summary-mode")
+                    }
                     Section("Density") {
                         Picker("Density", selection: $presentation.settings.density) {
                             ForEach(ActivityListDensity.allCases) { Text($0.title).tag($0) }

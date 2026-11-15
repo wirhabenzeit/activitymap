@@ -16,12 +16,12 @@ enum AppTab: CaseIterable, Hashable {
     }
 }
 
-nonisolated enum FilterOperator: String, Hashable, Sendable {
+nonisolated enum FilterOperator: String, Codable, Hashable, Sendable {
     case gte = ">="
     case lte = "<="
 }
 
-nonisolated struct NumericFilter: Hashable, Sendable {
+nonisolated struct NumericFilter: Codable, Hashable, Sendable {
     var operatorType: FilterOperator = .gte
     var value: Double = 0
     var upperLimit: Double? = nil
@@ -32,7 +32,7 @@ nonisolated struct NumericFilter: Hashable, Sendable {
 
 /// Ordinary browsing filters are one value so a user intent can publish and
 /// reconcile its final predicates once. Selected-only scope stays in the reducer.
-struct ActivityFilterState: Equatable {
+struct ActivityFilterState: Codable, Equatable {
     var searchText = ""
     var place: PlaceFilter?
     var activeSportTypes = Set(SportType.allCases)
@@ -140,10 +140,13 @@ final class ActivityStore {
     /// The profile whose chart is being dragged. Only an active drag suspends
     /// pager paging; an accessibility-adjusted cursor must not.
     var elevationScrubOwner: UUID?
-    let mapContext = MapContext()
+    let mapContext: MapContext
+    @ObservationIgnored private let browsingPreferences: BrowsingPreferences?
     let listPresentation: ActivityListPresentation
 
-    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation(), stats: StatsController = StatsController(), photoImages: PhotoImageCache = PhotoImageCache()) {
+    init(activities: [Activity] = [], listPresentation: ActivityListPresentation = ActivityListPresentation(), stats: StatsController = StatsController(), photoImages: PhotoImageCache = PhotoImageCache(), browsingDefaults: UserDefaults? = nil) {
+        browsingPreferences = browsingDefaults.map(BrowsingPreferences.init)
+        mapContext = MapContext(defaults: browsingDefaults)
         self.photoImages = photoImages
         self.stats = stats
         self.listPresentation = listPresentation
@@ -151,6 +154,19 @@ final class ActivityStore {
         selection.setVisible(Set(filteredActivities.map(\.id)))
         publishSelectionSnapshot()
     }
+
+    func restoreBrowsingScope(_ scope: StoreScope?) {
+        browsingPreferences?.activate(scope)
+        placeUserID = scope?.userID
+        applyFilters(browsingPreferences?.filters() ?? ActivityFilterState(), resetSelectedOnly: true)
+        mapContext.restoreCamera(browsingPreferences?.camera())
+        mapContext.saveCamera = { [weak self] in
+            guard let self else { return }
+            browsingPreferences?.save(camera: mapContext.camera)
+        }
+    }
+
+    func forgetBrowsingPreferences(scope: StoreScope) { browsingPreferences?.remove(scope: scope) }
 
     /// The sync coordinator will call this after a committed sync pass.
     func load(from store: LocalStore, scope: StoreScope) async throws {
@@ -522,6 +538,11 @@ final class ActivityStore {
 
     /// Logout, account or deployment transition.
     func clearScope() {
+        browsingPreferences?.save(filters: filters)
+        browsingPreferences?.save(camera: mapContext.camera)
+        browsingPreferences?.activate(nil)
+        mapContext.saveCamera = nil
+        applyFilters(ActivityFilterState(), resetSelectedOnly: true)
         selectedPlace = nil
         placeUserID = nil
         placeMatchingVersion = nil
@@ -559,6 +580,7 @@ final class ActivityStore {
         guard changed || (resetSelectedOnly && selection.onlySelected) else { return }
         if changed {
             filters = next
+            browsingPreferences?.save(filters: next)
             filterRevision &+= 1
         }
         // Reset scope before validating inspection against the final visibility.

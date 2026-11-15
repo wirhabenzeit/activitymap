@@ -136,6 +136,14 @@ private struct StatsDashboardGrid: View, Equatable {
         ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: AppTheme.Spacing.section) {
+                    if let message = presentation.notice(locale: locale) {
+                        HStack(spacing: 12) {
+                            if presentation.state == .loading { ProgressView() }
+                            Text(verbatim: message).font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .accessibilityIdentifier("stats-history-status")
+                    }
                     if presentation.hasContent {
                         ForEach(StatsTileGroup.allCases, id: \.self) { group in
                             VStack(alignment: .leading, spacing: AppTheme.Spacing.small) {

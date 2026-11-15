@@ -17,3 +17,20 @@ nonisolated struct ActivityEditsAPI: ActivityEditSource {
         return activity
     }
 }
+
+nonisolated protocol ActivityRefreshSource: Sendable {
+    func refresh(activityID: String) async throws -> ActivityMapAPI.ActivityRefreshResult
+}
+
+extension ActivityEditsAPI: ActivityRefreshSource {
+    func refresh(activityID: String) async throws -> ActivityMapAPI.ActivityRefreshResult {
+        let id = try StreamsAPI.validated(activityID)
+        let result = try await APIClient.post("/api/v1/activities/\(id)/refresh",
+            bearerToken: token, baseURL: baseURL, session: session, timeout: 60, as: ActivityMapAPI.ActivityRefreshResult.self)
+        guard result.activity.id == id, result.photos.allSatisfy({ $0.activityID == id }),
+              Set(result.photos.map(\.uniqueID)).count == result.photos.count else {
+            throw APIClient.RequestError.decoding("Activity refresh identity mismatch")
+        }
+        return result
+    }
+}

@@ -156,6 +156,7 @@ struct MapScreen: View {
         }
         .onChange(of: context.activeOverlays) { _, _ in picker.invalidateQuery() }
         .onChange(of: context.scopeRevision) { _, _ in
+            acceptsCameraEvents = false
             cameraTransitionID = nil
             picker.isPresented = false
             resultsGeometry = nil
@@ -178,6 +179,7 @@ struct MapScreen: View {
             // A permission prompt can make the scene inactive. Only leaving
             // the foreground cancels the request that caused that prompt.
             if phase == .background {
+                context.saveCamera?()
                 location.cancel()
                 context.cancelLocationRequest()
             }
@@ -295,6 +297,7 @@ struct MapScreen: View {
             applyNavigation(proxy: proxy, geometry: geometry)
         }
         .onMapIdle { _ in
+            if acceptsCameraEvents { context.saveCamera?() }
             refreshPhotos(proxy: proxy, geometry: geometry)
             refreshPlaces(proxy: proxy, geometry: geometry)
             // A local/cached style can finish before SwiftUI installs its
@@ -714,7 +717,7 @@ struct MapScreen: View {
                     }) {
                         Text("No located photos in the current filter")
                     }
-                    Toggle(isOn: $context.showPlaces) { Label("Places", systemImage: "mountain.2") }
+                    Toggle(isOn: $context.showPlaces) { Label("Places", systemImage: "mappin.and.ellipse") }
                         .menuActionDismissBehavior(.disabled)
                     if context.showPlaces, placeModels.isEmpty, store.activityPlaces?.overviewLoading != true {
                         Text("No matched places saved in the current filter")

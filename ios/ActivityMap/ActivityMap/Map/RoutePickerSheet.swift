@@ -72,8 +72,8 @@ struct RoutePickerSheet: View {
     @ViewBuilder private var results: some View {
         if candidates.isEmpty {
             VStack {
-                ContentUnavailableView("Selection hidden", systemImage: "line.3.horizontal.decrease.circle",
-                                       description: Text("Your selected activities are hidden by filters."))
+                ContentUnavailableView(String(localized: AppMessages.statusBrowsingSelectionHidden(locale: locale)), systemImage: "line.3.horizontal.decrease.circle",
+                                       description: Text(AppMessages.statusBrowsingSelectionHiddenDetail(locale: locale)))
                 Button("Clear filters") { store.resetFilters() }
                     .buttonStyle(.bordered).padding(.bottom, 16)
             }

@@ -21,7 +21,7 @@ nonisolated enum ActivityCategory: String, CaseIterable, Identifiable, Sendable 
     }
 }
 
-nonisolated enum SportType: String, CaseIterable, Identifiable, Sendable {
+nonisolated enum SportType: String, Codable, CaseIterable, Identifiable, Sendable {
     case backcountrySki = "BackcountrySki"
     case nordicSki = "NordicSki"
     case rollerSki = "RollerSki"

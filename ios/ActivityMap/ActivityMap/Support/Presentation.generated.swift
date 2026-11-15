@@ -1571,6 +1571,66 @@ nonisolated enum AppMessages {
     static func statusFirstSummaryCount(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("status.firstSummary.count", defaultValue: "\(count) activities fetched. Older history, details and photos continue in the background.", table: "Presentation", locale: locale, comment: "Complete initial-summary import result. Zero has its own empty-library explanation. History, details and photos continue independently.")
     }
+    static func filtersOnlyGroup(_ group: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.onlyGroup", defaultValue: "Only \(group)", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func filtersResultCount(_ shown: Int, _ total: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.resultCount", defaultValue: "\(shown) of \(total) activities", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func filtersActiveCount(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.activeCount", defaultValue: "\(count) active filters", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func statusBrowsingSelectionHidden(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.selectionHidden", defaultValue: "Selection hidden", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func statusBrowsingSelectionHiddenDetail(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("status.browsing.selectionHiddenDetail", defaultValue: "Your selected activities are hidden by filters.", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func statsHistoryLoading(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.historyLoading", defaultValue: "Loading activity history…", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func statsHistoryIncomplete(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("stats.historyIncomplete", defaultValue: "History is still loading. Comparisons may be incomplete.", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func activityRefreshHint(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.refresh.hint", defaultValue: "Reload activity details and photos from Strava.", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func activityRefreshSignIn(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.refresh.signIn", defaultValue: "Sign in and connect to Strava to refresh this activity.", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func activityRefreshReconnect(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.refresh.reconnect", defaultValue: "Reconnect and sync before refreshing this activity.", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func activityRefreshBusy(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.refresh.busy", defaultValue: "Another activity change is in progress. Please wait.", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func activityRefreshUnavailable(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("activity.refresh.unavailable", defaultValue: "This activity is no longer available. Sync to update your library.", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func actionRefreshing(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("action.refreshing", defaultValue: "Refreshing from Strava…", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func sharingCreatedAt(_ date: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.createdAt", defaultValue: "Created \(date)", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func sharingStatusExpiry(_ status: String, _ date: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.statusExpiry", defaultValue: "\(status) · expires \(date)", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func sharingStatusActive(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.status.active", defaultValue: "Active", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func sharingStatusExpired(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.status.expired", defaultValue: "Expired", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func sharingStatusRevoked(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.status.revoked", defaultValue: "Revoked", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func sharingRevoking(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.revoking", defaultValue: "Revoking…", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
+    static func sharingRevoke(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("sharing.revoke", defaultValue: "Revoke", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
+    }
 }
 
 nonisolated enum SportPresentation {
@@ -1699,7 +1759,7 @@ nonisolated enum ActionPresentation {
         case "clearFiltersAndShowOnMap": (AppMessages.actionClearFiltersAndShowOnMap(locale: locale), "mappin", false)
         case "select": (AppMessages.actionSelect(locale: locale), "square", false)
         case "activate": (AppMessages.actionActivate(locale: locale), "eye", false)
-        case "exportGPX": (AppMessages.actionExportGPXNative(locale: locale), "square.and.arrow.up", false)
+        case "exportGPX": (AppMessages.actionExportGPXNative(locale: locale), "arrow.down.document", false)
         case "edit": (AppMessages.actionEdit(locale: locale), "pencil", false)
         case "shareActivity": (AppMessages.actionShareActivity(locale: locale), "square.and.arrow.up", false)
         case "openInStrava": (AppMessages.actionOpenInStrava(locale: locale), "arrow.up.right.square", false)
