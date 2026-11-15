@@ -50,9 +50,9 @@ import UIKit
             #expect(ActionPresentation.definition(action.rawValue) != nil)
             #expect(!ActionPresentation.glyph(action).isEmpty)
         }
-        #expect(ActionPresentation.glyph(.activate, variant: "active") == "location.fill")
-        #expect(ActionPresentation.glyph(.activate, variant: "badge") == "location.fill")
-        #expect(ActionPresentation.glyph(.activate) == "location")
+        #expect(ActionPresentation.glyph(.activate, variant: "active") == "eye.fill")
+        #expect(ActionPresentation.glyph(.activate, variant: "badge") == "eye.fill")
+        #expect(ActionPresentation.glyph(.activate) == "eye")
         #expect(ActionPresentation.definition("close")?.mirrorsInRTL == false)
         #expect(ActionPresentation.definition("select")?.glyph != ActionPresentation.definition("activate")?.glyph)
         #expect(String(localized: try #require(ActionPresentation.definition("exportGPX", locale: english)).title) == "Export GPX")

@@ -207,7 +207,7 @@ export function PlaceSearch() {
         {search && (
           <button
             type="button"
-            aria-label="Clear activity-name search"
+            aria-label="Clear search"
             className="flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-full hover:bg-accent"
             onClick={() => {
               setSearch('');
@@ -290,7 +290,7 @@ export function PlaceSearch() {
               role="status"
               className="px-2 py-1 text-xs text-muted-foreground"
             >
-              No places found.
+              No matching places
             </p>
           )}
         </div>

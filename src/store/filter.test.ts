@@ -16,6 +16,7 @@ import {
   type FilterableActivity,
   type ValueColumn,
   type ValueFilter,
+  activeFilterCount,
   applyFilters,
   calendarDateFromLocalDate,
   createFilterSlice,
@@ -23,6 +24,7 @@ import {
   initializeBinary,
   initializeSportType,
   initializeValues,
+  isolateSportGroup,
   normalizeDateRange,
   parseValueFilterInput,
   sanitizePersistedBinary,
@@ -299,4 +301,44 @@ void test('an invalid date update preserves the last valid active range', () => 
     .setDateRange({ start: '2026-04-30', end: '2026-04-01' });
 
   assert.deepEqual(filterStore.getState().dateRange, valid);
+});
+
+void test('active filter count mirrors the native semantics and stats scope', () => {
+  const base = stateFor({});
+  assert.equal(activeFilterCount(base), 0);
+
+  const sportType = { ...base.sportType, Run: false };
+  const narrowed = {
+    ...base,
+    sportType,
+    sportGroup: deriveSportGroups(sportType),
+    search: '  morning ',
+    dateRange: { start: '2026-01-01', end: '2026-01-31' },
+    place: { id: 'place', userId: 'user', name: 'Zurich' },
+    values: {
+      ...base.values,
+      distance: { operator: '>=', value: 1 } as ValueFilter,
+    },
+    binary: {
+      ...base.binary,
+      commute: 'yes',
+      flagged: 'no',
+    } as FilterState['binary'],
+    onlySelected: true,
+  };
+  // sports + search + date + place + distance + 2 flags + only selected
+  assert.equal(activeFilterCount(narrowed), 8);
+  assert.equal(activeFilterCount(narrowed, 'stats'), 6);
+  assert.equal(activeFilterCount({ ...base, search: '   ' }), 0);
+});
+
+void test('only one sport group stays selected when isolating', () => {
+  const groups = deriveSportGroups(initializeSportType());
+  const isolated = isolateSportGroup(groups, 'run');
+  assert.equal(isolated.run, true);
+  assert.equal(
+    Object.entries(isolated).filter(([, selected]) => selected).length,
+    1,
+  );
+  assert.deepEqual(Object.keys(isolated), Object.keys(groups));
 });

@@ -318,7 +318,7 @@ try {
     await assertWidthBehavior(next);
     await page
       .getByRole('button', {
-        name: 'Close activity detail',
+        name: 'Close activity details',
         exact: true,
       })
       .click();
@@ -350,7 +350,7 @@ try {
   await assertWidthBehavior('Free scrolling');
   await page
     .getByRole('button', {
-      name: 'Close activity detail',
+      name: 'Close activity details',
       exact: true,
     })
     .click();
@@ -403,7 +403,7 @@ try {
     document.querySelector('#table-main').parentElement.scrollLeft = 0;
   });
   await page
-    .getByRole('button', { name: 'Close activity detail', exact: true })
+    .getByRole('button', { name: 'Close activity details', exact: true })
     .click();
   await waitID(null);
   await widthButton('Pinned columns').click();
@@ -414,12 +414,12 @@ try {
   );
 
   await page.getByRole('button', { name: 'View', exact: true }).click();
-  await page.getByRole('menuitem', { name: 'Columns', exact: true }).hover();
+  await page.getByRole('menuitem', { name: 'Metrics', exact: true }).hover();
   const dateOption = page.getByRole('menuitemcheckbox', {
     name: 'Date',
     exact: true,
   });
-  await enterSubmenu('Columns', dateOption);
+  await enterSubmenu('Metrics', dateOption);
   await dateOption.click();
   await page.keyboard.press('Escape');
   await page.keyboard.press('Escape');
@@ -702,7 +702,7 @@ try {
   await waitID('204');
   await assertMode('panel');
   await page
-    .getByRole('button', { name: 'Close activity detail', exact: true })
+    .getByRole('button', { name: 'Close activity details', exact: true })
     .click();
   await waitID(null);
   console.log(

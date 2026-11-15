@@ -18,6 +18,7 @@ import { message } from '~/lib/presentation/messages';
 import {
   BinaryFilter,
   CategoryFilter,
+  FilterSummary,
   InequalityFilter,
   MonthPicker,
   ResetFilters,
@@ -37,6 +38,11 @@ export function AppSidebar() {
         </SidebarHeader>
       )}
       <SidebarContent className="overflow-x-hidden">
+        <SidebarGroup className="pb-0">
+          <SidebarGroupContent>
+            <FilterSummary />
+          </SidebarGroupContent>
+        </SidebarGroup>
         <SidebarGroup>
           <SidebarGroupLabel>
             {message('navigation.categories')}

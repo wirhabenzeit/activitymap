@@ -1,14 +1,6 @@
 'use client';
 
-import {
-  ArrowLeft,
-  ChevronLeft,
-  ChevronRight,
-  Globe,
-  Maximize2,
-  Minimize2,
-  Scan,
-} from 'lucide-react';
+import { ArrowLeft, Box } from 'lucide-react';
 import { LngLat, type SkyLayer } from 'mapbox-gl';
 import { useSearchParams } from 'next/navigation';
 import React, {
@@ -33,14 +25,13 @@ import { ActivityCard, ActivityCardContent } from '~/components/list/card';
 import { columns } from '~/components/list/columns';
 import { DataTable } from '~/components/list/data-table';
 import { usePrefetchStreamSummaries } from '~/components/list/elevation-chart';
-import { Download } from '~/components/map/download-control';
 import { LayerSwitcher } from '~/components/map/layer-switcher';
 import { LegacySharingDisabledNotice } from '~/components/map/legacy-sharing-disabled-notice';
 import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import Overlay from '~/components/map/overlay';
+import { PanelResizeHandle } from '~/components/map/panel-resize-handle';
 import PhotoLayer from '~/components/map/photo';
 import { Selection } from '~/components/map/selection-control';
-import { UploadControl } from '~/components/map/upload-control';
 import { Button } from '~/components/ui/button';
 import { useActivityGeoJsonFromActivities } from '~/hooks/use-activities';
 import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
@@ -52,7 +43,9 @@ import { sortActivities } from '~/lib/activity-presentation';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { observeMapResize } from '~/lib/map-resize';
 import { parseMapShareParams } from '~/lib/map-share';
+import { semanticAction } from '~/lib/presentation/icons';
 import {
+  canFrameRoute,
   routeBounds,
   routeCoordinates,
   routeFitPadding,
@@ -88,6 +81,11 @@ const skyLayer: SkyLayer = {
 
 type OverlayMapId = keyof typeof overlayMaps;
 
+/** Tilt applied by the 3D control (iOS requests the same pitch). */
+const MAP_3D_PITCH = 50;
+/** Any tilt above this counts as a 3D view, however the user reached it. */
+const MAP_3D_PITCH_THRESHOLD = 1;
+
 const isDefaultViewState = (viewState: ViewState): boolean => {
   return (
     Math.abs(viewState.longitude - defaultMapPosition.longitude) < 1e-8 &&
@@ -101,6 +99,29 @@ const isDefaultViewState = (viewState: ViewState): boolean => {
 const getOverlayMapSetting = (overlayId: OverlayMapId): OverlaySetting => {
   return overlayMaps[overlayId];
 };
+
+/**
+ * Route line widths in px, mirroring iOS RouteLayers.swift. Every state keeps
+ * the sport colour; selected and active add contrasting casings so the state
+ * never depends on colour alone.
+ */
+const ROUTE_WIDTHS = {
+  ordinary: 3,
+  selectedCasing: 8,
+  selected: 5,
+  activeCasing: 12,
+  activeHalo: 9,
+  active: 6,
+} as const;
+const ROUTE_CASING = {
+  selected: '#ffffff',
+  halo: '#ffffff',
+  active: '#000000',
+};
+const ROUTE_LINE_LAYOUT = {
+  'line-join': 'round',
+  'line-cap': 'round',
+} as const;
 
 const RouteLayer = React.memo(function RouteLayer({
   activities,
@@ -150,86 +171,50 @@ const RouteLayer = React.memo(function RouteLayer({
     filter,
     ['==', 'id', highlighted],
   ];
+  const line = (
+    id: string,
+    lineFilter: mapboxgl.FilterSpecification,
+    lineColor: mapboxgl.Expression | string,
+    width: number,
+  ) => (
+    <Layer
+      source="routeSource"
+      id={id}
+      type="line"
+      paint={{
+        'line-color': lineColor,
+        'line-width': width,
+        'line-emissive-strength': 1,
+      }}
+      layout={ROUTE_LINE_LAYOUT}
+      filter={lineFilter}
+    />
+  );
 
   return (
     <Source data={geoJson} id="routeSource" type="geojson">
-      <Layer
-        source="routeSource"
-        id="routeLayerBG"
-        type="line"
-        paint={{ 'line-color': 'black', 'line-width': 4 }}
-        layout={{
-          'line-join': 'round',
-          'line-cap': 'round',
-        }}
-        filter={filterAll}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerFG"
-        type="line"
-        paint={{ 'line-color': color, 'line-width': 2 }}
-        layout={{
-          'line-join': 'round',
-          'line-cap': 'round',
-        }}
-        filter={filterAll}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerBGsel"
-        type="line"
-        paint={{ 'line-color': 'black', 'line-width': 6 }}
-        layout={{
-          'line-join': 'round',
-          'line-cap': 'round',
-        }}
-        filter={filterSel}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerMIDsel"
-        type="line"
-        paint={{ 'line-color': color, 'line-width': 4 }}
-        layout={{
-          'line-join': 'round',
-          'line-cap': 'round',
-        }}
-        filter={filterSel}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerFGsel"
-        type="line"
-        paint={{ 'line-color': 'white', 'line-width': 2 }}
-        layout={{
-          'line-join': 'round',
-          'line-cap': 'round',
-        }}
-        filter={filterSel}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerHigh"
-        type="line"
-        paint={{
-          'line-color': 'black',
-          'line-width': 9,
-        }}
-        layout={{
-          'line-join': 'round',
-          'line-cap': 'round',
-        }}
-        filter={filterHigh}
-      />
-      <Layer
-        source="routeSource"
-        id="routeLayerHighFG"
-        type="line"
-        paint={{ 'line-color': '#f97316', 'line-width': 5 }}
-        layout={{ 'line-join': 'round', 'line-cap': 'round' }}
-        filter={filterHigh}
-      />
+      {/* routeLayerBG / routeLayerBGsel double as the pick targets. */}
+      {line('routeLayerBG', filterAll, color, ROUTE_WIDTHS.ordinary)}
+      {line(
+        'routeLayerBGsel',
+        filterSel,
+        ROUTE_CASING.selected,
+        ROUTE_WIDTHS.selectedCasing,
+      )}
+      {line('routeLayerMIDsel', filterSel, color, ROUTE_WIDTHS.selected)}
+      {line(
+        'routeLayerHigh',
+        filterHigh,
+        ROUTE_CASING.active,
+        ROUTE_WIDTHS.activeCasing,
+      )}
+      {line(
+        'routeLayerHighHalo',
+        filterHigh,
+        ROUTE_CASING.halo,
+        ROUTE_WIDTHS.activeHalo,
+      )}
+      {line('routeLayerHighFG', filterHigh, color, ROUTE_WIDTHS.active)}
     </Source>
   );
 });
@@ -241,7 +226,8 @@ export default function InteractiveMap() {
     [searchParams],
   );
   const [cursor, setCursor] = useState('auto');
-  const [panelExpanded, setPanelExpanded] = useState(false);
+  // Pixel height set by dragging the panel handle; null keeps the default size.
+  const [panelHeight, setPanelHeight] = useState<number | null>(null);
   // Bumped on every map pick so a new list starts scrolled to the top.
   const [pickCount, setPickCount] = useState(0);
   const onMouseEnter = useCallback(() => setCursor('pointer'), []);
@@ -269,11 +255,9 @@ export default function InteractiveMap() {
     setPosition,
     hydrateMapState,
     threeDim,
-    toggleThreeDim,
     showPhotos,
     showPlaces,
     compactList,
-    uploadedGeoJson,
     isGuest,
     guestModeType,
     summaryUserId,
@@ -296,9 +280,7 @@ export default function InteractiveMap() {
     threeDim: state.threeDim,
     showPhotos: state.showPhotos,
     showPlaces: state.showPlaces,
-    toggleThreeDim: state.toggleThreeDim,
     compactList: state.compactList,
-    uploadedGeoJson: state.uploadedGeoJson,
     isGuest: state.isGuest,
     guestModeType: state.guestMode.type,
     routeFitRequest: state.routeFitRequest,
@@ -345,6 +327,13 @@ export default function InteractiveMap() {
   const mapRefLoc = useRef<MapRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const detailBackButtonRef = useRef<HTMLButtonElement>(null);
+  // A new selection starts at the default size, not at the last dragged height.
+  const hasSelection = selected.length > 0;
+  const [hadSelection, setHadSelection] = useState(hasSelection);
+  if (hasSelection !== hadSelection) {
+    setHadSelection(hasSelection);
+    if (!hasSelection) setPanelHeight(null);
+  }
   const [mapLoaded, setMapLoaded] = useState(false);
   useEffect(() => {
     // A reused map can fire load before React attaches its ref. Publish the
@@ -371,6 +360,8 @@ export default function InteractiveMap() {
 
   const initialViewport = sharedMapState.patch.position ?? mapPosition;
   const [viewport, setViewport] = useState(initialViewport);
+  // The controlled viewport mirrors every move/pitch event of the real map.
+  const pitched = (viewport.pitch ?? 0) > MAP_3D_PITCH_THRESHOLD;
   const hasAutoCenteredOnLatest = useRef(false);
   const hasExplicitInitialView =
     !!routeFitRequest ||
@@ -435,7 +426,7 @@ export default function InteractiveMap() {
         !padding
       ) {
         finish(
-          'Shrink results or collapse filters to leave room for the route, then try Fit again.',
+          'Shrink results to leave room for the route, then try Fit again.',
         );
         return;
       }
@@ -446,7 +437,7 @@ export default function InteractiveMap() {
       ) {
         if (performance.now() - started > 15000) {
           finish(
-            'The map is not ready to frame this route. Try Fit routes once it has loaded.',
+            'The map is not ready to frame this route. Try Fit again once it has loaded.',
           );
         } else frame = requestAnimationFrame(fit);
         return;
@@ -461,7 +452,7 @@ export default function InteractiveMap() {
         }),
       );
       if (!bounds) {
-        finish('These activities have no visible GPS route to frame.');
+        finish('These activities have no GPS route to frame.');
         return;
       }
       // Read the destination geometry after the list-to-map navigation and
@@ -735,6 +726,21 @@ export default function InteractiveMap() {
     }),
     [],
   );
+  const previousAction = semanticAction('previousActivity');
+  const nextAction = semanticAction('nextActivity');
+  // Fit keeps the catalog's frame glyph; it is not a panel-size control.
+  const fitAction = semanticAction('fit');
+  // Like iOS, Fit is unavailable when none of its targets has a route to frame.
+  const fittableIDs = useMemo(
+    () =>
+      new Set(
+        resultIds.filter((id) => {
+          const activity = activityDict.get(id);
+          return activity && canFrameRoute(routeCoordinates(activity));
+        }),
+      ),
+    [resultIds, activityDict],
+  );
   const panelControls = (fitIds: number[], fitLabel: string) => (
     <div className="flex shrink-0 items-center gap-0.5">
       {detailId > 0 && resultIds.length > 1 && (
@@ -747,21 +753,21 @@ export default function InteractiveMap() {
             variant="ghost"
             size="icon"
             className="size-8 shrink-0"
-            aria-label="Previous activity"
+            aria-label={previousAction.label}
             disabled={detailIndex <= 0}
             onClick={() => openDetail(resultIds[detailIndex - 1]!)}
           >
-            <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+            <previousAction.Icon className="h-4 w-4" aria-hidden="true" />
           </Button>
           <Button
             variant="ghost"
             size="icon"
             className="size-8 shrink-0"
-            aria-label="Next activity"
+            aria-label={nextAction.label}
             disabled={detailIndex < 0 || detailIndex >= resultIds.length - 1}
             onClick={() => openDetail(resultIds[detailIndex + 1]!)}
           >
-            <ChevronRight className="h-4 w-4" aria-hidden="true" />
+            <nextAction.Icon className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>
       )}
@@ -771,25 +777,10 @@ export default function InteractiveMap() {
         className={detailId > 0 ? 'size-8' : 'size-10'}
         aria-label={fitLabel}
         title={fitLabel}
+        disabled={!fitIds.some((id) => fittableIDs.has(id))}
         onClick={() => requestRouteFit(fitIds)}
       >
-        <Scan className="h-4 w-4" aria-hidden="true" />
-      </Button>
-      <Button
-        size="icon"
-        variant="ghost"
-        className={detailId > 0 ? 'size-8' : 'size-10'}
-        aria-label={panelExpanded ? 'Shrink route panel' : 'Expand route panel'}
-        title={panelExpanded ? 'Shrink route panel' : 'Expand route panel'}
-        aria-expanded={panelExpanded}
-        aria-controls="map-route-panel"
-        onClick={() => setPanelExpanded((value) => !value)}
-      >
-        {panelExpanded ? (
-          <Minimize2 className="h-4 w-4" aria-hidden="true" />
-        ) : (
-          <Maximize2 className="h-4 w-4" aria-hidden="true" />
-        )}
+        <fitAction.Icon className="h-4 w-4" aria-hidden="true" />
       </Button>
     </div>
   );
@@ -799,7 +790,7 @@ export default function InteractiveMap() {
     const hits = state.pickActivities(ids);
     if (state.combineSelections && !hits.length) return;
     setDetailId(!state.combineSelections && hits.length === 1 ? hits[0]! : 0);
-    setPanelExpanded(false);
+    setPanelHeight(null);
     setPickCount((count) => count + 1);
   }, []);
 
@@ -869,47 +860,32 @@ export default function InteractiveMap() {
         <NavigationControl position="top-right" />
         <GeolocateControl position="top-right" />
         <FullscreenControl position="top-right" />
-        <Overlay position="top-right">
-          <Download />
-        </Overlay>
-        <Overlay position="top-right">
-          <UploadControl />
-        </Overlay>
         <Selection onSelection={handleMapPick} />
         <Overlay position="top-left">
-          <LayerSwitcher />
+          <LayerSwitcher
+            activities={activityDict}
+            visibleIds={visibleIDs}
+            photos={photos}
+          />
         </Overlay>
         <Overlay position="top-left">
           <MapControlIconButton
             onClick={() => {
-              toggleThreeDim();
-              mapRefLoc.current?.getMap().easeTo({ pitch: threeDim ? 0 : 60 });
+              // Terrain follows the control; the pressed state follows the
+              // real tilt, so tilting with the compass control stays in sync.
+              hydrateMapState({ threeDim: !pitched });
+              mapRefLoc.current
+                ?.getMap()
+                .easeTo({ pitch: pitched ? 0 : MAP_3D_PITCH });
             }}
-            aria-label="Toggle 3D globe"
+            aria-label="3D map"
+            title="3D map"
+            aria-pressed={pitched}
           >
-            <Globe
-              color={threeDim ? 'hsl(var(--header-background))' : 'gray'}
-            />
+            <Box color={pitched ? 'hsl(var(--header-background))' : 'gray'} />
           </MapControlIconButton>
         </Overlay>
         {overlayMapComponents}
-        {uploadedGeoJson && (
-          <Source id="uploaded-gpx" type="geojson" data={uploadedGeoJson}>
-            <Layer
-              id="uploaded-gpx-layer"
-              type="line"
-              paint={{
-                'line-color': '#000',
-                'line-width': 2,
-                'line-opacity': 1,
-              }}
-              layout={{
-                'line-join': 'round',
-                'line-cap': 'round',
-              }}
-            />
-          </Source>
-        )}
         <RouteLayer activities={activities} filterIDs={visibleIDs} />
         <ElevationRouteMarker
           activities={activityDict}
@@ -934,14 +910,20 @@ export default function InteractiveMap() {
           style={
             {
               '--selection-results-height': `${resultIds.length * 33 + 40}px`,
+              height: panelHeight ?? undefined,
             } as React.CSSProperties
           }
           className={cn(
-            'absolute right-2 bottom-2 z-10 flex flex-col overflow-hidden rounded-lg bg-background shadow-lg lg:right-5 lg:bottom-5',
+            'absolute right-2 bottom-2 z-10 flex max-h-[calc(100%-1.5rem)] flex-col overflow-hidden rounded-lg bg-background shadow-lg lg:right-5 lg:bottom-5 lg:max-h-[calc(100%-2.5rem)]',
             selected.length > 0 &&
               'left-2 lg:left-auto lg:w-[min(70vw,48rem)] [@media(min-width:650px)_and_(max-height:500px)]:left-auto [@media(min-width:650px)_and_(max-height:500px)]:w-[min(42vw,24rem)]',
           )}
         >
+          <PanelResizeHandle
+            panelRef={panelRef}
+            height={panelHeight}
+            onHeightChange={setPanelHeight}
+          />
           {
             <SelectionBar
               filterIDs={filterIDs}
@@ -954,7 +936,7 @@ export default function InteractiveMap() {
                     variant="ghost"
                     size="icon"
                     className="size-8 shrink-0"
-                    aria-label={`Back to ${resultIds.length} ${resultIds.length === 1 ? 'route' : 'routes'}`}
+                    aria-label="Back to selected activities"
                     title="Back to selected activities"
                     onClick={() => setDetailId(0)}
                   >
@@ -975,10 +957,11 @@ export default function InteractiveMap() {
           {selected.length > 0 && (
             <DataTable
               key={pickCount}
-              // List and detail share a stable footprint; only the size control changes it.
+              // List and detail share a stable footprint; only the handle changes it.
+              // Once dragged, the panel owns the height and the table fills it.
               className={
-                panelExpanded
-                  ? 'h-[calc(65dvh+3rem)]'
+                panelHeight !== null
+                  ? 'min-h-0 flex-1'
                   : detailId
                     ? 'h-[min(43dvh,23rem)]'
                     : 'h-[min(43dvh,var(--selection-results-height))]'

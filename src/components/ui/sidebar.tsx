@@ -2,7 +2,7 @@
 
 import { Slot } from '@radix-ui/react-slot';
 import { type VariantProps, cva } from 'class-variance-authority';
-import { PanelLeft, X } from 'lucide-react';
+import { ListFilter, X } from 'lucide-react';
 import * as React from 'react';
 
 import { Button } from '~/components/ui/button';
@@ -457,8 +457,11 @@ Sidebar.displayName = 'Sidebar';
 
 const SidebarTrigger = React.forwardRef<
   React.ElementRef<typeof Button>,
-  React.ComponentProps<typeof Button>
->(({ className, onClick, ...props }, ref) => {
+  React.ComponentProps<typeof Button> & {
+    /** Restrictions in force; shown as a badge and in the accessible name. */
+    activeCount?: number;
+  }
+>(({ className, onClick, activeCount = 0, ...props }, ref) => {
   const { toggleSidebar, state, isMobile, openMobile } = useSidebar();
 
   return (
@@ -469,15 +472,28 @@ const SidebarTrigger = React.forwardRef<
       aria-controls="activity-filters"
       variant="ghost"
       size="icon"
-      className={cn('h-11 w-11', className)}
+      className={cn('relative h-11 w-11', className)}
       onClick={(event) => {
         onClick?.(event);
         toggleSidebar();
       }}
       {...props}
     >
-      <PanelLeft />
-      <span className="sr-only">{message('navigation.filters')}</span>
+      <ListFilter />
+      {activeCount > 0 && (
+        <span
+          aria-hidden="true"
+          data-filter-badge
+          className="absolute top-1 right-1 flex min-w-4 items-center justify-center rounded-full bg-header-foreground px-1 text-[10px] leading-4 font-bold text-header-background tabular-nums"
+        >
+          {activeCount}
+        </span>
+      )}
+      <span className="sr-only">
+        {activeCount > 0
+          ? message('navigation.activeFilters', { count: activeCount })
+          : message('navigation.filters')}
+      </span>
     </Button>
   );
 });

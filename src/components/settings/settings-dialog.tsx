@@ -1,6 +1,6 @@
 'use client';
 
-import { RefreshCw } from 'lucide-react';
+import { CircleArrowDown, LoaderCircle, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 import {
@@ -348,15 +348,15 @@ export function SettingsDialog({
                         clock < manualImport.retryAt
                       }
                     >
-                      <RefreshCw
-                        aria-hidden="true"
-                        className={
-                          manualImport.starting ||
-                          manualImport.data?.status === 'running'
-                            ? 'animate-spin'
-                            : ''
-                        }
-                      />
+                      {manualImport.starting ||
+                      manualImport.data?.status === 'running' ? (
+                        <LoaderCircle
+                          aria-hidden="true"
+                          className="animate-spin"
+                        />
+                      ) : (
+                        <CircleArrowDown aria-hidden="true" />
+                      )}
                       {message('status.browsing.fetchFromStrava')}
                     </Button>
                     <p className="text-xs text-muted-foreground">

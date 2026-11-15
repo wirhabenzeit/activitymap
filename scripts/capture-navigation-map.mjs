@@ -1,9 +1,10 @@
 // Verify the accepted map navigation contract against synthetic data and capture its controls.
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+
 import { chromium } from 'playwright-core';
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:3018');
@@ -300,7 +301,7 @@ export default function Review() {
       assert.equal(
         await page
           .locator('[data-selection-bar]')
-          .getByRole('button', { name: /^Back to \d+ routes?$/ })
+          .getByRole('button', { name: 'Back to selected activities' })
           .count(),
         1,
         'Back belongs to the persistent selection header',
@@ -348,15 +349,19 @@ export default function Review() {
         () => !document.querySelector('[data-route-fit="pending"]'),
       );
       await observe('fit-route');
-      await page
-        .getByRole('button', { name: 'Expand route panel', exact: true })
-        .click();
+      // The results handle is a keyboard-operable separator: End opens the
+      // panel fully, Home collapses it to its header.
+      const panelHandle = page.getByRole('separator', {
+        name: 'Results panel',
+      });
+      await panelHandle.focus();
+      await panelHandle.press('End');
       await observe('expand-panel');
-      await page
-        .getByRole('button', { name: 'Shrink route panel', exact: true })
-        .click();
+      await panelHandle.press('Home');
       await observe('shrink-panel');
-      await page.getByRole('button', { name: /^Back to \d+ routes?$/ }).click();
+      await page
+        .getByRole('button', { name: 'Back to selected activities' })
+        .click();
       await page
         .locator('[data-detail-presentation]')
         .waitFor({ state: 'hidden' });

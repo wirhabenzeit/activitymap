@@ -124,7 +124,7 @@ struct RoutePickerSheet: View {
                 SelectionBar(store: store, showsClear: false, expandsCount: true)
             }
             Button { store.mapContext.request(fitActivityID.map { .fitActivity($0) } ?? .fitSelection) } label: {
-                Image(systemName: "viewfinder").frame(width: 44, height: 44).contentShape(Rectangle())
+                Image(systemName: ActionPresentation.glyph(.fit)).frame(width: 44, height: 44).contentShape(Rectangle())
             }.accessibilityLabel(fitActivityID == nil ? "Fit selection" : "Fit route")
                 .accessibilityIdentifier("map-results-fit")
                 .disabled(fitActivityID.map { !store.routableActivityIDs.contains($0) }

@@ -14,7 +14,6 @@ import {
   flexRender,
   useTable,
 } from '@tanstack/react-table';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
 import * as React from 'react';
 
 import { Button } from '~/components/ui/button';
@@ -36,9 +35,12 @@ import {
 } from '~/hooks/use-display-preferences';
 import { useElementSize } from '~/hooks/use-element-size';
 import { sortActivities } from '~/lib/activity-presentation';
+import { semanticAction } from '~/lib/presentation/icons';
+import { message } from '~/lib/presentation/messages';
 import { speedDisplayForSports } from '~/lib/speed-display';
 import { cn } from '~/lib/utils';
 
+import { BrowsingEmptyState } from './browsing-empty-state';
 import { DataTablePagination } from './data-table-pagination';
 import { type DetailPresentation, inspectionStep } from './inspection';
 import { ListDetailTransition } from './list-detail-transition';
@@ -486,6 +488,8 @@ export const DataTable = React.memo(function DataTable<
       scroller.scrollTop += rowBounds.bottom - bounds.bottom;
   }, [activeId, pageIndex, detailStepping]);
 
+  const previousAction = semanticAction('previousActivity');
+  const nextAction = semanticAction('nextActivity');
   const content = (
     <div
       ref={containerRef}
@@ -510,11 +514,11 @@ export const DataTable = React.memo(function DataTable<
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                aria-label="Previous activity"
+                aria-label={previousAction.label}
                 disabled={inspectionIndex <= 0}
                 onClick={() => step(-1)}
               >
-                <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+                <previousAction.Icon className="h-4 w-4" aria-hidden="true" />
               </Button>
               <span
                 className="whitespace-nowrap"
@@ -526,14 +530,14 @@ export const DataTable = React.memo(function DataTable<
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                aria-label="Next activity"
+                aria-label={nextAction.label}
                 disabled={
                   inspectionIndex < 0 ||
                   inspectionIndex >= inspectionRows.length - 1
                 }
                 onClick={() => step(1)}
               >
-                <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                <nextAction.Icon className="h-4 w-4" aria-hidden="true" />
               </Button>
             </div>
           ) : (
@@ -722,7 +726,16 @@ export const DataTable = React.memo(function DataTable<
                   colSpan={columns.length}
                   className="h-24 text-center"
                 >
-                  No results.
+                  {data.length === 0 && !browsingDataReady ? (
+                    <p
+                      role="status"
+                      className="p-6 text-sm text-muted-foreground"
+                    >
+                      {message('status.browsing.loadingYourActivityLibrary')}
+                    </p>
+                  ) : (
+                    <BrowsingEmptyState libraryCount={data.length} />
+                  )}
                 </TableCell>
               </TableRow>
             )}

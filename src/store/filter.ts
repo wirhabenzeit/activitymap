@@ -346,6 +346,40 @@ export const applyFilters = (
   return true;
 };
 
+/** Keep exactly one sport group selected (the native "Only X" command). */
+export const isolateSportGroup = <Group extends string>(
+  groups: Record<Group, CategoryGroupState>,
+  only: Group,
+): Record<Group, boolean> =>
+  Object.fromEntries(
+    (Object.keys(groups) as Group[]).map((group) => [group, group === only]),
+  ) as Record<Group, boolean>;
+
+export type FilterScope = 'activities' | 'stats';
+
+/**
+ * How many independent restrictions narrow the library, mirroring iOS
+ * `ActivityStore.activeFilterCount`: search, sport types, place, each numeric
+ * filter and each flag count once. The reporting period and "only selected"
+ * apply to activity browsing only; stats omit them.
+ */
+export const activeFilterCount = (
+  state: Pick<FilterState, 'search' | 'sportType' | 'dateRange' | 'place'> &
+    Pick<FilterState, 'values' | 'binary'> & { onlySelected?: boolean },
+  scope: FilterScope = 'activities',
+): number => {
+  let count = state.search.trim() ? 1 : 0;
+  if (Object.values(state.sportType).some((selected) => !selected)) count += 1;
+  if (state.place) count += 1;
+  count += Object.values(state.values).filter(Boolean).length;
+  count += Object.values(state.binary).filter((mode) => mode !== 'any').length;
+  if (scope === 'activities') {
+    if (state.dateRange) count += 1;
+    if (state.onlySelected) count += 1;
+  }
+  return count;
+};
+
 export const createFilterSlice: StateCreator<
   RootState,
   [['zustand/immer', never], never],

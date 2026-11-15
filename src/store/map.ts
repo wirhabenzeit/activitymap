@@ -18,7 +18,6 @@ export type MapState = {
   threeDim: boolean;
   showPhotos: boolean;
   showPlaces: boolean;
-  uploadedGeoJson: GeoJSON.FeatureCollection | null;
   routeFitRequest: { id: string; activityIDs: number[] } | null;
   placeFlyRequest: { id: string; latitude: number; longitude: number } | null;
 };
@@ -43,7 +42,6 @@ export type MapActions = {
       >
     >,
   ) => void;
-  setUploadedGeoJson: (geoJson: GeoJSON.FeatureCollection | null) => void;
   requestRouteFit: (activityIDs: number[]) => void;
   completeRouteFit: (id: string) => void;
   requestPlaceFly: (latitude: number, longitude: number) => void;
@@ -69,7 +67,6 @@ export const createMapSlice: StateCreator<
   threeDim: false,
   showPhotos: false,
   showPlaces: false,
-  uploadedGeoJson: null,
   routeFitRequest: null,
   placeFlyRequest: null,
 
@@ -149,10 +146,5 @@ export const createMapSlice: StateCreator<
   toggleThreeDim: () =>
     set((state: RootState) => {
       state.threeDim = !state.threeDim;
-    }),
-
-  setUploadedGeoJson: (geoJson) =>
-    set((state: RootState) => {
-      state.uploadedGeoJson = geoJson;
     }),
 });

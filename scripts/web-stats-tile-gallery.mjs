@@ -1,8 +1,9 @@
 // Capture actual dashboard elements, including their real expansion controls.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
+
 import { chromium } from 'playwright-core';
 
 const [output, baseURL = 'http://localhost:3000'] = process.argv.slice(2);
@@ -102,10 +103,8 @@ try {
       if (state.startsWith('expanded-')) {
         await page
           .locator('[data-stats-focus]:visible')
-          .getByRole('combobox', { name: 'Volume grouping' })
-          .click();
-        await page
-          .getByRole('option', {
+          .getByRole('group', { name: 'Volume grouping' })
+          .getByRole('button', {
             name: state === 'expanded-months' ? 'By month' : 'By year',
             exact: true,
           })

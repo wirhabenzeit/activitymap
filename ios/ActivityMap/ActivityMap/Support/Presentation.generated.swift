@@ -1685,8 +1685,8 @@ nonisolated enum NativeActionID: String, CaseIterable {
 nonisolated enum ActionPresentation {
     static func glyph(_ id: NativeActionID, variant: String? = nil) -> String {
         switch (id.rawValue, variant) {
-        case ("activate", "active"): "location.fill"
-        case ("activate", "badge"): "location.fill"
+        case ("activate", "active"): "eye.fill"
+        case ("activate", "badge"): "eye.fill"
         default: definition(id.rawValue)!.glyph
         }
     }
@@ -1694,11 +1694,11 @@ nonisolated enum ActionPresentation {
         switch id {
         case "back": (AppMessages.actionBack(locale: locale), "chevron.backward", true)
         case "close": (AppMessages.actionClose(locale: locale), "xmark", false)
-        case "fit": (AppMessages.actionFit(locale: locale), "arrow.up.left.and.arrow.down.right", false)
+        case "fit": (AppMessages.actionFit(locale: locale), "viewfinder", false)
         case "showOnMap": (AppMessages.actionShowOnMap(locale: locale), "mappin", false)
         case "clearFiltersAndShowOnMap": (AppMessages.actionClearFiltersAndShowOnMap(locale: locale), "mappin", false)
         case "select": (AppMessages.actionSelect(locale: locale), "square", false)
-        case "activate": (AppMessages.actionActivate(locale: locale), "location", false)
+        case "activate": (AppMessages.actionActivate(locale: locale), "eye", false)
         case "exportGPX": (AppMessages.actionExportGPXNative(locale: locale), "square.and.arrow.up", false)
         case "edit": (AppMessages.actionEdit(locale: locale), "pencil", false)
         case "shareActivity": (AppMessages.actionShareActivity(locale: locale), "square.and.arrow.up", false)

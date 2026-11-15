@@ -100,7 +100,7 @@ export function DataTableViewOptions<TData extends RowData>({
           <DropdownMenuSub>
             <DropdownMenuSubTrigger className="gap-2">
               <Columns className="size-4" />
-              <span>Columns</span>
+              <span>Metrics</span>
             </DropdownMenuSubTrigger>
             <DropdownMenuPortal>
               <PreferenceMenuSubContent>
@@ -226,10 +226,10 @@ export function DataTableViewOptions<TData extends RowData>({
                   {(['sm', 'md', 'lg'] as const).map((value) => (
                     <DropdownMenuRadioItem key={value} value={value}>
                       {value === 'sm'
-                        ? 'Dense'
+                        ? 'Compact'
                         : value === 'md'
-                          ? 'Normal'
-                          : 'Loose'}
+                          ? 'Comfortable'
+                          : 'Spacious'}
                     </DropdownMenuRadioItem>
                   ))}
                 </DropdownMenuRadioGroup>

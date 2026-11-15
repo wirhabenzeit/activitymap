@@ -1,13 +1,12 @@
 'use client';
 
-import { format } from 'date-fns/format';
 import {
   Check,
   FunnelX,
-  ListFilter,
   Minus,
   MoreHorizontal,
   Search,
+  SquareCheckBig,
 } from 'lucide-react';
 import { CalendarIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
@@ -23,9 +22,12 @@ import {
 import { Button } from '~/components/ui/button';
 import {
   DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import { Input } from '~/components/ui/input';
+import { Label } from '~/components/ui/label';
 import { MonthRangePicker } from '~/components/ui/monthrangepicker';
 import {
   Popover,
@@ -48,7 +50,17 @@ import {
 } from '~/components/ui/sidebar';
 import { Switch } from '~/components/ui/switch';
 import type { SportType } from '~/contracts/sport';
-import { useDisplayUnits } from '~/hooks/use-display-preferences';
+import {
+  useActiveFilterCount,
+  useFilterResultCount,
+} from '~/hooks/use-active-filter-count';
+import {
+  useDateFormat,
+  useDisplayUnits,
+  useFormattingLocale,
+} from '~/hooks/use-display-preferences';
+import { message } from '~/lib/presentation/messages';
+import { isStatsRoute } from '~/lib/stats/route';
 import { measurementScale, measurementUnit } from '~/lib/units';
 import { cn } from '~/lib/utils';
 import { categorySettings } from '~/settings/category';
@@ -56,12 +68,23 @@ import { binaryFilters, inequalityFilters } from '~/settings/filter';
 import { useShallowStore } from '~/store';
 import {
   type BinaryFilterMode,
+  type DateRange,
   calendarDateFromLocalDate,
   calendarDateToLocalDate,
+  isolateSportGroup,
   normalizeDateRange,
   parseValueFilterInput,
   toggleSportGroupState,
 } from '~/store/filter';
+
+import {
+  DATE_PRESETS,
+  activeDatePreset,
+  datePresetRange,
+  formatDateRangeLabel,
+  parseDayRangeInput,
+  todayCalendarDate,
+} from './date-range';
 
 export function CategoryFilter() {
   const { sportType, sportGroup, setSportGroup, setSportType } =
@@ -86,13 +109,7 @@ export function CategoryFilter() {
     };
 
     const doDoubleClickThing = () => {
-      if (key)
-        setSportGroup(
-          (group) =>
-            Object.fromEntries(
-              Object.keys(group).map((k) => [k, k === key]),
-            ) as Record<keyof typeof categorySettings, boolean>,
-        );
+      if (key) setSportGroup((group) => isolateSportGroup(group, key));
     };
     let singleClickTimer: NodeJS.Timeout | undefined;
     if (clicks === 1) {
@@ -180,6 +197,16 @@ export function CategoryFilter() {
                 </SidebarMenuAction>
               </DropdownMenuTrigger>
               <PreferenceMenuContent side="right" align="start">
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setSportGroup((group) =>
+                      isolateSportGroup(group, id as keyof typeof group),
+                    )
+                  }
+                >
+                  Only {name}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
                 {(
                   Object.entries(
                     Object.fromEntries(alias.map((a) => [a, sportType[a]])),
@@ -371,6 +398,80 @@ export function InequalityFilter({
   );
 }
 
+const DATE_RANGE_ERROR =
+  'Choose a valid range whose end is on or after its start.';
+
+/** Day-level From / Through fields with an inclusive end. Keyed by the applied
+ * range, so the drafts follow it when a preset or the month grid changes it. */
+function DayRangeFields({
+  range,
+  onApply,
+}: {
+  range: DateRange | undefined;
+  onApply: (range: DateRange) => void;
+}) {
+  const id = React.useId();
+  const [from, setFrom] = useState(range?.start ?? '');
+  const [through, setThrough] = useState(range?.end ?? '');
+  const [error, setError] = useState<string>();
+  const parsed = parseDayRangeInput(from, through);
+
+  return (
+    <div className="space-y-2 border-t p-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label htmlFor={`${id}-from`}>From</Label>
+          <Input
+            id={`${id}-from`}
+            type="date"
+            value={from}
+            onChange={(event) => {
+              setFrom(event.target.value);
+              setError(undefined);
+            }}
+            className="h-8"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`${id}-through`}>Through</Label>
+          <Input
+            id={`${id}-through`}
+            type="date"
+            value={through}
+            onChange={(event) => {
+              setThrough(event.target.value);
+              setError(undefined);
+            }}
+            className="h-8"
+          />
+        </div>
+      </div>
+      <p className="text-xs text-muted-foreground">The end day is included.</p>
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
+      <Button
+        type="button"
+        size="sm"
+        variant="outline"
+        disabled={parsed.status === 'empty'}
+        onClick={() => {
+          if (parsed.status !== 'valid') {
+            setError(DATE_RANGE_ERROR);
+            return;
+          }
+          setError(undefined);
+          onApply(parsed.range);
+        }}
+      >
+        Apply date range
+      </Button>
+    </div>
+  );
+}
+
 export function MonthPicker() {
   const pathname = usePathname();
   const [dates, setDates] = useShallowStore((state) => [
@@ -389,39 +490,57 @@ export function MonthPicker() {
     selectedDates?.start && selectedDates.end
       ? { start: selectedDates.start, end: selectedDates.end }
       : undefined;
-  const dateStr = [validSelectedDates?.start, validSelectedDates?.end].map(
-    (date) => (date ? format(date, 'MMM yyyy') : undefined),
-  );
+  const dateFormat = useDateFormat();
+  const locale = useFormattingLocale();
 
-  if (pathname === '/stats/tiles') return null;
+  if (isStatsRoute(pathname)) return null;
+
+  const rangeLabel = dates
+    ? formatDateRangeLabel(dates, dateFormat, locale)
+    : 'All time';
+  const activePreset = activeDatePreset(dates, todayCalendarDate());
+  const rangeKey = dates ? `${dates.start}/${dates.end}` : 'none';
 
   return (
     <SidebarMenuItem>
       <Popover>
         <PopoverTrigger asChild>
-          <SidebarMenuButton className={cn(!dates && 'text-muted-foreground')}>
+          <SidebarMenuButton
+            className={cn(!dates && 'text-muted-foreground')}
+            aria-label={`Date range: ${rangeLabel}`}
+            tooltip={`Date range: ${rangeLabel}`}
+          >
             <CalendarIcon />
-            {dates == undefined ? (
-              <span>Pick a month range</span>
-            ) : dateStr[0] == dateStr[1] ? (
-              <span>{dateStr[0]}</span>
-            ) : (
-              <span>
-                {dateStr[0]} - {dateStr[1]}
-              </span>
-            )}
+            <span>{rangeLabel}</span>
           </SidebarMenuButton>
         </PopoverTrigger>
         <PopoverContent className="w-auto p-0">
+          <div className="flex flex-wrap gap-1 p-3 pb-0">
+            {DATE_PRESETS.map(({ id, label }) => (
+              <Button
+                key={id}
+                type="button"
+                size="sm"
+                variant={activePreset === id ? 'default' : 'outline'}
+                aria-pressed={activePreset === id}
+                onClick={() => {
+                  setDateError(undefined);
+                  setDates(datePresetRange(id, todayCalendarDate()));
+                }}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
           <MonthRangePicker
+            key={rangeKey}
+            showQuickSelectors={false}
             onMonthRangeSelect={(range) => {
               const start = calendarDateFromLocalDate(range.start);
               const end = calendarDateFromLocalDate(range.end);
               const normalized = normalizeDateRange(start, end);
               if (!normalized) {
-                setDateError(
-                  'Choose a valid range whose end is on or after its start.',
-                );
+                setDateError(DATE_RANGE_ERROR);
                 return;
               }
               setDateError(undefined);
@@ -433,6 +552,29 @@ export function MonthPicker() {
             <p className="px-3 pb-3 text-sm text-destructive" role="alert">
               {dateError}
             </p>
+          ) : null}
+          <DayRangeFields
+            key={rangeKey}
+            range={dates}
+            onApply={(range) => {
+              setDateError(undefined);
+              setDates(range);
+            }}
+          />
+          {dates ? (
+            <div className="border-t p-3">
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setDateError(undefined);
+                  setDates(undefined);
+                }}
+              >
+                Clear date range
+              </Button>
+            </div>
           ) : null}
         </PopoverContent>
       </Popover>
@@ -538,7 +680,7 @@ export function SelectedActivitiesFilter() {
   }));
   const count = useShallowStore((state) => state.selected.length);
   const { state } = useSidebar();
-  if (pathname?.startsWith('/stats')) return null;
+  if (isStatsRoute(pathname)) return null;
   const content = (
     <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 text-sm">
       Only selected activities
@@ -555,7 +697,7 @@ export function SelectedActivitiesFilter() {
       <CollapsedFilter
         label="Selected activities filter"
         icon={
-          <ListFilter
+          <SquareCheckBig
             className={onlySelected ? 'text-header-background' : undefined}
           />
         }
@@ -572,29 +714,75 @@ export function SelectedActivitiesFilter() {
   return <SidebarMenuItem className="mx-2">{content}</SidebarMenuItem>;
 }
 
-export function ResetFilters() {
+/** Stats clears only its own filters; browsing also clears the reporting
+ * period and "only selected". */
+function useResetFilters() {
   const pathname = usePathname();
-  const resetFilters = useShallowStore((state) =>
-    pathname === '/stats/tiles'
-      ? state.resetActivityFilters
-      : state.resetFilters,
+  return useShallowStore((state) =>
+    isStatsRoute(pathname) ? state.resetActivityFilters : state.resetFilters,
   );
+}
+
+export function ResetFilters() {
+  const resetFilters = useResetFilters();
 
   return (
-    <SidebarMenuItem className="mx-2 mt-2 group-data-[collapsible=icon]:mx-0">
+    // Expanded, the reset sits beside the result count (FilterSummary), as on
+    // iOS; this one only serves the collapsed icon rail, where that line is hidden.
+    <SidebarMenuItem className="mx-2 mt-2 hidden group-data-[collapsible=icon]:mx-0 group-data-[collapsible=icon]:block">
       <SidebarMenuButton
         variant="outline"
-        aria-label="Clear filters"
-        tooltip="Clear filters"
+        aria-label={message('status.browsing.clearFilters')}
+        tooltip={message('status.browsing.clearFilters')}
         onClick={() => {
           resetFilters();
         }}
       >
         <FunnelX />
         <span className="group-data-[collapsible=icon]:hidden">
-          Clear filters
+          {message('status.browsing.clearFilters')}
         </span>
       </SidebarMenuButton>
     </SidebarMenuItem>
+  );
+}
+
+/** Result count and active-restriction count, like the native filter panel,
+ * with the reset beside the count while any filter is active. */
+export function FilterSummary() {
+  const result = useFilterResultCount();
+  const active = useActiveFilterCount();
+  const resetFilters = useResetFilters();
+  if (!result) return null;
+  return (
+    <div
+      data-filter-summary
+      className="flex items-start justify-between gap-2 px-2 py-1 group-data-[collapsible=icon]:hidden"
+    >
+      <div className="min-w-0">
+        <p className="text-sm font-semibold">
+          {result.shown.toLocaleString()} of {result.total.toLocaleString()}{' '}
+          activities
+        </p>
+        {active > 0 && (
+          <p className="text-xs text-muted-foreground">
+            {active} active {active === 1 ? 'filter' : 'filters'}
+          </p>
+        )}
+      </div>
+      {active > 0 && (
+        <Button
+          type="button"
+          variant="link"
+          size="sm"
+          className="h-auto shrink-0 px-1 py-0.5"
+          onClick={() => {
+            resetFilters();
+          }}
+        >
+          {message('status.browsing.clearFilters')}
+        </Button>
+      )}
+    </div>
   );
 }

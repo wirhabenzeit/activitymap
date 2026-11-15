@@ -308,8 +308,10 @@ try {
   await active('training-volume');
   assert.equal(new URL(page.url()).searchParams.get('keep'), '1');
   assert.equal(new URL(page.url()).hash, '#anchor');
-  await focus.getByRole('combobox', { name: 'Volume grouping' }).click();
-  await page.getByRole('option', { name: 'By month', exact: true }).click();
+  await focus
+    .getByRole('group', { name: 'Volume grouping' })
+    .getByRole('button', { name: 'By month', exact: true })
+    .click();
   assert.equal(
     await focus.locator('details').count(),
     0,
@@ -325,14 +327,20 @@ try {
   );
   await page.goForward();
   await active('training-volume');
-  assert.match(
-    await focus.getByRole('combobox', { name: 'Volume grouping' }).innerText(),
-    /By month/,
+  assert.equal(
+    await focus
+      .getByRole('group', { name: 'Volume grouping' })
+      .getByRole('button', { name: 'By month', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
   );
   await page.setViewportSize({ width: 402, height: 874 });
-  assert.match(
-    await focus.getByRole('combobox', { name: 'Volume grouping' }).innerText(),
-    /By month/,
+  assert.equal(
+    await focus
+      .getByRole('group', { name: 'Volume grouping' })
+      .getByRole('button', { name: 'By month', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
   );
   await page.setViewportSize({ width: 1440, height: 1000 });
   await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
@@ -341,9 +349,12 @@ try {
     .getByRole('button', { name: 'Expand Training volume' })
     .click();
   await active('training-volume');
-  assert.match(
-    await focus.getByRole('combobox', { name: 'Volume grouping' }).innerText(),
-    /By month/,
+  assert.equal(
+    await focus
+      .getByRole('group', { name: 'Volume grouping' })
+      .getByRole('button', { name: 'By month', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
   );
   await page.reload();
   await active('training-volume');
@@ -472,7 +483,7 @@ try {
     );
     if (dismiss === 'close')
       await dialog
-        .getByRole('button', { name: 'Close activity detail', exact: true })
+        .getByRole('button', { name: 'Close activity details', exact: true })
         .click();
     else if (dismiss === 'header')
       await focus
@@ -773,8 +784,10 @@ try {
   await page.setViewportSize({ width: 402, height: 874 });
   await loaded('?tile=training-volume');
   await focus.getByRole('button', { name: 'Elevation', exact: true }).click();
-  await focus.getByRole('combobox', { name: 'Volume grouping' }).click();
-  await page.getByRole('option', { name: 'By month', exact: true }).click();
+  await focus
+    .getByRole('group', { name: 'Volume grouping' })
+    .getByRole('button', { name: 'By month', exact: true })
+    .click();
   const focusScroller = focus.locator('[data-stats-focus-scroll]');
   const savedFocusScroll = await focusScroller.evaluate((element) => {
     element.scrollTop = 200;
@@ -794,8 +807,11 @@ try {
     'true',
   );
   assert.equal(
-    await focus.getByRole('combobox', { name: 'Volume grouping' }).innerText(),
-    'By month',
+    await focus
+      .getByRole('group', { name: 'Volume grouping' })
+      .getByRole('button', { name: 'By month', exact: true })
+      .getAttribute('aria-pressed'),
+    'true',
   );
   // Other tile focus surfaces stay mounted but hidden. Bind to the visible
   // scroller after remount, rather than the first hidden tile in document order.

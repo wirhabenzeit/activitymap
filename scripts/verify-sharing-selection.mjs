@@ -83,7 +83,7 @@ try {
   const dialog = page.getByRole('dialog');
   const close = () =>
     page
-      .getByRole('button', { name: 'Close Share tracks', exact: true })
+      .getByRole('button', { name: 'Close Share activities', exact: true })
       .click();
   const scope = () =>
     dialog
@@ -153,7 +153,7 @@ try {
   );
   await dialog.getByRole('button', { name: 'Your links', exact: true }).click();
   await dialog
-    .getByRole('heading', { name: 'Your share links', exact: true })
+    .getByRole('heading', { name: 'Your links', exact: true })
     .waitFor();
   await dialog.getByRole('button', { name: 'Back', exact: true }).click();
   await dialog

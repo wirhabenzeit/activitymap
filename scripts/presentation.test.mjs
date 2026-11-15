@@ -160,8 +160,8 @@ test('native action variants and export terminology are generated from explicit 
     'Download GPX',
   );
   assert.deepEqual(catalog.actions.activate.iosGlyphVariants, {
-    active: 'location.fill',
-    badge: 'location.fill',
+    active: 'eye.fill',
+    badge: 'eye.fill',
   });
   const invalid = structuredClone(catalog);
   invalid.actions.activate.iosGlyphVariants.active = '';

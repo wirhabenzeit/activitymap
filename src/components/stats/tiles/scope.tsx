@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 
 import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
 import { useDeferredActivityFilters } from '~/hooks/use-deferred-activity-filters';
+import { message } from '~/lib/presentation/messages';
 import {
   filterStatsActivities,
   statsFilterScope,
@@ -58,7 +59,7 @@ export function FilterScope({
         className="min-h-8 underline underline-offset-2"
         onClick={onReset}
       >
-        Clear activity filters
+        {message('status.browsing.clearFilters')}
       </button>
     </div>
   );
