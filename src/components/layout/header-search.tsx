@@ -40,7 +40,7 @@ const isTyping = (target: EventTarget | null) =>
   (target.isContentEditable ||
     ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName));
 
-/** The search button beside Filters. `/` or ⌘K / Ctrl+K open search too. */
+/** The search button at the right end of the header. `/` or ⌘K / Ctrl+K open search too. */
 export function HeaderSearchButton({ onBegin }: { onBegin: () => void }) {
   React.useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -109,10 +109,10 @@ function SearchField({
     inputRef.current?.focus();
   }, []);
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2">
+    <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
       <div
         data-testid="header-search-field"
-        className="flex h-9 max-w-xl min-w-0 flex-1 origin-left items-center gap-2 rounded-full bg-white/15 px-3 duration-200 animate-in fade-in zoom-in-95"
+        className="flex h-9 max-w-xl min-w-0 flex-1 origin-right items-center gap-2 rounded-full bg-white/15 px-3 duration-200 animate-in fade-in zoom-in-95"
       >
         <Search
           className="size-4 shrink-0 text-header-foreground/80"
@@ -422,7 +422,7 @@ function SearchResults({
 
   return (
     <div
-      className="absolute inset-x-2 top-14 z-10 mx-auto max-w-[520px] overflow-hidden rounded-2xl border bg-popover text-popover-foreground shadow-xl duration-150 animate-in fade-in slide-in-from-top-1 sm:left-14 sm:mx-0"
+      className="absolute inset-x-2 top-14 z-10 ml-auto max-w-[520px] overflow-hidden rounded-2xl border bg-popover text-popover-foreground shadow-xl duration-150 animate-in fade-in slide-in-from-top-1"
       data-testid="header-search-results"
     >
       <div
