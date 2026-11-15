@@ -366,6 +366,27 @@ export const applyFilters = (
   return true;
 };
 
+/** How many filters are on, as the Filters button's badge counts them; the
+ * same parts as iOS `ActivityStore.activeFilterCount`. Stats ignores the
+ * date range and Only selected, as its filters do. */
+export const activeFilterCount = (
+  state: FilterState & { onlySelected?: boolean },
+  scope: 'browse' | 'stats' = 'browse',
+) => {
+  let count = 0;
+  if (state.search.trim()) count++;
+  if (Object.values(state.sportType).some((on) => !on)) count++;
+  if (state.place) count++;
+  for (const filter of Object.values(state.values))
+    if (filter && Number.isFinite(filter.value)) count++;
+  for (const mode of Object.values(state.binary)) if (mode !== 'any') count++;
+  if (scope === 'browse') {
+    if (state.dateRange) count++;
+    if (state.onlySelected) count++;
+  }
+  return count;
+};
+
 export const createFilterSlice: StateCreator<
   RootState,
   [['zustand/immer', never], never],

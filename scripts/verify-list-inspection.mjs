@@ -756,7 +756,7 @@ try {
   await page.goForward();
   await waitID('205');
   await page.setViewportSize({ width: 402, height: 874 });
-  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await page.getByRole('button', { name: /^Filters(, \d+ active)?$/ }).click();
   await page.getByRole('dialog', { name: 'Filters', exact: true }).waitFor();
   await page.keyboard.press('Escape');
   await page
@@ -765,7 +765,7 @@ try {
   assert.equal(id(), '205', 'Filter Escape leaves inspection open');
   assert.equal(
     await page
-      .getByRole('button', { name: 'Filters', exact: true })
+      .getByRole('button', { name: /^Filters(, \d+ active)?$/ })
       .evaluate((button) => button === document.activeElement),
     true,
   );

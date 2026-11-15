@@ -279,7 +279,7 @@ try {
           });
           if (!(await chip.isVisible()))
             await page
-              .getByRole('button', { name: 'Filters', exact: true })
+              .getByRole('button', { name: /^Filters(, \d+ active)?$/ })
               .first()
               .click();
           await chip.waitFor();
