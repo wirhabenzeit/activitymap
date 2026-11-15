@@ -104,7 +104,7 @@ struct MatchedPlaceCard: View {
     var onClose: () -> Void = {}
     @Environment(DisplayPreferences.self) private var preferences: DisplayPreferences?
     var body: some View {
-        HStack(spacing: 0) {
+        PlaceCalloutLayout {
             VStack(alignment: .leading, spacing: 2) {
                 Text(verbatim: place.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
@@ -118,7 +118,6 @@ struct MatchedPlaceCard: View {
             }
             .padding(.vertical, 10)
             .padding(.leading, 12)
-            .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: onClose) {
                 Image(systemName: "xmark").font(.system(size: 12, weight: .medium))
                     .frame(width: 44, height: 44).contentShape(Rectangle())
@@ -126,11 +125,31 @@ struct MatchedPlaceCard: View {
             .buttonStyle(.plain).foregroundStyle(.secondary)
             .accessibilityLabel("Close place").accessibilityIdentifier("close-place")
         }
-        .frame(width: 240, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
         .background(.background, in: RoundedRectangle(cornerRadius: 12))
         .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.1), lineWidth: 0.5) }
         .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
         .accessibilityElement(children: .contain)
+    }
+}
+
+/// Fit short labels to their contents; propose a bounded text width for long
+/// names so they wrap while the close control keeps its full touch target.
+private struct PlaceCalloutLayout: Layout {
+    private let maximumWidth: CGFloat = 240
+    private let closeWidth: CGFloat = 44
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard subviews.count == 2 else { return .zero }
+        let textWidth = min(subviews[0].sizeThatFits(.unspecified).width, maximumWidth - closeWidth)
+        let text = subviews[0].sizeThatFits(ProposedViewSize(width: textWidth, height: nil))
+        return CGSize(width: textWidth + closeWidth, height: max(text.height, closeWidth))
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        guard subviews.count == 2 else { return }
+        subviews[0].place(at: CGPoint(x: bounds.minX, y: bounds.midY), anchor: .leading,
+                          proposal: ProposedViewSize(width: bounds.width - closeWidth, height: nil))
+        subviews[1].place(at: CGPoint(x: bounds.maxX - closeWidth, y: bounds.midY), anchor: .leading,
+                          proposal: ProposedViewSize(width: closeWidth, height: closeWidth))
     }
 }
