@@ -57,6 +57,12 @@ struct IngestionStatusSection: View {
             } else {
                 Text(controller.isLoading ? AppMessages.statusBrowsingCheckingYourImport(locale: locale) : AppMessages.statusBrowsingImportStatusUnavailablePleaseTryAgainLater(locale: locale))
                     .foregroundStyle(.secondary)
+                // Without a snapshot the footer's "last known" line is hidden, so
+                // say why the status is missing (offline, sign-in, server error).
+                if !controller.isLoading, controller.scope == session.scope,
+                   let message = controller.message(locale: locale) {
+                    Text(verbatim: message).font(.footnote).foregroundStyle(.secondary)
+                }
             }
         } header: {
             Text(AppMessages.statusBrowsingStravaImportStatus(locale: locale))

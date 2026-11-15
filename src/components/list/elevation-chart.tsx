@@ -273,7 +273,7 @@ export function ElevationChart({
             role="status"
           >
             <Loader2 className="h-4 w-4 animate-spin" />
-            Loading elevation samples…
+            {query.data?.message ?? 'Loading elevation samples…'}
           </div>
         ) : (
           <div className="flex h-full items-center justify-center rounded-md bg-muted/40 px-3 text-center text-xs text-muted-foreground">

@@ -1,8 +1,11 @@
 'use client';
 
-import type { ReactNode } from 'react';
 import { Check, Funnel, ListChecks, X } from 'lucide-react';
+import type { ReactNode } from 'react';
+
+import { SelectionShareButton } from '~/components/share-button';
 import { Button } from '~/components/ui/button';
+import type { Activity } from '~/lib/activity';
 import { store, useShallowStore } from '~/store';
 
 export function SelectionCount({
@@ -94,10 +97,19 @@ export function ClearSelectionButton() {
   ) : null;
 }
 
-export function SelectionActions({ controls }: { controls?: ReactNode }) {
+export function SelectionActions({
+  controls,
+  showShare = true,
+  activities,
+}: {
+  controls?: ReactNode;
+  showShare?: boolean;
+  activities: readonly Activity[];
+}) {
   return (
     <div className="flex shrink-0 items-center">
       {controls}
+      {showShare && <SelectionShareButton activities={activities} />}
       <ClearSelectionButton />
     </div>
   );
@@ -107,10 +119,14 @@ export function SelectionBar({
   filterIDs,
   controls,
   backButton,
+  showShare = true,
+  activities,
 }: {
   filterIDs: number[];
+  activities: readonly Activity[];
   controls?: ReactNode;
   backButton?: ReactNode;
+  showShare?: boolean;
 }) {
   const hasSelection = useShallowStore((state) => state.selected.length > 0);
   if (!hasSelection) return null;
@@ -124,7 +140,11 @@ export function SelectionBar({
         <SelectionCount filterIDs={filterIDs} />
         {backButton && <CombineSelectionButton />}
       </div>
-      <SelectionActions controls={controls} />
+      <SelectionActions
+        controls={controls}
+        showShare={showShare}
+        activities={activities}
+      />
     </div>
   );
 }
@@ -170,7 +190,7 @@ export function ActivitySelectionSymbol({
       {selected && (
         <span
           data-selection-checkmark
-          className="absolute -bottom-0.5 -right-0.5 flex size-3.5 items-center justify-center rounded-full bg-header-background text-white ring-1 ring-background"
+          className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full bg-header-background text-white ring-1 ring-background"
         >
           <Check className="size-2.5" />
         </span>

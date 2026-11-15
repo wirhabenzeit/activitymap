@@ -391,16 +391,22 @@ export async function fetchActivityStreamSummary(options: {
   ).safeParse(body);
   if (!parsed.success) throw new Error('Could not read elevation data.');
   const entry = parsed.data.data;
-  if (response.status === 202) {
+  if (response.status === 202 || entry.metadata.state !== 'current') {
+    const scheduledRetry = entry.next_retry_at
+      ? Date.parse(entry.next_retry_at) - now
+      : DEFAULT_PENDING_RETRY_MS;
     return pendingResult({
       previous: options.previous,
       requestedAgainst: options.observedMetadata,
       metadata: entry.metadata,
       retryAfterMs:
         parseRetryAfterMs(response.headers.get('Retry-After'), now) ??
-        DEFAULT_PENDING_RETRY_MS,
+        Math.max(DEFAULT_PENDING_RETRY_MS, scheduledRetry),
       now,
-      message: 'Elevation data is still being prepared.',
+      message:
+        entry.metadata.state === 'not_fetched'
+          ? 'Elevation samples are waiting to be imported…'
+          : 'Elevation data is still being prepared.',
     });
   }
 

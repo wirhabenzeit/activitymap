@@ -3,27 +3,13 @@
 import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
 import { type Row } from '@tanstack/react-table';
 import type { Feature, LineString } from 'geojson';
-import {
-  Download,
-  ExternalLink,
-  MoreHorizontal,
-  Pencil,
-  Image as PhotosIcon,
-  RefreshCw,
-} from 'lucide-react';
-import Link from 'next/link';
+import { Image as PhotosIcon, RefreshCw } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ActivitySelectionSymbol } from '~/components/activity-selection-controls';
 import { DismissButton } from '~/components/dismiss-button';
 import { Button } from '~/components/ui/button';
 import { Card, CardHeader, CardTitle } from '~/components/ui/card';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '~/components/ui/dropdown-menu';
 import { useActivityMutations } from '~/hooks/use-activity-mutations';
 import {
   useDateFormat,
@@ -57,6 +43,7 @@ import { categorySettings } from '~/settings/category';
 import { aliasMap } from '~/settings/category';
 import { store, useShallowStore } from '~/store';
 
+import { ActivityDetailActions } from './activity-detail-actions';
 import { ActivityDetailStats } from './activity-detail-stats';
 import { ActivityMapAction } from './activity-map-action';
 import { EditActivity } from './edit';
@@ -77,7 +64,7 @@ interface ActivityCardContentProps {
   mapActionVariant?: MapActionVariant;
 }
 
-/** Cards this wide label "Show on map" and keep Edit beside it (as on iOS). */
+/** Cards this wide label "Show on map"; narrower cards use its icon. */
 const LABELLED_ACTIONS_WIDTH = 520;
 
 export function DescriptionCard({ row }: { row: Row<Features, Activity> }) {
@@ -142,8 +129,6 @@ export function ActivityCardContent({
   const activityId = activity.id;
 
   const photos = allPhotos.filter((p) => p.activity_id === activityId);
-
-  const id: number = activity.id;
 
   const date = activity.start_date_local;
   const coordinates = useMemo(
@@ -285,113 +270,20 @@ export function ActivityCardContent({
                   labelled={labelled}
                 />
               )}
-              {labelled && (
+              {!isGuest && !readOnly && stravaConnected && (
                 <Button
+                  type="button"
                   variant="ghost"
-                  size="sm"
-                  className="min-h-11 shrink-0 px-2 text-xs"
-                  onClick={() => canEdit && setOpen(true)}
-                  title={editReason}
-                  aria-label={
-                    editReason
-                      ? message('activity.action.unavailable', {
-                          action: message('action.edit'),
-                          name: activity.name,
-                          reason: editReason,
-                        })
-                      : undefined
-                  }
-                  disabled={loading || !canEdit || readOnly}
+                  size="icon"
+                  className="size-11 shrink-0"
+                  aria-label={message('action.refresh')}
+                  title={message('action.refresh')}
+                  disabled={loading}
+                  onClick={() => void handleRefresh()}
                 >
-                  {message('action.edit')}
+                  <RefreshCw aria-hidden="true" />
                 </Button>
               )}
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="size-11 shrink-0"
-                    aria-label={message('actions.more')}
-                  >
-                    <MoreHorizontal className="h-4 w-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  {!labelled && (
-                    <DropdownMenuItem
-                      onSelect={() => canEdit && setOpen(true)}
-                      title={editReason}
-                      aria-label={
-                        editReason
-                          ? message('activity.action.unavailable', {
-                              action: message('action.edit'),
-                              name: activity.name,
-                              reason: editReason,
-                            })
-                          : undefined
-                      }
-                      disabled={loading || !canEdit || readOnly}
-                    >
-                      <Pencil aria-hidden="true" />
-                      <span>
-                        {message('action.edit')}
-                        {editReason && (
-                          <span className="block text-xs text-muted-foreground">
-                            {editReason}
-                          </span>
-                        )}
-                      </span>
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuItem
-                    onSelect={() => void handleRefresh()}
-                    disabled={
-                      loading || isGuest || readOnly || !stravaConnected
-                    }
-                  >
-                    <RefreshCw aria-hidden="true" /> {message('action.refresh')}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onSelect={handleDownloadGpx}
-                    title={
-                      !canExport
-                        ? message('activity.action.noRoute')
-                        : undefined
-                    }
-                    aria-label={
-                      !canExport
-                        ? message('activity.action.unavailable', {
-                            action: message('action.exportGPX'),
-                            name: activity.name,
-                            reason: message('activity.action.noRoute'),
-                          })
-                        : undefined
-                    }
-                    disabled={!canExport}
-                  >
-                    <Download aria-hidden="true" />
-                    <span>
-                      {message('action.exportGPX')}
-                      {!canExport && (
-                        <span className="block text-xs text-muted-foreground">
-                          {message('activity.action.noRoute')}
-                        </span>
-                      )}
-                    </span>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link
-                      href={`https://strava.com/activities/${id}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      <ExternalLink aria-hidden="true" />{' '}
-                      {message('action.openInStrava')}
-                    </Link>
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
               {onCollapse && (
                 <DismissButton
                   intent="collapse"
@@ -441,6 +333,15 @@ export function ActivityCardContent({
                 </section>
               ) : undefined
             }
+          />
+          <ActivityDetailActions
+            activity={activity}
+            canEdit={canEdit && !loading && !readOnly}
+            editReason={editReason}
+            onEdit={() => setOpen(true)}
+            canShare={!isGuest && !readOnly}
+            canExport={canExport}
+            onExport={handleDownloadGpx}
           />
         </RouteDetailsContent>
       </Card>
