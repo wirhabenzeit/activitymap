@@ -70,6 +70,7 @@ function fixture(
     neighbours?: StravaActivity[];
     uploads?: StravaUpload[];
     updateFails?: boolean;
+    streams?: (id: string) => MergeStreams;
   } = {},
 ) {
   const calls: { method: string; args: unknown[] }[] = [];
@@ -100,7 +101,7 @@ function fixture(
       },
       getActivityStreamsForMerge: async (id: string) => {
         calls.push({ method: 'streams', args: [id] });
-        return streams(11);
+        return options.streams?.(id) ?? streams(11);
       },
       createUpload: async (input) => {
         calls.push({ method: 'createUpload', args: [input] });
@@ -293,4 +294,24 @@ void test('duplicateOf reads both of Strava’s wordings', () => {
   assert.equal(duplicateOf('duplicate of activity 98765432'), '98765432');
   assert.equal(duplicateOf('Improperly formatted data.'), null);
   assert.equal(duplicateOf(null), null);
+});
+
+void test('refuses a partially empty recording before uploading anything', async () => {
+  for (const emptyId of ['1', '2']) {
+    const { deps, calls } = fixture(parts, {
+      streams: (id) => streams(id === emptyId ? 0 : 11),
+    });
+    await assert.rejects(
+      mergeActivities(actor, { ...metadata, activity_ids: ['1', '2'] }, deps),
+      (error) =>
+        error instanceof ActivityMutationError &&
+        error.code === 'merge_not_allowed' &&
+        error.status === 422 &&
+        error.details?.activityId === emptyId,
+    );
+    assert.equal(
+      calls.some((call) => call.method === 'createUpload'),
+      false,
+    );
+  }
 });

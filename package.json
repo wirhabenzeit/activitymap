@@ -44,6 +44,7 @@
     "test:library-owner": "node scripts/run-library-owner-browser.mjs",
     "presentation:generate": "node scripts/generate-presentation.mjs && node scripts/generate-place-symbols.mjs",
     "presentation:check": "node scripts/generate-presentation.mjs --check && node --test scripts/presentation.test.mjs && node scripts/generate-place-symbols.mjs --check",
+    "test:merge-ui": "node scripts/verify-activity-merge.mjs",
     "test:browsing-ui": "tsx --test src/components/list/*.test.tsx",
     "test:activity-places-ui": "node scripts/verify-activity-places.mjs",
     "test:place-search-ui": "node scripts/verify-place-search.mjs",

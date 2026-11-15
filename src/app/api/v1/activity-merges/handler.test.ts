@@ -4,7 +4,6 @@ import test from 'node:test';
 
 import { ActivityMutationError } from '~/server/application/activities';
 import type { Actor } from '~/server/auth/actor';
-import { isActivityMergeEnabled } from '~/server/config/activity-merge';
 
 import {
   type ActivityMergeHandlerDeps,
@@ -132,22 +131,67 @@ void test('the continue endpoint rejects malformed upload IDs', async () => {
   assert.equal(response.status, 400);
 });
 
-void test('rollout reads named athletes or everyone', () => {
-  assert.equal(isActivityMergeEnabled(42, {}), false);
-  assert.equal(
-    isActivityMergeEnabled(42, { ACTIVITYMAP_MERGE_ATHLETE_IDS: '7, 42' }),
-    true,
-  );
-  assert.equal(
-    isActivityMergeEnabled(43, { ACTIVITYMAP_MERGE_ATHLETE_IDS: '7 42' }),
-    false,
-  );
-  assert.equal(
-    isActivityMergeEnabled(43, { ACTIVITYMAP_MERGE_ATHLETE_IDS: '*' }),
-    true,
-  );
-  assert.equal(
-    isActivityMergeEnabled(null, { ACTIVITYMAP_MERGE_ATHLETE_IDS: '*' }),
-    false,
-  );
+void test('all merge endpoints default to the admin allowlist', async () => {
+  const previous = process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS;
+  try {
+    for (const allowlist of [undefined, '7', '*', '7, 42']) {
+      if (allowlist === undefined)
+        delete process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS;
+      else process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS = allowlist;
+      let calls = 0;
+      const state = {
+        upload_id: '900',
+        status: 'processing' as const,
+        activity_id: null,
+        error: null,
+        duplicate_of: null,
+        metadata_applied: false,
+      };
+      const defaults = deps({
+        isEnabled: undefined,
+        merge: async () => {
+          calls++;
+          return state;
+        },
+        continueUpload: async () => {
+          calls++;
+          return state;
+        },
+        buildFile: async () => {
+          calls++;
+          return {
+            bytes: new Uint8Array([14]),
+            fileName: 'merged.fit',
+            sources: [],
+            sport: 'Ride',
+            trainer: false,
+          };
+        },
+      });
+      const responses = [
+        await createMergeActivitiesHandler(defaults)(post(body)),
+        await createMergeFileHandler(defaults)(
+          post({ activity_ids: ['1', '2'] }),
+        ),
+        await createContinueMergeUploadHandler(defaults)(
+          post({
+            name: body.name,
+            description: body.description,
+            sport_type: body.sport_type,
+          }),
+          '900',
+        ),
+      ];
+      const enabled = allowlist === '7, 42';
+      assert.deepEqual(
+        responses.map((response) => response.status),
+        enabled ? [200, 200, 200] : [404, 404, 404],
+      );
+      assert.equal(calls, enabled ? 3 : 0);
+    }
+  } finally {
+    if (previous === undefined)
+      delete process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS;
+    else process.env.ACTIVITYMAP_ADMIN_ATHLETE_IDS = previous;
+  }
 });

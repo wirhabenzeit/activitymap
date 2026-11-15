@@ -12,7 +12,10 @@ import {
   describeMergeBlocker,
   planMerge,
 } from '~/lib/activity-merge/eligibility';
-import { combineRecordings } from '~/server/activity-merge/combine';
+import {
+  MissingMergeSamplesError,
+  combineRecordings,
+} from '~/server/activity-merge/combine';
 import { encodeMergedFit } from '~/server/activity-merge/fit';
 import type { MergeStreams } from '~/server/activity-merge/streams';
 import type { Actor } from '~/server/auth/actor';
@@ -204,11 +207,14 @@ export async function buildMergedFile(
       })),
     );
   } catch (error) {
-    if (error instanceof Error && error.message.includes('no samples'))
+    if (error instanceof MissingMergeSamplesError)
       throw new ActivityMutationError(
         'merge_not_allowed',
-        'The activities have no recorded data to merge.',
+        'An activity has no usable recorded data to merge.',
         422,
+        false,
+        undefined,
+        { activityId: error.sourceId },
       );
     throw mutationFailure(error);
   }

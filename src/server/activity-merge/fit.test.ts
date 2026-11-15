@@ -3,7 +3,11 @@ import assert from 'node:assert/strict';
 import { Decoder, Stream } from '@garmin/fitsdk';
 import test from 'node:test';
 
-import { type MergeSource, combineRecordings } from './combine';
+import {
+  type MergeSource,
+  MissingMergeSamplesError,
+  combineRecordings,
+} from './combine';
 import { encodeMergedFit, fitSport } from './fit';
 
 const start = new Date('2026-06-01T06:00:00Z');
@@ -145,4 +149,18 @@ void test('sports map to FIT sports, with trainer rides indoors', () => {
     subSport: 'indoorCycling',
   });
   assert.deepEqual(fitSport('Yoga'), { sport: 'generic', subSport: 'generic' });
+});
+
+void test('every selected source must contribute usable samples', () => {
+  for (const unusable of [
+    source('b', 3600, 0),
+    source('b', 3600, 1, { time: { data: [NaN] } }),
+    source('b', 0, 2), // Completely shadowed by the previous recording.
+  ]) {
+    assert.throws(
+      () => combineRecordings([source('a', 0, 11), unusable]),
+      (error) =>
+        error instanceof MissingMergeSamplesError && error.sourceId === 'b',
+    );
+  }
 });

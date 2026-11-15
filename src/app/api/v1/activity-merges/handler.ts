@@ -19,7 +19,7 @@ import {
   mergeActivities,
 } from '~/server/application/activity-merge';
 import type { Actor } from '~/server/auth/actor';
-import { isActivityMergeEnabled } from '~/server/config/activity-merge';
+import { isAdminAthlete } from '~/server/config/admin';
 import { requestIdFor } from '~/server/http/request-id';
 import { errorDiagnostic } from '~/server/logging/error-diagnostic';
 
@@ -53,7 +53,7 @@ function guarded(deps: ActivityMergeHandlerDeps, handle: Handle) {
           'not_authenticated',
           'Authentication is required.',
         );
-      if (!(deps.isEnabled ?? isActivityMergeEnabled)(actor.athleteId))
+      if (!(deps.isEnabled ?? isAdminAthlete)(actor.athleteId))
         return failure(requestId, 404, 'not_found', 'Not found.');
       if (!mutationOriginAllowed(request, 'required-unless-bearer'))
         return failure(

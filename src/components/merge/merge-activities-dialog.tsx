@@ -9,7 +9,16 @@ import {
   Pause,
   TriangleAlert,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import {
+  type ReactNode,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   AppDialogBody,
@@ -23,7 +32,6 @@ import {
   DialogClose,
   DialogDescription,
   DialogTitle,
-  DialogTrigger,
 } from '~/components/ui/dialog';
 import { Input } from '~/components/ui/input';
 import { Label } from '~/components/ui/label';
@@ -37,6 +45,7 @@ import {
 import { type SportType, sportTypes } from '~/contracts/sport';
 import type { MergeUploadState } from '~/contracts/v1/activity-merge';
 import { ACTIVITY_DESCRIPTION_MAX_LENGTH } from '~/contracts/v1/activity-mutations';
+import { useActivities } from '~/hooks/use-activities';
 import {
   useDateFormat,
   useDisplayUnits,
@@ -103,23 +112,26 @@ function largestPhotoUrl(urls: Record<string, string> | null): string | null {
 export function MergeActivitiesDialog({
   parts,
   library,
-  children,
+  onClose,
 }: {
   parts: readonly Activity[];
   /** Every activity in the library, live: deletions show up as they sync. */
   library: readonly Activity[];
-  children: React.ReactElement;
+  onClose: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [draft, setDraft] = useState<readonly Activity[]>([]);
-  const [name, setName] = useState('');
-  const [description, setDescription] = useState('');
-  const [sport, setSport] = useState<SportType>('Ride');
+  const [initial] = useState(() => planMerge(parts, library));
+  const draft = initial.parts;
+  const [name, setName] = useState(() => defaultMergedName(draft));
+  const [description, setDescription] = useState(() =>
+    defaultMergedDescription(draft),
+  );
+  const [sport, setSport] = useState<SportType>(initial.sport);
   const [phase, setPhase] = useState<Phase>({ kind: 'review' });
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const abort = useRef<AbortController | null>(null);
   const busy = phase.kind === 'uploading';
+  useEffect(() => () => abort.current?.abort(), []);
 
   const plan = useMemo(() => planMerge(draft, library), [draft, library]);
   const names = useMemo(
@@ -130,22 +142,11 @@ export function MergeActivitiesDialog({
 
   return (
     <Dialog
-      open={open}
+      open
       onOpenChange={(next) => {
-        if (!next && busy) return;
-        setOpen(next);
-        if (next) {
-          const initial = planMerge(parts, library);
-          setDraft(initial.parts);
-          setName(defaultMergedName(initial.parts));
-          setDescription(defaultMergedDescription(initial.parts));
-          setSport(initial.sport);
-          setPhase({ kind: 'review' });
-          setDownloadError(null);
-        } else abort.current?.abort();
+        if (!next && !busy) onClose();
       }}
     >
-      <DialogTrigger asChild>{children}</DialogTrigger>
       <AppDialogContent
         closeLabel="Close merge"
         layout="sections"
@@ -624,6 +625,67 @@ function MergeDone({
   );
 }
 
+const MergeContext = createContext<
+  ((parts: readonly Activity[]) => void) | null
+>(null);
+
+/** Lives in the app shell so selection changes and deletion of the last
+ * original cannot unmount an active upload or its cleanup checklist. */
+export function MergeActivitiesProvider({ children }: { children: ReactNode }) {
+  const { userId, enabled } = useShallowStore((state) => ({
+    userId: state.user?.id,
+    enabled: !state.isGuest && !!state.user?.features?.activityMerge,
+  }));
+  const [session, setSession] = useState<{
+    userId: string;
+    parts: readonly Activity[];
+    returnFocus: HTMLElement | null;
+  } | null>(null);
+  const begin = useCallback(
+    (parts: readonly Activity[]) => {
+      if (userId && enabled)
+        setSession({
+          userId,
+          parts: [...parts],
+          returnFocus:
+            document.activeElement instanceof HTMLElement
+              ? document.activeElement
+              : null,
+        });
+    },
+    [userId, enabled],
+  );
+  const close = () => {
+    setSession(null);
+    if (session?.returnFocus?.isConnected) session.returnFocus.focus();
+  };
+  return (
+    <MergeContext.Provider value={begin}>
+      {children}
+      {session && session.userId === userId && enabled && (
+        <MergeSession
+          key={session.userId}
+          parts={session.parts}
+          onClose={close}
+        />
+      )}
+    </MergeContext.Provider>
+  );
+}
+
+function MergeSession({
+  parts,
+  onClose,
+}: {
+  parts: readonly Activity[];
+  onClose: () => void;
+}) {
+  const { data: library = parts } = useActivities();
+  return (
+    <MergeActivitiesDialog parts={parts} library={library} onClose={onClose} />
+  );
+}
+
 /** The selection bar's Merge action: offered for 2–5 selected activities to
  * athletes the feature is rolled out to, with Strava write permission. */
 export function SelectionMergeButton({
@@ -631,6 +693,7 @@ export function SelectionMergeButton({
 }: {
   activities: readonly Activity[];
 }) {
+  const begin = useContext(MergeContext);
   const { enabled, selected, combine, canEdit } = useShallowStore((state) => ({
     enabled: !state.isGuest && !!state.user?.features?.activityMerge,
     selected: state.selected,
@@ -638,6 +701,7 @@ export function SelectionMergeButton({
     canEdit: activityMutationAvailability(state).canEdit,
   }));
   if (
+    !begin ||
     !enabled ||
     !canEdit ||
     !combine ||
@@ -650,15 +714,14 @@ export function SelectionMergeButton({
   if (parts.length !== selected.length) return null;
   const label = `Merge ${parts.length} selected activities`;
   return (
-    <MergeActivitiesDialog parts={parts} library={activities}>
-      <Button
-        variant="ghost"
-        className="size-11 shrink-0 px-0"
-        aria-label={label}
-        title={label}
-      >
-        <Merge className="size-4" aria-hidden />
-      </Button>
-    </MergeActivitiesDialog>
+    <Button
+      variant="ghost"
+      className="size-11 shrink-0 px-0"
+      aria-label={label}
+      title={label}
+      onClick={() => begin(parts)}
+    >
+      <Merge className="size-4" aria-hidden />
+    </Button>
   );
 }

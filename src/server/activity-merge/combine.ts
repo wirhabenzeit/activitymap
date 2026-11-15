@@ -16,6 +16,13 @@ export type MergeSource = {
   streams: MergeStreams;
 };
 
+export class MissingMergeSamplesError extends Error {
+  constructor(readonly sourceId: string) {
+    super(`Activity ${sourceId} has no usable recorded samples.`);
+    this.name = 'MissingMergeSamplesError';
+  }
+}
+
 export type MergedSample = {
   /** Unix seconds. */
   timestamp: number;
@@ -134,7 +141,7 @@ export function combineRecordings(
     }
 
     const last = samples.length;
-    if (last === first) continue;
+    if (last === first) throw new MissingMergeSamplesError(source.id);
     // Strava's own distance is authoritative for the part's total when the
     // streams carry none.
     const lapDistance = partDistance > 0 ? partDistance : source.distance;
