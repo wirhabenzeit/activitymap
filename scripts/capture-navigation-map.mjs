@@ -366,13 +366,15 @@ export default function Review() {
         .locator('[data-detail-presentation]')
         .waitFor({ state: 'hidden' });
       await observe('back-to-four');
-      await page.getByRole('button', { name: 'Filters', exact: true }).click();
+      await page
+        .getByRole('button', { name: /^Filters(, \d+ active)?$/ })
+        .click();
       await observe('filters-toggled');
       await page.keyboard.press('Escape');
       await observe('filters-after-escape');
       if (width >= 480)
         await page
-          .getByRole('button', { name: 'Filters', exact: true })
+          .getByRole('button', { name: /^Filters(, \d+ active)?$/ })
           .click();
       await page.locator('#map-route-panel [data-activity-id]').first().click();
       await page.locator('[data-detail-presentation]').waitFor();

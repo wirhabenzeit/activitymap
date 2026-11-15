@@ -2,104 +2,53 @@ import XCTest
 
 @MainActor
 final class FilterPanelUITests: XCTestCase {
-    func testSearchRowRidesOnTheKeyboardAndKeepsFilters() {
+    func testListSearchNarrowsRowsAndBecomesAFilterChip() {
         let app = launchSheet(orientation: .portrait)
         defer { app.terminate() }
         let done = app.buttons["filters-done"]
-        let field = app.activitySearchField
-        XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(done.waitForExistence(timeout: 5))
-        let restingY = done.frame.minY
+        XCTAssertTrue(done.waitForExistence(timeout: 10), app.debugDescription)
         let count = app.filterResultCount
         XCTAssertEqual(count.label, "3 of 3 activities")
+        XCTAssertFalse(app.otherElements["active-text-filters"].exists, "Filters has no search field")
 
-        field.tap()
-        let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons[Self.pilatus].exists, "An empty search has no place matches")
-        field.typeText("Morning")
-        // A short sheet rides on the keyboard; the filtered list stays visible above it.
-        let row = app.staticTexts["Morning ridge"].firstMatch
-        XCTAssertTrue(row.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertLessThan(row.frame.maxY, field.frame.minY, "The list shows above the search sheet")
-        XCTAssertFalse(app.staticTexts["Evening outing"].exists, "The list filters while typing")
-        XCTAssertLessThan(field.frame.maxY, keyboard.frame.minY)
+        // Search closes the filter sheet and narrows the list as you type.
+        app.openHeaderSearch()
+        XCTAssertTrue(done.waitForNonExistence(timeout: 5), "Search closes the filter sheet")
+        app.typeText("Morning")
+        let narrowed = app.staticTexts["list-search-count"]
+        XCTAssertTrue(narrowed.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(narrowed.label, "1 of 3 match “Morning”")
+        XCTAssertTrue(app.staticTexts["Morning ridge"].firstMatch.exists)
+        XCTAssertFalse(app.staticTexts["Evening outing"].exists, "The rows narrow while typing")
         let typing = XCTAttachment(screenshot: app.screenshot())
-        typing.name = "Search above the keyboard"; typing.lifetime = .keepAlways; add(typing)
-        field.typeText("\n")
-        XCTAssertTrue(keyboard.waitForNonExistence(timeout: 5), "Search hides the keyboard")
-        XCTAssertEqual(count.label, "1 of 3 activities · 1 active", "The name filter stays")
-        XCTAssertEqual(field.value as? String, "Morning", "The field shows the kept text")
-        XCTAssertEqual(done.frame.minY, restingY, accuracy: 2, "The sheet returns with the keyboard")
+        typing.name = "List narrowed by header search"; typing.lifetime = .keepAlways; add(typing)
 
-        app.clearActivitySearch()
-        XCTAssertEqual(count.label, "3 of 3 activities")
-        field.tap()
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
-        field.typeText("Pilatus")
-        let first = app.buttons[Self.pilatus]
-        let second = app.buttons["place-suggestion-00000000-0000-4000-8000-000000000002"]
-        XCTAssertTrue(first.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertTrue(second.exists)
-        XCTAssertEqual(first.frame.midY, second.frame.midY, accuracy: 2, "Place matches share one row")
-        XCTAssertLessThanOrEqual(first.frame.maxY, keyboard.frame.minY, "Place matches sit above the keyboard")
-        let matches = XCTAttachment(screenshot: app.screenshot())
-        matches.name = "Place matches"; matches.lifetime = .keepAlways; add(matches)
+        // A visited place matches too: every fixture activity passed Pilátus.
+        app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 7) + "pilatus")
+        XCTAssertEqual(narrowed.label, "3 of 3 match “pilatus”", "Places and accents match")
 
-        first.tap()
-        let place = app.buttons["Place: Pilátus. View details"]
-        XCTAssertTrue(place.waitForExistence(timeout: 5))
-        XCTAssertTrue(keyboard.waitForNonExistence(timeout: 5), "Choosing a place hides the keyboard")
-        XCTAssertEqual(done.frame.minY, restingY, accuracy: 2, "The sheet returns with the keyboard")
-        XCTAssertEqual(place.frame.midY, field.frame.midY, accuracy: 4, "The place is a pill in the field")
-        XCTAssertEqual(field.value as? String, "Activity name", "Choosing a place clears the text")
-        XCTAssertEqual(count.label, "2 of 3 activities · 1 active")
-        let selected = XCTAttachment(screenshot: app.screenshot())
-        selected.name = "Selected place"; selected.lifetime = .keepAlways; add(selected)
+        app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 7) + "Morning")
+        app.buttons["list-search-apply-filter"].tap()
+        XCTAssertTrue(app.textFields["header-search-field"].waitForNonExistence(timeout: 5), "Filter closes search")
+        XCTAssertFalse(app.staticTexts["Evening outing"].exists, "The narrowing is now a filter")
 
-        field.tap()
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
-        field.typeText("Evening\n")
-        XCTAssertTrue(keyboard.waitForNonExistence(timeout: 5))
-        XCTAssertEqual(done.frame.minY, restingY, accuracy: 2, "The sheet returns with the keyboard")
-        XCTAssertEqual(field.value as? String, "Evening")
-        XCTAssertEqual(count.label, "1 of 3 activities · 2 active", "Place and name filters combine")
-
-        app.buttons["remove-place-filter"].tap()
-        XCTAssertTrue(place.waitForNonExistence(timeout: 5))
-        XCTAssertEqual(count.label, "2 of 3 activities · 1 active", "Removing the place keeps the name filter")
-        app.clearActivitySearch()
-        XCTAssertEqual(count.label, "3 of 3 activities", "Clearing the field removes the text")
+        app.buttons["browse-filters"].firstMatch.tap()
+        XCTAssertTrue(done.waitForExistence(timeout: 5))
+        XCTAssertEqual(count.label, "1 of 3 activities · 1 active")
+        let chip = app.buttons["Remove text filter: Morning"]
+        XCTAssertTrue(chip.waitForExistence(timeout: 5), app.debugDescription)
+        chip.tap()
+        XCTAssertEqual(count.label, "3 of 3 activities", "The chip removes the text filter")
     }
 
-    func testLandscapeFiltersUseTheStandardSheetAndSearchAboveTheKeyboard() {
+    func testLandscapeFiltersUseTheStandardSheet() {
         let app = launchSheet(orientation: .landscapeLeft)
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let close = app.buttons["filters-done"]
-        let field = app.activitySearchField
-        XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(close.waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertGreaterThan(close.frame.minX, app.frame.width * 0.6, "Filters use the full-height standard sheet")
         let sheet = XCTAttachment(screenshot: app.screenshot())
         sheet.name = "Landscape filter sheet"; sheet.lifetime = .keepAlways; add(sheet)
-
-        field.tap()
-        let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
-        field.typeText("Pilatus")
-        let first = app.buttons[Self.pilatus]
-        XCTAssertTrue(first.waitForExistence(timeout: 5), app.debugDescription)
-        XCTAssertLessThan(field.frame.maxY, keyboard.frame.minY)
-        XCTAssertLessThanOrEqual(first.frame.maxY, keyboard.frame.minY, "Place matches stay above the keyboard")
-        XCTAssertTrue(first.isHittable)
-        let search = XCTAttachment(screenshot: app.screenshot())
-        search.name = "Landscape place matches"; search.lifetime = .keepAlways; add(search)
-        first.tap()
-        let place = app.buttons["Place: Pilátus. View details"]
-        XCTAssertTrue(place.waitForExistence(timeout: 5))
-        close.tap()
-        XCTAssertTrue(close.waitForNonExistence(timeout: 5))
-        app.buttons["browse-filters"].firstMatch.tap()
-        XCTAssertTrue(place.waitForExistence(timeout: 5), "Closing preserves the place filter")
         close.tap()
         XCTAssertTrue(close.waitForNonExistence(timeout: 5))
         XCUIDevice.shared.orientation = .portrait
@@ -108,13 +57,11 @@ final class FilterPanelUITests: XCTestCase {
         XCTAssertGreaterThan(close.frame.minY, app.frame.height * 0.35, "Portrait still opens at half height")
     }
 
-    func testFilterSheetKeepsOneHeightWhileSearching() {
+    func testFilterSheetKeepsOneHeight() {
         let app = launchSheet(orientation: .portrait)
         defer { app.terminate() }
         let done = app.buttons["filters-done"]
-        let field = app.activitySearchField
-        let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(done.waitForExistence(timeout: 10), app.debugDescription)
         let restingY = done.frame.minY
         XCTAssertGreaterThan(restingY, app.frame.height * 0.5, "The sheet leaves the screen above it visible")
         func waitForSheet(_ settled: @escaping () -> Bool) {
@@ -128,18 +75,6 @@ final class FilterPanelUITests: XCTestCase {
             .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)))
         waitForSheet { abs(done.frame.minY - restingY) < 2 }
         XCTAssertEqual(done.frame.minY, restingY, accuracy: 2, "The sheet has one height")
-
-        // The keyboard lifts the sheet without resizing it, and it returns afterwards.
-        let height = app.frame.maxY - restingY
-        field.tap()
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
-        waitForSheet { abs(keyboard.frame.minY - done.frame.minY - height) < 20 }
-        XCTAssertEqual(keyboard.frame.minY - done.frame.minY, height, accuracy: 60, "The keyboard lifts the whole sheet")
-        field.typeText("Morning\n")
-        XCTAssertTrue(keyboard.waitForNonExistence(timeout: 5))
-        waitForSheet { abs(done.frame.minY - restingY) < 2 }
-        XCTAssertEqual(done.frame.minY, restingY, accuracy: 2, "The sheet returns to its height")
-        XCTAssertEqual(field.value as? String, "Morning")
     }
 
     func testListBehindTheFilterSheetStaysUsable() {
@@ -210,60 +145,109 @@ final class FilterPanelUITests: XCTestCase {
         XCTAssertTrue(done.waitForNonExistence(timeout: 5))
     }
 
-    private static let pilatus = "place-suggestion-00000000-0000-4000-8000-000000000001"
-
-    func testChosenPlaceFliesTheMapAboveTheSheetWithAPin() {
-        let app = launchSheet(orientation: .portrait, map: true)
+    func testListSearchSurvivesADetailButEndsWithShowOnMap() {
+        let app = launchSheet(orientation: .portrait, header: true)
         defer { app.terminate() }
-        let done = app.buttons["filters-done"]
-        let field = app.activitySearchField
-        XCTAssertTrue(field.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(done.waitForExistence(timeout: 5))
-        let pin = app.otherElements["place-filter-pin"]
-        XCTAssertFalse(pin.exists, "Only a place filter has a pin")
+        let menu = app.buttons.matching(identifier: "browse-destination-menu").allElementsBoundByIndex.first { $0.frame.width > 0 }
+        XCTAssertNotNil(menu, app.debugDescription)
+        menu?.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let listItem = app.buttons["browse-destination-menu-list"].firstMatch
+        XCTAssertTrue(listItem.waitForExistence(timeout: 5), app.debugDescription)
+        listItem.tap()
 
-        field.tap()
-        let keyboard = app.keyboards.firstMatch
-        XCTAssertTrue(keyboard.waitForExistence(timeout: 5))
-        field.typeText("Pilatus")
-        let first = app.buttons[Self.pilatus]
-        XCTAssertTrue(first.waitForExistence(timeout: 5), app.debugDescription)
-        first.tap()
-        XCTAssertTrue(keyboard.waitForNonExistence(timeout: 5), "Choosing a place hides the keyboard")
-        XCTAssertTrue(pin.waitForExistence(timeout: 5), app.debugDescription)
-        // The camera flies there: the pin settles centred above the sheet.
-        let window = app.windows.firstMatch.frame
-        let settled = NSPredicate { _, _ in
-            abs(pin.frame.midX - window.midX) < 8 && pin.frame.maxY < done.frame.minY - 24 && pin.frame.minY > window.minY + 60
-        }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: nil)], timeout: 10), .completed,
-                       "\(pin.frame) in \(window), sheet at \(done.frame.minY)")
-        let flown = XCTAttachment(screenshot: app.screenshot())
-        flown.name = "Place pin above the sheet"; flown.lifetime = .keepAlways; add(flown)
+        app.openHeaderSearch()
+        app.typeText("Morning")
+        let narrowed = app.staticTexts["list-search-count"]
+        XCTAssertTrue(narrowed.waitForExistence(timeout: 5), app.debugDescription)
 
-        // The map behind the sheet pans while the filters stay open.
-        let before = pin.frame
-        let map = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
-        // Slow, with a hold at the end, so the map does not fling on.
-        map.press(forDuration: 0.05, thenDragTo: map.withOffset(CGVector(dx: -80, dy: -40)),
-                  withVelocity: .slow, thenHoldForDuration: 0.3)
-        XCTAssertTrue(done.exists, "Panning keeps the filters")
-        let panned = NSPredicate { _, _ in
-            pin.exists && pin.frame.midX < before.midX - 40 && pin.frame.midY < before.midY - 20
-        }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: panned, object: nil)], timeout: 5), .completed,
-                       "The map pans behind the sheet: \(before) → \(pin.frame)")
+        // A detail and Back keep the search, without the keyboard.
+        let row = app.buttons["activity-list-row-1"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.tap()
+        let back = app.buttons["list-detail-back"].firstMatch
+        XCTAssertTrue(back.waitForExistence(timeout: 10), app.debugDescription)
+        back.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(narrowed.waitForExistence(timeout: 10), "Back returns to the narrowed list")
+        XCTAssertEqual(narrowed.label, "1 of 3 match “Morning”")
+        XCTAssertTrue(app.textFields["header-search-field"].exists)
+        XCTAssertFalse(app.keyboards.firstMatch.exists, "Back does not bring the keyboard back")
 
-        app.buttons["remove-place-filter"].tap()
-        XCTAssertTrue(pin.waitForNonExistence(timeout: 5), "Removing the place removes its pin")
+        // Show on map acts on the result: search ends and the map is clear.
+        row.press(forDuration: 1)
+        let showOnMap = app.buttons["Show on map"].firstMatch
+        XCTAssertTrue(showOnMap.waitForExistence(timeout: 5), app.debugDescription)
+        showOnMap.tap()
+        XCTAssertTrue(app.textFields["header-search-field"].waitForNonExistence(timeout: 5), "Leaving the List ends search")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label == 'View: Map'")).firstMatch.waitForExistence(timeout: 5),
+                      app.debugDescription)
+        let shown = XCTAttachment(screenshot: app.screenshot())
+        shown.name = "Show on map ends search"; shown.lifetime = .keepAlways; add(shown)
     }
 
-    private func launchSheet(orientation: UIDeviceOrientation, map: Bool = false) -> XCUIApplication {
+    private static let pilatus = "header-search-place-00000000-0000-4000-8000-000000000001"
+
+    func testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest() {
+        let app = launchSheet(orientation: .portrait, header: true)
+        defer { app.terminate() }
+        let pin = app.otherElements["place-filter-pin"]
+        app.openHeaderSearch()
+        app.typeText("Pil")
+        let place = app.buttons[Self.pilatus]
+        XCTAssertTrue(place.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.buttons["header-search-activity-1"].exists, "Activities that visited the place match")
+        let panel = XCTAttachment(screenshot: app.screenshot())
+        panel.name = "Header search results"; panel.lifetime = .keepAlways; add(panel)
+
+        // Picking a place selects its activities and pins it; the filters stay.
+        place.tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(pin.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertFalse(app.buttons["browse-filters"].firstMatch.label.contains("active"), "Picking does not filter")
+        // The selected routes open the results sheet (its rows are not exposed
+        // to UI tests in this fixture; the rendered tests cover them).
+        XCTAssertTrue(app.buttons["Sheet Grabber"].waitForExistence(timeout: 10), "The place's routes are selected")
+        let picked = XCTAttachment(screenshot: app.screenshot())
+        picked.name = "Place picked from search"; picked.lifetime = .keepAlways; add(picked)
+
+        // Long-press offers the place filter instead.
+        app.openHeaderSearch()
+        app.typeText("Pil")
+        XCTAssertTrue(place.waitForExistence(timeout: 5))
+        place.press(forDuration: 1.2)
+        let filterToPlace = app.buttons["Filter to this place"]
+        XCTAssertTrue(filterToPlace.waitForExistence(timeout: 5), app.debugDescription)
+        filterToPlace.tap()
+
+        // The last row applies the text filter and offers to clear it.
+        app.openHeaderSearch()
+        app.typeText("Morning")
+        let apply = app.buttons["header-search-apply-filter"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 5), app.debugDescription)
+        apply.tap()
+        app.buttons["browse-filters"].firstMatch.tap()
+        let count = app.filterResultCount
+        XCTAssertTrue(count.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(count.label, "1 of 3 activities · 2 active", "Place and text filters combine")
+        XCTAssertTrue(app.buttons["Place: Pilátus. View details"].exists, "The place filter shows as a chip")
+        app.buttons["remove-place-filter"].tap()
+        XCTAssertEqual(count.label, "1 of 3 activities · 1 active", "Removing the place keeps the text filter")
+        app.buttons["filters-done"].tap()
+
+        app.openHeaderSearch()
+        app.typeText("Morning")
+        let clear = app.buttons["header-search-clear-filter"]
+        XCTAssertTrue(clear.waitForExistence(timeout: 5), app.debugDescription)
+        clear.tap()
+        app.buttons["browse-filters"].firstMatch.tap()
+        XCTAssertEqual(app.filterResultCount.label, "3 of 3 activities", "Search clears the text filter")
+    }
+
+    private func launchSheet(orientation: UIDeviceOrientation, header: Bool = false) -> XCUIApplication {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = orientation
         let app = XCUIApplication()
         app.launchArguments = ["--places-ui-testing", "--place-search-ui-testing", "--place-search-sheet-ui-testing", "-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
-            + (map ? ["--place-search-map-ui-testing"] : [])
+            + (header ? ["--place-search-header-ui-testing"] : [])
         app.launch()
         return app
     }
@@ -275,26 +259,25 @@ extension XCUIApplication {
         navigationBars.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", " activities")).firstMatch
     }
 
-    /// The search row of the filter form, or of the iPad search sheet.
-    var activitySearchField: XCUIElement { textFields["activity-search"] }
-
-    /// Phone filter sheets search in a row of the form; the iPad sidebar and
-    /// rail open the same row in a sheet, which Search closes. Leaves the
-    /// text applied and the keyboard hidden either way.
-    func searchActivities(_ text: String, file: StaticString = #filePath, line: UInt = #line) {
-        let launcher = buttons["activity-search-open"]
-        let field = activitySearchField
+    /// Opens header search from the browsing header, focused.
+    func openHeaderSearch(file: StaticString = #filePath, line: UInt = #line) {
         let deadline = Date().addingTimeInterval(10)
-        while !launcher.exists && !field.exists && Date() < deadline { _ = field.waitForExistence(timeout: 0.5) }
-        if launcher.exists { launcher.tap() } else { field.tap() }
-        XCTAssertTrue(field.waitForExistence(timeout: 5), debugDescription, file: file, line: line)
-        field.typeText(text + "\n")
-        XCTAssertTrue(keyboards.firstMatch.waitForNonExistence(timeout: 5), file: file, line: line)
+        var button: XCUIElement?
+        while button == nil && Date() < deadline {
+            button = buttons.matching(identifier: "browse-search").allElementsBoundByIndex.first { $0.exists && $0.frame.width > 0 }
+            if button == nil { RunLoop.current.run(until: Date().addingTimeInterval(0.3)) }
+        }
+        guard let button else { return XCTFail("No search button: \(debugDescription)", file: file, line: line) }
+        // Header controls report not hittable while their transitions settle.
+        button.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        XCTAssertTrue(textFields["header-search-field"].waitForExistence(timeout: 5), debugDescription, file: file, line: line)
+        XCTAssertTrue(keyboards.firstMatch.waitForExistence(timeout: 5), file: file, line: line)
     }
 
-    func clearActivitySearch(file: StaticString = #filePath, line: UInt = #line) {
-        let clear = buttons["clear-activity-search"]
-        XCTAssertTrue(clear.waitForExistence(timeout: 5), debugDescription, file: file, line: line)
-        clear.tap()
+    /// Applies a text filter through header search from Map or Stats.
+    func applyTextFilter(_ text: String, file: StaticString = #filePath, line: UInt = #line) {
+        openHeaderSearch(file: file, line: line)
+        typeText(text + "\n")
+        XCTAssertTrue(textFields["header-search-field"].waitForNonExistence(timeout: 5), file: file, line: line)
     }
 }

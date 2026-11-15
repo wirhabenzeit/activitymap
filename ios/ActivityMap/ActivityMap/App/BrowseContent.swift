@@ -12,6 +12,7 @@ struct BrowseContent: View {
     @Environment(\.browsePaneWidth) private var paneWidth
     @Environment(\.listRootHeader) private var listRootHeader
     @State private var landscapeInsets = PhoneLandscapeInsets()
+    @AppToolbarEnvironment private var toolbarLayout
 
     var body: some View {
         GeometryReader { geometry in
@@ -25,9 +26,12 @@ struct BrowseContent: View {
                         // Establish inline metrics before the first detail push.
                         .navigationBarTitleDisplayMode(.inline)
                 }
-                    // Compact List owns its header inside this stack. Reclaim
-                    // the shell's placeholder consistently, including offscreen.
-                    .ignoresSafeArea(.container, edges: listRootHeader == nil ? [] : .top)
+                    // List owns its header inside this stack. Reclaim the shell's
+                    // placeholder consistently, including offscreen: in landscape
+                    // the whole top inset, in portrait only the placeholder so
+                    // the header stays below the status bar.
+                    .ignoresSafeArea(.container, edges: listRootHeader != nil && toolbarLayout.isCompact ? .top : [])
+                    .padding(.top, listRootHeader != nil && !toolbarLayout.isCompact ? -toolbarLayout.height : 0)
                     .id(store.mapContext.scopeRevision)
                     .refreshable {
                         guard sync?.canRefresh ?? true else { return }

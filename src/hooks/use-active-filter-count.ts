@@ -15,7 +15,7 @@ import { useDeferredActivityFilters } from './use-deferred-activity-filters';
 /** Restrictions in force for the current page: stats ignore the reporting
  * period and "only selected", so those never inflate its count. */
 export function useActiveFilterCount() {
-  const scope = isStatsRoute(usePathname()) ? 'stats' : 'activities';
+  const scope = isStatsRoute(usePathname()) ? 'stats' : 'browse';
   return useShallowStore((state) => activeFilterCount(state, scope));
 }
 

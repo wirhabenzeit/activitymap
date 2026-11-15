@@ -3,7 +3,11 @@ import { type StateCreator } from 'zustand';
 
 import type { SportType } from '~/contracts/sport';
 import type { Activity } from '~/lib/activity';
-import { type PlaceFilter, effectiveActivityPlaces } from '~/lib/place-library';
+import {
+  type PlaceFilter,
+  effectiveActivityPlaces,
+  normalizePlaceSearch,
+} from '~/lib/place-library';
 import { type CategorySetting, categorySettings } from '~/settings/category';
 import { type inequalityFilters } from '~/settings/filter';
 
@@ -294,6 +298,22 @@ const matchesBinaryFilter = (mode: BinaryFilterMode, value: boolean | null) =>
 
 const normalizeSearch = (value: string) => value.normalize('NFC').toLowerCase();
 
+/** The text filter matches the activity's name (case-insensitive, accents
+ * significant) or the name of a place it visited (case- and accent-insensitive,
+ * like place search). iOS header search and its List narrowing use this rule. */
+export const matchesTextFilter = (
+  activity: Pick<FilterableActivity, 'name' | 'placeMatches'>,
+  query: string,
+) => {
+  const name = normalizeSearch(query.trim());
+  if (!name) return true;
+  if (normalizeSearch(activity.name).includes(name)) return true;
+  const place = normalizePlaceSearch(query);
+  return effectiveActivityPlaces(activity).some((visited) =>
+    normalizePlaceSearch(visited.name).includes(place),
+  );
+};
+
 export const applyFilters = (
   state: FilterState,
   activity: FilterableActivity,
@@ -340,8 +360,8 @@ export const applyFilters = (
     if (!matchesBinaryFilter(mode, activity[key])) return false;
   }
 
-  const search = normalizeSearch(state.search.trim());
-  if (search && !normalizeSearch(activity.name).includes(search)) return false;
+  const query = state.search.trim();
+  if (query && !matchesTextFilter(activity, query)) return false;
 
   return true;
 };
@@ -355,27 +375,26 @@ export const isolateSportGroup = <Group extends string>(
     (Object.keys(groups) as Group[]).map((group) => [group, group === only]),
   ) as Record<Group, boolean>;
 
-export type FilterScope = 'activities' | 'stats';
+/** Browsing counts every part; stats omits the reporting period and Only selected. */
+export type FilterScope = 'browse' | 'stats';
 
-/**
- * How many independent restrictions narrow the library, mirroring iOS
- * `ActivityStore.activeFilterCount`: search, sport types, place, each numeric
- * filter and each flag count once. The reporting period and "only selected"
- * apply to activity browsing only; stats omit them.
- */
+/** How many filters are on, as the Filters button's badge counts them; the
+ * same parts as iOS `ActivityStore.activeFilterCount`. Stats ignores the
+ * date range and Only selected, as its filters do. */
 export const activeFilterCount = (
-  state: Pick<FilterState, 'search' | 'sportType' | 'dateRange' | 'place'> &
-    Pick<FilterState, 'values' | 'binary'> & { onlySelected?: boolean },
-  scope: FilterScope = 'activities',
-): number => {
-  let count = state.search.trim() ? 1 : 0;
-  if (Object.values(state.sportType).some((selected) => !selected)) count += 1;
-  if (state.place) count += 1;
-  count += Object.values(state.values).filter(Boolean).length;
-  count += Object.values(state.binary).filter((mode) => mode !== 'any').length;
-  if (scope === 'activities') {
-    if (state.dateRange) count += 1;
-    if (state.onlySelected) count += 1;
+  state: FilterState & { onlySelected?: boolean },
+  scope: FilterScope = 'browse',
+) => {
+  let count = 0;
+  if (state.search.trim()) count++;
+  if (Object.values(state.sportType).some((on) => !on)) count++;
+  if (state.place) count++;
+  for (const filter of Object.values(state.values))
+    if (filter && Number.isFinite(filter.value)) count++;
+  for (const mode of Object.values(state.binary)) if (mode !== 'any') count++;
+  if (scope === 'browse') {
+    if (state.dateRange) count++;
+    if (state.onlySelected) count++;
   }
   return count;
 };

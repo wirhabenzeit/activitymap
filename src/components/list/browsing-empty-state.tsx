@@ -9,7 +9,7 @@ import { type FilterScope, activeFilterCount } from '~/store/filter';
 import { BrowsingEmptyView, browsingEmptyKind } from './browsing-empty-view';
 
 /** Stats keep the reporting period and "only selected"; list and map do not. */
-export function useClearFilters(scope: FilterScope = 'activities') {
+export function useClearFilters(scope: FilterScope = 'browse') {
   return useShallowStore((state) =>
     scope === 'stats' ? state.resetActivityFilters : state.resetFilters,
   );
@@ -17,7 +17,7 @@ export function useClearFilters(scope: FilterScope = 'activities') {
 
 /** Inline recovery for compact surfaces such as the selection bar. */
 export function ClearFiltersButton({
-  scope = 'activities',
+  scope = 'browse',
   className,
 }: {
   scope?: FilterScope;
@@ -40,7 +40,7 @@ export function ClearFiltersButton({
  * catalog copy and offers the same recovery as the native apps. */
 export function BrowsingEmptyState({
   libraryCount,
-  scope = 'activities',
+  scope = 'browse',
   selectionHidden,
   className,
 }: {
@@ -55,7 +55,7 @@ export function BrowsingEmptyState({
   const active = useShallowStore((state) => activeFilterCount(state, scope));
   const onlySelectedHidden = useShallowStore(
     (state) =>
-      scope === 'activities' && state.onlySelected && state.selected.length > 0,
+      scope === 'browse' && state.onlySelected && state.selected.length > 0,
   );
   const clear = useClearFilters(scope);
   return (

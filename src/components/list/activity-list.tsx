@@ -1,6 +1,8 @@
 'use client';
 
+import { ListFilter } from 'lucide-react';
 import React from 'react';
+import { useShallow } from 'zustand/shallow';
 
 import { ActivityCardContent } from '~/components/list/card';
 import { activityColumns } from '~/components/list/columns';
@@ -10,9 +12,12 @@ import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useListInspection } from '~/hooks/use-list-inspection';
 import { useShowOnMap } from '~/hooks/use-show-on-map';
 import type { Activity } from '~/lib/activity';
+import { applyTextFilter } from '~/lib/header-search';
 import { groupBy } from '~/lib/utils';
 import type { Photo } from '~/server/records';
-import { useShallowStore } from '~/store';
+import { store, useShallowStore } from '~/store';
+import { matchesTextFilter } from '~/store/filter';
+import { useHeaderSearch } from '~/store/header-search';
 
 export function ActivityListView({
   activities,
@@ -27,7 +32,29 @@ export function ActivityListView({
   hasNextPage?: boolean;
   isFetching?: boolean;
 }) {
-  const filterIDs = useBrowsingIDs(ordinaryFilterIDs);
+  const browsingIDs = useBrowsingIDs(ordinaryFilterIDs);
+  // While header search is open, the rows narrow as you type, by the same
+  // rule as the text filter. Filter makes the narrowing that filter.
+  const { searching, query, endSearch } = useHeaderSearch(
+    useShallow((state) => ({
+      searching: state.active,
+      query: state.query,
+      endSearch: state.end,
+    })),
+  );
+  React.useEffect(() => {
+    useHeaderSearch.setState({ narrowsRows: true });
+    return () => useHeaderSearch.setState({ narrowsRows: false });
+  }, []);
+  const narrowing = React.useDeferredValue(searching ? query.trim() : '');
+  const filterIDs = React.useMemo(() => {
+    if (!narrowing || !activities) return browsingIDs;
+    const byID = new Map(activities.map((activity) => [activity.id, activity]));
+    return browsingIDs.filter((id) => {
+      const activity = byID.get(id);
+      return activity !== undefined && matchesTextFilter(activity, narrowing);
+    });
+  }, [browsingIDs, activities, narrowing]);
   const filterIDSet = React.useMemo(() => new Set(filterIDs), [filterIDs]);
   const eligibleIDSet = React.useMemo(
     () => new Set(ordinaryFilterIDs),
@@ -83,15 +110,37 @@ export function ActivityListView({
     <div
       ref={containerRef}
       data-list-inspection-ready={ready}
-      className="h-full max-h-dvh w-full bg-muted"
+      className="flex h-full max-h-dvh w-full flex-col bg-muted"
       style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
     >
+      {narrowing && (
+        <div
+          data-testid="list-search-narrowing"
+          className="flex h-11 items-center gap-3 border-b bg-background px-3 text-sm"
+        >
+          <span role="status" className="text-muted-foreground tabular-nums">
+            {filterIDs.length} {filterIDs.length === 1 ? 'match' : 'matches'}
+          </span>
+          <button
+            type="button"
+            data-testid="list-search-apply-filter"
+            className="inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-full bg-[var(--activity-accent)]/10 px-3 text-[var(--activity-accent)] hover:bg-[var(--activity-accent)]/20"
+            onClick={() => {
+              applyTextFilter(store, narrowing, activities ?? [], false);
+              endSearch();
+            }}
+          >
+            <ListFilter className="size-4" aria-hidden />
+            Filter
+          </button>
+        </div>
+      )}
       <DataTable
         browsingKey="list"
         browsingDataReady={
           activities !== undefined && !hasNextPage && !isFetching
         }
-        className="h-full"
+        className="min-h-0 flex-1"
         columns={columns}
         data={rows}
         selected={selected}

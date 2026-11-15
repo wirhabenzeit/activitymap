@@ -4,19 +4,36 @@ import { Marker } from 'react-map-gl/mapbox';
 
 import { PlaceSymbol } from '~/components/place-symbol';
 import { usePlaceLibrary } from '~/hooks/use-place-library';
+import type { LibraryPlace } from '~/lib/place-library';
 import { primaryPlaceKind } from '~/lib/place-symbols';
 import { useShallowStore } from '~/store';
 
-/** The place filter on the map: an accent pin whose tip marks the place.
- *  Pointer events pass through to the routes and places beneath. */
+/** The place filter, and a place picked in header search, on the map: an
+ *  accent pin whose tip marks the place. Pointer events pass through to the
+ *  routes and places beneath. */
 export function PlaceFilterPin() {
   const { library } = usePlaceLibrary();
-  const place = useShallowStore((state) => state.place);
-  const item =
-    place && place.userId === library.userId
-      ? library.byId.get(place.id)
+  const { place, searchPlace } = useShallowStore((state) => ({
+    place: state.place,
+    searchPlace: state.searchPlace,
+  }));
+  const resolve = (value: typeof place | null) =>
+    value && value.userId === library.userId
+      ? library.byId.get(value.id)
       : undefined;
-  if (!item) return null;
+  const filtered = resolve(place);
+  const searched = resolve(searchPlace);
+  return (
+    <>
+      {filtered && <Pin item={filtered} label="Place filter" />}
+      {searched && searched.id !== filtered?.id && (
+        <Pin item={searched} label="Found place" />
+      )}
+    </>
+  );
+}
+
+function Pin({ item, label }: { item: LibraryPlace; label: string }) {
   return (
     <Marker
       longitude={item.longitude}
@@ -26,8 +43,10 @@ export function PlaceFilterPin() {
     >
       <span
         role="img"
-        aria-label={`Place filter: ${item.name}`}
-        data-testid="place-filter-pin"
+        aria-label={`${label}: ${item.name}`}
+        data-testid={
+          label === 'Place filter' ? 'place-filter-pin' : 'search-place-pin'
+        }
         className="flex flex-col items-center drop-shadow-md"
       >
         <span className="flex size-8 items-center justify-center rounded-full border-2 border-white bg-[var(--activity-accent)] text-white">

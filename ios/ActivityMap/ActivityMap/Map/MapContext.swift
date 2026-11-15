@@ -31,6 +31,8 @@ final class MapContext {
     private(set) var pendingRequest: Request?
     private(set) var locatedPosition: CLLocationCoordinate2D?
     var hiddenTargetID: Int?
+    /// A place picked in header search, pinned without filtering. A map tap clears it.
+    var highlightedPlaceID: String?
     var navigationError: String?
 
     struct Request: Equatable {

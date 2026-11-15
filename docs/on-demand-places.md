@@ -28,7 +28,8 @@ stream generation/revision before exposing memberships. A changed global version
 also invalidates the native projection when activity payloads themselves have not
 changed. Completed empty replacements and deletions remove previous memberships.
 
-Typing in the activity filter remains activity-name search. Choosing a labelled
+The text filter matches activity names and the names of visited places (see
+the parity contract's text search row). Choosing a labelled
 place suggestion consumes that query and creates one explicit Place chip;
 subsequent text is an independent AND constraint. Removing the chip preserves
 text and other filters; Clear filters removes it. Stats applies the same place
@@ -73,8 +74,9 @@ Verification: `shared/place-library-fixtures.v1.json` supplies cross-client
 counts, freshness and filter cases; `pnpm test:place-search-ui` checks production
 web controls with synthetic activities, including keyboard selection, restored
 filters, comparison history, completed-zero replacement, account changes and zero
-API requests. `PlaceLibraryTests` and `PlaceSearchUITests` cover the native model
-and the real filter/detail interaction and are registered in the native harness.
+API requests. `PlaceLibraryTests` and the header-search `FilterPanelUITests`
+cover the native model and the real search/filter interaction and are registered
+in the native harness.
 
 ## Request and data flow
 

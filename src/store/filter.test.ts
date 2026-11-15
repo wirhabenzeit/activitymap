@@ -303,33 +303,32 @@ void test('an invalid date update preserves the last valid active range', () => 
   assert.deepEqual(filterStore.getState().dateRange, valid);
 });
 
-void test('active filter count mirrors the native semantics and stats scope', () => {
-  const base = stateFor({});
+void test('the Filters badge counts each active filter; Stats skips date and selection', () => {
+  const base: FilterState = {
+    sportType: initializeSportType(),
+    sportGroup: deriveSportGroups(initializeSportType()),
+    dateRange: undefined,
+    values: initializeValues(),
+    search: '  ',
+    binary: initializeBinary(),
+  };
   assert.equal(activeFilterCount(base), 0);
-
-  const sportType = { ...base.sportType, Run: false };
-  const narrowed = {
+  const sportType = { ...initializeSportType(), Ride: false };
+  const state = {
     ...base,
+    search: 'pilatus',
     sportType,
-    sportGroup: deriveSportGroups(sportType),
-    search: '  morning ',
-    dateRange: { start: '2026-01-01', end: '2026-01-31' },
-    place: { id: 'place', userId: 'user', name: 'Zurich' },
+    dateRange: { start: '2026-01-01', end: '2026-12-31' },
+    place: { id: 'p', name: 'Pilátus', userId: 'alice' },
     values: {
-      ...base.values,
-      distance: { operator: '>=', value: 1 } as ValueFilter,
+      ...initializeValues(),
+      distance: { value: 10_000, operator: '>=' as const },
     },
-    binary: {
-      ...base.binary,
-      commute: 'yes',
-      flagged: 'no',
-    } as FilterState['binary'],
+    binary: { ...initializeBinary(), commute: 'no' as const },
     onlySelected: true,
   };
-  // sports + search + date + place + distance + 2 flags + only selected
-  assert.equal(activeFilterCount(narrowed), 8);
-  assert.equal(activeFilterCount(narrowed, 'stats'), 6);
-  assert.equal(activeFilterCount({ ...base, search: '   ' }), 0);
+  assert.equal(activeFilterCount(state), 7);
+  assert.equal(activeFilterCount(state, 'stats'), 5);
 });
 
 void test('only one sport group stays selected when isolating', () => {

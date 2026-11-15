@@ -14,7 +14,8 @@ struct FilterRail: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 4) {
-                ForEach(FilterPart.available(in: scope)) { item(for: $0) }
+                // Text and place filters are set from header search: shown only while on.
+                ForEach(FilterPart.available(in: scope).filter { $0 != .text || $0.isActive(store) }) { item(for: $0) }
                 Divider().padding(.horizontal, 12)
                 FilterResetButton(store: store, scope: scope, iconOnly: true)
             }
@@ -63,7 +64,7 @@ struct FilterRail: View {
 
     private static func popoverHeight(_ part: FilterPart) -> CGFloat {
         switch part {
-        case .search: 520
+        case .text: 150
         case .selection: 150
         case .sports: 560
         case .dates: 330

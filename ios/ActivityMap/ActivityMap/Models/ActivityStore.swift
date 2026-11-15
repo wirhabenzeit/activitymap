@@ -295,7 +295,7 @@ final class ActivityStore {
         // do not invalidate this snapshot; all filter setters bump the key.
         let data = activitiesRevision, filters = filterRevision
         if let cached = filteredSnapshot, cached.data == data, cached.filters == filters { return cached.activities }
-        let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+        let query = TextQuery(searchText)
         let result = activities.filter { matchesFilters($0, query: query, includeDate: true) }
         filteredSnapshot = (data, filters, result)
         filterBuildCount += 1
@@ -304,13 +304,42 @@ final class ActivityStore {
 
     /// Full authorized metadata; map/list dates and selection never narrow Stats.
     var statsActivities: [Activity] {
-        let query = Self.normalizedSearch(searchText.trimmingCharacters(in: .whitespacesAndNewlines))
+        let query = TextQuery(searchText)
         return activities.filter { matchesFilters($0, query: query, includeDate: false) }
     }
 
-    private func matchesFilters(_ activity: Activity, query: String, includeDate: Bool) -> Bool {
+    /// The text filter, header search and List narrowing share one rule: the
+    /// activity's name (ignoring case, keeping accents, as on the web: shared
+    /// parity fixtures) or a visited place's name (ignoring case and accents, as
+    /// place search does).
+    struct TextQuery {
+        let name: String
+        let place: String
+        init(_ text: String) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            name = ActivityStore.normalizedSearch(trimmed)
+            place = PlaceLibrary.normalizedSearch(trimmed)
+        }
+        var isEmpty: Bool { name.isEmpty }
+        func matchesName(_ activity: Activity) -> Bool { ActivityStore.normalizedSearch(activity.name).contains(name) }
+        @MainActor func matches(_ activity: Activity) -> Bool {
+            matchesName(activity) || PlaceLibrary.effectivePlaces(activity).contains { PlaceLibrary.normalizedSearch($0.name).contains(place) }
+        }
+    }
+
+    nonisolated static func normalizedSearch(_ text: String) -> String {
+        text.precomposedStringWithCanonicalMapping.lowercased()
+    }
+
+    /// How many activities the filters would show with this text filter instead.
+    func countWithTextFilter(_ text: String, includeDate: Bool) -> Int {
+        let query = TextQuery(text)
+        return activities.filter { matchesFilters($0, query: query, includeDate: includeDate) }.count
+    }
+
+    private func matchesFilters(_ activity: Activity, query: TextQuery, includeDate: Bool) -> Bool {
         if let selectedPlace, activity.placeMatches?.userID != selectedPlace.userID || !PlaceLibrary.effectivePlaces(activity).contains(where: { $0.id == selectedPlace.id }) { return false }
-        if !query.isEmpty, !Self.normalizedSearch(activity.name).contains(query) { return false }
+        if !query.isEmpty, !query.matches(activity) { return false }
         guard activeSportTypes.contains(activity.sportType) else { return false }
 
         if includeDate, let dateDayRange, !dateDayRange.contains(activity.localDayKey) { return false }
@@ -370,9 +399,6 @@ final class ActivityStore {
         return true
     }
 
-    private static func normalizedSearch(_ text: String) -> String {
-        text.precomposedStringWithCanonicalMapping.lowercased()
-    }
 
     func categorySelection(_ category: ActivityCategory) -> SportGroupSelection {
         let selected = activeSportTypes.intersection(category.sportTypes)

@@ -74,7 +74,6 @@ export const nativeSuites = [
   'ActivityMapTests/ActivityContinuationTests',
   'ActivityMapTests/PhotoGalleryTests',
   'ActivityMapUITests/ActivityPlacesUITests',
-  'ActivityMapUITests/PlaceSearchUITests',
   'ActivityMapUITests/FilterPanelUITests',
   'ActivityMapUITests/ActivityActionUITests',
   'ActivityMapUITests/StatsUITests',
@@ -85,8 +84,8 @@ export const nativeSuites = [
 ];
 
 export const nativePRUISelectors = [
-  'ActivityMapUITests/FilterPanelUITests/testSearchRowRidesOnTheKeyboardAndKeepsFilters',
-  'ActivityMapUITests/PlaceSearchUITests/testPlaceAutocompleteFilteringDetailsAndStatsHistory',
+  'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
+  'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
   'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
   'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
   'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
