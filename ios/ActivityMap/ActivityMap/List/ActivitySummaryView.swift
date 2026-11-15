@@ -16,15 +16,24 @@ struct ActivitySummaryView: View {
 
     private var mode: ActivitySummaryMode { store.listPresentation.settings.summaryMode }
     private var highlights: [ActivitySummaryMetric] { [.distance, .elapsedTime, .elevationGain] }
+    private var additionalMetrics: [ActivitySummaryMetric] {
+        ActivitySummaryMetric.allCases.filter { !highlights.contains($0) }
+    }
 
     var body: some View {
         if let summary = store.activitySummary {
             VStack(alignment: .leading, spacing: 12) {
-                ViewThatFits(in: .horizontal) {
-                    HStack(alignment: .firstTextBaseline) { heading(summary); Spacer(); hideButton }
-                    VStack(alignment: .leading, spacing: 4) { heading(summary); hideButton }
+                HStack {
+                    Text("Summary").font(.headline).accessibilityAddTraits(.isHeader)
+                        .accessibilityValue(mode.title)
+                    Spacer()
+                    Button { store.listPresentation.settings.summaryMode = .off } label: {
+                        Image(systemName: "xmark").font(.caption.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                            .frame(width: 44, height: 44).contentShape(Rectangle())
+                    }
+                    .accessibilityLabel("Turn off activity summary")
                 }
-                .fixedSize(horizontal: false, vertical: true)
                 if !store.selectedActivityIDs.isEmpty {
                     Picker("Summary scope", selection: Binding(get: { mode },
                                                                set: { store.listPresentation.settings.summaryMode = $0 })) {
@@ -35,40 +44,28 @@ struct ActivitySummaryView: View {
                     .frame(minHeight: 44)
                     .accessibilityIdentifier("activity-summary-scope")
                 }
-                Text(typeSize.isAccessibilitySize ? conciseScope : scopeExplanation)
-                    .accessibilityLabel(scopeExplanation).font(.caption).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
-                    ForEach(highlights) { metric in metricView(metric, summary: summary, alwaysShowCoverage: false) }
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+                    ForEach(highlights) { metric in metricView(metric, summary: summary) }
                 }
                 DisclosureGroup(isExpanded: expansion) {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Text("Means use only recorded activity values. Weighted average power is a source metric; activities are not weighted together.")
-                            .font(.caption).foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
-                            ForEach(ActivitySummaryMetric.allCases) { metric in
-                                metricView(metric, summary: summary, alwaysShowCoverage: true)
-                            }
-                        }
+                    LazyVGrid(columns: columns, alignment: .leading, spacing: 16) {
+                        ForEach(additionalMetrics) { metric in metricView(metric, summary: summary) }
                     }
                     .padding(.top, 8)
                 } label: {
-                    Text("All summary metrics").frame(minHeight: 44, alignment: .leading)
+                    Text("More metrics").frame(minHeight: 44, alignment: .leading)
                 }
                 .font(.subheadline)
                 .accessibilityIdentifier("activity-summary-expand")
             }
-            .padding(.vertical, 8)
+            .padding(.vertical, 4)
             .buttonStyle(.borderless)
             .accessibilityIdentifier("activity-summary")
         }
     }
 
     // A List cell and DisclosureGroup otherwise animate the same self-sizing
-    // content independently: labels slide through each other and scrolling
-    // moves the header during expansion. Commit the disclosure as one layout
-    // update, keeping native disclosure semantics without those nested motions.
+    // content independently. Commit the disclosure as one layout update.
     private var expansion: Binding<Bool> {
         Binding(get: { allMetricsExpanded }, set: { expanded in
             var transaction = Transaction(animation: nil)
@@ -81,53 +78,18 @@ struct ActivitySummaryView: View {
         typeSize.isAccessibilitySize ? [GridItem(.flexible(), alignment: .leading)]
             : [GridItem(.adaptive(minimum: 140), alignment: .leading)]
     }
-    private func heading(_ summary: ActivitySummary) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(typeSize.isAccessibilitySize ? "\(mode == .filtered ? "Filtered" : "Selected") summary" : "\(mode.title) summary")
-                .font(.headline).accessibilityAddTraits(.isHeader)
-                .accessibilityLabel("\(mode.title) summary")
-            Text("\(summary.activityCount) \(summary.activityCount == 1 ? "activity" : "activities") · \(summary.localDayCount) \(typeSize.isAccessibilitySize ? "" : "local ")\(summary.localDayCount == 1 ? "day" : "days")")
-                .accessibilityLabel("\(summary.activityCount) activities on \(summary.localDayCount) distinct activity-local calendar days")
-                .font(.caption).foregroundStyle(.secondary)
-                .accessibilityIdentifier("activity-summary-counts")
-        }
-        .fixedSize(horizontal: false, vertical: true)
-    }
-    private var hideButton: some View {
-        Button("Hide") { store.listPresentation.settings.summaryMode = .off }
-            .frame(minWidth: 44, minHeight: 44)
-            .accessibilityLabel("Turn off activity summary")
-    }
-    private var conciseScope: String {
-        if mode == .filtered { return "All filtered activities" }
-        return store.hiddenSelectedCount > 0 ? "\(store.hiddenSelectedCount) hidden selections included" : "All selected activities"
-    }
-    private var scopeExplanation: String {
-        switch mode {
-        case .off: ""
-        case .filtered: "All matching activities, including rows offscreen."
-        case .selected:
-            store.hiddenSelectedCount > 0
-                ? "Includes \(store.hiddenSelectedCount) selected activities hidden by filters."
-                : "All selected activities, including any hidden by filters."
-        }
-    }
-    private func metricView(_ metric: ActivitySummaryMetric, summary: ActivitySummary, alwaysShowCoverage: Bool) -> some View {
-        let aggregate = summary[metric]
-        let formatted = metric.formatted(aggregate.value, units: units, locale: locale)
-        let coverage = summary.activityCount == 0 ? "No activities in this scope" : "Recorded in \(aggregate.knownCount) of \(summary.activityCount) activities"
+
+    private func metricView(_ metric: ActivitySummaryMetric, summary: ActivitySummary) -> some View {
+        let formatted = metric.formatted(summary[metric].value, units: units, locale: locale)
         return VStack(alignment: .leading, spacing: 4) {
             Text(metric.title).font(.caption).foregroundStyle(.secondary)
-            Text(formatted).font(.subheadline.weight(.semibold)).monospacedDigit()
-            if alwaysShowCoverage || aggregate.knownCount < summary.activityCount {
-                Text(coverage).font(.caption2).foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(formatted).font(.title3.weight(.semibold)).monospacedDigit()
+                .fixedSize(horizontal: false, vertical: true)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(metric.title)
-        .accessibilityValue("\(formatted == Formatters.unknown ? "Not recorded" : formatted). \(coverage)")
+        .accessibilityValue(formatted == Formatters.unknown ? "Not recorded" : formatted)
         .accessibilityIdentifier("activity-summary-\(metric.id)")
     }
 }

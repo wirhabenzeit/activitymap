@@ -28,20 +28,21 @@ final class ListSelectionUITests: XCTestCase {
         XCTAssertTrue(share.waitForExistence(timeout: 5))
         app.buttons["List view options"].tap()
         app.buttons["Show summary"].tap()
-        let filteredHeading = app.staticTexts["Filtered activities summary"]
+        let filteredHeading = app.staticTexts["Summary"]
         XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
         let scope = app.segmentedControls.containing(.button, identifier: "Selected").firstMatch
         XCTAssertTrue(scope.waitForExistence(timeout: 5), app.debugDescription)
         scope.buttons["Selected"].tap()
-        XCTAssertTrue(app.staticTexts["Selected activities summary"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(scope.buttons["Selected"].isSelected)
+        XCTAssertTrue(app.staticTexts["Summary"].waitForExistence(timeout: 5), app.debugDescription)
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = "Selected summary and Combine share"
         capture.lifetime = .keepAlways
         add(capture)
-        let heading = app.staticTexts["Selected activities summary"]
+        let heading = app.staticTexts["Summary"]
         let headingY = heading.frame.minY
-        let disclosure = app.buttons.matching(NSPredicate(format: "label == %@", "All summary metrics")).firstMatch
-        let detail = app.staticTexts["Means use only recorded activity values. Weighted average power is a source metric; activities are not weighted together."]
+        let disclosure = app.buttons.matching(NSPredicate(format: "label == %@", "More metrics")).firstMatch
+        let detail = app.otherElements.matching(NSPredicate(format: "label == %@", "Moving time")).firstMatch
         for _ in 0..<3 {
             disclosure.tap()
             XCTAssertTrue(detail.waitForExistence(timeout: 5), app.debugDescription)
