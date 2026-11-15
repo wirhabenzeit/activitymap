@@ -11,6 +11,7 @@ import {
 import { type ReactNode, useRef, useState } from 'react';
 
 import { ClearFiltersButton } from '~/components/list/browsing-empty-state';
+import { SelectionMergeButton } from '~/components/merge/merge-activities-dialog';
 import { SelectionShareButton } from '~/components/share-button';
 import { Button } from '~/components/ui/button';
 import { useToast } from '~/hooks/use-toast';
@@ -224,6 +225,7 @@ export function SelectionActions({
   return (
     <div className="flex shrink-0 items-center">
       {controls}
+      {showShare && <SelectionMergeButton activities={activities} />}
       {showShare && <SelectionDownloadButton activities={activities} />}
       {showShare && <SelectionShareButton activities={activities} />}
       <ClearSelectionButton />

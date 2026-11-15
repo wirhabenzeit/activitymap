@@ -20,7 +20,7 @@ export type CurrentUserDTO = {
   /** What the approved Strava scopes allow; `null` when not yet known. */
   stravaPermissions: StravaPermissions | null;
   /** Web features currently limited to admin athletes. */
-  features?: { activityGPXExport?: boolean };
+  features?: { activityMerge?: boolean; activityGPXExport?: boolean };
 };
 
 export function toCurrentUserDTO(

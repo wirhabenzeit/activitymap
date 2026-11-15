@@ -7,6 +7,7 @@ import {
 } from '~/components/auth/strava-connect';
 import { AppHeader } from '~/components/layout/app-header';
 import { AppSidebar } from '~/components/layout/app-sidebar';
+import { MergeActivitiesProvider } from '~/components/merge/merge-activities-dialog';
 import { AuthProvider } from '~/components/providers/auth';
 import { OfflineSyncProvider } from '~/components/providers/offline-sync';
 import { ServiceWorkerProvider } from '~/components/providers/service-worker';
@@ -56,7 +57,7 @@ export default async function AppShellLayout({
           ...toCurrentUserDTO(user, account),
           ...(liveUrl && { convexLive: { url: liveUrl } }),
           ...(isAdminAthlete(user.athlete_id) && {
-            features: { activityGPXExport: true },
+            features: { activityMerge: true, activityGPXExport: true },
           }),
         }
       : null;
@@ -70,25 +71,27 @@ export default async function AppShellLayout({
         <OfflineSyncProvider />
         <AuthProvider initialAuth={initialAuth}>
           <BrowsingProvider>
-            <StravaConnectProvider>
-              <SidebarProvider
-                className="flex h-dvh flex-col"
-                style={{ height: '100dvh' }}
-              >
-                <AppHeader />
-                <div className="flex min-h-0 flex-1 overflow-hidden">
-                  <AppSidebar />
-                  <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                    <div className="h-14 w-full" />
-                    <div className="min-h-0 w-full flex-1 overflow-hidden">
-                      {children}
-                      <SignedOutConnectPanel />
-                      <FirstSummaryFetch />
-                    </div>
-                  </main>
-                </div>
-              </SidebarProvider>
-            </StravaConnectProvider>
+            <MergeActivitiesProvider>
+              <StravaConnectProvider>
+                <SidebarProvider
+                  className="flex h-dvh flex-col"
+                  style={{ height: '100dvh' }}
+                >
+                  <AppHeader />
+                  <div className="flex min-h-0 flex-1 overflow-hidden">
+                    <AppSidebar />
+                    <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+                      <div className="h-14 w-full" />
+                      <div className="min-h-0 w-full flex-1 overflow-hidden">
+                        {children}
+                        <SignedOutConnectPanel />
+                        <FirstSummaryFetch />
+                      </div>
+                    </main>
+                  </div>
+                </SidebarProvider>
+              </StravaConnectProvider>
+            </MergeActivitiesProvider>
           </BrowsingProvider>
           <Toaster />
           <ToastManager />
