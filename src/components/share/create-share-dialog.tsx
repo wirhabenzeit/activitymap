@@ -9,7 +9,11 @@ import {
   AppDialogFooter,
   AppDialogHeader,
 } from '~/components/app-dialog';
-import { MY_SHARE_LINKS_QUERY_KEY } from '~/components/share/manage-shares-dialog';
+import {
+  MY_SHARE_LINKS_QUERY_KEY,
+  formatActivityCount,
+  formatTimestamp,
+} from '~/components/share/manage-shares-dialog';
 import { Button } from '~/components/ui/button';
 import {
   DialogClose,
@@ -30,6 +34,7 @@ import { useDateFormat } from '~/hooks/use-display-preferences';
 import { useToast } from '~/hooks/use-toast';
 import type { Activity } from '~/lib/activity';
 import { formatPreferredDate } from '~/lib/date-preferences';
+import { message } from '~/lib/presentation/messages';
 import { createShareLink } from '~/lib/sharing/client';
 import {
   DEFAULT_SHARE_LINK_FIELD_OPTIONS,
@@ -51,10 +56,6 @@ const EXPIRY_OPTIONS = [
 
 type Step = 'configure' | 'created';
 
-function pluralizeTracks(count: number) {
-  return `${count} ${count === 1 ? 'track' : 'tracks'}`;
-}
-
 /** The configuration screen discloses the exact scope and privacy before Create link. */
 export function CreateShareDialog({
   activities: selectedActivities,
@@ -73,9 +74,10 @@ export function CreateShareDialog({
   );
   const [isCreating, setIsCreating] = useState(false);
   const [createdUrl, setCreatedUrl] = useState<string | null>(null);
+  const [createdExpiresAt, setCreatedExpiresAt] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const selectionLabel = pluralizeTracks(selectedActivities.length);
+  const selectionLabel = formatActivityCount(selectedActivities.length);
   const scopeError =
     selectedActivities.length > 200
       ? 'A link can share up to 200 activities. Choose a smaller group.'
@@ -95,6 +97,7 @@ export function CreateShareDialog({
         window.location.origin,
       ).toString();
       setCreatedUrl(url);
+      setCreatedExpiresAt(result.expiresAt);
       setStep('created');
       void queryClient.invalidateQueries({
         queryKey: MY_SHARE_LINKS_QUERY_KEY,
@@ -121,7 +124,7 @@ export function CreateShareDialog({
     return (
       <>
         <AppDialogHeader>
-          <DialogTitle>Link created</DialogTitle>
+          <DialogTitle>{message('sharing.linkCreated')}</DialogTitle>
           <DialogDescription>
             Copy it now. For your privacy, the full link is only shown once.
           </DialogDescription>
@@ -129,7 +132,7 @@ export function CreateShareDialog({
         <AppDialogBody>
           <div className="flex items-center gap-2">
             <Label htmlFor="created-link" className="sr-only">
-              Share link
+              {message('sharing.shareLink')}
             </Label>
             <Input
               id="created-link"
@@ -148,10 +151,15 @@ export function CreateShareDialog({
               {copied ? 'Copied' : 'Copy'}
             </Button>
           </div>
+          {createdExpiresAt && (
+            <p className="text-xs text-muted-foreground">
+              {message('sharing.expires')} {formatTimestamp(createdExpiresAt)}
+            </p>
+          )}
         </AppDialogBody>
         <AppDialogFooter>
           <Button variant="outline" onClick={onShowLinks}>
-            Your links
+            {message('sharing.yourLinks')}
           </Button>
           <DialogClose asChild>
             <Button>Done</Button>
@@ -165,16 +173,16 @@ export function CreateShareDialog({
     return (
       <>
         <AppDialogHeader>
-          <DialogTitle>Share tracks</DialogTitle>
+          <DialogTitle>{message('sharing.shareActivities')}</DialogTitle>
           <DialogDescription>
-            Open an activity’s details to share just that track. To share a
+            Open an activity’s details to share just that activity. To share a
             group from the map, turn on Combine selections and select the
             activities you want to include.
           </DialogDescription>
         </AppDialogHeader>
         <AppDialogFooter>
           <Button variant="outline" onClick={onShowLinks}>
-            Your links
+            {message('sharing.yourLinks')}
           </Button>
           <DialogClose asChild>
             <Button>OK</Button>
@@ -189,8 +197,8 @@ export function CreateShareDialog({
       <AppDialogHeader>
         <DialogTitle>Share {selectionLabel}</DialogTitle>
         <DialogDescription>
-          Anyone with this link can view these tracks on a map until it expires
-          or you revoke it.
+          Anyone with this link can view these activities on a map until it
+          expires or you revoke it.
         </DialogDescription>
       </AppDialogHeader>
 
@@ -222,7 +230,9 @@ export function CreateShareDialog({
 
         <div className="divide-y rounded-md border">
           <div className="flex items-center justify-between gap-4 px-3 py-2">
-            <Label htmlFor="share-expiry">Expires after</Label>
+            <Label htmlFor="share-expiry">
+              {message('sharing.expiresAfter')}
+            </Label>
             <Select
               disabled={isCreating}
               value={String(expiresInMs)}
@@ -247,7 +257,7 @@ export function CreateShareDialog({
           >
             <span className="grid gap-1">
               <span className="text-sm leading-none font-medium">
-                Show start and finish
+                {message('sharing.showStartAndFinish')}
               </span>
               <span className="text-xs text-muted-foreground">
                 Otherwise the first and last {SHARED_ROUTE_END_TRIM_METERS} m
@@ -267,10 +277,12 @@ export function CreateShareDialog({
       </AppDialogBody>
       <AppDialogFooter>
         <Button variant="outline" onClick={onShowLinks} disabled={isCreating}>
-          Your links
+          {message('sharing.yourLinks')}
         </Button>
         <Button onClick={handleCreate} disabled={isCreating || !!scopeError}>
-          {isCreating ? 'Creating…' : 'Create link'}
+          {isCreating
+            ? message('sharing.creating')
+            : message('sharing.createLink')}
         </Button>
       </AppDialogFooter>
     </>

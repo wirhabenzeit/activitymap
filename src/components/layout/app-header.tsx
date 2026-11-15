@@ -6,10 +6,12 @@ import * as React from 'react';
 import { Separator } from '~/components/ui/separator';
 import { SidebarTrigger, useSidebar } from '~/components/ui/sidebar';
 import { message } from '~/lib/presentation/messages';
+import { isStatsRoute } from '~/lib/stats/route';
 import { store, useShallowStore } from '~/store';
 import { activeFilterCount } from '~/store/filter';
 import { useHeaderSearch } from '~/store/header-search';
 
+import { AccountButton, SettingsDialogHost } from './account-entry';
 import { HeaderSearchBar, HeaderSearchButton } from './header-search';
 import { MainNav } from './main-nav';
 
@@ -18,14 +20,10 @@ export const AppHeader = () => {
   const { active, begin, end } = useHeaderSearch();
   const { isMobile, setOpenMobile } = useSidebar();
   const filterCount = useShallowStore((state) =>
-    activeFilterCount(
-      state,
-      pathname?.startsWith('/stats') ? 'stats' : 'browse',
-    ),
+    activeFilterCount(state, isStatsRoute(pathname) ? 'stats' : 'browse'),
   );
   React.useEffect(() => {
-    if (pathname?.startsWith('/stats'))
-      store.getState().setCombineSelections(false);
+    if (isStatsRoute(pathname)) store.getState().setCombineSelections(false);
   }, [pathname]);
   // Search is transient: leaving the view ends it.
   React.useEffect(() => end, [pathname, end]);
@@ -67,10 +65,12 @@ export const AppHeader = () => {
             <MainNav />
             <div className="flex flex-1 items-center justify-end">
               <HeaderSearchButton onBegin={beginSearch} />
+              <AccountButton />
             </div>
           </>
         )}
       </div>
+      <SettingsDialogHost />
     </header>
   );
 };

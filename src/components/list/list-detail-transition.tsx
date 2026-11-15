@@ -10,6 +10,7 @@ import {
 import { type ReactNode, type RefObject, useEffect, useRef } from 'react';
 
 import { Button } from '~/components/ui/button';
+import { message } from '~/lib/presentation/messages';
 import { cn } from '~/lib/utils';
 
 import { type DetailPresentation } from './inspection';
@@ -108,7 +109,9 @@ function DetailPage({
             variant="ghost"
             onClick={onBack}
             aria-label={
-              presentation === 'panel' ? 'Close activity detail' : backLabel
+              presentation === 'panel'
+                ? message('action.closeActivityDetails')
+                : backLabel
             }
             className="min-w-0 gap-1 px-1 text-xs sm:px-2 sm:text-sm"
           >

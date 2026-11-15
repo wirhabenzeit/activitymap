@@ -103,7 +103,9 @@ try {
   await panel.getByRole('button', { name: 'Fit route', exact: true }).click();
   await page.waitForSelector('[data-route-fit="idle"]');
   await count(5);
-  await panel.getByRole('button', { name: /Back to 5 routes/ }).click();
+  await panel
+    .getByRole('button', { name: 'Back to selected activities' })
+    .click();
   await panel
     .getByRole('button', { name: 'Fit selection', exact: true })
     .waitFor();

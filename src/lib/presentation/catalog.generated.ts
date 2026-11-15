@@ -113,10 +113,10 @@ export const presentation = {
     },
     "fit": {
       "message": "action.fit",
-      "webGlyph": "Expand",
-      "iosGlyph": "arrow.up.left.and.arrow.down.right",
+      "webGlyph": "Scan",
+      "iosGlyph": "viewfinder",
       "mirrorsInRTL": false,
-      "intent": "Fit available activity routes in the map viewport.",
+      "intent": "Fit available activity routes in the map viewport. Distinct from expanding a panel or tile.",
       "colorToken": "foreground"
     },
     "showOnMap": {
@@ -145,14 +145,14 @@ export const presentation = {
     },
     "activate": {
       "message": "action.activate",
-      "webGlyph": "Locate",
-      "iosGlyph": "location",
+      "webGlyph": "Eye",
+      "iosGlyph": "eye",
       "mirrorsInRTL": false,
-      "intent": "Make this activity the active map route without changing selection.",
+      "intent": "Make this activity the active (highlighted) map route without changing selection: the one currently in view. Deliberately not a location pin or crosshair, which mean locate-me on the map.",
       "colorToken": "foreground",
       "iosGlyphVariants": {
-        "active": "location.fill",
-        "badge": "location.fill"
+        "active": "eye.fill",
+        "badge": "eye.fill"
       }
     },
     "exportGPX": {

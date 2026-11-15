@@ -1,7 +1,6 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Edit } from 'lucide-react';
 import { type ComponentType } from 'react';
 import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -55,7 +54,9 @@ import {
   mutationFailureNotice,
   mutationNotice,
 } from '~/lib/activity-mutation-notice';
+import { semanticAction } from '~/lib/presentation/icons';
 import { message } from '~/lib/presentation/messages';
+import { sportTitle } from '~/lib/presentation/sport-title';
 import { aliasMap, colorMap, iconMap } from '~/settings/category';
 import { useShallowStore } from '~/store';
 
@@ -287,7 +288,7 @@ export function ProfileForm({
                         <SelectItem key={name} value={name}>
                           <div className="flex items-center space-x-2">
                             <Icon className="size-4" style={{ color }} />
-                            <span>{name}</span>
+                            <span>{sportTitle(name)}</span>
                           </div>
                         </SelectItem>
                       ))}
@@ -349,6 +350,7 @@ export function EditActivity({
   commands?: ReturnType<typeof useActivityMutations>;
 }) {
   const { canEdit, editReason } = useShallowStore(activityMutationAvailability);
+  const { Icon: EditIcon } = semanticAction('edit');
   const [localOpen, setLocalOpen] = useState(false);
   const boundCommands = useActivityMutations(activity.id);
   const commands = suppliedCommands ?? boundCommands;
@@ -389,7 +391,7 @@ export function EditActivity({
                 : message('activity.edit.title')
             }
           >
-            <Edit className="size-4" />
+            <EditIcon className="size-4" aria-hidden="true" />
           </Button>
         </DialogTrigger>
       )}

@@ -1,9 +1,7 @@
 'use client';
 
 import { ChevronsUpDown, Info, Loader2, LogOut, Settings2 } from 'lucide-react';
-import * as React from 'react';
 
-import { SettingsDialog } from '~/components/settings/settings-dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '~/components/ui/avatar';
 import {
   DropdownMenu,
@@ -20,12 +18,15 @@ import { useToast } from '~/hooks/use-toast';
 import { clearLocalAccountData } from '~/lib/account-deletion';
 import { signOut } from '~/lib/auth-client';
 import { displayEmail, safeReturnPath } from '~/lib/auth-return';
+import { message } from '~/lib/presentation/messages';
 import { cn } from '~/lib/utils';
 import {
   checkWebhookStatus,
   createWebhookSubscription,
 } from '~/server/strava/actions';
 import { useShallowStore } from '~/store';
+
+import { openSettingsDialog } from '../settings-dialog-state';
 
 export function UserSettings() {
   const { user, isInitialized } = useShallowStore((state) => ({
@@ -116,7 +117,6 @@ export function UserSettings() {
     }
   };
 
-  const [settingsOpen, setSettingsOpen] = React.useState(false);
   const email = displayEmail(user?.email);
 
   // The app shell resolves the session on the server, so a reload is what
@@ -165,9 +165,6 @@ export function UserSettings() {
                     isLoadingActivities ? 'opacity-100' : 'opacity-0',
                   )}
                 />
-                <span role="status" className="sr-only">
-                  {isLoadingActivities ? 'Loading activities' : ''}
-                </span>
                 <AvatarFallback className="rounded-lg"></AvatarFallback>
               </Avatar>
               <div className="grid flex-1 text-left text-sm leading-tight">
@@ -197,11 +194,11 @@ export function UserSettings() {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem
-              onClick={() => setSettingsOpen(true)}
+              onClick={openSettingsDialog}
               className="cursor-pointer"
             >
               <Settings2 className="mr-2 h-4 w-4" />
-              Settings
+              {message('navigation.settings')}
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             {isDevelopment && (
@@ -211,14 +208,14 @@ export function UserSettings() {
                   className="cursor-pointer"
                 >
                   <Info className="mr-2 h-4 w-4" />
-                  Check Webhook Status
+                  Check webhook status
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleCreateWebhook}
                   className="cursor-pointer"
                 >
                   <Info className="mr-2 h-4 w-4" />
-                  Create Webhook Subscription
+                  Create webhook subscription
                 </DropdownMenuItem>
               </>
             )}
@@ -228,13 +225,11 @@ export function UserSettings() {
               className="cursor-pointer text-destructive focus:bg-destructive focus:text-destructive-foreground"
             >
               <LogOut className="mr-2 h-4 w-4" />
-              Sign Out
+              {message('account.signOut')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         )}
       </DropdownMenu>
-
-      <SettingsDialog open={settingsOpen} onOpenChange={setSettingsOpen} />
     </SidebarMenuItem>
   );
 }

@@ -4,11 +4,16 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft } from 'lucide-react';
 import { useState } from 'react';
 
-import { AppDialogBody, AppDialogHeader } from '~/components/app-dialog';
+import {
+  AppDialogBody,
+  AppDialogFooter,
+  AppDialogHeader,
+} from '~/components/app-dialog';
 import { Button } from '~/components/ui/button';
 import { DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import type { ShareLinkSummaryDTO } from '~/contracts/v1/share-links';
 import { useToast } from '~/hooks/use-toast';
+import { message } from '~/lib/presentation/messages';
 import { listMyShareLinks, revokeShareLink } from '~/lib/sharing/client';
 import { cn } from '~/lib/utils';
 
@@ -26,7 +31,11 @@ const STATUS_STYLE: Record<
   revoked: { label: 'Revoked', className: 'bg-muted text-muted-foreground' },
 };
 
-function formatTimestamp(value: string) {
+export function formatActivityCount(count: number) {
+  return `${count} ${count === 1 ? 'activity' : 'activities'}`;
+}
+
+export function formatTimestamp(value: string) {
   return new Date(value).toLocaleString(undefined, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -54,6 +63,7 @@ export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [revokingId, setRevokingId] = useState<string | null>(null);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
 
   const sharesQuery = useQuery({
     queryKey: MY_SHARE_LINKS_QUERY_KEY,
@@ -77,21 +87,66 @@ export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
       toast({
         title: 'Could not revoke share link',
         description:
-          error instanceof Error ? error.message : 'Please try again.',
+          error instanceof Error
+            ? error.message
+            : message('sharing.revocationCouldNotBeConfirmedRefreshYourLinks'),
         variant: 'destructive',
       });
     },
-    onSettled: () => setRevokingId(null),
+    onSettled: () => {
+      setRevokingId(null);
+      setConfirmingId(null);
+    },
   });
 
   const shares = sharesQuery.data;
   const emptyMessage = sharesQuery.isError
-    ? 'Could not load your share links.'
+    ? message('sharing.couldnTLoadYourLinksCheckYourConnection')
     : shares === undefined
-      ? 'Loading…'
+      ? message('sharing.loadingLinks')
       : shares.length === 0
-        ? 'You have not created any share links yet.'
+        ? message('sharing.youHaveNoShareLinks')
         : null;
+  const confirming =
+    shares?.find(
+      (share) => share.id === confirmingId && share.status === 'active',
+    ) ?? null;
+
+  if (confirming) {
+    const isRevoking = revokingId === confirming.id;
+    return (
+      <>
+        <AppDialogHeader>
+          <DialogTitle>{message('sharing.revokeThisLink')}</DialogTitle>
+          <DialogDescription>
+            {message('sharing.anyoneWithThisLinkWillLoseAccessImmediately')}
+          </DialogDescription>
+        </AppDialogHeader>
+        <AppDialogBody>
+          <p className="text-sm text-muted-foreground">
+            {formatActivityCount(confirming.activityCount)} ·{' '}
+            {describeShare(confirming)}
+          </p>
+        </AppDialogBody>
+        <AppDialogFooter>
+          <Button
+            variant="outline"
+            onClick={() => setConfirmingId(null)}
+            disabled={isRevoking}
+          >
+            {message('activity.edit.cancel')}
+          </Button>
+          <Button
+            variant="destructive"
+            onClick={() => revokeMutation.mutate(confirming.id)}
+            disabled={isRevoking}
+          >
+            {isRevoking ? 'Revoking…' : message('sharing.revokeLink')}
+          </Button>
+        </AppDialogFooter>
+      </>
+    );
+  }
 
   return (
     <>
@@ -106,7 +161,7 @@ export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
             <ArrowLeft />
             <span className="sr-only">Back</span>
           </Button>
-          <DialogTitle>Your share links</DialogTitle>
+          <DialogTitle>{message('sharing.yourLinks')}</DialogTitle>
         </div>
         <DialogDescription>
           Revoking a link takes effect immediately.
@@ -144,8 +199,7 @@ export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
                           'text-sm leading-none font-medium',
                         )}
                       >
-                        {share.activityCount}{' '}
-                        {share.activityCount === 1 ? 'track' : 'tracks'}
+                        {formatActivityCount(share.activityCount)}
                       </span>
                       <span
                         className={cn(
@@ -167,7 +221,7 @@ export function ManageSharesDialog({ onBack }: { onBack: () => void }) {
                       variant="ghost"
                       size="sm"
                       className="shrink-0 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                      onClick={() => revokeMutation.mutate(share.id)}
+                      onClick={() => setConfirmingId(share.id)}
                       disabled={revokingId === share.id}
                     >
                       {revokingId === share.id ? 'Revoking…' : 'Revoke'}

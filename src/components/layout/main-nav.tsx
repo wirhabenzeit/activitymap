@@ -7,30 +7,27 @@ import { usePathname } from 'next/navigation';
 import { message } from '~/lib/presentation/messages';
 import { cn } from '~/lib/utils';
 
+import { type NavigationView, navigationView } from './nav-view';
+
+const items: { view: NavigationView; href: string; label: () => string }[] = [
+  { view: 'map', href: '/map', label: () => message('navigation.map') },
+  { view: 'list', href: '/list', label: () => message('navigation.list') },
+  {
+    view: 'stats',
+    href: '/stats/tiles',
+    label: () => message('navigation.stats'),
+  },
+];
+
 export function MainNav() {
-  const pathname = usePathname();
-
-  // Get current view from pathname for highlighting
-  const getCurrentView = () => {
-    if (pathname === '/list') return 'list';
-    if (pathname?.startsWith('/stats')) return 'stats';
-    return 'map'; // default to map for root path
-  };
-
-  const currentView = getCurrentView();
+  const currentView = navigationView(usePathname());
 
   return (
     <div className="mr-4 ml-2 flex">
       <Link
         href="/"
-        aria-current={currentView === 'map' ? 'page' : undefined}
         aria-label={message('navigation.home')}
-        className={cn(
-          'mr-4 flex min-h-11 items-center space-x-2 hover:text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 lg:mr-6',
-          currentView === 'map'
-            ? 'text-header-foreground'
-            : 'text-header-foreground/60',
-        )}
+        className="mr-4 flex min-h-11 items-center space-x-2 text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 lg:mr-6"
       >
         <Image
           src="/app-mark.svg"
@@ -45,30 +42,21 @@ export function MainNav() {
         aria-label={message('navigation.view')}
         className="flex items-center gap-4 text-sm font-semibold lg:gap-6"
       >
-        <Link
-          href="/list"
-          aria-current={currentView === 'list' ? 'page' : undefined}
-          className={cn(
-            'inline-flex min-h-11 items-center hover:text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4',
-            currentView === 'list'
-              ? 'text-header-foreground'
-              : 'text-header-foreground/60',
-          )}
-        >
-          {message('navigation.list')}
-        </Link>
-        <Link
-          href="/stats/tiles"
-          aria-current={currentView === 'stats' ? 'page' : undefined}
-          className={cn(
-            'inline-flex min-h-11 items-center hover:text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4',
-            currentView === 'stats'
-              ? 'text-header-foreground'
-              : 'text-header-foreground/60',
-          )}
-        >
-          {message('navigation.stats')}
-        </Link>
+        {items.map(({ view, href, label }) => (
+          <Link
+            key={view}
+            href={href}
+            aria-current={currentView === view ? 'page' : undefined}
+            className={cn(
+              'inline-flex min-h-11 items-center hover:text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4',
+              currentView === view
+                ? 'text-header-foreground'
+                : 'text-header-foreground/60',
+            )}
+          >
+            {label()}
+          </Link>
+        ))}
       </nav>
     </div>
   );

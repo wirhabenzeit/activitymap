@@ -1,6 +1,5 @@
 import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
 import type { Feature, GeoJsonProperties, Geometry } from 'geojson';
-import { Download } from 'lucide-react';
 import Image from 'next/image';
 import React from 'react';
 import Markdown from 'react-markdown';
@@ -14,6 +13,7 @@ import {
   CardHeader,
   CardTitle,
 } from '~/components/ui/card';
+import { semanticAction } from '~/lib/presentation/icons';
 
 interface FeatureInfoCardProps {
   feature: Feature<Geometry, GeoJsonProperties> | null;
@@ -25,6 +25,8 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
   onClose,
 }) => {
   if (!feature) return null;
+  const gpxAction = semanticAction('exportGPX');
+  const GpxIcon = gpxAction.Icon;
   const properties = feature.properties ?? {};
   const propertyMap = properties as Record<string, unknown>;
   const getStringProperty = (key: string): string | undefined => {
@@ -200,7 +202,7 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
             className="flex-1"
             onClick={() => window.open(originalUrl, '_blank')}
           >
-            View Details
+            View details
           </Button>
         )}
         {(hasGeometry || hasExternalGpxUrl) && (
@@ -210,8 +212,8 @@ export const FeatureInfoCard: React.FC<FeatureInfoCardProps> = ({
             className={originalUrl ? 'w-auto' : 'flex-1'}
             onClick={handleGpxClick}
           >
-            <Download className="mr-2 h-4 w-4" />
-            GPX
+            <GpxIcon className="mr-2 h-4 w-4" aria-hidden="true" />
+            {gpxAction.label}
           </Button>
         )}
       </CardFooter>

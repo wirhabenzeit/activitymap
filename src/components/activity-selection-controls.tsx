@@ -1,11 +1,13 @@
 'use client';
 
-import { Check, Funnel, ListChecks, X } from 'lucide-react';
+import { Check, ListChecks, SquareCheckBig, X } from 'lucide-react';
 import type { ReactNode } from 'react';
 
+import { ClearFiltersButton } from '~/components/list/browsing-empty-state';
 import { SelectionShareButton } from '~/components/share-button';
 import { Button } from '~/components/ui/button';
 import type { Activity } from '~/lib/activity';
+import { message } from '~/lib/presentation/messages';
 import { store, useShallowStore } from '~/store';
 
 export function SelectionCount({
@@ -36,7 +38,10 @@ export function SelectionCount({
             title="Showing selected activities only"
             aria-label="Showing selected activities only"
           >
-            <Funnel className="size-3 text-header-background" aria-hidden />
+            <SquareCheckBig
+              className="size-3 text-header-background"
+              aria-hidden
+            />
           </span>
         )}
       </div>
@@ -44,13 +49,18 @@ export function SelectionCount({
         onlySelected ||
         hidden > 0 ||
         filteredCount !== undefined) && (
-        <div className="truncate text-[11px] leading-4 text-muted-foreground">
+        <div className="flex items-center gap-2 truncate text-[11px] leading-4 text-muted-foreground">
           {combine ? (
             <span className="text-header-background">Combine on</span>
           ) : onlySelected ? (
             'Selected only'
           ) : hidden > 0 ? (
-            `${hidden} hidden by filters`
+            <>
+              <span className="truncate">
+                {message('list.hidden', { count: hidden })}
+              </span>
+              <ClearFiltersButton className="shrink-0" />
+            </>
           ) : (
             `${filteredCount} activities`
           )}

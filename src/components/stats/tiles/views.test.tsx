@@ -358,7 +358,8 @@ void test('expanded training history exposes bounded presets and period totals',
     /Volume chart style|>Area<|>Bars<|Previous period|Next period/,
   );
   assert.match(html, />By week</);
-  assert.match(html, /role="combobox"/);
+  assert.match(html, /role="group" aria-label="Volume grouping"/);
+  assert.doesNotMatch(html, /role="combobox"/);
   assert.match(html, /2\.0 h/);
   assert.match(html, /Period totals/);
   assert.doesNotMatch(html, /<details|<summary/);

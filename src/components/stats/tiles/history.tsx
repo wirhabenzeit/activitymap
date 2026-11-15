@@ -1,16 +1,8 @@
 'use client';
 
-import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '~/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '~/components/ui/select';
 import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import {
@@ -29,8 +21,6 @@ import {
   calendarSummaryWindow,
   dailyTotals,
   dateOfDay,
-  monthStart,
-  yearStart,
 } from '~/lib/stats/tile-series';
 import { categorySettings } from '~/settings/category';
 import { type StatsMetric } from '~/settings/stats-tiles.generated';
@@ -38,57 +28,16 @@ import { type StatsMetric } from '~/settings/stats-tiles.generated';
 import { ActivityRow } from './activity-row';
 import { WeekdayRows } from './calendar';
 import { Measure, SportArea } from './charts';
+import { StatsChoices } from './choices';
 import { monthName, shortDate, statsFormat } from './format';
 import { type TileContext } from './tiles';
 
-function PeriodNavigation({
-  label,
-  previous,
-  next,
-  onPrevious,
-  onNext,
-  onReset,
-}: {
-  label: string;
-  previous: boolean;
-  next: boolean;
-  onPrevious: () => void;
-  onNext: () => void;
-  onReset: () => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button
-        variant="outline"
-        size="icon"
-        className="size-8"
-        aria-label="Previous period"
-        disabled={!previous}
-        onClick={onPrevious}
-      >
-        <ChevronLeft className="size-4" />
-      </Button>
-      <span className="text-xs" aria-live="polite">
-        {label}
-      </span>
-      <Button
-        variant="outline"
-        size="icon"
-        className="size-8"
-        aria-label="Next period"
-        disabled={!next}
-        onClick={onNext}
-      >
-        <ChevronRight className="size-4" />
-      </Button>
-      {next && (
-        <Button variant="ghost" className="h-8 px-2 text-xs" onClick={onReset}>
-          Latest
-        </Button>
-      )}
-    </div>
-  );
-}
+const rangeOptions = ['weeks', 'months', 'years'] as const;
+const rangeLabels: Record<HistoryRange, string> = {
+  weeks: 'By week',
+  months: 'By month',
+  years: 'By year',
+};
 
 export function VolumeHistory({
   context,
@@ -201,28 +150,14 @@ export function VolumeHistory({
   return (
     <div className="space-y-3 pt-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Select
+        <StatsChoices
+          label="Volume grouping"
+          options={rangeOptions}
           value={range}
-          onValueChange={(value) => setRange(value as HistoryRange)}
-        >
-          <SelectTrigger
-            aria-label="Volume grouping"
-            className="w-auto min-w-32 gap-3 text-xs"
-          >
-            <SelectValue>
-              {range === 'weeks'
-                ? 'By week'
-                : range === 'months'
-                  ? 'By month'
-                  : 'By year'}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="weeks">By week</SelectItem>
-            <SelectItem value="months">By month</SelectItem>
-            <SelectItem value="years">By year</SelectItem>
-          </SelectContent>
-        </Select>
+          onChange={setRange}
+          accessibleLabel={(value) => rangeLabels[value]}
+          visibleLabel={(value) => rangeLabels[value]}
+        />
         <p className="text-xs text-muted-foreground">
           {dateLabel(first)} – {dateLabel(last)}
         </p>
@@ -510,47 +445,5 @@ function CalendarHistoryContent({
           )}
       </div>
     </>
-  );
-}
-
-export function ComparisonHistory({
-  context,
-  period,
-  children,
-}: {
-  context: TileContext;
-  period: 'year' | 'month';
-  children: (context: TileContext) => ReactNode;
-}) {
-  const [offset, setOffset] = useBrowsingState(`stats:comparison:${period}`, 0);
-  const date = dateOfDay(context.today);
-  const year = date.getUTCFullYear();
-  const month = date.getUTCMonth();
-  const first =
-    period === 'year'
-      ? yearStart(year - offset)
-      : monthStart(year, month - offset);
-  const end =
-    offset === 0
-      ? context.today
-      : period === 'year'
-        ? yearStart(year - offset + 1) - 1
-        : monthStart(year, month - offset + 1) - 1;
-  return (
-    <div className="space-y-3 pt-2">
-      <PeriodNavigation
-        label={
-          period === 'year'
-            ? String(dateOfDay(first).getUTCFullYear())
-            : `${monthName(dateOfDay(first))} ${dateOfDay(first).getUTCFullYear()}`
-        }
-        previous={first > firstActivityDay(context.activities, context.today)}
-        next={offset > 0}
-        onPrevious={() => setOffset(offset + 1)}
-        onNext={() => setOffset(Math.max(0, offset - 1))}
-        onReset={() => setOffset(0)}
-      />
-      {children({ ...context, today: end })}
-    </div>
   );
 }

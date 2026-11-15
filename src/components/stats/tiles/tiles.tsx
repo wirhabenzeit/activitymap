@@ -372,7 +372,7 @@ function PeriodComparison({
                   {formatWithUnit(row.elapsed, metric)}
                 </td>
                 <td className="py-2 pl-3 text-right">
-                  {index === 0 ? '–' : formatWithUnit(row.total, metric)}
+                  {index === 0 ? '—' : formatWithUnit(row.total, metric)}
                 </td>
               </tr>
             );
@@ -711,7 +711,7 @@ const sportMixView: TileView = {
     const range = (option ?? 'currentYear') as MixRange;
     const shares = sportMix(activities, today, range);
     const [top] = shares;
-    if (!top) return { value: '–', unit: '', sub: 'No moving time yet' };
+    if (!top) return { value: '—', unit: '', sub: 'No moving time yet' };
     const hours = activities.length
       ? sportBreakdown(
           activities,
@@ -796,7 +796,7 @@ const sportMixView: TileView = {
           <thead className="border-b text-muted-foreground">
             <tr>
               <th className="pb-1 text-left font-medium">Sport</th>
-              <th className="pb-1 text-right font-medium">Acts</th>
+              <th className="pb-1 text-right font-medium">Activities</th>
               <th className="pb-1 text-right font-medium">Time</th>
             </tr>
           </thead>
@@ -897,7 +897,7 @@ const sportMixView: TileView = {
               <th className="py-1.5 pr-2 text-left font-medium">Sport</th>
               {[
                 'Share',
-                'Acts',
+                'Activities',
                 metricUnit.distance,
                 metricUnit.elevation,
                 'h',
@@ -1264,7 +1264,7 @@ const yearPaceView: TileView = {
               </LegendLabel>
             }
             value={
-              pace.lastYear > 0 ? formatMetric(pace.lastYear, metric) : '–'
+              pace.lastYear > 0 ? formatMetric(pace.lastYear, metric) : '—'
             }
             unit={pace.lastYear > 0 ? unit : undefined}
           />
@@ -1295,7 +1295,7 @@ function RecordStats({
         large
         label="Longest distance"
         value={
-          best.distance ? formatMetric(best.distance.value, 'distance') : '–'
+          best.distance ? formatMetric(best.distance.value, 'distance') : '—'
         }
         unit={best.distance ? metricUnit.distance : undefined}
         note={noteFor(best.distance)}
@@ -1303,7 +1303,7 @@ function RecordStats({
       <Stat
         large
         label="Longest moving time"
-        value={best.time ? formatMetric(best.time.value, 'time') : '–'}
+        value={best.time ? formatMetric(best.time.value, 'time') : '—'}
         unit={best.time ? 'h' : undefined}
         note={noteFor(best.time)}
       />
@@ -1311,7 +1311,7 @@ function RecordStats({
         large
         label="Biggest climb"
         value={
-          best.elevation ? formatMetric(best.elevation.value, 'elevation') : '–'
+          best.elevation ? formatMetric(best.elevation.value, 'elevation') : '—'
         }
         unit={best.elevation ? metricUnit.elevation : undefined}
         note={noteFor(best.elevation)}
@@ -1322,7 +1322,7 @@ function RecordStats({
         value={
           best.biggestWeek
             ? formatMetric(best.biggestWeek.value, 'distance')
-            : '–'
+            : '—'
         }
         unit={best.biggestWeek ? metricUnit.distance : undefined}
         note={
@@ -1619,7 +1619,7 @@ function Best30DayRecords({ context }: { context: TileContext }) {
               <div className="flex flex-wrap items-baseline justify-between gap-2">
                 <dt>{metricLabel[metric]}</dt>
                 <dd className="font-mono font-medium">
-                  {total > 0 ? formatWithUnit(total, metric) : '–'}
+                  {total > 0 ? formatWithUnit(total, metric) : '—'}
                 </dd>
               </div>
               {total > 0 ? (

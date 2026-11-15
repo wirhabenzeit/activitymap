@@ -112,7 +112,7 @@ export function MonthRhythm({
           </dt>
           <dd className="mt-1 font-mono text-lg">
             {rhythm.average === null
-              ? '–'
+              ? '—'
               : metric === 'count'
                 ? formatDailyRate(rhythm.average)
                 : formatWithUnit(rhythm.average, metric)}
@@ -227,7 +227,7 @@ export function MonthRhythm({
         </h3>
         {selected?.activities.length === 0 && (
           <p className="mt-2 text-xs text-muted-foreground">
-            No activities on this day.
+            No matching activities on this day.
           </p>
         )}
         <div className="divide-y divide-muted">

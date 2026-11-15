@@ -13,6 +13,7 @@ import {
   firstSummaryFetchOptions,
   shouldFetchFirstSummaries,
 } from '~/lib/first-summary-fetch';
+import { message } from '~/lib/presentation/messages';
 import { useBrowserSyncStatus } from '~/lib/sync/browser-status';
 import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
 import { requestLibrarySync } from '~/lib/sync/library-sync';
@@ -96,12 +97,12 @@ export function FirstSummaryFetch() {
       >
         <DialogTitle className="text-lg font-semibold">
           {fetch.isFetching
-            ? 'Loading your recent activities'
+            ? message('status.firstSummary.loading')
             : fetch.isError
-              ? 'Could not fetch your activities'
+              ? message('status.firstSummary.failed')
               : fetch.data === 0
-                ? 'No activities found in Strava'
-                : 'Your recent activities are ready'}
+                ? message('status.firstSummary.empty')
+                : message('status.firstSummary.ready')}
         </DialogTitle>
         <DialogDescription>
           {fetch.isFetching
@@ -109,8 +110,10 @@ export function FirstSummaryFetch() {
             : fetch.isError
               ? fetch.error.message
               : fetch.data === 0
-                ? 'New activities will appear here after you record them in Strava.'
-                : `${fetch.data} activities fetched. Older history, details and photos continue in the background.`}
+                ? message('status.firstSummary.emptyMessage')
+                : message('status.firstSummary.count', {
+                    count: fetch.data ?? 0,
+                  })}
         </DialogDescription>
         {fetch.isError && waiting && (
           <p className="text-sm text-muted-foreground">
@@ -123,7 +126,9 @@ export function FirstSummaryFetch() {
               aria-hidden="true"
               className="size-5 text-muted-foreground motion-safe:animate-spin"
             />
-            <span className="sr-only">Loading your recent activities</span>
+            <span className="sr-only">
+              {message('status.firstSummary.loading')}
+            </span>
           </div>
         ) : (
           <div className="flex gap-6">

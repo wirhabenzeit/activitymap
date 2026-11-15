@@ -3,7 +3,7 @@
 import GeoJsonToGpx from '@dwayneparton/geojson-to-gpx';
 import { type Row } from '@tanstack/react-table';
 import type { Feature, LineString } from 'geojson';
-import { Image as PhotosIcon, RefreshCw } from 'lucide-react';
+import { Image as PhotosIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { ActivitySelectionSymbol } from '~/components/activity-selection-controls';
@@ -34,6 +34,7 @@ import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
 import { semanticAction } from '~/lib/presentation/icons';
 import { message } from '~/lib/presentation/messages';
+import { sportTitle } from '~/lib/presentation/sport-title';
 import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { authenticatedLibraryScope } from '~/lib/sync/library-owner';
 import { loadLiveActivityDetail } from '~/lib/sync/live-detail';
@@ -124,6 +125,7 @@ export function ActivityCardContent({
   const labelled = cardWidth >= LABELLED_ACTIONS_WIDTH;
 
   const sport_type = activity.sport_type;
+  const { Icon: RefreshIcon } = semanticAction('refresh');
   const sport_group = aliasMap[sport_type];
   const Icon = sport_group ? categorySettings[sport_group].icon : undefined;
   const activityId = activity.id;
@@ -247,8 +249,8 @@ export function ActivityCardContent({
                   {activity.name}
                 </CardTitle>
                 <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {sport_type} · {formatPreferredDate(date, dateFormat, locale)}{' '}
-                  ·{' '}
+                  {sportTitle(sport_type)} ·{' '}
+                  {formatPreferredDate(date, dateFormat, locale)} ·{' '}
                   {formatLocalTime(
                     date,
                     {
@@ -281,7 +283,7 @@ export function ActivityCardContent({
                   disabled={loading}
                   onClick={() => void handleRefresh()}
                 >
-                  <RefreshCw aria-hidden="true" />
+                  <RefreshIcon aria-hidden="true" />
                 </Button>
               )}
               {onCollapse && (

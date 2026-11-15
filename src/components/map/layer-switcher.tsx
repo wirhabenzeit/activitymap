@@ -1,5 +1,5 @@
-import { Camera, Map, Mountain } from 'lucide-react';
-import { useState } from 'react';
+import { Image as ImageIcon, Landmark, Layers } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import {
@@ -15,6 +15,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
+import { useSelectedActivityPlaces } from '~/hooks/use-activity-places';
+import type { Activity } from '~/lib/activity';
+import { validPhotoLocation } from '~/lib/photo-gallery';
+import type { Photo } from '~/server/records';
 import { baseMaps, overlayMaps as overlayMapSettings } from '~/settings/map';
 import { useShallowStore } from '~/store';
 
@@ -39,7 +43,29 @@ export function DropdownMenuRadioGroupDemo() {
   );
 }
 
-export function LayerSwitcher() {
+const noActivityIds: number[] = [];
+const noActivities: ReadonlyMap<number, Activity> = new Map();
+const noPhotos: Photo[] = [];
+
+function LayerHint({ id, children }: { id: string; children: string }) {
+  return (
+    <p id={id} className="px-2 pb-1.5 pl-8 text-xs text-muted-foreground">
+      {children}
+    </p>
+  );
+}
+
+/** `activities`, `visibleIds` and `photos` describe the current filtered set, so
+ * the menu can say when a layer has nothing to show (as the iOS layers menu does). */
+export function LayerSwitcher({
+  activities = noActivities,
+  visibleIds = noActivityIds,
+  photos = noPhotos,
+}: {
+  activities?: ReadonlyMap<number, Activity>;
+  visibleIds?: number[];
+  photos?: Photo[];
+}) {
   const {
     overlayMaps: activeOverlays,
     baseMap,
@@ -59,12 +85,27 @@ export function LayerSwitcher() {
     showPlaces: state.showPlaces,
     togglePlaces: state.togglePlaces,
   }));
+  const hasLocatedPhotos = useMemo(() => {
+    const visible = new Set(visibleIds);
+    return photos.some(
+      (photo) =>
+        visible.has(photo.activity_id) && validPhotoLocation(photo.location),
+    );
+  }, [photos, visibleIds]);
+  const places = useSelectedActivityPlaces(
+    activities,
+    noActivityIds,
+    showPlaces ? visibleIds : noActivityIds,
+  );
+  const noPlaces =
+    showPlaces && !places.isLoading && places.places.length === 0;
 
   return (
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <MapControlIconButton aria-label="Map layers">
-          <Map color="black" />
+          {/* The Mapbox control group is always white; keep the glyph dark. */}
+          <Layers color="black" />
         </MapControlIconButton>
       </DropdownMenuTrigger>
       <PreferenceMenuContent className="w-56">
@@ -73,18 +114,33 @@ export function LayerSwitcher() {
           checked={showPhotos}
           onCheckedChange={togglePhotos}
           className="gap-2"
+          aria-describedby={
+            showPhotos && !hasLocatedPhotos ? 'layer-photos-hint' : undefined
+          }
         >
-          <Camera className="h-4 w-4" aria-hidden="true" />
+          <ImageIcon className="h-4 w-4" aria-hidden="true" />
           Photos
         </PreferenceMenuCheckboxItem>
+        {showPhotos && !hasLocatedPhotos && (
+          <LayerHint id="layer-photos-hint">
+            No located photos in the current filter
+          </LayerHint>
+        )}
         <PreferenceMenuCheckboxItem
           checked={showPlaces}
           onCheckedChange={togglePlaces}
           className="gap-2"
+          aria-describedby={noPlaces ? 'layer-places-hint' : undefined}
         >
-          <Mountain className="h-4 w-4" aria-hidden="true" />
+          {/* TODO(ios): iOS uses mountain.2 here, which collides with the elevation metric glyph. */}
+          <Landmark className="h-4 w-4" aria-hidden="true" />
           Places
         </PreferenceMenuCheckboxItem>
+        {noPlaces && (
+          <LayerHint id="layer-places-hint">
+            No matched places saved in the current filter
+          </LayerHint>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuLabel>Base Map</DropdownMenuLabel>
         <DropdownMenuSeparator />

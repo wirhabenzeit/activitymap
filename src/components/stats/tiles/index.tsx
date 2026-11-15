@@ -24,6 +24,7 @@ import {
   useState,
 } from 'react';
 
+import { BrowsingEmptyState } from '~/components/list/browsing-empty-state';
 import {
   useBrowsingState,
   useRetainedScrollRef,
@@ -108,13 +109,10 @@ export default function StatsTiles() {
           Loading activity history…
         </p>
       ) : empty && query.isError ? null : empty ? (
-        <div className="p-6 text-sm text-muted-foreground">
-          <p>
-            {scope.filtered && (query.data?.length ?? 0) > 0
-              ? 'No activities match these filters.'
-              : 'No activity history available yet.'}
-          </p>
-        </div>
+        <BrowsingEmptyState
+          libraryCount={query.data?.length ?? 0}
+          scope="stats"
+        />
       ) : (
         <>
           {(query.isFetching || query.hasNextPage) && (

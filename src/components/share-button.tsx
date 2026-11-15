@@ -1,6 +1,5 @@
 'use client';
 
-import { Share as ShareIcon } from 'lucide-react';
 import { type ReactElement, useState } from 'react';
 
 import { AppDialogContent } from '~/components/app-dialog';
@@ -9,6 +8,8 @@ import { ManageSharesDialog } from '~/components/share/manage-shares-dialog';
 import { Button } from '~/components/ui/button';
 import { Dialog, DialogTrigger } from '~/components/ui/dialog';
 import type { Activity } from '~/lib/activity';
+import { semanticAction } from '~/lib/presentation/icons';
+import { message } from '~/lib/presentation/messages';
 import { useShallowStore } from '~/store';
 
 /**
@@ -38,6 +39,7 @@ function ShareLinksDialog({
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<readonly Activity[]>([]);
   const [view, setView] = useState<'create' | 'manage'>('create');
+  const { Icon: ShareIcon } = semanticAction('shareActivity');
 
   return (
     <Dialog
@@ -62,7 +64,10 @@ function ShareLinksDialog({
           </Button>
         )}
       </DialogTrigger>
-      <AppDialogContent closeLabel="Close Share tracks" layout="sections">
+      <AppDialogContent
+        closeLabel={`Close ${message('sharing.shareActivities')}`}
+        layout="sections"
+      >
         {view === 'create' ? (
           <CreateShareDialog
             activities={draft}
@@ -87,7 +92,10 @@ export function ActivityShareButton({
   const isGuest = useShallowStore((state) => state.isGuest);
   if (isGuest) return null;
   return (
-    <ShareLinksDialog activities={activities} label="Share activity">
+    <ShareLinksDialog
+      activities={activities}
+      label={semanticAction('shareActivity').label}
+    >
       {children}
     </ShareLinksDialog>
   );

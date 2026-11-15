@@ -366,12 +366,24 @@ export const applyFilters = (
   return true;
 };
 
+/** Keep exactly one sport group selected (the native "Only X" command). */
+export const isolateSportGroup = <Group extends string>(
+  groups: Record<Group, CategoryGroupState>,
+  only: Group,
+): Record<Group, boolean> =>
+  Object.fromEntries(
+    (Object.keys(groups) as Group[]).map((group) => [group, group === only]),
+  ) as Record<Group, boolean>;
+
+/** Browsing counts every part; stats omits the reporting period and Only selected. */
+export type FilterScope = 'browse' | 'stats';
+
 /** How many filters are on, as the Filters button's badge counts them; the
  * same parts as iOS `ActivityStore.activeFilterCount`. Stats ignores the
  * date range and Only selected, as its filters do. */
 export const activeFilterCount = (
   state: FilterState & { onlySelected?: boolean },
-  scope: 'browse' | 'stats' = 'browse',
+  scope: FilterScope = 'browse',
 ) => {
   let count = 0;
   if (state.search.trim()) count++;

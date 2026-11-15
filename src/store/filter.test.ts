@@ -24,6 +24,7 @@ import {
   initializeBinary,
   initializeSportType,
   initializeValues,
+  isolateSportGroup,
   normalizeDateRange,
   parseValueFilterInput,
   sanitizePersistedBinary,
@@ -328,4 +329,15 @@ void test('the Filters badge counts each active filter; Stats skips date and sel
   };
   assert.equal(activeFilterCount(state), 7);
   assert.equal(activeFilterCount(state, 'stats'), 5);
+});
+
+void test('only one sport group stays selected when isolating', () => {
+  const groups = deriveSportGroups(initializeSportType());
+  const isolated = isolateSportGroup(groups, 'run');
+  assert.equal(isolated.run, true);
+  assert.equal(
+    Object.entries(isolated).filter(([, selected]) => selected).length,
+    1,
+  );
+  assert.deepEqual(Object.keys(isolated), Object.keys(groups));
 });
