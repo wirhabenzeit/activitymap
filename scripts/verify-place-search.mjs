@@ -157,7 +157,9 @@ try {
     'whitespace does not show hints',
   );
   await input.fill('Pilatus');
-  await expectIDs('');
+  // The text filter also matches visited place names, so typing a place name
+  // narrows to every activity that visited a place called Pilatus.
+  await expectIDs('1,2,3');
   assert.equal(
     await page.getByRole('option').count(),
     3,
