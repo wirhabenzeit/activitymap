@@ -127,18 +127,25 @@ export function SelectionDownloadButton({
   activities: readonly Activity[];
 }) {
   const { toast } = useToast();
-  const { isGuest, userId, stored, selected, combine } = useShallowStore(
-    (state) => ({
+  const { isGuest, userId, enabled, stored, selected, combine } =
+    useShallowStore((state) => ({
       isGuest: state.isGuest,
       userId: state.user?.id,
+      enabled: state.user?.features?.activityGPXExport === true,
       stored: hasStoredLibraryAccess(state.user),
       selected: state.selected,
       combine: state.combineSelections,
-    }),
-  );
+    }));
   const [busy, setBusy] = useState(false);
   const busyRef = useRef(false);
-  if (isGuest || !stored || !userId || !combine || selected.length === 0)
+  if (
+    isGuest ||
+    !enabled ||
+    !stored ||
+    !userId ||
+    !combine ||
+    selected.length === 0
+  )
     return null;
   const selectedIDs = new Set(selected);
   const scope = activities.filter((activity) => selectedIDs.has(activity.id));

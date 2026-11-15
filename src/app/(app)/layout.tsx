@@ -18,6 +18,7 @@ import { auth } from '~/lib/auth';
 import { QueryProvider } from '~/providers/query-provider';
 import { toCurrentUserDTO } from '~/server/auth/current-user';
 import { getAccountInternal, getUserInternal } from '~/server/auth/users';
+import { isAdminAthlete } from '~/server/config/admin';
 import { convexLiveUrlFor } from '~/server/library/live-configuration';
 import type { InitialAuth } from '~/store/auth';
 
@@ -54,6 +55,9 @@ export default async function AppShellLayout({
       ? {
           ...toCurrentUserDTO(user, account),
           ...(liveUrl && { convexLive: { url: liveUrl } }),
+          ...(isAdminAthlete(user.athlete_id) && {
+            features: { activityGPXExport: true },
+          }),
         }
       : null;
   }
