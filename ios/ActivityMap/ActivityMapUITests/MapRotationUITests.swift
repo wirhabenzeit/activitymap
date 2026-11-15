@@ -61,9 +61,6 @@ final class MapRotationUITests: XCTestCase {
         let close = app.buttons["filters-done"]
         XCTAssertTrue(close.waitForExistence(timeout: 10), app.debugDescription)
         capture(app, name: "Landscape filter sheet over Map")
-        app.searchActivities("Rotation")
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
-        app.buttons["filter-reset"].tap()
         close.tap()
         let returned = try await state(in: app) { $0.ready && $0.presentationDepth == 1 }
         XCTAssertEqual(returned.selection, landscape.selection)

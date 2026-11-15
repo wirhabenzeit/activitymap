@@ -16,6 +16,7 @@ import {
   type FilterableActivity,
   type ValueColumn,
   type ValueFilter,
+  activeFilterCount,
   applyFilters,
   calendarDateFromLocalDate,
   createFilterSlice,
@@ -299,4 +300,32 @@ void test('an invalid date update preserves the last valid active range', () => 
     .setDateRange({ start: '2026-04-30', end: '2026-04-01' });
 
   assert.deepEqual(filterStore.getState().dateRange, valid);
+});
+
+void test('the Filters badge counts each active filter; Stats skips date and selection', () => {
+  const base: FilterState = {
+    sportType: initializeSportType(),
+    sportGroup: deriveSportGroups(initializeSportType()),
+    dateRange: undefined,
+    values: initializeValues(),
+    search: '  ',
+    binary: initializeBinary(),
+  };
+  assert.equal(activeFilterCount(base), 0);
+  const sportType = { ...initializeSportType(), Ride: false };
+  const state = {
+    ...base,
+    search: 'pilatus',
+    sportType,
+    dateRange: { start: '2026-01-01', end: '2026-12-31' },
+    place: { id: 'p', name: 'Pilátus', userId: 'alice' },
+    values: {
+      ...initializeValues(),
+      distance: { value: 10_000, operator: '>=' as const },
+    },
+    binary: { ...initializeBinary(), commute: 'no' as const },
+    onlySelected: true,
+  };
+  assert.equal(activeFilterCount(state), 7);
+  assert.equal(activeFilterCount(state, 'stats'), 5);
 });

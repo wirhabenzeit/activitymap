@@ -661,8 +661,11 @@ try {
     .getByRole('button', { name: /^(Select|Deselect) Activity 205$/ })
     .click();
   const selectedBefore = await row(205).getAttribute('data-state');
-  const search = page.getByRole('combobox', {
-    name: 'Search activity names or choose a place',
+  // Header search narrows the rows as you type, like a text filter, and
+  // stays open while a detail is inspected.
+  await page.getByTestId('header-search-button').click();
+  const search = page.getByLabel('Find activities or places', {
+    exact: true,
   });
   await search.fill('Activity 00');
   await row(9).waitFor();
@@ -753,7 +756,7 @@ try {
   await page.goForward();
   await waitID('205');
   await page.setViewportSize({ width: 402, height: 874 });
-  await page.getByRole('button', { name: 'Filters', exact: true }).click();
+  await page.getByRole('button', { name: /^Filters(, \d+ active)?$/ }).click();
   await page.getByRole('dialog', { name: 'Filters', exact: true }).waitFor();
   await page.keyboard.press('Escape');
   await page
@@ -762,7 +765,7 @@ try {
   assert.equal(id(), '205', 'Filter Escape leaves inspection open');
   assert.equal(
     await page
-      .getByRole('button', { name: 'Filters', exact: true })
+      .getByRole('button', { name: /^Filters(, \d+ active)?$/ })
       .evaluate((button) => button === document.activeElement),
     true,
   );

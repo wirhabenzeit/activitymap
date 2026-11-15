@@ -81,7 +81,11 @@ export const createSelectionSlice: StateCreator<
     // A fresh map pick replaces the place interaction too. An empty Combine
     // pick is a no-op, so it keeps both the current group and place focus.
     if (!state.combineSelections || hits.length) resetActivityPlaceFocus();
-    set((state) => apply(state, { type: 'pick', ids: hits }));
+    set((state) => {
+      apply(state, { type: 'pick', ids: hits });
+      // A header-search place pin lasts until the next pick.
+      if (!state.combineSelections || hits.length) state.searchPlace = null;
+    });
     return hits;
   },
   toggleSelectedActivity: (id) =>
@@ -92,7 +96,10 @@ export const createSelectionSlice: StateCreator<
     set((state) => apply(state, { type: 'remove', ids })),
   clearSelection: () => {
     resetActivityPlaceFocus();
-    set((state) => apply(state, { type: 'clear' }));
+    set((state) => {
+      apply(state, { type: 'clear' });
+      state.searchPlace = null;
+    });
   },
   resetSelectionScope: () =>
     set((state) => apply(state, { type: 'clear_scope' })),

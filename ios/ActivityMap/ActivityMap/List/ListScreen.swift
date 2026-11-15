@@ -10,6 +10,10 @@ struct ListScreen: View {
     @Environment(\.listRootToolbar) private var shellToolbar
     @Environment(\.listRootHeader) private var shellHeader
     @State private var localPushedDetail = false
+    /// Header search narrows the rows while it is open; the filters are untouched
+    /// until its Filter button makes the narrowing a text filter.
+    @Environment(\.headerSearch) private var headerSearch
+    private var trimmedQuery: String { headerSearch?.isActive == true ? headerSearch!.trimmedQuery : "" }
     private var hasPushedDetail: Bool {
         get { shellNavigation?.detailPresented ?? localPushedDetail }
         nonmutating set {
@@ -42,13 +46,33 @@ struct ListScreen: View {
         .safeAreaInset(edge: .bottom, spacing: 0) {
             BrowseListFooter(store: store)
         }
+        // The search keyboard covers the footer instead of lifting it.
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .modifier(ActivityRowEditorPresenter(store: store))
     }
 
     private func activityList(width: CGFloat, inspectedID: Int?) -> some View {
-        let activities = store.listedActivities
+        let activities = ActivityTextSearch.activities(in: store.listedActivities, query: trimmedQuery)
         let speedDisplay = SpeedDisplay.forActivities(activities)
         return List {
+            if !trimmedQuery.isEmpty {
+                HStack {
+                    Text("\(activities.count) of \(store.listedActivities.count) match “\(trimmedQuery)”")
+                        .font(.footnote).foregroundStyle(AppTheme.secondaryText)
+                        .accessibilityIdentifier("list-search-count")
+                    Spacer(minLength: 8)
+                    Button {
+                        store.applyTextFilter(trimmedQuery)
+                        headerSearch?.end()
+                    } label: {
+                        Label("Filter", systemImage: "line.3.horizontal.decrease").font(.footnote.weight(.semibold))
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Filter to \(activities.count) activities matching \(trimmedQuery)")
+                    .accessibilityIdentifier("list-search-apply-filter")
+                }
+                .listRowSeparator(.hidden)
+            }
             ForEach(activities) { activity in
                 ActivityRowView(store: store, activity: activity, availableWidth: width,
                                 isInspected: activity.id == inspectedID, speedDisplay: speedDisplay)
@@ -65,6 +89,14 @@ struct ListScreen: View {
             }
         }
         .listStyle(.plain)
+        // Reading narrowed results puts the search keyboard away; editing a
+        // row title keeps the system behaviour.
+        .scrollDismissesKeyboard(headerSearch?.isActive == true ? .immediately : .automatic)
+        .onChange(of: store.inspectedActivityID) { _, id in
+            if id != nil, headerSearch?.isActive == true {
+                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+            }
+        }
         .safeAreaInset(edge: .top, spacing: 0) {
             if ActivityTableLayout.supports(store.listPresentation.settings, typeSize: typeSize, availableWidth: width) {
                 ActivityTableHeader(store: store, availableWidth: width,

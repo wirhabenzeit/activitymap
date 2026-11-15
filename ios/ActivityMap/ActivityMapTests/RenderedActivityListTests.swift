@@ -656,17 +656,13 @@ extension RenderedRoutePickingTests {
         list.setContentOffset(CGPoint(x: 0, y: 200), animated: false)
         try await Task.sleep(for: .milliseconds(200))
         let offset = list.contentOffset
-        let customRootHeader = scenario == "landscape"
-        #expect(navigation.isNavigationBarHidden == customRootHeader,
-                "Compact landscape uses the custom browsing header; other roots keep their native bar")
-        let headerBottom: CGFloat
-        if customRootHeader {
-            headerBottom = try compactBrowseHeaderBottom(in: host.snapshot())
-            #expect(abs(headerBottom - (host.window.safeAreaInsets.top + 44)) < 1,
-                    "The compact browsing header ends 44pt below the top safe area")
-        } else {
-            headerBottom = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view).maxY
-        }
+        // The app draws its own browsing and detail bars at every size.
+        let customRootHeader = true
+        let headerHeight = scenario == "landscape" ? AppToolbarLayout.compactHeight : AppToolbarLayout.regularHeight
+        #expect(navigation.isNavigationBarHidden, "The browsing header is the app's own bar")
+        let headerBottom = try compactBrowseHeaderBottom(in: host.snapshot())
+        #expect(abs(headerBottom - (host.window.safeAreaInsets.top + headerHeight)) < 1,
+                "The browsing header ends \(headerHeight)pt below the top safe area")
         let listTop = list.convert(list.bounds, to: host.host.view).minY
         #expect(listTop + list.adjustedContentInset.top >= headerBottom,
                 "The retained List starts below the visible shell bar")
@@ -690,7 +686,7 @@ extension RenderedRoutePickingTests {
         let barFrame = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
         if customRootHeader {
             #expect(abs(try compactBrowseHeaderBottom(in: host.snapshot()) - headerBottom) < 1,
-                    "The detail uses the same compact 44pt header as its browsing root")
+                    "The detail uses the same header height as its browsing root")
         } else {
             #expect(abs(barFrame.minY - host.host.view.safeAreaInsets.top) < 2,
                     "The detail's native Back/title bar occupies the top header position")

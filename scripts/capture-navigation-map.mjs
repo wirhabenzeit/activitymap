@@ -1,9 +1,10 @@
 // Verify the accepted map navigation contract against synthetic data and capture its controls.
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, writeFile, rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
+
 import { chromium } from 'playwright-core';
 
 const base = new URL(process.argv[2] || 'http://127.0.0.1:3018');
@@ -361,13 +362,15 @@ export default function Review() {
         .locator('[data-detail-presentation]')
         .waitFor({ state: 'hidden' });
       await observe('back-to-four');
-      await page.getByRole('button', { name: 'Filters', exact: true }).click();
+      await page
+        .getByRole('button', { name: /^Filters(, \d+ active)?$/ })
+        .click();
       await observe('filters-toggled');
       await page.keyboard.press('Escape');
       await observe('filters-after-escape');
       if (width >= 480)
         await page
-          .getByRole('button', { name: 'Filters', exact: true })
+          .getByRole('button', { name: /^Filters(, \d+ active)?$/ })
           .click();
       await page.locator('#map-route-panel [data-activity-id]').first().click();
       await page.locator('[data-detail-presentation]').waitFor();

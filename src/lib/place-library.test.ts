@@ -135,10 +135,10 @@ void test('place filters intersect text/sport/date constraints and Stats retain 
     [1],
   );
   store.getState().setSearch('Pilatus');
-  assert.equal(
-    filterStatsActivities(activities, store.getState()).length,
-    0,
-    'typing is still activity-name search',
+  assert.deepEqual(
+    filterStatsActivities(activities, store.getState()).map((a) => a.id),
+    [1, 2],
+    'text also matches the names of visited places',
   );
   store.getState().resetActivityFilters();
   assert.equal(store.getState().place, undefined);
@@ -146,6 +146,21 @@ void test('place filters intersect text/sport/date constraints and Stats retain 
     store.getState().dateRange,
     'Stats clear preserves reporting dates',
   );
+  store.getState().resetFilters();
+});
+
+void test('the text filter matches names and visited places by the shared cases', () => {
+  for (const testCase of fixture.expected.textFilterCases) {
+    store.getState().resetFilters();
+    store.getState().setSearch(testCase.search);
+    assert.deepEqual(
+      activities
+        .filter((activity) => applyFilters(store.getState(), activity))
+        .map((a) => a.id),
+      testCase.expected_ids,
+      testCase.name,
+    );
+  }
   store.getState().resetFilters();
 });
 

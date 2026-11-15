@@ -15,11 +15,11 @@ import { useEffect } from 'react';
 import * as React from 'react';
 import { useState } from 'react';
 
-import { PlaceSearch } from '~/components/place-search';
 import {
   PreferenceMenuCheckboxItem,
   PreferenceMenuContent,
 } from '~/components/preference-menu';
+import { TextPlaceFilterChips } from '~/components/text-place-filter-chips';
 import { Button } from '~/components/ui/button';
 import {
   DropdownMenu,
@@ -507,27 +507,30 @@ export function BinaryFilter({ name }: { name: keyof typeof binaryFilters }) {
   );
 }
 
+/** Header search sets the text and place filters; Filters shows them as
+ * removable chips while they are on. */
 export function SearchFilter() {
   const active = useShallowStore((state) =>
-    Boolean(state.search || state.place),
+    Boolean(state.search.trim() || state.place),
   );
 
   const { state } = useSidebar();
-  const input = <PlaceSearch />;
+  if (!active) return null;
+  const chips = <TextPlaceFilterChips />;
 
   if (state === 'collapsed') {
     return (
       <CollapsedFilter
-        label="Search activities or places"
+        label="Text and place filters"
         icon={<Search />}
         active={active}
       >
-        {input}
+        {chips}
       </CollapsedFilter>
     );
   }
 
-  return <SidebarMenuItem className="relative mx-2">{input}</SidebarMenuItem>;
+  return <SidebarMenuItem className="relative mx-2">{chips}</SidebarMenuItem>;
 }
 
 export function SelectedActivitiesFilter() {

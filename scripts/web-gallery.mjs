@@ -272,16 +272,17 @@ try {
             .waitFor();
         }
         if (s.id === 'filters') {
-          const search = page.getByRole('combobox', {
-            name: 'Search activity names or choose a place',
+          // The text filter shows as a removable chip in Filters.
+          const chip = page.getByRole('button', {
+            name: `Remove text filter: ${s.search}`,
+            exact: true,
           });
-          if (!(await search.isVisible()))
+          if (!(await chip.isVisible()))
             await page
-              .getByRole('button', { name: 'Filters', exact: true })
+              .getByRole('button', { name: /^Filters(, \d+ active)?$/ })
               .first()
               .click();
-          await search.waitFor();
-          assert.equal(await search.inputValue(), s.search);
+          await chip.waitFor();
         }
         await page.evaluate(async () => {
           await document.fonts.ready;

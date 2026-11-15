@@ -27,7 +27,7 @@ struct RenderedFilterTests {
         store.distanceFilter = NumericFilter(value: 10000, upperLimit: 80000)
         #expect(store.activeFilterCount == 3)
         #expect(FilterCountBadge.label(count: store.activeFilterCount) == "Filters, 3 active")
-        #expect(Set(FilterPart.allCases.filter { $0.isActive(store) }) == [.search, .distance, .details])
+        #expect(Set(FilterPart.allCases.filter { $0.isActive(store) }) == [.text, .distance, .details])
         #expect(!FilterPart.available(in: .stats).contains(.dates))
         #expect(FilterPart.available(in: .browsing) == FilterPart.allCases)
     }

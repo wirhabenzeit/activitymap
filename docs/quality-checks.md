@@ -86,11 +86,12 @@ or invalid comparison conservatively runs it. This builds the real app and runs
 all selected unit/app-hosted suites plus the following real UI smoke methods on
 iOS 27:
 
-- Search row riding on the keyboard, with place pills and live activity-name
-  filtering:
-  `FilterPanelUITests/testSearchRowRidesOnTheKeyboardAndKeepsFilters`.
-- Place autocomplete, filtering, details and Stats history:
-  `PlaceSearchUITests/testPlaceAutocompleteFilteringDetailsAndStatsHistory`.
+- Header search narrowing the List by name or visited place, and Filter making
+  it a text filter shown as a chip:
+  `FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip`.
+- Header search on the Map: a place selects and pins without filtering;
+  long-press, the panel's text-filter row, chips and clearing:
+  `FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest`.
 - Visited-place clustering, filtering and contextual activity picking:
   `ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking`.
 - Offline matched places on the map/profile, repeated encounters, style replacement and selection preservation:

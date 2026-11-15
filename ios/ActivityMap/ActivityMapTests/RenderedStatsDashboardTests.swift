@@ -35,8 +35,8 @@ import Testing
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(400))
         let navigation = try #require(host.contentNavigation())
-        #expect(navigation.isNavigationBarHidden == (variant == "landscape"),
-                "The compact landscape dashboard and focus share app chrome; portrait retains native chrome")
+        #expect(navigation.isNavigationBarHidden, "The dashboard and focus share the app's own bar at every size")
+        let headerHeight = variant == "landscape" ? AppToolbarLayout.compactHeight : AppToolbarLayout.regularHeight
         let root = try #require(host.descendants(UIScrollView.self, in: navigation.viewControllers[0].view)
             .first { !($0 is UICollectionView) && $0.contentSize.height > 1500 })
         root.setContentOffset(CGPoint(x: 0, y: 500), animated: false)
@@ -113,19 +113,13 @@ import Testing
             try await statsWait { navigation.transitionCoordinator == nil && navigation.viewControllers.count == (phase == "push" ? 2 : 1) }
             if phase == "push" {
                 #expect(navigation.topViewController?.navigationItem.title == "Training volume")
-                if variant == "landscape" {
-                    #expect(navigation.isNavigationBarHidden)
-                    let image = try host.capture("landscape-focus-toolbar")
-                    #expect(abs(try compactBrowseHeaderBottom(in: image) - host.window.safeAreaInsets.top - 44) < 1,
-                            "Stats focus uses the same compact 44pt toolbar as its dashboard")
-                } else {
-                    let bar = navigation.navigationBar.convert(navigation.navigationBar.bounds, to: host.host.view)
-                    #expect(abs(bar.minY - host.host.view.safeAreaInsets.top) < 2,
-                            "Stats detail takes over the top header instead of adding another row")
-                }
-                #expect(host.controllers(UINavigationController.self).filter {
-                    !$0.isNavigationBarHidden && $0.navigationBar.window != nil
-                }.count == (variant == "landscape" ? 0 : 1))
+                #expect(navigation.isNavigationBarHidden)
+                let image = try host.capture("\(variant)-focus-toolbar")
+                #expect(abs(try compactBrowseHeaderBottom(in: image) - host.window.safeAreaInsets.top - headerHeight) < 1,
+                        "Stats focus takes over the dashboard's header instead of adding another row")
+                #expect(host.controllers(UINavigationController.self).allSatisfy {
+                    $0.isNavigationBarHidden || $0.navigationBar.window == nil
+                }, "No native bar is stacked with the app's own")
             }
 
             try host.capture("phone-single-stats-header-\(variant)-\(phase)")
