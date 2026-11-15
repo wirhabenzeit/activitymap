@@ -31,7 +31,7 @@ struct ActivitySummaryView: View {
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 12) {
                     ForEach(highlights) { metric in metricView(metric, summary: summary, alwaysShowCoverage: false) }
                 }
-                DisclosureGroup(isExpanded: $allMetricsExpanded) {
+                DisclosureGroup(isExpanded: expansion) {
                     VStack(alignment: .leading, spacing: 12) {
                         Text("Means use only recorded activity values. Weighted average power is a source metric; activities are not weighted together.")
                             .font(.caption).foregroundStyle(.secondary)
@@ -50,8 +50,21 @@ struct ActivitySummaryView: View {
                 .accessibilityIdentifier("activity-summary-expand")
             }
             .padding(.vertical, 8)
+            .buttonStyle(.borderless)
             .accessibilityIdentifier("activity-summary")
         }
+    }
+
+    // A List cell and DisclosureGroup otherwise animate the same self-sizing
+    // content independently: labels slide through each other and scrolling
+    // moves the header during expansion. Commit the disclosure as one layout
+    // update, keeping native disclosure semantics without those nested motions.
+    private var expansion: Binding<Bool> {
+        Binding(get: { allMetricsExpanded }, set: { expanded in
+            var transaction = Transaction(animation: nil)
+            transaction.disablesAnimations = true
+            withTransaction(transaction) { allMetricsExpanded = expanded }
+        })
     }
 
     private var columns: [GridItem] {

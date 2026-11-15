@@ -38,8 +38,20 @@ final class ListSelectionUITests: XCTestCase {
         capture.name = "Selected summary and Combine share"
         capture.lifetime = .keepAlways
         add(capture)
+        let heading = app.staticTexts["Selected activities summary"]
+        let headingY = heading.frame.minY
+        let disclosure = app.buttons.matching(NSPredicate(format: "label == %@", "All summary metrics")).firstMatch
+        let detail = app.staticTexts["Means use only recorded activity values. Weighted average power is a source metric; activities are not weighted together."]
+        for _ in 0..<3 {
+            disclosure.tap()
+            XCTAssertTrue(detail.waitForExistence(timeout: 5), app.debugDescription)
+            XCTAssertEqual(heading.frame.minY, headingY, accuracy: 1, "Expansion keeps the summary header anchored")
+            disclosure.tap()
+            XCTAssertTrue(detail.waitForNonExistence(timeout: 5), app.debugDescription)
+            XCTAssertEqual(heading.frame.minY, headingY, accuracy: 1, "Collapse keeps the summary header anchored")
+        }
         app.buttons["Turn off activity summary"].tap()
-        XCTAssertTrue(app.staticTexts["Selected activities summary"].waitForNonExistence(timeout: 5))
+        XCTAssertTrue(heading.waitForNonExistence(timeout: 5))
     }
 
     func testDetailScrollReachesBottomAndKeepsLastActionVisible() throws {
