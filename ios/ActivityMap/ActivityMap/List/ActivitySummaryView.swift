@@ -25,6 +25,16 @@ struct ActivitySummaryView: View {
                     VStack(alignment: .leading, spacing: 4) { heading(summary); hideButton }
                 }
                 .fixedSize(horizontal: false, vertical: true)
+                if !store.selectedActivityIDs.isEmpty {
+                    Picker("Summary scope", selection: Binding(get: { mode },
+                                                               set: { store.listPresentation.settings.summaryMode = $0 })) {
+                        Text("Filtered").tag(ActivitySummaryMode.filtered)
+                        Text("Selected").tag(ActivitySummaryMode.selected)
+                    }
+                    .pickerStyle(.segmented)
+                    .frame(minHeight: 44)
+                    .accessibilityIdentifier("activity-summary-scope")
+                }
                 Text(typeSize.isAccessibilitySize ? conciseScope : scopeExplanation)
                     .accessibilityLabel(scopeExplanation).font(.caption).foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

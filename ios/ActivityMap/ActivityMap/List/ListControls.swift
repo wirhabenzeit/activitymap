@@ -34,6 +34,11 @@ struct ListControls: View {
                 Label("View and metrics", systemImage: "rectangle.split.3x1")
             }
             .accessibilityIdentifier("list-display-control")
+            Toggle(isOn: Binding(get: { presentation.settings.summaryMode != .off },
+                                 set: { presentation.settings.summaryMode = $0 ? .filtered : .off })) {
+                Label("Show summary", systemImage: "sum")
+            }
+            .accessibilityIdentifier("list-summary-toggle")
         } label: {
             Group {
                 if iconOnly || typeSize.isAccessibilitySize {
@@ -120,12 +125,6 @@ struct ListOptionsSheets: ViewModifier {
                         Text(metricsFitColumns
                              ? "Columns aligns values under sortable headers. Details wraps labelled metrics beneath each activity."
                              : "These metrics need Details at this window width. Choose fewer metrics to use Columns.")
-                    }
-                    Section("Summary") {
-                        Picker("Summary", selection: $presentation.settings.summaryMode) {
-                            ForEach(ActivitySummaryMode.allCases) { Text($0.title).tag($0) }
-                        }
-                        .accessibilityIdentifier("list-summary-mode")
                     }
                     Section("Density") {
                         Picker("Density", selection: $presentation.settings.density) {

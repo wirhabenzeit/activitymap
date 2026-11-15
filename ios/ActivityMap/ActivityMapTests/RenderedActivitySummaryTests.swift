@@ -60,7 +60,7 @@ extension RenderedRoutePickingTests {
     @Test(arguments: ["small-phone", "large-text", "tablet-expanded", "selected-hidden", "empty-filtered", "all-unknown"])
     func summariesAdaptAndDiscloseExactScope(scenario: String) async throws {
         let preferences = ActivityListPresentation(defaults: nil)
-        preferences.settings.summaryMode = scenario == "selected-hidden" ? .selected : .filtered
+        preferences.settings.summaryMode = .filtered
         let partial = try StoredModelMapper.activity(Fixtures.activity([
             "id": "1", "distance": 1200, "elapsed_time": 600, "total_elevation_gain": 50,
             "moving_time": 540, "average_speed": 2, "average_heartrate": 120,
@@ -77,6 +77,7 @@ extension RenderedRoutePickingTests {
         store.selectedTab = .list
         if scenario == "selected-hidden" {
             store.replaceSelection(with: [1, 2])
+            preferences.settings.summaryMode = .selected
             store.searchText = "No activity matches"
             #expect(store.filteredActivities.isEmpty && store.hiddenSelectedCount == 2)
             #expect(store.activitySummary?.activityCount == 2 && store.activitySummary?[.distance].value == 1200)

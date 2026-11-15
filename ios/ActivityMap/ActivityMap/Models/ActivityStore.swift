@@ -276,6 +276,11 @@ final class ActivityStore {
         let snapshot = SelectionSnapshot(selected: selection.selectedIDs,
                                          visible: selection.visibleIDs, active: selection.activeID, combine: selection.combine, onlySelected: selection.onlySelected)
         if snapshot != selectionSnapshot { selectionSnapshot = snapshot }
+        // Selected totals are offered only while a selection exists. Keep an
+        // enabled summary useful after Clear selection, deletion or relaunch.
+        if snapshot.selected.isEmpty && listPresentation.settings.summaryMode == .selected {
+            listPresentation.settings.summaryMode = .filtered
+        }
     }
 
     var selectedActivityIDs: Set<Int> { selectionSnapshot.selected }

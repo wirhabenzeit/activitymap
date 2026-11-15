@@ -27,12 +27,12 @@ final class ListSelectionUITests: XCTestCase {
         listControl(in: app, label: "Combine selections", identifier: "combine-selection").tap()
         XCTAssertTrue(share.waitForExistence(timeout: 5))
         app.buttons["List view options"].tap()
-        app.buttons["list-display-control"].tap()
-        let picker = app.buttons["list-summary-mode"]
-        XCTAssertTrue(picker.waitForExistence(timeout: 5), app.debugDescription)
-        picker.tap()
-        app.buttons["Selected activities"].tap()
-        app.buttons["Done"].tap()
+        app.buttons["Show summary"].tap()
+        let filteredHeading = app.staticTexts["Filtered activities summary"]
+        XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
+        let scope = app.segmentedControls.containing(.button, identifier: "Selected").firstMatch
+        XCTAssertTrue(scope.waitForExistence(timeout: 5), app.debugDescription)
+        scope.buttons["Selected"].tap()
         XCTAssertTrue(app.staticTexts["Selected activities summary"].waitForExistence(timeout: 5), app.debugDescription)
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = "Selected summary and Combine share"
@@ -50,8 +50,18 @@ final class ListSelectionUITests: XCTestCase {
             XCTAssertTrue(detail.waitForNonExistence(timeout: 5), app.debugDescription)
             XCTAssertEqual(heading.frame.minY, headingY, accuracy: 1, "Collapse keeps the summary header anchored")
         }
+        listControl(in: app, label: "Clear selection", identifier: "clear-selection").tap()
+        XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(scope.waitForNonExistence(timeout: 5), app.debugDescription)
+        app.buttons["List view options"].tap()
+        app.buttons["Show summary"].tap()
+        XCTAssertTrue(filteredHeading.waitForNonExistence(timeout: 5))
+        app.buttons["List view options"].tap()
+        app.buttons["Show summary"].tap()
+        XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5))
+        XCTAssertFalse(scope.exists)
         app.buttons["Turn off activity summary"].tap()
-        XCTAssertTrue(heading.waitForNonExistence(timeout: 5))
+        XCTAssertTrue(filteredHeading.waitForNonExistence(timeout: 5))
     }
 
     func testDetailScrollReachesBottomAndKeepsLastActionVisible() throws {

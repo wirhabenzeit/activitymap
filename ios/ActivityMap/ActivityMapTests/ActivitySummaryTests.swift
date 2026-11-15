@@ -118,8 +118,11 @@ struct ActivitySummaryTests {
         store.clearSelection()
         #expect(store.activitySummary?.activityCount == 0 && store.activitySummary?[.distance].value == 0)
         #expect(store.activitySummary?[.averageSpeed].value == nil)
+        #expect(prefs.settings.summaryMode == .filtered)
+        store.searchText = ""
+        #expect(store.activitySummary?.activityCount == 1 && store.activitySummary?[.distance].value == 1500)
         store.clearScope()
-        #expect(store.activitySummary?.activityCount == 0 && prefs.settings.summaryMode == .selected)
+        #expect(store.activitySummary?.activityCount == 0 && prefs.settings.summaryMode == .filtered)
         #expect(store.routeGeometry.buildCount == 1, "Only scope clearing updates route geometry; aggregation never traverses routes")
     }
 
@@ -158,6 +161,8 @@ struct ActivitySummaryTests {
         #expect(prefs.settings.density == .compact && prefs.settings.width == .details)
         prefs.settings.summaryMode = .selected
         #expect(ActivityListPresentation(defaults: defaults).settings == prefs.settings)
+        let restored = ActivityStore(listPresentation: ActivityListPresentation(defaults: defaults))
+        #expect(restored.listPresentation.settings.summaryMode == .filtered, "A new session has no restored selection")
         #expect(ActivitySummaryMode.allCases == [.off, .filtered, .selected])
     }
 
