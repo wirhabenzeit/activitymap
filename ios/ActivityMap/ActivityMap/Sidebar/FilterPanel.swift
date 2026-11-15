@@ -8,7 +8,6 @@ import SwiftUI
 struct FilterSheet: View {
     @Bindable var store: ActivityStore
     var scope: FilterScope
-    var account: FilterPanelAccount? = nil
     let onDismiss: () -> Void
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -17,9 +16,8 @@ struct FilterSheet: View {
 
     var body: some View {
         NavigationStack {
-            FilterPanel(store: store, scope: scope, inNavigationStack: true, onDismiss: onDismiss, account: account)
+            FilterPanel(store: store, scope: scope, inNavigationStack: true, onDismiss: onDismiss)
         }
-        .environment(\.mapSheetFraction, fullHeight ? 0 : Self.restingFraction)
         .presentationDetents(fullHeight ? [.large] : [.fraction(Self.restingFraction)])
         // The list or map behind the sheet stays usable.
         .presentationBackgroundInteraction(.enabled)
@@ -74,11 +72,9 @@ struct FilterPanel: View {
     /// One part alone, as the iPad filter rail's popovers show it; nil is the whole panel.
     var part: FilterPart? = nil
     /// Hosted in a navigation stack: the count, Reset and Close move into its
-    /// title and toolbar, and search is the form's first row.
+    /// title and toolbar.
     var inNavigationStack = false
     var onDismiss: (() -> Void)? = nil
-    /// PROTOTYPE: profile footer opening the account sheet.
-    var account: FilterPanelAccount? = nil
     @State private var editingCustomDates = false
     @State private var contentScrolled = false
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -134,7 +130,7 @@ struct FilterPanel: View {
 
     @ViewBuilder private func single(_ part: FilterPart) -> some View {
         switch part {
-        case .search: Section { searchField }
+        case .text: Section { textFilters }
         case .selection: Section { selectionFilter }
         case .sports: activitySection
         case .dates: dateSection
@@ -145,39 +141,13 @@ struct FilterPanel: View {
 
     @ViewBuilder private var full: some View {
         Section {
-            searchField
+            textFilters
             if scope != .stats { selectionFilter }
         }
         activitySection
         if scope != .stats { dateSection }
         metricsSection([.distance, .duration, .elevation]).id(store.filterResetRevision)
         binarySection
-        if let account { accountFooter(account) }
-    }
-
-    private func accountFooter(_ account: FilterPanelAccount) -> some View {
-        Section {
-            Button(action: account.open) {
-                HStack(spacing: 12) {
-                    AsyncImage(url: account.imageURL) { phase in
-                        if let image = phase.image { image.resizable().scaledToFill() }
-                        else { Image(systemName: "person.crop.circle.fill").resizable().foregroundStyle(.secondary) }
-                    }
-                    .frame(width: 36, height: 36)
-                    .clipShape(Circle())
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(account.name ?? "Account").foregroundStyle(.primary)
-                        Text(account.syncing ? "Syncing activities…" : "Settings, sync & Strava")
-                            .font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(.tertiary)
-                }
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.plain)
-            .accessibilityIdentifier("filter-panel-account")
-        }
     }
 
     private var summaryHeader: some View {
@@ -217,11 +187,30 @@ struct FilterPanel: View {
             .accessibilityIdentifier("only-selected-filter")
     }
 
-    @ViewBuilder private var searchField: some View {
-        if inNavigationStack {
-            InlinePlaceSearch(store: store)
-        } else {
-            PlaceSearchField(store: store)
+    /// Text and place filters are set from header search. Filters shows them
+    /// only while on, as chips that remove them.
+    @ViewBuilder private var textFilters: some View {
+        let name = store.searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if store.selectedPlace != nil || !name.isEmpty {
+            HStack(spacing: 8) {
+                SelectedPlacePill(store: store)
+                if !name.isEmpty {
+                    HStack(spacing: 0) {
+                        Text("Matching “\(name)”").font(.subheadline.weight(.medium)).lineLimit(1)
+                        Button { store.searchText = "" } label: {
+                            Image(systemName: "xmark").font(.caption.weight(.semibold))
+                                .frame(width: 44, height: 44).contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove text filter: \(name)")
+                    }
+                    .padding(.leading, 12)
+                    .foregroundStyle(AppTheme.accent)
+                    .background(AppTheme.accent.opacity(0.12), in: Capsule())
+                }
+                Spacer(minLength: 0)
+            }
+            .accessibilityIdentifier("active-text-filters")
         }
     }
 
@@ -420,13 +409,13 @@ struct FilterPanel: View {
 
 /// The panel's independently usable parts, in panel order.
 enum FilterPart: CaseIterable, Identifiable {
-    case search, selection, sports, dates, distance, duration, elevation, details
+    case text, selection, sports, dates, distance, duration, elevation, details
 
     var id: Self { self }
 
     var title: String {
         switch self {
-        case .search: "Search"
+        case .text: "Text and place"
         case .selection: "Selected activities"
         case .sports: "Sports"
         case .dates: "Dates"
@@ -439,7 +428,7 @@ enum FilterPart: CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .search: "magnifyingglass"
+        case .text: "magnifyingglass"
         case .selection: "line.3.horizontal.decrease"
         case .sports: "figure.run"
         case .dates: "calendar"
@@ -459,7 +448,7 @@ enum FilterPart: CaseIterable, Identifiable {
     @MainActor func isActive(_ store: ActivityStore) -> Bool {
         switch self {
         case .selection: store.onlySelected
-        case .search: store.selectedPlace != nil || !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        case .text: store.selectedPlace != nil || !store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         case .sports: store.activeSportTypes != Set(SportType.allCases)
         case .dates: store.dateDayRange != nil
         case .distance: store.distanceFilter != nil
@@ -497,13 +486,4 @@ struct FilterResetButton: View {
         .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
         .accessibilityIdentifier("filter-reset")
     }
-}
-
-
-/// PROTOTYPE: what the filter panel's profile footer shows.
-struct FilterPanelAccount {
-    var name: String?
-    var imageURL: URL?
-    var syncing: Bool
-    var open: () -> Void
 }

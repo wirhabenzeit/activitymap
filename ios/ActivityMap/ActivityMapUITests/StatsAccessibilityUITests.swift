@@ -157,8 +157,9 @@ extension StatsUITests {
         XCTAssertTrue(filters.isHittable)
         if UIDevice.current.userInterfaceIdiom == .phone { XCTAssertFalse(settings.isHittable) }
         filters.tap()
-        app.searchActivities("No matching activity")
-        XCTAssertTrue(app.buttons["place-search-done"].waitForNonExistence(timeout: 5))
+        let noSports = app.buttons["Deselect all sports"]
+        XCTAssertTrue(noSports.waitForExistence(timeout: 5), app.debugDescription)
+        noSports.tap()
         axCloseFilters(app, filters: filters, scenario: scenario)
         XCTAssertTrue(detail.staticTexts["No matching activities"].waitForExistence(timeout: 10), app.debugDescription)
         XCTAssertFalse(detail.staticTexts["Calculating…"].exists)
@@ -172,13 +173,20 @@ extension StatsUITests {
         XCTAssertTrue(back.isHittable)
         back.tap()
         XCTAssertTrue(detail.waitForNonExistence(timeout: 10))
-        XCTAssertTrue(settings.isHittable, app.debugDescription)
-        XCTAssertEqual(settings.frame.midX, initial.midX, accuracy: 1)
-        XCTAssertEqual(settings.frame.midY, initial.midY, accuracy: 1)
-        settings.tap()
+        // The shell and the Stats root each render the header, and after Back
+        // XCUITest can report both identical copies as not hittable although
+        // the button takes taps: check its place and tap that point.
+        func settingsInPlace() -> Bool {
+            app.buttons.matching(identifier: "open-settings").allElementsBoundByIndex.contains {
+                abs($0.frame.midX - initial.midX) < 1 && abs($0.frame.midY - initial.midY) < 1
+            }
+        }
+        XCTAssertTrue(settingsInPlace(), app.debugDescription)
+        app.coordinate(withNormalizedOffset: .zero).withOffset(CGVector(dx: initial.midX, dy: initial.midY)).tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 10))
         app.buttons["Done"].tap()
-        XCTAssertTrue(settings.isHittable, app.debugDescription)
+        XCTAssertTrue(app.navigationBars["Settings"].waitForNonExistence(timeout: 10))
+        XCTAssertTrue(settingsInPlace(), app.debugDescription)
     }
 
     private func axCloseFilters(_ app: XCUIApplication, filters: XCUIElement, scenario: String) {

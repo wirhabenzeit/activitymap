@@ -3,7 +3,11 @@ import { type StateCreator } from 'zustand';
 
 import type { SportType } from '~/contracts/sport';
 import type { Activity } from '~/lib/activity';
-import { type PlaceFilter, effectiveActivityPlaces } from '~/lib/place-library';
+import {
+  type PlaceFilter,
+  effectiveActivityPlaces,
+  normalizePlaceSearch,
+} from '~/lib/place-library';
 import { type CategorySetting, categorySettings } from '~/settings/category';
 import { type inequalityFilters } from '~/settings/filter';
 
@@ -294,6 +298,22 @@ const matchesBinaryFilter = (mode: BinaryFilterMode, value: boolean | null) =>
 
 const normalizeSearch = (value: string) => value.normalize('NFC').toLowerCase();
 
+/** The text filter matches the activity's name (case-insensitive, accents
+ * significant) or the name of a place it visited (case- and accent-insensitive,
+ * like place search). iOS header search and its List narrowing use this rule. */
+export const matchesTextFilter = (
+  activity: Pick<FilterableActivity, 'name' | 'placeMatches'>,
+  query: string,
+) => {
+  const name = normalizeSearch(query.trim());
+  if (!name) return true;
+  if (normalizeSearch(activity.name).includes(name)) return true;
+  const place = normalizePlaceSearch(query);
+  return effectiveActivityPlaces(activity).some((visited) =>
+    normalizePlaceSearch(visited.name).includes(place),
+  );
+};
+
 export const applyFilters = (
   state: FilterState,
   activity: FilterableActivity,
@@ -340,8 +360,8 @@ export const applyFilters = (
     if (!matchesBinaryFilter(mode, activity[key])) return false;
   }
 
-  const search = normalizeSearch(state.search.trim());
-  if (search && !normalizeSearch(activity.name).includes(search)) return false;
+  const query = state.search.trim();
+  if (query && !matchesTextFilter(activity, query)) return false;
 
   return true;
 };

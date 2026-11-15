@@ -60,6 +60,26 @@ import Testing
         #expect(store.placeLibrary.places.isEmpty && store.selectedPlace == nil)
     }
 
+    @Test func textFilterMatchesNamesAndVisitedPlacesLikeHeaderSearch() throws {
+        let (root, snapshot) = try fixture()
+        let store = ActivityStore()
+        try store.replaceSyncedActivities(snapshot, scope: Fixtures.scope)
+        let expected = try #require(root["expected"] as? [String: Any])
+        let cases = try #require(expected["textFilterCases"] as? [[String: Any]])
+        #expect(!cases.isEmpty)
+        for testCase in cases {
+            let search = try #require(testCase["search"] as? String)
+            let ids = try #require(testCase["expected_ids"] as? [Int])
+            let name = testCase["name"] as? String ?? search
+            // Header search, the count it shows and the filter it applies agree.
+            #expect(ActivityTextSearch.activities(in: store.activities, query: search).map(\.id).sorted() == ids, "\(name)")
+            #expect(store.countWithTextFilter(search, includeDate: true) == ids.count, "\(name)")
+            store.searchText = search
+            #expect(store.filteredActivities.map(\.id).sorted() == ids, "\(name)")
+        }
+        store.searchText = ""
+    }
+
     @Test func replacementAndVersionChangesRemoveOldMemberships() throws {
         let (_, snapshot) = try fixture()
         let store = ActivityStore()

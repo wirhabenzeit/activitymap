@@ -253,6 +253,7 @@ struct MapScreen: View {
 
             routeInteraction(proxy: proxy)
             TapInteraction { context in
+                self.context.highlightedPlaceID = nil
                 if let map = proxy.map, !handlePlaceTap(at: context.point, map: map) && !handlePhotoTap(at: context.point, map: map) {
                     picker.pick(at: context.point, map: map, store: store)
                 }
@@ -396,11 +397,11 @@ struct MapScreen: View {
         guard let loader = store.activityPlaces else { return [] }
         // The place filter has its own pin.
         return DisplayMatchedPlace.aggregate(store.mapPlacesActivityIDs.compactMap { loader.result(String($0)) })
-            .filter { $0.id != store.selectedPlace?.id }
+            .filter { $0.id != filteredPlace?.id }
     }
 
     private var filteredPlace: LibraryPlace? {
-        store.selectedPlace.flatMap { store.placeLibrary.byID[$0.id] }
+        (store.selectedPlace?.id ?? context.highlightedPlaceID).flatMap { store.placeLibrary.byID[$0] }
     }
 
     private var renderedPlaces: [DisplayMatchedPlace] {
@@ -665,6 +666,7 @@ struct MapScreen: View {
         // Route hits take priority over external feature overlays. Photo
         // annotations consume their own taps before this layer interaction.
         TapInteraction(.layer(RouteSource.ordinaryLayerID), radius: RouteHitTesting.radius) { _, context in
+            self.context.highlightedPlaceID = nil
             if let map = proxy.map, !handlePlaceTap(at: context.point, map: map) && !handlePhotoTap(at: context.point, map: map) {
                 picker.pick(at: context.point, map: map, store: store)
             }

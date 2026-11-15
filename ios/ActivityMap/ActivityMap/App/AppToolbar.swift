@@ -38,21 +38,13 @@ extension EnvironmentValues {
     }
 }
 
-/// Destinations supply actions and identity once. Both native portrait bars
-/// and the compact landscape renderer consume these same slots.
-struct AppToolbar: ToolbarContent {
+/// Destinations supply actions and identity once; the app's own bar renders
+/// these slots at every size.
+struct AppToolbar {
     let leading: AnyView
     let principal: AnyView
     let trailing: AnyView
     var identifier = "app-toolbar"
-
-    var body: some ToolbarContent {
-        ToolbarItemGroup(placement: .topBarLeading) { leading }
-            .sharedBackgroundVisibility(.hidden)
-        ToolbarItem(placement: .principal) { principal }
-        ToolbarItemGroup(placement: .topBarTrailing) { trailing }
-            .sharedBackgroundVisibility(.hidden)
-    }
 
     var bar: some View { AppToolbarBar(items: self) }
 }
@@ -88,12 +80,12 @@ private struct AppToolbarBar: View {
 
 extension View {
     /// Keep the page and its navigation controller mounted when layout changes.
-    /// Compact chrome lives in the page's safe-area inset, so native pushes and
+    /// The bar lives in the page's safe-area inset, so native pushes and
     /// swipe-Back keep their existing owners and retained scroll positions.
     func appNavigationBar(_ toolbar: AppToolbar, visible: Bool = true,
-                          compactPlaceholder: Bool = false, embedded: Bool = false) -> some View {
+                          compactPlaceholder: Bool = false) -> some View {
         modifier(AppNavigationBar(toolbar: toolbar, visible: visible,
-                                  compactPlaceholder: compactPlaceholder, embedded: embedded))
+                                  compactPlaceholder: compactPlaceholder))
     }
 }
 
@@ -101,19 +93,16 @@ private struct AppNavigationBar: ViewModifier {
     let toolbar: AppToolbar
     let visible: Bool
     let compactPlaceholder: Bool
-    let embedded: Bool
     @AppToolbarEnvironment private var layout
 
+    /// The app draws its own bar at every size. UIKit's bar re-laid out the
+    /// header search swap (controls jumped, the field snapped to the centre).
     func body(content: Content) -> some View {
         content
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar(visible && !layout.isCompact && !embedded ? .visible : .hidden, for: .navigationBar)
-            .toolbarBackground(AppTheme.navigationBlue, for: .navigationBar)
-            .toolbarBackgroundVisibility(.visible, for: .navigationBar)
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar { if visible && !layout.isCompact && !embedded { toolbar } }
+            .toolbar(.hidden, for: .navigationBar)
             .safeAreaInset(edge: .top, spacing: 0) {
-                if visible && (layout.isCompact || embedded) {
+                if visible {
                     if compactPlaceholder {
                         Color.clear.frame(height: layout.height).allowsHitTesting(false)
                     } else { toolbar.bar }

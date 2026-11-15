@@ -14,6 +14,7 @@ struct AppShell: View {
     @Environment(\.statsDetailPresentation) private var statsDetailPresentation
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var shellSize: CGSize = .zero
+    @State private var headerSearch = HeaderSearch()
     @Namespace private var statsZoom
     @Environment(\.horizontalSizeClass) private var sizeClass
     @Environment(\.dynamicTypeSize) private var typeSize
@@ -214,13 +215,14 @@ struct AppShell: View {
                     filterWorkspace(sidebarAvailable: sidebarAvailable, panelFloats: panelFloats) {
                         navigableContent(nativeListHeader: nativeListHeader, sidebarAvailable: sidebarAvailable)
                             .environment(\.browsePaneWidth, contentWidth)
+                            .environment(\.headerSearch, headerSearch)
                             .environment(\.statsFocusZoom, statsZoom)
                             .environment(\.listRootToolbar, usesStatsNavigation ? nil : browseRootToolbar(sidebarAvailable: sidebarAvailable))
-                            .environment(\.listRootHeader, toolbarLayout.isCompact && nativeListHeader ? browseRootToolbar(sidebarAvailable: sidebarAvailable) : nil)
+                            .environment(\.listRootHeader, nativeListHeader ? browseRootToolbar(sidebarAvailable: sidebarAvailable) : nil)
                             .environment(\.filtersCollapseForDetail, panelTight && sheets.showsFilters && !panelFloats)
                             // Filters and Settings stack over the map's results sheet
                             // instead of waiting for it to dismiss first.
-                            .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented)
+                            .environment(\.mapResultsSheetSuspended, sheets.shellSheetPresented || (headerSearch.isActive && !sidebarAvailable))
                             .environment(\.mapResultsPresentationChanged, { presented in
                                 // Filters stacked over the results close with them, as
                                 // when the map behind clears the selection, unannounced.
@@ -233,6 +235,28 @@ struct AppShell: View {
                                                  set: { if $0 == nil { clearShellRequest() } }),
                                 content: { AnyView(shellSheet($0)) }))
                     }
+                }
+                .overlay(alignment: .top) {
+                    // The List is its own results: its rows narrow instead.
+                    if headerSearch.isActive && store.selectedTab != .list {
+                        HeaderSearchResults(store: store, query: headerSearch.query, onDone: headerSearch.end)
+                            .padding(.top, toolbarLayout.height + 8)
+                            .transition(.opacity.combined(with: .offset(y: -8)))
+                    }
+                }
+                // A filter sheet would open under the keyboard. Beside a filter
+                // sidebar (iPad) search and filters stay open together.
+                .onChange(of: sheets.showsFilters) { _, shown in if shown && !sidebarAvailable { headerSearch.end() } }
+                // Search belongs to the tab it started on: Show on map from a List
+                // row or detail, a Stats result, or any other switch ends it.
+                .onChange(of: store.selectedTab) { if headerSearch.isActive { headerSearch.end() } }
+                .onChange(of: headerSearch.submitCount) {
+                    // Search key: Map and Stats apply the text as a filter, like the
+                    // panel's last row; List keeps its narrowed rows.
+                    let text = headerSearch.trimmedQuery
+                    guard store.selectedTab != .list, !text.isEmpty else { return }
+                    store.applyTextFilter(text)
+                    headerSearch.end()
                 }
                 // While the map's results sheet is up, it presents these itself.
                 .sheet(item: Binding(
@@ -305,8 +329,7 @@ struct AppShell: View {
     }
 
     private func shellRequest(sidebarAvailable: Bool) -> ShellSheet? {
-        if sheets.showsSearch { return .search }
-        return sheets.showsFilters && !sidebarAvailable ? .filters : sheets.accountDestination.map(ShellSheet.account)
+        sheets.showsFilters && !sidebarAvailable ? .filters : sheets.accountDestination.map(ShellSheet.account)
     }
 
     private var filterSidebarAvailable: Bool { filterSidebarAvailable(width: shellSize.width) }
@@ -331,7 +354,7 @@ struct AppShell: View {
     }
 
     private func filterPanel(floating: Bool) -> some View {
-        FilterPanel(store: store, scope: filterScope, account: filterPanelAccount)
+        FilterPanel(store: store, scope: filterScope)
             .frame(width: BrowsePaneLayout.filterWidth)
             .frame(maxHeight: .infinity)
             .background(Color(uiColor: .secondarySystemBackground))
@@ -348,17 +371,13 @@ struct AppShell: View {
 
     private func clearShellRequest() {
         sheets.showsFilters = false
-        sheets.showsSearch = false
         sheets.accountDestination = nil
     }
 
     @ViewBuilder private func shellSheet(_ destination: ShellSheet) -> some View {
         switch destination {
         case .filters:
-            FilterSheet(store: store, scope: filterScope, account: filterPanelAccount) { sheets.showsFilters = false }
-        case .search:
-            SearchFirstSheet(store: store)
-                .presentationDetents([.large])
+            FilterSheet(store: store, scope: filterScope) { sheets.showsFilters = false }
         case .account(let account):
             AccountSheet(destination: account, auth: auth, sync: sync, refresh: refresh)
         }
@@ -386,12 +405,29 @@ struct AppShell: View {
     private var syncing: Bool { sync?.status.showsLoadingIndicator == true }
 
     private func browseRootToolbar(sidebarAvailable: Bool) -> AppToolbar {
-        AppToolbar(leading: AnyView(HStack(spacing: 8) {
-            filterButton(sidebarAvailable: sidebarAvailable)
-            if toolbarLayout.packsListControls && store.selectedTab == .list { SelectionBar(store: store, includesTotal: true, onNavigationBar: true) }
-        }), principal: AnyView(destinationPicker), trailing: AnyView(HStack(spacing: 8) {
-            if toolbarLayout.packsListControls && store.selectedTab == .list { ListControls(presentation: store.listPresentation, store: store, iconOnly: true, onNavigationBar: true) }
-            searchButton
+        // While searching, the field takes the whole bar: Filters steps aside
+        // with the other controls, so it can't open a sheet under the keyboard.
+        return AppToolbar(leading: AnyView(HeaderSearchSlot(search: headerSearch) {
+            HStack(spacing: 8) {
+                filterButton(sidebarAvailable: sidebarAvailable)
+                searchButton(sidebarAvailable: sidebarAvailable)
+                if toolbarLayout.packsListControls && store.selectedTab == .list { SelectionBar(store: store, includesTotal: true, onNavigationBar: true) }
+            }
+            .transition(HeaderSearchTransition.swapOut)
+        } active: {
+            EmptyView()
+        }), principal: AnyView(HeaderSearchSlot(search: headerSearch) {
+            destinationPicker.transition(HeaderSearchTransition.swapOut)
+        } active: {
+            HeaderSearchField(search: headerSearch)
+        }), trailing: AnyView(HeaderSearchSlot(search: headerSearch) {
+            HStack(spacing: 8) {
+                if toolbarLayout.packsListControls && store.selectedTab == .list { ListControls(presentation: store.listPresentation, store: store, iconOnly: true, onNavigationBar: true) }
+                accountButton
+            }
+            .transition(HeaderSearchTransition.swapOut)
+        } active: {
+            HeaderSearchClose(search: headerSearch)
         }), identifier: "browse-header")
     }
 
@@ -427,14 +463,20 @@ struct AppShell: View {
 
     private var destinationPicker: some View {
         ViewThatFits(in: .horizontal) {
-            modePicker.fixedSize(horizontal: true, vertical: false)
+            // Phone portrait keeps the bar for Filters, search and the avatar:
+            // the destinations move into a menu. Landscape and iPad have room.
+            if toolbarLayout.isCompact || sizeClass == .regular { modePicker.fixedSize(horizontal: true, vertical: false) }
             Menu {
                 ForEach(AppTab.available(stats: statsContent != nil), id: \.self) { tab in
                     Button(tab.title) { store.selectedTab = tab }
+                        .accessibilityIdentifier("browse-destination-menu-\(tab.title.lowercased())")
                 }
             } label: {
-                Label(store.selectedTab.title, systemImage: "chevron.down")
-                    .font(.subheadline.weight(.semibold))
+                HStack(spacing: 4) {
+                    Text(store.selectedTab.title)
+                    Image(systemName: "chevron.down").font(.caption.weight(.bold))
+                }
+                    .font(.headline)
                     .foregroundStyle(.white).frame(minHeight: 44)
             }
             .accessibilityLabel(Text(AppMessages.navigationCurrentView(store.selectedTab.title, locale: locale)))
@@ -442,18 +484,14 @@ struct AppShell: View {
         }
     }
 
-    /// PROTOTYPE: the account entry moves to the filter panel's footer.
-    private var filterPanelAccount: FilterPanelAccount {
-        FilterPanelAccount(name: auth.currentUser?.name, imageURL: auth.currentUser?.image.flatMap(URL.init(string:)),
-                           syncing: syncing) {
-            sheets.showsFilters = false
-            sheets.accountDestination = .settings
-        }
-    }
-
-    /// PROTOTYPE: search-first header entry.
-    private var searchButton: some View {
-        Button { sheets.showsSearch = true } label: {
+    private func searchButton(sidebarAvailable: Bool) -> some View {
+        Button {
+            // Search takes over on the phone: the Filters sheet closes, and the
+            // route results step aside (mapResultsSheetSuspended), returning
+            // if nothing is picked.
+            if !sidebarAvailable { sheets.showsFilters = false }
+            headerSearch.begin()
+        } label: {
             Image(systemName: "magnifyingglass")
                 .font(.body.weight(.semibold))
                 .frame(width: 44, height: 44)
@@ -572,10 +610,8 @@ enum AccountDestination: String, Identifiable {
 enum ShellSheet: Identifiable {
     case filters
     case account(AccountDestination)
-    case search
     var id: String {
         switch self {
-        case .search: "search"
         case .filters: "filters"
         case .account(let destination): "account-\(destination.rawValue)"
         }
@@ -606,7 +642,6 @@ struct FilterCountBadge: View {
 final class BrowseSheetPresentation {
     /// Filters are open: the sheet on narrow windows, the overlay sidebar on wide ones.
     var showsFilters = false
-    var showsSearch = false
     var accountDestination: AccountDestination?
     var mapResultsPresented = false
     var shellSheetPresented = false

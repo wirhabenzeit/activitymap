@@ -181,7 +181,7 @@ final class ActivityContinuationUITests: XCTestCase {
         XCTAssertEqual(restored.controllerID, initial.controllerID)
         XCTAssertTrue(app.buttons["map-result-open-3"].label.contains("Renamed ride"))
 
-        try visibleButton("browse-destination-list", in: app).tap()
+        try showDestination("list", in: app)
         _ = try await state(in: app) { $0.ready && $0.selectedTab == "list" }
         let row = app.buttons["activity-list-row-2"]
         XCTAssertTrue(row.waitForExistence(timeout: 10))
@@ -325,7 +325,7 @@ final class ActivityContinuationUITests: XCTestCase {
         XCTAssertEqual(mapped.selection, [3])
         XCTAssertEqual(mapped.detailID, 3, "The footer must show the inspected activity on Map")
         capture(app, name: "List footer opens the activity on Map")
-        try visibleButton("browse-destination-list", in: app).tap()
+        try showDestination("list", in: app)
         let returned = try await state(in: app) { $0.ready && $0.selectedTab == "list" && $0.inspectedID == -1 }
         XCTAssertEqual(returned.selection, mapped.selection)
         XCTAssertTrue(app.buttons["activity-list-row-3"].isHittable,
@@ -598,6 +598,19 @@ final class ActivityContinuationUITests: XCTestCase {
         request.usesLanguageCorrection = false
         try VNImageRequestHandler(cgImage: image).perform([request])
         return (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
+    }
+
+    /// Landscape and iPad show the destination tabs; phone portrait a menu.
+    private func showDestination(_ name: String, in app: XCUIApplication) throws {
+        if let tab = app.buttons.matching(identifier: "browse-destination-\(name)").allElementsBoundByIndex.first(where: \.isHittable) {
+            return tab.tap()
+        }
+        let menu = try XCTUnwrap(app.buttons.matching(identifier: "browse-destination-menu").allElementsBoundByIndex.first { $0.frame.width > 0 },
+                                 "Missing destination menu: \(app.debugDescription)")
+        menu.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+        let item = app.buttons["browse-destination-menu-\(name)"].firstMatch
+        XCTAssertTrue(item.waitForExistence(timeout: 5), app.debugDescription)
+        item.tap()
     }
 
     private func visibleButton(_ identifier: String, in app: XCUIApplication) throws -> XCUIElement {

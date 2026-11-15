@@ -10,7 +10,8 @@ struct PlaceSearchUITestFixture: View {
     @State private var sheets = BrowseSheetPresentation()
     private let sheetTest = ProcessInfo.processInfo.arguments.contains("--place-search-sheet-ui-testing")
     private let mapTest = ProcessInfo.processInfo.arguments.contains("--place-search-map-ui-testing")
-    private let prototype = ProcessInfo.processInfo.arguments.contains("--search-first-prototype")
+    /// Header search: opens on Map, with routes past the places.
+    private let headerTest = ProcessInfo.processInfo.arguments.contains("--place-search-header-ui-testing")
     var body: some View {
         Group {
             if sheetTest {
@@ -35,12 +36,12 @@ struct PlaceSearchUITestFixture: View {
                     let result: [String: Any] = ["userId": "place-search", "activityId": String(id), "status": "complete", "streamGeneration": "g", "streamRevision": "1", "catalogueSnapshotId": "fixture", "matcherVersion": "fixture", "matchingVersion": version, "places": id == 3 ? [duplicate, western] : [peak]]
                     let fields: [String: Any] = ["id": String(id), "athlete": "42", "name": id == 1 ? "Morning ridge" : "Evening outing", "sport_type": id == 2 ? "Ride" : "Hike", "start_date": "2026-05-01T12:00:00Z", "start_date_local": id == 1 ? "2025-05-01T12:00:00Z" : "2026-05-01T12:00:00Z", "timezone": "Europe/Zurich", "geometry_state": "summary", "placeMatches": result]
                         // A route past the place, so the map shows it rather than its empty state.
-                        .merging(mapTest || prototype ? ["map_summary_polyline": "oyt}G_khq@o}@o}@o}@o}@"] : [:]) { $1 }
+                        .merging(mapTest || headerTest ? ["map_summary_polyline": "oyt}G_khq@o}@o}@o}@o}@"] : [:]) { $1 }
                     return try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.Activity.self, from: JSONSerialization.data(withJSONObject: fields))
                 }
                 let checkpoint = SyncCheckpoint(bootstrapComplete: true, lastSyncAt: .now, freshness: .init(lastSummaryReconciledAt: nil, placeMatchingVersion: version))
                 try store.replaceSyncedActivities(StoreSnapshot(activities: activities, photos: [], checkpoint: checkpoint), scope: StoreScope(deployment: URL(string: "https://example.test")!, userID: "place-search"))
-                if prototype { store.selectedTab = .map }
+                if headerTest { store.selectedTab = .map }
                 else if sheetTest { store.selectedTab = mapTest ? .map : .list; sheets.showsFilters = true }
             } catch { self.error = error.localizedDescription }
         }

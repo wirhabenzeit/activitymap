@@ -516,6 +516,28 @@
     },
     "placeFilter": "00000000-0000-4000-8000-000000000001",
     "browsingIds": [2],
-    "statsIds": [1, 2]
+    "statsIds": [1, 2],
+    "textFilterCases": [
+      {
+        "name": "a visited place matches, ignoring case and accents",
+        "search": "PILATUS",
+        "expected_ids": [1, 2, 3]
+      },
+      {
+        "name": "any visited place counts, not only the first",
+        "search": "alpine",
+        "expected_ids": [1]
+      },
+      {
+        "name": "the activity name still matches",
+        "search": "Morning",
+        "expected_ids": [1]
+      },
+      {
+        "name": "stale or other-account place matches never count",
+        "search": "pilátus",
+        "expected_ids": [1, 2, 3]
+      }
+    ]
   }
 }
