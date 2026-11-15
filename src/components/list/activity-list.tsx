@@ -5,6 +5,7 @@ import React from 'react';
 import { ActivityCardContent } from '~/components/list/card';
 import { activityColumns } from '~/components/list/columns';
 import { DataTable } from '~/components/list/data-table';
+import { SelectionShareButton } from '~/components/share-button';
 import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useListInspection } from '~/hooks/use-list-inspection';
 import { useShowOnMap } from '~/hooks/use-show-on-map';
@@ -94,6 +95,9 @@ export function ActivityListView({
         columns={columns}
         data={rows}
         selected={selected}
+        selectionActions={
+          <SelectionShareButton activities={activities ?? []} />
+        }
         setSelected={setSelected}
         columnFilters={columnFilters}
         activeId={ready ? activeId : 0}

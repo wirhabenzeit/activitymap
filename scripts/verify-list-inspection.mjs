@@ -600,22 +600,29 @@ try {
   await row(205).focus();
   await page.keyboard.press('Enter');
   await assertMode('panel');
+  const actions = detail.getByRole('region', { name: 'Activity actions' });
+  const shareAction = actions.getByRole('button', { name: /^Share activity / });
+  await shareAction.focus();
+  await page.keyboard.press('Enter');
+  await page.getByRole('dialog').waitFor();
+  // Focus a plain button: ArrowDown on the expiry picker opens its own popup,
+  // whose first Escape correctly closes that popup before the dialog.
   await page
-    .getByRole('button', { name: 'More activity actions', exact: true })
-    .click();
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Create link', exact: true })
+    .focus();
   await page.keyboard.press('ArrowDown');
   assert.equal(id(), '205');
   await page.keyboard.press('Escape');
-  await page.getByRole('menu').waitFor({ state: 'hidden' });
+  await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  assert.equal(id(), '205', 'Escape in Share only dismisses the dialog');
   assert.equal(
-    id(),
-    '205',
-    'Escape in the actions menu only dismisses the menu',
+    await shareAction.evaluate((element) => element === document.activeElement),
+    true,
+    'Share restores its visible action button',
   );
-  await page
-    .getByRole('button', { name: 'More activity actions', exact: true })
-    .click();
-  await page.getByRole('menuitem', { name: 'Edit', exact: true }).focus();
+  const editAction = actions.getByRole('button', { name: /^Edit / });
+  await editAction.focus();
   await page.keyboard.press('Enter');
   await page.getByRole('dialog').waitFor();
   await page.keyboard.press('ArrowDown');
@@ -623,24 +630,19 @@ try {
   await page.keyboard.press('Escape');
   await page.getByRole('dialog').waitFor({ state: 'hidden' });
   assert.equal(id(), '205', 'Escape in Edit only dismisses the dialog');
-  await page.waitForFunction(
-    () =>
-      document.activeElement?.getAttribute('aria-label') ===
-      'More activity actions',
-  );
   assert.equal(
-    await page
-      .getByRole('button', { name: 'More activity actions', exact: true })
-      .evaluate((element) => element === document.activeElement),
+    await editAction.evaluate((element) => element === document.activeElement),
     true,
-    'Edit restores its menu trigger, not the removed Edit menu item',
+    'Edit restores its visible action button',
   );
   assert(
     await detail
       .getByRole('button', { name: 'Show on map: Activity 205', exact: true })
       .isEnabled(),
   );
-  console.log('PASS actions menu and Edit keep their own keyboard handling');
+  console.log(
+    'PASS Share and Edit keep their own keyboard handling and restore focus',
+  );
   console.log(
     'PASS stepping across pages, one inspector, reload, query preservation and list restoration on widening',
   );

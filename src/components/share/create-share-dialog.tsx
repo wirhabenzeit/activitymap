@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query';
 import { Check, Copy } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useState } from 'react';
 
 import {
   AppDialogBody,
@@ -26,9 +26,9 @@ import {
   SelectValue,
 } from '~/components/ui/select';
 import { Switch } from '~/components/ui/switch';
-import { useActivities } from '~/hooks/use-activities';
 import { useDateFormat } from '~/hooks/use-display-preferences';
 import { useToast } from '~/hooks/use-toast';
+import type { Activity } from '~/lib/activity';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { createShareLink } from '~/lib/sharing/client';
 import {
@@ -36,7 +36,6 @@ import {
   type ShareLinkFieldOptions,
 } from '~/lib/sharing/fields';
 import { SHARED_ROUTE_END_TRIM_METERS } from '~/lib/sharing/route-trim';
-import { useShallowStore } from '~/store';
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;
@@ -58,21 +57,15 @@ function pluralizeTracks(count: number) {
 
 /** The configuration screen discloses the exact scope and privacy before Create link. */
 export function CreateShareDialog({
+  activities: selectedActivities,
   onShowLinks,
 }: {
+  activities: readonly Activity[];
   onShowLinks: () => void;
 }) {
   const dateFormat = useDateFormat();
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const selected = useShallowStore((state) => state.selected);
-  const { data: activities = [] } = useActivities();
-
-  const selectedActivities = useMemo(
-    () => activities.filter((activity) => selected.includes(activity.id)),
-    [activities, selected],
-  );
-
   const [step, setStep] = useState<Step>('configure');
   const [expiresInMs, setExpiresInMs] = useState<number>(EXPIRY_OPTIONS[3].ms); // 7 days
   const [fields, setFields] = useState<ShareLinkFieldOptions>(
@@ -83,9 +76,13 @@ export function CreateShareDialog({
   const [copied, setCopied] = useState(false);
 
   const selectionLabel = pluralizeTracks(selectedActivities.length);
+  const scopeError =
+    selectedActivities.length > 200
+      ? 'A link can share up to 200 activities. Choose a smaller group.'
+      : null;
 
   async function handleCreate() {
-    if (isCreating) return;
+    if (isCreating || !selectedActivities.length || scopeError) return;
     setIsCreating(true);
     try {
       const result = await createShareLink({
@@ -170,8 +167,9 @@ export function CreateShareDialog({
         <AppDialogHeader>
           <DialogTitle>Share tracks</DialogTitle>
           <DialogDescription>
-            Select one or more activities on the map or list, then come back
-            here to create a private link to their tracks.
+            Open an activity’s details to share just that track. To share a
+            group from the map, turn on Combine selections and select the
+            activities you want to include.
           </DialogDescription>
         </AppDialogHeader>
         <AppDialogFooter>
@@ -210,6 +208,11 @@ export function CreateShareDialog({
             </li>
           ))}
         </ul>
+        {scopeError && (
+          <p role="alert" className="text-sm text-destructive">
+            {scopeError}
+          </p>
+        )}
         <p className="text-xs text-muted-foreground">
           Shares route, elevation profile, name, sport, date and time, distance,
           moving time, elevation gain and average speed. Heart rate, power,
@@ -266,7 +269,7 @@ export function CreateShareDialog({
         <Button variant="outline" onClick={onShowLinks} disabled={isCreating}>
           Your links
         </Button>
-        <Button onClick={handleCreate} disabled={isCreating}>
+        <Button onClick={handleCreate} disabled={isCreating || !!scopeError}>
           {isCreating ? 'Creating…' : 'Create link'}
         </Button>
       </AppDialogFooter>

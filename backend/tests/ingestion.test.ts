@@ -1635,3 +1635,51 @@ void test('a new library appears from the list at once and is completed newest f
   assert.deepEqual(summaryOnly(), []);
   assert.equal(sweep!.phase, 'idle');
 });
+
+void test('an explicit import retries a repaired gateway configuration without waiting for its backoff', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  provider.set(manual(7, 'Waiting for configuration'));
+  await convex.run(async (ctx) => {
+    const sweep = await ctx.db.query('ingestionSweeps').first();
+    await ctx.db.patch('ingestionSweeps', sweep!._id, {
+      phase: 'scanning',
+      page: 1,
+      error: 'The provider gateway is not configured',
+      attempt: 10,
+      dueAt: Date.now() + 6 * 60 * 60_000,
+    });
+  });
+  assert.equal(
+    await convex.mutation(internal.ingestionSweep.requestNow, { scope }),
+    true,
+  );
+  assert.equal(
+    await convex.mutation(internal.ingestionSweep.requestNow, { scope }),
+    false,
+  );
+  await settle(convex);
+  assert.equal((await state(convex)).activities.length, 1);
+});
+
+void test('an explicit import never bypasses provider rate limits or rejected credentials', async () => {
+  fakeProvider();
+  const convex = await owner();
+  for (const error of ['rate_limited', 'credentials_rejected']) {
+    const dueAt = Date.now() + 60_000;
+    await convex.run(async (ctx) => {
+      const sweep = await ctx.db.query('ingestionSweeps').first();
+      await ctx.db.patch('ingestionSweeps', sweep!._id, {
+        phase: 'scanning',
+        page: 1,
+        error,
+        dueAt,
+      });
+    });
+    assert.equal(
+      await convex.mutation(internal.ingestionSweep.requestNow, { scope }),
+      false,
+    );
+    assert.equal((await state(convex)).sweep!.dueAt, dueAt);
+  }
+});

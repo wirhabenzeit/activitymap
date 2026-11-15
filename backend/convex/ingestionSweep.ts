@@ -496,9 +496,10 @@ export const recover = internalMutation({
 /** How long after a finished sweep a request for another is ignored. */
 const REQUEST_COOLDOWN_MS = 5 * 60_000;
 
-/** Start a sweep now instead of at its due time (the import command). A
- * sweep that is under way, or one that finished minutes ago, is left alone.
- * Returns whether a sweep was started. */
+/** Start a sweep now instead of at its due time (the import command).
+ * Active sweeps and recently completed scans are left alone. A scan blocked
+ * on missing gateway configuration can resume its existing page on retry.
+ * Returns whether work was scheduled. */
 export const requestNow = internalMutation({
   args: { scope: v.object(scopeFields) },
   handler: async (ctx, { scope }): Promise<boolean> => {
@@ -511,6 +512,21 @@ export const requestNow = internalMutation({
       throw new Error('Activity owner unavailable');
     const sweep = await sweepFor(ctx, owner._id);
     const now = Date.now();
+    // Once an operator restores the gateway, a user's explicit retry can
+    // resume the failed page without waiting for the old configuration backoff.
+    // Active leases and provider-imposed waits keep their ordinary guards.
+    if (
+      sweep?.error === 'The provider gateway is not configured' &&
+      (!sweep.lease || sweep.lease.expiresAt <= now)
+    ) {
+      await ctx.db.patch('ingestionSweeps', sweep._id, {
+        dueAt: now,
+        error: undefined,
+        attempt: 0,
+      });
+      await schedule(ctx, owner._id, now);
+      return true;
+    }
     if (
       !sweep ||
       sweep.phase !== 'idle' ||

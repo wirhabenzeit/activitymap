@@ -3,6 +3,7 @@ import 'server-only';
 import { randomBytes } from 'node:crypto';
 
 import { errorEnvelope } from '~/contracts/v1/error';
+import { ActivityMutationError } from '~/server/application/activities';
 import type { Actor } from '~/server/auth/actor';
 import { updateUserInternal } from '~/server/auth/users';
 import { convexAppAdapter } from '~/server/library/convex';
@@ -120,30 +121,81 @@ export async function firstFetch(
   deps: {
     wait?: (ms: number) => Promise<void>;
     now?: () => number;
+    writer?: ConvexWriter;
+    knownActivityCount?: () => Promise<number>;
   } = {},
 ): Promise<number> {
   const epoch = actor.convexEpoch ?? (await startLibrary(actor));
-  const writer = bridge(actor);
-  await writer.write({ kind: 'sweepNow' }, epoch);
+  const writer = deps.writer ?? bridge(actor);
+  const requestedAt = (deps.now ?? Date.now)();
+  const started = await writer.write<boolean>({ kind: 'sweepNow' }, epoch);
   const now = deps.now ?? Date.now;
   const wait =
     deps.wait ?? ((ms) => new Promise<void>((done) => setTimeout(done, ms)));
   const deadline = now() + WAIT_MS;
-  // Until the sweep has read two pages, or has finished reading.
+  type Sweep = {
+    phase: 'idle' | 'scanning' | 'confirming';
+    page: number;
+    error: string | null;
+    dueAt: number;
+    running: boolean;
+    completedAt: number | null;
+  };
+  let sweep: Sweep | null = null;
+  let scanComplete = false;
   for (;;) {
-    const sweep = await writer.write<{ phase: string; page: number } | null>(
-      { kind: 'sweepStatus' },
-      epoch,
-    );
-    if (sweep && (sweep.phase !== 'scanning' || sweep.page > 2)) break;
-    if (now() >= deadline) break;
+    sweep = await writer.write<Sweep | null>({ kind: 'sweepStatus' }, epoch);
+    scanComplete =
+      sweep?.phase === 'confirming' ||
+      (sweep?.phase === 'idle' &&
+        sweep.completedAt != null &&
+        (!started || sweep.completedAt >= requestedAt));
+    if (
+      scanComplete ||
+      (sweep?.phase === 'scanning' && sweep.page > 2) ||
+      (sweep?.error && !sweep.running) ||
+      now() >= deadline
+    )
+      break;
     await wait(POLL_MS);
   }
-  const status = await convexAppAdapter(actor, epoch).loadStatus(
-    actor,
-    new Date(),
+  const count = deps.knownActivityCount
+    ? await deps.knownActivityCount()
+    : (await convexAppAdapter(actor, epoch).loadStatus(actor, new Date()))
+        .history.knownActivityCount;
+  if (count > 0) return Math.min(FIRST_FETCH, count);
+  // Zero is a confirmed empty Strava library only after its list was read.
+  // A pending or failed background import must reach the existing error UI.
+  if (scanComplete && !sweep?.error) return 0;
+  if (sweep?.error === 'credentials_rejected')
+    throw new ActivityMutationError(
+      'strava_not_connected',
+      'Reconnect Strava to import your activities.',
+      409,
+    );
+  const retryAfter = Math.max(
+    30,
+    Math.ceil(((sweep?.dueAt ?? now()) - now()) / 1000),
   );
-  return Math.min(FIRST_FETCH, status.history.knownActivityCount);
+  if (sweep?.error === 'rate_limited')
+    throw new ActivityMutationError(
+      'rate_limited',
+      'Strava is limiting requests. Your activities will be imported when the limit resets.',
+      429,
+      true,
+      retryAfter,
+    );
+  throw new ActivityMutationError(
+    'upstream_unavailable',
+    sweep?.error === 'The provider gateway is not configured'
+      ? 'The Strava importer is not configured for this environment.'
+      : sweep?.error
+        ? 'The Strava import could not complete. Please try again.'
+        : 'Your activities are still being imported. Please try again shortly.',
+    503,
+    true,
+    30,
+  );
 }
 
 /** Answer for a request without an actor. */

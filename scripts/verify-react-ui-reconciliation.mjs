@@ -163,7 +163,9 @@ try {
         .isVisible(),
     );
     await dialog.getByRole('button', { name: 'Close Settings' }).click();
-    await page.getByRole('button', { name: 'Share', exact: true }).click();
+    await page
+      .getByRole('button', { name: 'Share activity', exact: true })
+      .click();
     dialog = page.getByRole('dialog');
     await fits(dialog);
     await dialog
@@ -201,11 +203,12 @@ try {
     await page.keyboard.press('Escape');
     assert.equal(await page.getByRole('dialog').count(), 0);
     await page.waitForFunction(
-      () => document.activeElement?.textContent?.trim() === 'Share',
+      () =>
+        document.activeElement?.getAttribute('aria-label') === 'Share activity',
     );
     assert.equal(
       await page
-        .getByRole('button', { name: 'Share', exact: true })
+        .getByRole('button', { name: 'Share activity', exact: true })
         .evaluate((element) => element === document.activeElement),
       true,
       'Dialog returns focus to its trigger',
