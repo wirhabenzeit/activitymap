@@ -40,7 +40,7 @@ struct MapPhotoTests {
         #expect(!MapPhotoLayout.validLocation(CLLocationCoordinate2D(latitude: 0, longitude: .infinity)))
         #expect(MapPhotoLayout.groups([.init(id: "a", x: .nan, y: 0)], size: CGSize(width: 400, height: 700), zoom: 15).isEmpty)
     }
-    @MainActor @Test func scopeResetClearsPhotoVisibilityWithoutCameraOrSelectionNavigation() {
+    @MainActor @Test func photoVisibilityDoesNotNavigateAndSurvivesScopeReset() {
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
         store.replaceSelection(with: [1])
         let selected = store.selectedActivityIDs
@@ -50,6 +50,6 @@ struct MapPhotoTests {
         #expect(store.mapContext.pendingRequest == nil)
         #expect(store.mapContext.camera.zoom == camera.zoom)
         store.mapContext.clearScope()
-        #expect(!store.mapContext.showPhotos)
+        #expect(store.mapContext.showPhotos, "Photo visibility is a device preference, independent of the account scope")
     }
 }
