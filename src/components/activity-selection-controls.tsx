@@ -1,13 +1,26 @@
 'use client';
 
-import { Check, ListChecks, SquareCheckBig, X } from 'lucide-react';
-import type { ReactNode } from 'react';
+import {
+  Check,
+  Download,
+  ListChecks,
+  Loader2,
+  SquareCheckBig,
+  X,
+} from 'lucide-react';
+import { type ReactNode, useRef, useState } from 'react';
 
 import { ClearFiltersButton } from '~/components/list/browsing-empty-state';
 import { SelectionShareButton } from '~/components/share-button';
 import { Button } from '~/components/ui/button';
+import { useToast } from '~/hooks/use-toast';
 import type { Activity } from '~/lib/activity';
+import {
+  buildActivitiesGPXArchive,
+  downloadBlob,
+} from '~/lib/export-activities-gpx';
 import { message } from '~/lib/presentation/messages';
+import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { store, useShallowStore } from '~/store';
 
 export function SelectionCount({
@@ -107,6 +120,98 @@ export function ClearSelectionButton() {
   ) : null;
 }
 
+/** Downloads the selected routes as a zip of GPX files, with elevation. */
+export function SelectionDownloadButton({
+  activities,
+}: {
+  activities: readonly Activity[];
+}) {
+  const { toast } = useToast();
+  const { isGuest, userId, enabled, stored, selected, combine } =
+    useShallowStore((state) => ({
+      isGuest: state.isGuest,
+      userId: state.user?.id,
+      enabled: state.user?.features?.activityGPXExport === true,
+      stored: hasStoredLibraryAccess(state.user),
+      selected: state.selected,
+      combine: state.combineSelections,
+    }));
+  const [busy, setBusy] = useState(false);
+  const busyRef = useRef(false);
+  if (
+    isGuest ||
+    !enabled ||
+    !stored ||
+    !userId ||
+    !combine ||
+    selected.length === 0
+  )
+    return null;
+  const selectedIDs = new Set(selected);
+  const scope = activities.filter((activity) => selectedIDs.has(activity.id));
+  if (scope.length === 0) return null;
+  const label = `Download ${scope.length} selected ${scope.length === 1 ? 'activity' : 'activities'} as GPX (zip)`;
+
+  const download = async () => {
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(true);
+    try {
+      const archive = await buildActivitiesGPXArchive(
+        scope,
+        userId,
+        new AbortController().signal,
+      );
+      if (archive.exported === 0) {
+        toast({
+          variant: 'destructive',
+          title: 'Nothing to download',
+          description: 'None of the selected activities has a route.',
+        });
+        return;
+      }
+      downloadBlob(archive.blob, archive.fileName);
+      const missing = archive.exported - archive.withElevation;
+      const notes = [
+        missing > 0 &&
+          `${missing} without elevation (streams not imported yet)`,
+        archive.skipped > 0 && `${archive.skipped} without a route skipped`,
+      ].filter(Boolean);
+      toast({
+        title: `Downloaded ${archive.exported} GPX ${archive.exported === 1 ? 'file' : 'files'}`,
+        description: notes.length ? notes.join('; ') : undefined,
+      });
+    } catch {
+      toast({
+        variant: 'destructive',
+        title: 'Download failed',
+        description: 'The GPX files could not be created. Try again.',
+      });
+    } finally {
+      busyRef.current = false;
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="size-11 shrink-0"
+      aria-label={label}
+      title={label}
+      disabled={busy}
+      onClick={() => void download()}
+    >
+      {busy ? (
+        <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+      ) : (
+        <Download className="size-4" aria-hidden="true" />
+      )}
+    </Button>
+  );
+}
+
 export function SelectionActions({
   controls,
   showShare = true,
@@ -119,6 +224,7 @@ export function SelectionActions({
   return (
     <div className="flex shrink-0 items-center">
       {controls}
+      {showShare && <SelectionDownloadButton activities={activities} />}
       {showShare && <SelectionShareButton activities={activities} />}
       <ClearSelectionButton />
     </div>
