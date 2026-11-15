@@ -57,7 +57,7 @@ export default async function AppShellLayout({
           ...toCurrentUserDTO(user, account),
           ...(liveUrl && { convexLive: { url: liveUrl } }),
           ...(isAdminAthlete(user.athlete_id) && {
-            features: { activityMerge: true },
+            features: { activityMerge: true, activityGPXExport: true },
           }),
         }
       : null;

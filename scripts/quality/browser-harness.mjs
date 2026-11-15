@@ -51,12 +51,6 @@ export function fixtureEnvironment(inherited, base) {
     NEXT_TELEMETRY_DISABLED: '1',
     AUTH_SECRET: 'browser-fixture-secret-at-least-32-characters',
     BETTER_AUTH_SECRET: 'browser-fixture-secret-at-least-32-characters',
-    DATABASE_URL:
-      'postgres://fixture:fixture@127.0.0.1:1/activitymap_browser_fixture',
-    NEON_DATABASE_URL:
-      'postgres://fixture:fixture@127.0.0.1:1/activitymap_browser_fixture',
-    NEON_DATABASE_URL_UNPOOLED:
-      'postgres://fixture:fixture@127.0.0.1:1/activitymap_browser_fixture',
     ACTIVITYMAP_EXTERNAL_EFFECTS: '',
     NEXT_PUBLIC_MAPBOX_TOKEN: 'pk.browser-fixture-unused',
     NEXT_PUBLIC_ENV: 'development',

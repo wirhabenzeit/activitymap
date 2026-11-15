@@ -174,7 +174,6 @@ export async function applyPhotoSet(
       changed++;
       continue;
     }
-    // eslint-disable-next-line drizzle/enforce-delete-with-where -- in-memory Map
     next.delete(doc.key);
     if (doc.generation === owner.generation && same(doc.dto, dto)) continue;
     await ctx.db.patch('photos', doc._id, {

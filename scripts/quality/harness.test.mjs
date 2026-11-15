@@ -177,14 +177,14 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
   });
 });
 
-test('fixture startup drops inherited service credentials and uses an inert database', () => {
+test('fixture startup drops inherited service credentials', () => {
   const environment = fixtureEnvironment(
     {
       PATH: '/tools',
       HOME: '/user',
       NODE_OPTIONS: '--import=/unsafe',
-      DATABASE_URL: 'postgres://real/db',
-      NEON_DATABASE_URL: 'postgres://real/neon',
+      ACTIVITYMAP_CONVEX_SITE: 'https://real.convex.site',
+      ACTIVITYMAP_CONVEX_SIGNING_KEY: 'real',
       ACTIVITYMAP_EXTERNAL_EFFECTS: 'enabled',
       VERCEL_ENV: 'production',
       AUTH_STRAVA_SECRET: 'secret',
@@ -197,8 +197,8 @@ test('fixture startup drops inherited service credentials and uses an inert data
   assert.equal(environment.AUTH_STRAVA_SECRET, undefined);
   assert.equal(environment.NODE_OPTIONS, undefined);
   assert.equal(environment.ACTIVITYMAP_EXTERNAL_EFFECTS, '');
-  assert.equal(new URL(environment.DATABASE_URL).host, '127.0.0.1:1');
-  assert.equal(environment.NEON_DATABASE_URL, environment.DATABASE_URL);
+  assert.equal(environment.ACTIVITYMAP_CONVEX_SITE, undefined);
+  assert.equal(environment.ACTIVITYMAP_CONVEX_SIGNING_KEY, undefined);
   assert.equal(environment.PUBLIC_URL, 'http://127.0.0.1:4321');
 });
 
@@ -230,7 +230,7 @@ test('temporary workspace excludes local secrets and preserves preexisting sourc
     'ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json',
   ])
     await writeFile(join(root, file), '{}');
-  await writeFile(join(root, '.env.local'), 'DATABASE_URL=production');
+  await writeFile(join(root, '.env.local'), 'AUTH_SECRET=production');
   await writeFile(
     join(root, 'src/app/list-inspection-test/page.tsx'),
     'owned by developer',
