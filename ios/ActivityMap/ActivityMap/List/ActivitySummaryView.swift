@@ -21,40 +21,7 @@ struct ActivitySummaryView: View {
     var body: some View {
         if let summary = store.activitySummary {
             VStack(alignment: .leading, spacing: 8) {
-                Button { toggleDetails() } label: {
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(spacing: 8) {
-                            Text("Summary").font(.headline).foregroundStyle(.primary).fixedSize()
-                            if !typeSize.isAccessibilitySize {
-                                Text("·").foregroundStyle(.secondary)
-                                Text(AppMessages.selectionCount(summary.activityCount, locale: locale))
-                                    .font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer(minLength: 0)
-                            Image(systemName: allMetricsExpanded ? "chevron.up" : "chevron.down")
-                                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
-                        }
-                        if typeSize.isAccessibilitySize {
-                            Text(AppMessages.selectionCount(summary.activityCount, locale: locale))
-                                .font(.caption).foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(minHeight: 44).contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(allMetricsExpanded ? "Collapse summary" : "Expand summary")
-                .accessibilityValue("\(mode.title), \(String(localized: AppMessages.selectionCount(summary.activityCount, locale: locale)))")
-                .accessibilityIdentifier("activity-summary-toggle")
-                if !store.selectedActivityIDs.isEmpty {
-                    Picker("Summary scope", selection: Binding(get: { mode },
-                        set: { store.listPresentation.settings.summaryMode = $0 })) {
-                        Text("Filtered").tag(ActivitySummaryMode.filtered)
-                        Text("Selected").tag(ActivitySummaryMode.selected)
-                    }
-                    .pickerStyle(.segmented)
-                    .frame(minHeight: 44)
-                    .accessibilityIdentifier("activity-summary-scope")
-                }
+                header(summary)
                 if typeSize.isAccessibilitySize {
                     VStack(alignment: .leading, spacing: 16) {
                         hero(.distance, title: "Distance", rowID: "distance", summary: summary)
@@ -84,8 +51,85 @@ struct ActivitySummaryView: View {
             .frame(width: availableWidth, alignment: .leading)
             .background(.primary.opacity(0.04), in: RoundedRectangle(cornerRadius: 18))
             .buttonStyle(.borderless)
-            .accessibilityIdentifier("activity-summary")
         }
+    }
+
+    private func header(_ summary: ActivitySummary) -> some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 6) {
+                Text("Summary").font(.headline).fixedSize()
+                if !store.selectedActivityIDs.isEmpty {
+                    scopeSwitch.fixedSize(horizontal: true, vertical: false)
+                } else {
+                    Text("·").foregroundStyle(.secondary)
+                    Text(AppMessages.selectionCount(summary.activityCount, locale: locale))
+                        .font(.caption).foregroundStyle(.secondary).fixedSize()
+                }
+                Spacer(minLength: 0)
+                disclosure(summary)
+            }
+            VStack(alignment: .leading, spacing: 0) {
+                HStack {
+                    Text("Summary").font(.headline)
+                    Spacer(minLength: 0)
+                    disclosure(summary)
+                }
+                if !store.selectedActivityIDs.isEmpty {
+                    scopeSwitch
+                } else {
+                    Text(AppMessages.selectionCount(summary.activityCount, locale: locale))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+
+    private func disclosure(_ summary: ActivitySummary) -> some View {
+        Button { toggleDetails() } label: {
+            Image(systemName: allMetricsExpanded ? "chevron.up" : "chevron.down")
+                .font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                .frame(width: 44, height: 44).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(allMetricsExpanded ? "Collapse summary" : "Expand summary")
+        .accessibilityValue("\(mode.title), \(String(localized: AppMessages.selectionCount(summary.activityCount, locale: locale)))")
+        .accessibilityIdentifier("activity-summary-toggle")
+    }
+
+    @ViewBuilder private var scopeSwitch: some View {
+        if typeSize.isAccessibilitySize {
+            VStack(alignment: .leading, spacing: 0) {
+                scopeButton(.selected, count: store.selectedActivityIDs.count)
+                scopeButton(.filtered, count: store.visibleActivityIDs.count)
+            }
+        } else {
+            HStack(spacing: 2) {
+                scopeButton(.selected, count: store.selectedActivityIDs.count)
+                Text("/").font(.caption).foregroundStyle(.tertiary).accessibilityHidden(true)
+                scopeButton(.filtered, count: store.visibleActivityIDs.count)
+            }
+        }
+    }
+
+    private func scopeButton(_ scope: ActivitySummaryMode, count: Int) -> some View {
+        let active = mode == scope
+        let count = count.formatted(.number.locale(locale))
+        return Button {
+            store.listPresentation.settings.summaryMode = scope
+        } label: {
+            Group {
+                if scope == .selected { Text("\(count) selected") }
+                else { Text("\(count) filtered") }
+            }
+            .font(.caption.weight(active ? .semibold : .regular))
+            .foregroundStyle(active ? AppTheme.accent : .secondary)
+            .padding(.horizontal, 5).padding(.vertical, 4)
+            .background(active ? AppTheme.accent.opacity(0.14) : .clear, in: RoundedRectangle(cornerRadius: 6))
+            .frame(minHeight: 44).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(active ? .isSelected : [])
+        .accessibilityIdentifier("activity-summary-scope-\(scope.rawValue)")
     }
 
     // Avoid competing List-cell and content resize animations.

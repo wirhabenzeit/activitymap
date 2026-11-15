@@ -30,10 +30,20 @@ final class ListSelectionUITests: XCTestCase {
         app.buttons["Show summary"].tap()
         let filteredHeading = app.buttons.matching(NSPredicate(format: "label IN %@", ["Expand summary", "Collapse summary"])).firstMatch
         XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
-        let scope = app.segmentedControls.containing(.button, identifier: "Selected").firstMatch
+        let scope = app.buttons["activity-summary-scope-selected"]
+        let filteredScope = app.buttons["activity-summary-scope-filtered"]
         XCTAssertTrue(scope.waitForExistence(timeout: 5), app.debugDescription)
-        scope.buttons["Selected"].tap()
-        XCTAssertTrue(scope.buttons["Selected"].isSelected)
+        XCTAssertEqual(scope.label, "2 selected")
+        XCTAssertTrue(filteredScope.isSelected)
+        XCTAssertEqual(scope.frame.midY, filteredHeading.frame.midY, accuracy: 1, "Scope controls stay inline with the summary header")
+        scope.tap()
+        XCTAssertTrue(scope.isSelected)
+        XCTAssertFalse(filteredScope.isSelected)
+        filteredScope.tap()
+        XCTAssertTrue(filteredScope.isSelected)
+        XCTAssertFalse(scope.isSelected)
+        scope.tap()
+        XCTAssertTrue(scope.isSelected)
         XCTAssertTrue(filteredHeading.waitForExistence(timeout: 5), app.debugDescription)
         let capture = XCTAttachment(screenshot: app.screenshot())
         capture.name = "Selected summary and Combine share"

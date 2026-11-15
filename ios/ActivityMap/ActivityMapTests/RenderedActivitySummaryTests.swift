@@ -57,7 +57,7 @@ extension RenderedRoutePickingTests {
         #expect(store.selectedActivityIDs.isEmpty)
     }
 
-    @Test(arguments: ["small-phone", "large-text", "tablet-expanded", "selected-hidden", "empty-filtered", "all-unknown", "reference", "reference-small", "reference-imperial"])
+    @Test(arguments: ["small-phone", "large-text", "tablet-expanded", "selected-hidden", "empty-filtered", "all-unknown", "reference", "reference-selected", "reference-small", "reference-imperial"])
     func summariesAdaptAndDiscloseExactScope(scenario: String) async throws {
         let preferences = ActivityListPresentation(defaults: nil)
         preferences.settings.summaryMode = .filtered
@@ -93,6 +93,10 @@ extension RenderedRoutePickingTests {
         }
         let store = ActivityStore(activities: models, listPresentation: preferences)
         store.selectedTab = .list
+        if scenario == "reference-selected" || scenario == "reference-small" || scenario == "large-text" {
+            store.replaceSelection(with: [1, 2])
+            preferences.settings.summaryMode = .selected
+        }
         if scenario == "selected-hidden" {
             store.replaceSelection(with: [1, 2])
             preferences.settings.summaryMode = .selected
@@ -119,7 +123,7 @@ extension RenderedRoutePickingTests {
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(250))
         try host.save("summary-\(scenario)")
-        if scenario == "reference" || scenario == "reference-small" {
+        if scenario == "reference" || scenario == "reference-selected" || scenario == "reference-small" {
             let request = VNRecognizeTextRequest()
             request.recognitionLevel = .accurate
             let image = UIGraphicsImageRenderer(bounds: host.host.view.bounds).image { _ in
