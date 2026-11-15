@@ -32,6 +32,12 @@ export function BrowsingProvider({ children }: { children: ReactNode }) {
   return <BrowsingContext value={value}>{children}</BrowsingContext>;
 }
 
+/** True under a BrowsingProvider; lets optional chrome (e.g. the filter
+ * summary) render in fixtures that mount the sidebar without a library. */
+export function useHasBrowsingLibrary() {
+  return useContext(BrowsingContext) !== null;
+}
+
 export function useBrowsingLibrary() {
   const value = useContext(BrowsingContext);
   if (!value) throw new Error('Browsing consumers require BrowsingProvider');

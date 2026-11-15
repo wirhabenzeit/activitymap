@@ -54,6 +54,7 @@ import {
   useActiveFilterCount,
   useFilterResultCount,
 } from '~/hooks/use-active-filter-count';
+import { useHasBrowsingLibrary } from '~/hooks/use-browsing-library';
 import {
   useDateFormat,
   useDisplayUnits,
@@ -753,6 +754,10 @@ export function ResetFilters() {
 /** Result count and active-restriction count, like the native filter panel,
  * with the reset beside the count while any filter is active. */
 export function FilterSummary() {
+  return useHasBrowsingLibrary() ? <FilterSummaryContent /> : null;
+}
+
+function FilterSummaryContent() {
   const result = useFilterResultCount();
   const active = useActiveFilterCount();
   const resetFilters = useResetFilters();
