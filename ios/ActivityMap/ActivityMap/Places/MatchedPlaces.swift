@@ -106,7 +106,7 @@ struct MatchedPlaceCard: View {
     var body: some View {
         HStack(spacing: 0) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(place.name).font(.caption.weight(.semibold)).foregroundStyle(AppTheme.accent)
+                Text(verbatim: place.name).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
                     .lineLimit(2).fixedSize(horizontal: false, vertical: true)
                 HStack(spacing: 4) {
                     if let elevation = place.elevationM {
@@ -115,7 +115,10 @@ struct MatchedPlaceCard: View {
                     }
                     if routeCount > 1 { Text("\(place.elevationM == nil ? "" : "· ")\(routeCount) \(overview ? "activities" : "selected routes")") }
                 }.font(.caption2).foregroundStyle(.secondary)
-            }.padding(.vertical, 6).padding(.leading, 10)
+            }
+            .padding(.vertical, 10)
+            .padding(.leading, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
             Button(action: onClose) {
                 Image(systemName: "xmark").font(.system(size: 12, weight: .medium))
                     .frame(width: 44, height: 44).contentShape(Rectangle())
@@ -123,8 +126,11 @@ struct MatchedPlaceCard: View {
             .buttonStyle(.plain).foregroundStyle(.secondary)
             .accessibilityLabel("Close place").accessibilityIdentifier("close-place")
         }
-        .frame(maxWidth: 220).fixedSize(horizontal: true, vertical: true)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 10))
+        .frame(width: 240, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+        .background(.background, in: RoundedRectangle(cornerRadius: 12))
+        .overlay { RoundedRectangle(cornerRadius: 12).strokeBorder(.primary.opacity(0.1), lineWidth: 0.5) }
+        .shadow(color: .black.opacity(0.16), radius: 8, y: 3)
         .accessibilityElement(children: .contain)
     }
 }

@@ -178,7 +178,9 @@ import XCTest
         XCTAssertFalse(app.staticTexts["Alpine hut"].exists)
         XCTAssertEqual(hut.frame.midY, original.midY, accuracy: 1.5)
         pass.tap()
-        XCTAssertTrue(app.staticTexts["Test pass"].waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["Wasserscheide Rhein/Donau"].waitForExistence(timeout: 5), app.debugDescription)
+        let callout = XCTAttachment(screenshot: app.screenshot())
+        callout.name = "Long place name callout"; callout.lifetime = .keepAlways; add(callout)
         XCTAssertEqual(pass.frame.midY, passPosition.midY, accuracy: 1.5)
         pass.tap()
         // After map interaction iOS excludes inactive sheet content from its

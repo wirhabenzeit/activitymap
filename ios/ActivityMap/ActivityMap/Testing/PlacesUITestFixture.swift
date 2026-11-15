@@ -87,7 +87,7 @@ struct PlacesUITestFixture: View {
                     elevationM: 500, visits: [.init(distanceM: 350), .init(distanceM: 850), .init(distanceM: 1105)])
                 let peak = ActivityMapAPI.MatchedPlace(id: "peak", name: "Test summit", kinds: [.peak], longitude: 8.002, latitude: 47.002,
                     elevationM: 600, visits: [.init(distanceM: 600)])
-                let pass = ActivityMapAPI.MatchedPlace(id: "pass", name: "Test pass", kinds: [.pass], longitude: overviewTest ? 8.002 : 8.0035, latitude: overviewTest ? 47.002 : 47.0025,
+                let pass = ActivityMapAPI.MatchedPlace(id: "pass", name: "Wasserscheide Rhein/Donau", kinds: [.pass], longitude: overviewTest ? 8.002 : 8.0035, latitude: overviewTest ? 47.002 : 47.0025,
                     elevationM: 550, visits: [.init(distanceM: 725)])
                 let result = ActivityMapAPI.ActivityPlaces(userID: session.scope.userID, activityID: "1", status: .complete,
                     streamGeneration: "g", streamRevision: "1", catalogueSnapshotID: "synthetic", matcherVersion: "synthetic", matchingVersion: nil, resultRevision: nil,
