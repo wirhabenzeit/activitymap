@@ -87,6 +87,7 @@ export const nativeSuites = [
 
 export const nativePRUISelectors = [
   'ActivityMapUITests/ListSelectionUITests/testSummaryOptionsAndShareFollowCombineMode',
+  'ActivityMapUITests/ListSelectionUITests/testExpandedSummaryKeepsLargeValuesInsideProductionList',
   'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
   'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
   'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',

@@ -104,6 +104,7 @@ test('native profiles retain all unit suites and select exactly the intended PR 
   );
   const expectedUI = [
     'ActivityMapUITests/ListSelectionUITests/testSummaryOptionsAndShareFollowCombineMode',
+    'ActivityMapUITests/ListSelectionUITests/testExpandedSummaryKeepsLargeValuesInsideProductionList',
     'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
     'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
     'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
@@ -117,7 +118,7 @@ test('native profiles retain all unit suites and select exactly the intended PR 
   assert.equal(unitSuites.length, 36);
   assert.deepEqual(nativePRUISelectors, expectedUI);
   assert.deepEqual(pr.suites, [...unitSuites, ...expectedUI]);
-  assert.equal(new Set(pr.suites).size, 46);
+  assert.equal(new Set(pr.suites).size, 47);
   assert.equal(pr.name, 'pr');
   assert.equal(pr.runtimeTimeoutMs, 15 * 60 * 1000);
   assert.deepEqual(full.suites, nativeSuites);
@@ -153,7 +154,7 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
       (item) => item.actual === '26.2' && item.requires === 'iOS 27+',
     ),
   );
-  assert.equal(result.suites.length, 41);
+  assert.equal(result.suites.length, 42);
   assert(
     result.suites.includes(
       'ActivityMapTests/StatsCalendarScrollRenderingTests',

@@ -76,6 +76,35 @@ final class ListSelectionUITests: XCTestCase {
         XCTAssertTrue(filteredHeading.waitForNonExistence(timeout: 5))
     }
 
+    func testExpandedSummaryKeepsLargeValuesInsideProductionList() throws {
+        continueAfterFailure = false
+        let app = XCUIApplication()
+        app.launchArguments = ["--list-selection-ui-testing", "--summary-layout-ui-testing",
+                               "-AppleLanguages", "(en)", "-AppleLocale", "en_CH"]
+        app.launch()
+        defer { app.terminate() }
+        let disclosure = app.buttons["activity-summary-toggle"]
+        XCTAssertTrue(disclosure.waitForExistence(timeout: 10), app.debugDescription)
+        for _ in 0..<2 {
+            disclosure.tap()
+            let moving = app.otherElements["Moving time"]
+            XCTAssertTrue(moving.waitForExistence(timeout: 5), app.debugDescription)
+            for label in ["Moving time", "Average speed", "Minimum and maximum elevation",
+                          "Average power", "Weighted avg. power", "Max power", "Average heart rate", "Max heart rate"] {
+                let metric = app.descendants(matching: .any).matching(NSPredicate(format: "label == %@", label)).firstMatch
+                XCTAssertTrue(metric.exists, "Missing \(label): \(app.debugDescription)")
+                XCTAssertGreaterThanOrEqual(metric.frame.minX, 16, "\(label) overflows the card's leading edge")
+                XCTAssertLessThanOrEqual(metric.frame.maxX, app.frame.maxX - 16, "\(label) overflows the card's trailing edge")
+            }
+            let capture = XCTAttachment(screenshot: app.screenshot())
+            capture.name = "Expanded production summary with large totals"
+            capture.lifetime = .keepAlways
+            add(capture)
+            disclosure.tap()
+            XCTAssertTrue(moving.waitForNonExistence(timeout: 5))
+        }
+    }
+
     func testDetailScrollReachesBottomAndKeepsLastActionVisible() throws {
         continueAfterFailure = false
         defer { XCUIDevice.shared.orientation = .portrait }

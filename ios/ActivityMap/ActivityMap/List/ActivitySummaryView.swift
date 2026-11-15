@@ -244,7 +244,8 @@ struct ActivitySummaryView: View {
                         groupValue(.weightedPower, summary: summary)
                         groupValue(.maxPower, summary: summary)
                     }
-                    Divider().gridCellColumns(4)
+                    // A separator must not contribute an unbounded ideal width to the Grid.
+                    Divider().gridCellColumns(4).gridCellUnsizedAxes(.horizontal)
                     GridRow {
                         groupLabel("HR · bpm", icon: "heart")
                         groupValue(.averageHeartRate, summary: summary)
