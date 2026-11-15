@@ -96,6 +96,7 @@
     "dotenv": "^18.0.9",
     "embla-carousel-react": "^8.6.0",
     "eslint-plugin-next": "^0.0.0",
+    "fflate": "^0.8.3",
     "geotiff": "3.0.5",
     "htl": "^1.0.0",
     "immer": "^11.2.9",

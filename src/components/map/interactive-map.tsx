@@ -29,6 +29,10 @@ import { LayerSwitcher } from '~/components/map/layer-switcher';
 import { LegacySharingDisabledNotice } from '~/components/map/legacy-sharing-disabled-notice';
 import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import Overlay from '~/components/map/overlay';
+import {
+  PanelColumnMenu,
+  panelColumnVisibility,
+} from '~/components/map/panel-column-menu';
 import { PanelResizeHandle } from '~/components/map/panel-resize-handle';
 import PhotoLayer from '~/components/map/photo';
 import { Selection } from '~/components/map/selection-control';
@@ -54,7 +58,6 @@ import {
 import { hasStoredLibraryAccess } from '~/lib/stored-library-access';
 import { activityStreamMetadata } from '~/lib/sync/v1-mappers';
 import { cn, groupBy } from '~/lib/utils';
-import { activityFields } from '~/settings/activity';
 import { categorySettings } from '~/settings/category';
 import {
   type OverlaySetting,
@@ -711,20 +714,8 @@ export default function InteractiveMap() {
     [],
   );
   const mapColumnVisibility = useMemo(
-    () => ({
-      ...Object.fromEntries(
-        Object.keys(activityFields).map((id) => [id, false]),
-      ),
-      id: false,
-      description: false,
-      photos: false,
-      geometry_state: false,
-      edit: false,
-      name: true,
-      distance: true,
-      total_elevation_gain: true,
-    }),
-    [],
+    () => panelColumnVisibility(compactList.columnVisibility),
+    [compactList.columnVisibility],
   );
   const previousAction = semanticAction('previousActivity');
   const nextAction = semanticAction('nextActivity');
@@ -771,6 +762,7 @@ export default function InteractiveMap() {
           </Button>
         </div>
       )}
+      {detailId === 0 && <PanelColumnMenu className="size-10" />}
       <Button
         size="icon"
         variant="ghost"
