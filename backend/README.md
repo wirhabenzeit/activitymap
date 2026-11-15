@@ -59,12 +59,14 @@ before adding any write operation.
 
 The development project is `activitymap-backend-dev` (team
 `dominik-schroder`). `convex dev --configure` writes its deployment to
-`backend/.env.local`, which is not committed. Add the local bridge signer to
-the same file and the matching verification key to the deployment:
+`backend/.env.local`, which is not committed and is read only by the Convex
+CLI. The Next.js app reads the repository root's `.env.development.local`
+(see [Local development](../docs/local-development.md)), so put the local
+bridge signer there and the matching verification key on the deployment:
 
 ```sh
 pnpm exec convex env set ACTIVITYMAP_BRIDGE_SIGNING_KEYS '{"dev1":"<hex>"}'
-# backend/.env.local
+# .env.development.local (repository root)
 ACTIVITYMAP_CONVEX_SITE=https://<deployment>.convex.site
 ACTIVITYMAP_CONVEX_KEY_ID=dev1
 ACTIVITYMAP_CONVEX_SIGNING_KEY=<hex>
@@ -77,7 +79,7 @@ reader key:
 
 ```sh
 pnpm exec convex env set ACTIVITYMAP_BRIDGE_WRITER_KEYS '{"devw1":"<hex>"}'
-# backend/.env.local
+# .env.development.local (repository root)
 ACTIVITYMAP_CONVEX_WRITER_KEY_ID=devw1
 ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY=<hex>
 ```

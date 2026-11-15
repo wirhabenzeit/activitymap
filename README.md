@@ -45,6 +45,10 @@ Map, list, and analyze all your Strava activities.
 - `src/store` — client-side state (Zustand)
 - `cloudflare/cron` — the scheduled call that erases accounts whose Strava access was withdrawn
 
+## Local development
+
+The app needs a Convex deployment and several gitignored env files to start, including in git worktrees. See [Local development](docs/local-development.md).
+
 ## Quality checks
 
 Run `pnpm check` for static, generated-file and unit checks. Browser and native runtime checks have explicit isolated startup and evidence: see [Quality checks](docs/quality-checks.md). Use `pnpm format:check` for a nonmutating check of changed files.
