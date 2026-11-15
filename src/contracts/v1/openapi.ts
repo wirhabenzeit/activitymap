@@ -6,6 +6,12 @@ import {
 } from './account-deletion';
 import { activityDTOSchema } from './activity';
 import {
+  mergeActivitiesRequestSchema,
+  mergeFileRequestSchema,
+  mergeUploadStateSchema,
+  mergedActivityMetadataSchema,
+} from './activity-merge';
+import {
   activityRefreshResultSchema,
   activitySummaryFetchResultSchema,
   updateActivityRequestSchema,
@@ -70,6 +76,12 @@ export function buildOpenApiDocument() {
   registry.add(currentUserDTOSchema, { id: 'CurrentUser' });
   registry.add(activityDTOSchema, { id: 'Activity' });
   registry.add(updateActivityRequestSchema, { id: 'UpdateActivityRequest' });
+  registry.add(mergeFileRequestSchema, { id: 'MergeFileRequest' });
+  registry.add(mergeActivitiesRequestSchema, { id: 'MergeActivitiesRequest' });
+  registry.add(mergedActivityMetadataSchema, { id: 'MergedActivityMetadata' });
+  registry.add(responseEnvelope(mergeUploadStateSchema), {
+    id: 'MergeUploadStateResponse',
+  });
   registry.add(responseEnvelope(activityDTOSchema), { id: 'ActivityResponse' });
   registry.add(responseEnvelope(activityRefreshResultSchema), {
     id: 'RefreshActivityResponse',
@@ -252,6 +264,110 @@ export function buildOpenApiDocument() {
         },
       },
 
+      '/api/v1/activity-merges': {
+        post: {
+          operationId: 'mergeActivities',
+          summary:
+            'Merge consecutive activities into one new Strava activity (rollout-gated)',
+          description:
+            'Rebuilds one recording from the activities’ streams, uploads it to Strava and applies the metadata once Strava created it. The originals are not deleted: Strava’s API cannot delete activities. Answers `processing` when Strava is slow; continue with /api/v1/activity-merges/uploads/{id}. 404 for athletes the feature is not rolled out to.',
+          security,
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('MergeActivitiesRequest') },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Upload state',
+              content: {
+                'application/json': { schema: ref('MergeUploadStateResponse') },
+              },
+            },
+            '400': errorResponse('Invalid selection or metadata'),
+            '401': errorResponse('Authentication required'),
+            '403': errorResponse('Origin denied'),
+            '404': errorResponse(
+              'Not rolled out, or an activity is unavailable',
+            ),
+            '409': errorResponse('Strava not connected'),
+            '422': errorResponse('The activities cannot be merged'),
+            '429': errorResponse('Rate limited'),
+            '503': errorResponse('Strava unavailable'),
+          },
+        },
+      },
+      '/api/v1/activity-merges/file': {
+        post: {
+          operationId: 'mergedActivityFile',
+          summary: 'The merged FIT file, without uploading it (rollout-gated)',
+          security,
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('MergeFileRequest') },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'FIT activity file',
+              content: {
+                'application/vnd.ant.fit': {
+                  schema: { type: 'string', format: 'binary' },
+                },
+              },
+            },
+            '400': errorResponse('Invalid selection'),
+            '401': errorResponse('Authentication required'),
+            '403': errorResponse('Origin denied'),
+            '404': errorResponse(
+              'Not rolled out, or an activity is unavailable',
+            ),
+            '409': errorResponse('Strava not connected'),
+            '422': errorResponse('The activities cannot be merged'),
+            '429': errorResponse('Rate limited'),
+            '503': errorResponse('Strava unavailable'),
+          },
+        },
+      },
+      '/api/v1/activity-merges/uploads/{id}': {
+        post: {
+          operationId: 'continueMergeUpload',
+          summary:
+            'Check a processing merge upload and apply its metadata once ready',
+          security,
+          parameters: [
+            {
+              name: 'id',
+              in: 'path',
+              required: true,
+              schema: { type: 'string', pattern: '^\\d{1,19}$' },
+            },
+          ],
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('MergedActivityMetadata') },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'Upload state',
+              content: {
+                'application/json': { schema: ref('MergeUploadStateResponse') },
+              },
+            },
+            '400': errorResponse('Invalid upload ID or metadata'),
+            '401': errorResponse('Authentication required'),
+            '403': errorResponse('Origin denied'),
+            '404': errorResponse('Not rolled out, or upload unknown'),
+            '409': errorResponse('Strava not connected'),
+            '429': errorResponse('Rate limited'),
+            '503': errorResponse('Strava unavailable'),
+          },
+        },
+      },
       '/api/v1/account/delete': {
         post: {
           operationId: 'deleteAccount',

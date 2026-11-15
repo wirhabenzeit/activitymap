@@ -19,6 +19,8 @@ export type CurrentUserDTO = {
   convexLive?: { url: string };
   /** What the approved Strava scopes allow; `null` when not yet known. */
   stravaPermissions: StravaPermissions | null;
+  /** Features rolled out to this athlete ahead of everyone. */
+  features?: { activityMerge?: boolean };
 };
 
 export function toCurrentUserDTO(

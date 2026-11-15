@@ -1028,6 +1028,328 @@
         },
         "additionalProperties": false
       },
+      "MergeFileRequest": {
+        "type": "object",
+        "properties": {
+          "activity_ids": {
+            "minItems": 2,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            }
+          },
+          "sport_type": {
+            "type": "string",
+            "enum": [
+              "AlpineSki",
+              "BackcountrySki",
+              "Badminton",
+              "Canoeing",
+              "Crossfit",
+              "EBikeRide",
+              "EMountainBikeRide",
+              "Elliptical",
+              "Golf",
+              "GravelRide",
+              "Handcycle",
+              "HighIntensityIntervalTraining",
+              "Hike",
+              "IceSkate",
+              "InlineSkate",
+              "Kayaking",
+              "Kitesurf",
+              "MountainBikeRide",
+              "NordicSki",
+              "Pickleball",
+              "Pilates",
+              "Racquetball",
+              "Ride",
+              "RockClimbing",
+              "RollerSki",
+              "Rowing",
+              "Run",
+              "Sail",
+              "Skateboard",
+              "Snowboard",
+              "Snowshoe",
+              "Soccer",
+              "Squash",
+              "StairStepper",
+              "StandUpPaddling",
+              "Surfing",
+              "Swim",
+              "TableTennis",
+              "Tennis",
+              "TrailRun",
+              "Velomobile",
+              "VirtualRide",
+              "VirtualRow",
+              "VirtualRun",
+              "Walk",
+              "WeightTraining",
+              "Wheelchair",
+              "Windsurf",
+              "Workout",
+              "Yoga"
+            ]
+          }
+        },
+        "required": ["activity_ids"],
+        "additionalProperties": false
+      },
+      "MergeActivitiesRequest": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "sport_type": {
+            "type": "string",
+            "enum": [
+              "AlpineSki",
+              "BackcountrySki",
+              "Badminton",
+              "Canoeing",
+              "Crossfit",
+              "EBikeRide",
+              "EMountainBikeRide",
+              "Elliptical",
+              "Golf",
+              "GravelRide",
+              "Handcycle",
+              "HighIntensityIntervalTraining",
+              "Hike",
+              "IceSkate",
+              "InlineSkate",
+              "Kayaking",
+              "Kitesurf",
+              "MountainBikeRide",
+              "NordicSki",
+              "Pickleball",
+              "Pilates",
+              "Racquetball",
+              "Ride",
+              "RockClimbing",
+              "RollerSki",
+              "Rowing",
+              "Run",
+              "Sail",
+              "Skateboard",
+              "Snowboard",
+              "Snowshoe",
+              "Soccer",
+              "Squash",
+              "StairStepper",
+              "StandUpPaddling",
+              "Surfing",
+              "Swim",
+              "TableTennis",
+              "Tennis",
+              "TrailRun",
+              "Velomobile",
+              "VirtualRide",
+              "VirtualRow",
+              "VirtualRun",
+              "Walk",
+              "WeightTraining",
+              "Wheelchair",
+              "Windsurf",
+              "Workout",
+              "Yoga"
+            ]
+          },
+          "commute": {
+            "type": "boolean"
+          },
+          "hide_from_home": {
+            "type": "boolean"
+          },
+          "gear_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activity_ids": {
+            "minItems": 2,
+            "maxItems": 5,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "pattern": "^\\d+$"
+            }
+          }
+        },
+        "required": ["name", "description", "sport_type", "activity_ids"],
+        "additionalProperties": false
+      },
+      "MergedActivityMetadata": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 10000
+          },
+          "sport_type": {
+            "type": "string",
+            "enum": [
+              "AlpineSki",
+              "BackcountrySki",
+              "Badminton",
+              "Canoeing",
+              "Crossfit",
+              "EBikeRide",
+              "EMountainBikeRide",
+              "Elliptical",
+              "Golf",
+              "GravelRide",
+              "Handcycle",
+              "HighIntensityIntervalTraining",
+              "Hike",
+              "IceSkate",
+              "InlineSkate",
+              "Kayaking",
+              "Kitesurf",
+              "MountainBikeRide",
+              "NordicSki",
+              "Pickleball",
+              "Pilates",
+              "Racquetball",
+              "Ride",
+              "RockClimbing",
+              "RollerSki",
+              "Rowing",
+              "Run",
+              "Sail",
+              "Skateboard",
+              "Snowboard",
+              "Snowshoe",
+              "Soccer",
+              "Squash",
+              "StairStepper",
+              "StandUpPaddling",
+              "Surfing",
+              "Swim",
+              "TableTennis",
+              "Tennis",
+              "TrailRun",
+              "Velomobile",
+              "VirtualRide",
+              "VirtualRow",
+              "VirtualRun",
+              "Walk",
+              "WeightTraining",
+              "Wheelchair",
+              "Windsurf",
+              "Workout",
+              "Yoga"
+            ]
+          },
+          "commute": {
+            "type": "boolean"
+          },
+          "hide_from_home": {
+            "type": "boolean"
+          },
+          "gear_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": ["name", "description", "sport_type"],
+        "additionalProperties": false
+      },
+      "MergeUploadStateResponse": {
+        "type": "object",
+        "properties": {
+          "schemaVersion": {
+            "type": "string",
+            "const": "1"
+          },
+          "serverTime": {
+            "type": "string",
+            "format": "date-time",
+            "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z))$"
+          },
+          "data": {
+            "type": "object",
+            "properties": {
+              "upload_id": {
+                "type": "string",
+                "pattern": "^\\d+$"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["processing", "ready", "failed"]
+              },
+              "activity_id": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "error": {
+                "type": ["string", "null"]
+              },
+              "duplicate_of": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^\\d+$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "metadata_applied": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "upload_id",
+              "status",
+              "activity_id",
+              "error",
+              "duplicate_of",
+              "metadata_applied"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": ["schemaVersion", "serverTime", "data"],
+        "additionalProperties": false
+      },
       "ActivityResponse": {
         "type": "object",
         "properties": {
@@ -4249,6 +4571,357 @@
           },
           "500": {
             "description": "Share request failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/activity-merges": {
+      "post": {
+        "operationId": "mergeActivities",
+        "summary": "Merge consecutive activities into one new Strava activity (rollout-gated)",
+        "description": "Rebuilds one recording from the activities’ streams, uploads it to Strava and applies the metadata once Strava created it. The originals are not deleted: Strava’s API cannot delete activities. Answers `processing` when Strava is slow; continue with /api/v1/activity-merges/uploads/{id}. 404 for athletes the feature is not rolled out to.",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeActivitiesRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeUploadStateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid selection or metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not rolled out, or an activity is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Strava not connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The activities cannot be merged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Strava unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/activity-merges/file": {
+      "post": {
+        "operationId": "mergedActivityFile",
+        "summary": "The merged FIT file, without uploading it (rollout-gated)",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergeFileRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "FIT activity file",
+            "content": {
+              "application/vnd.ant.fit": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid selection",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not rolled out, or an activity is unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Strava not connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The activities cannot be merged",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Strava unavailable",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/activity-merges/uploads/{id}": {
+      "post": {
+        "operationId": "continueMergeUpload",
+        "summary": "Check a processing merge upload and apply its metadata once ready",
+        "security": [
+          {
+            "cookieAuth": []
+          },
+          {
+            "bearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "pattern": "^\\d{1,19}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MergedActivityMetadata"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Upload state",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MergeUploadStateResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid upload ID or metadata",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Origin denied",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Not rolled out, or upload unknown",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Strava not connected",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limited",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FailureResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Strava unavailable",
             "content": {
               "application/json": {
                 "schema": {

@@ -51,6 +51,7 @@
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",
+    "@garmin/fitsdk": "21.221.0",
     "@hookform/resolvers": "^6.0.0",
     "@mapbox/geosimplify-js": "^0.1.0",
     "@mapbox/polyline": "^1.2.1",

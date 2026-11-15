@@ -18,6 +18,7 @@ import { auth } from '~/lib/auth';
 import { QueryProvider } from '~/providers/query-provider';
 import { toCurrentUserDTO } from '~/server/auth/current-user';
 import { getAccountInternal, getUserInternal } from '~/server/auth/users';
+import { isActivityMergeEnabled } from '~/server/config/activity-merge';
 import { convexLiveUrlFor } from '~/server/library/live-configuration';
 import type { InitialAuth } from '~/store/auth';
 
@@ -54,6 +55,9 @@ export default async function AppShellLayout({
       ? {
           ...toCurrentUserDTO(user, account),
           ...(liveUrl && { convexLive: { url: liveUrl } }),
+          ...(isActivityMergeEnabled(user.athlete_id) && {
+            features: { activityMerge: true },
+          }),
         }
       : null;
   }
