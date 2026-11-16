@@ -17,6 +17,26 @@ domain. Better Auth's OAuth proxy sends the Strava callback to Production, then
 returns encrypted OAuth data to the originating Preview. The user and tokens
 are stored in the Preview's Convex deployment, not Production's.
 
+## Current Preview backend
+
+Preview uses the Convex project `activitymap-backend-preview` (team
+`dominik-schroder`), production deployment `grandiose-mink-27`, separate from
+both Production and local development. Vercel Preview holds
+`ACTIVITYMAP_CONVEX_SITE=https://grandiose-mink-27.convex.site` and the reader
+(`preview1`) and writer (`previeww1`) bridge keys; the deployment holds the
+matching `ACTIVITYMAP_BRIDGE_SIGNING_KEYS` and `ACTIVITYMAP_BRIDGE_WRITER_KEYS`.
+`ACTIVITYMAP_AUTH_JWT_ISSUER` is `disabled` there, so Preview clients use HTTP
+sync rather than live Convex queries.
+
+Nothing deploys this backend automatically. After a change under `backend/`
+that a Preview needs, deploy it from `backend/` with a CLI configured for this
+project:
+
+```sh
+pnpm exec convex dev --configure existing --team dominik-schroder --project activitymap-backend-preview --once
+pnpm exec convex deploy -y
+```
+
 ## Vercel setup
 
 1. Confirm Preview's Convex settings name a non-production deployment. Keep
