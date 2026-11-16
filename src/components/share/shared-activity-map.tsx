@@ -22,6 +22,9 @@ import {
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
 import { transformMapRequest } from '~/lib/map-glyphs';
+
+import '~/lib/maplibre-worker';
+
 import {
   routeBounds,
   routeFitPadding,
