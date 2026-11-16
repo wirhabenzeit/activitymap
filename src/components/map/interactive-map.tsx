@@ -53,6 +53,9 @@ import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
 import { transformMapRequest } from '~/lib/map-glyphs';
 import { observeMapResize } from '~/lib/map-resize';
 import { parseMapShareParams } from '~/lib/map-share';
+
+import '~/lib/maplibre-worker';
+
 import {
   TERRAIN_SOURCE_ID,
   mapSky,

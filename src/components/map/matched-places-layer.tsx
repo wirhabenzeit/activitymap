@@ -241,12 +241,13 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
           else raw.addImage(id, image, { pixelRatio: 2 });
         }
     };
-    const missing = (event: { id: string }) => {
-      if (event.id.startsWith('matched-place-')) register();
-    };
+    // MapLibre 6 only lets a resolver supply a missing image; the
+    // `styleimagemissing` event is now notify-only.
+    raw.setMissingStyleImageResolver((id) => {
+      if (id.startsWith('matched-place-')) register();
+    });
     if (raw.isStyleLoaded()) register();
     raw.on('style.load', register);
-    raw.on('styleimagemissing', missing);
     const themeObserver = new MutationObserver(() => {
       if (raw.isStyleLoaded()) register();
     });
@@ -256,7 +257,7 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
     });
     return () => {
       raw.off('style.load', register);
-      raw.off('styleimagemissing', missing);
+      raw.setMissingStyleImageResolver(null);
       themeObserver.disconnect();
     };
   }, [map]);

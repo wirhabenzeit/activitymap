@@ -8,6 +8,8 @@ import { dirname, join, resolve } from 'node:path';
 
 import { chromium } from 'playwright-core';
 
+import { maplibreFixtureWorker } from './lib/maplibre-fixture-worker.mjs';
+
 const require = createRequire(import.meta.url);
 const { build } = require(
   require.resolve('esbuild', {
@@ -81,6 +83,7 @@ const bundleConfig = {
   nodePaths: [join(repo, 'node_modules')],
   bundle: true,
   format: 'iife',
+  inject: [await maplibreFixtureWorker(directory)],
   platform: 'browser',
   jsx: 'automatic',
   outfile: join(directory, 'fixture.js'),
