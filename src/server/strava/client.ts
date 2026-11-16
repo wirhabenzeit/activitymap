@@ -1,5 +1,10 @@
 import { z } from 'zod';
 
+import {
+  MERGE_STREAM_TYPES,
+  type MergeStreams,
+  mergeStreamsSchema,
+} from '~/server/activity-merge/streams';
 import { requireStravaAccessEnabled } from '~/server/config/external-effects';
 import { logger } from '~/server/logging/logger';
 
@@ -18,6 +23,29 @@ import type {
   StravaSubscription,
   UpdatableActivity,
 } from './types';
+
+/** Strava's upload status. `activity_id` is set once processing created
+ * the activity; `error` once it failed (e.g. "duplicate of activity 123"). */
+const stravaUploadSchema = z
+  .object({
+    id: z.number().optional(),
+    id_str: z.string().optional(),
+    external_id: z.string().nullish(),
+    error: z.string().nullish(),
+    status: z.string().nullish(),
+    activity_id: z.number().nullish(),
+  })
+  .transform((upload) => ({
+    id: upload.id_str ?? (upload.id === undefined ? null : String(upload.id)),
+    externalId: upload.external_id ?? null,
+    error: upload.error ?? null,
+    status: upload.status ?? null,
+    activityId:
+      upload.activity_id === null || upload.activity_id === undefined
+        ? null
+        : String(upload.activity_id),
+  }));
+export type StravaUpload = z.output<typeof stravaUploadSchema>;
 
 const STRAVA_API_BASE_URL = 'https://www.strava.com/api/v3';
 const STRAVA_TOKEN_URL = 'https://www.strava.com/api/v3/oauth/token';
@@ -542,6 +570,62 @@ export class StravaClient {
     });
     return rawActivityStreamsSchema.parse(
       await this.request<unknown>(`/activities/${activityId}/streams?${query}`),
+    );
+  }
+
+  /**
+   * Every stream a merge rebuilds the recording from, at full resolution.
+   * Not the stored display streams: see `~/server/activity-merge/streams`.
+   */
+  async getActivityStreamsForMerge(id: string): Promise<MergeStreams> {
+    const activityId = streamActivityIdSchema.parse(id);
+    const query = new URLSearchParams({
+      keys: MERGE_STREAM_TYPES.join(','),
+      key_by_type: 'true',
+    });
+    return mergeStreamsSchema.parse(
+      await this.request<unknown>(`/activities/${activityId}/streams?${query}`),
+    );
+  }
+
+  /** Start an upload; Strava processes it asynchronously. */
+  async createUpload(input: {
+    file: Uint8Array;
+    fileName: string;
+    dataType: 'fit';
+    name?: string;
+    description?: string;
+    trainer?: boolean;
+    commute?: boolean;
+    externalId?: string;
+  }): Promise<StravaUpload> {
+    const form = new FormData();
+    form.append(
+      'file',
+      new Blob([new Uint8Array(input.file)], {
+        type: 'application/octet-stream',
+      }),
+      input.fileName,
+    );
+    form.append('data_type', input.dataType);
+    if (input.name !== undefined) form.append('name', input.name);
+    if (input.description !== undefined)
+      form.append('description', input.description);
+    if (input.trainer !== undefined)
+      form.append('trainer', input.trainer ? '1' : '0');
+    if (input.commute !== undefined)
+      form.append('commute', input.commute ? '1' : '0');
+    if (input.externalId !== undefined)
+      form.append('external_id', input.externalId);
+    return stravaUploadSchema.parse(
+      await this.request<unknown>('/uploads', { method: 'POST', body: form }),
+    );
+  }
+
+  async getUpload(id: string): Promise<StravaUpload> {
+    if (!/^\d{1,19}$/.test(id)) throw new Error('Invalid upload id');
+    return stravaUploadSchema.parse(
+      await this.request<unknown>(`/uploads/${id}`),
     );
   }
 

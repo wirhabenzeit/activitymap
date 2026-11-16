@@ -23,7 +23,8 @@ export type ActivityMutationErrorCode =
   | 'local_state_conflict'
   | 'upstream_rejected'
   | 'upstream_unavailable'
-  | 'local_persistence_failed';
+  | 'local_persistence_failed'
+  | 'merge_not_allowed';
 
 /** A failed change to an activity, as the web and v1 boundaries report it. */
 export class ActivityMutationError extends Error {

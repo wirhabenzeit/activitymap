@@ -4,9 +4,11 @@ import { ListFilter } from 'lucide-react';
 import React from 'react';
 import { useShallow } from 'zustand/shallow';
 
+import { SelectionDownloadButton } from '~/components/activity-selection-controls';
 import { ActivityCardContent } from '~/components/list/card';
 import { activityColumns } from '~/components/list/columns';
 import { DataTable } from '~/components/list/data-table';
+import { SelectionMergeButton } from '~/components/merge/merge-activities-dialog';
 import { SelectionShareButton } from '~/components/share-button';
 import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useListInspection } from '~/hooks/use-list-inspection';
@@ -145,7 +147,11 @@ export function ActivityListView({
         data={rows}
         selected={selected}
         selectionActions={
-          <SelectionShareButton activities={activities ?? []} />
+          <>
+            <SelectionMergeButton activities={activities ?? []} />
+            <SelectionDownloadButton activities={activities ?? []} />
+            <SelectionShareButton activities={activities ?? []} />
+          </>
         }
         setSelected={setSelected}
         columnFilters={columnFilters}
