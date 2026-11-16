@@ -1,5 +1,5 @@
-// One open/closed flag for the single Settings dialog, so the header avatar and
-// the sidebar account menu open the same instance. React-free on purpose.
+// One open/closed flag for the single Settings dialog, so every account entry
+// point opens the same instance. React-free on purpose.
 
 let open = false;
 const listeners = new Set<() => void>();

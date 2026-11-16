@@ -5,7 +5,6 @@ import * as React from 'react';
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
@@ -25,7 +24,6 @@ import {
   SearchFilter,
   SelectedActivitiesFilter,
 } from './sidebar/filters';
-import { UserSettings } from './sidebar/user';
 
 export function AppSidebar() {
   const { isMobile } = useSidebar();
@@ -92,11 +90,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter>
-        <SidebarMenu>
-          <UserSettings />
-        </SidebarMenu>
-      </SidebarFooter>
     </Sidebar>
   );
 }
