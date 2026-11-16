@@ -8,6 +8,7 @@ import { convexJwtOptions } from '~/lib/auth-jwt';
 import {
   callbackScopeParam,
   grantedStravaScope,
+  isStravaSignInCallback,
 } from '~/lib/strava-permissions';
 import { convexAuthAdapter } from '~/server/auth/convex-adapter';
 import {
@@ -138,14 +139,9 @@ export const auth = betterAuth({
   // Hook to update athlete_id after OAuth sign-in
   hooks: {
     after: createAuthMiddleware(async (ctx) => {
-      // Both the direct and proxied Strava callbacks create a local session.
-      // Hooks see the route template (`/callback/:id`), with the provider in
-      // `params`; a concrete path is still accepted in case that changes.
-      const isStravaCallback =
-        ctx.path === '/callback/:id'
-          ? ctx.params?.id === 'strava'
-          : ctx.path.startsWith('/callback/strava');
-      if (isStravaCallback) {
+      // Both the direct (Production) and proxied (Preview) Strava callbacks
+      // create a local session; link its athlete in either case.
+      if (isStravaSignInCallback(ctx.path, ctx.params)) {
         const userId = getSessionUserId(ctx.context.newSession);
         if (userId) {
           try {

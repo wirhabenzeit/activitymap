@@ -69,6 +69,21 @@ export function grantedStravaScope(scope: unknown): string | null {
 }
 
 /** The raw `scope` query value of an OAuth callback URL, if any. */
+/**
+ * Whether a Better Auth hook runs for a completed Strava sign-in. Hooks see
+ * route templates: `/callback/:id` for a direct callback (Production) and
+ * `/callback/:id/oauth-proxy` where the OAuth proxy finishes a Preview
+ * sign-in. Concrete paths are accepted in case that changes.
+ */
+export function isStravaSignInCallback(
+  path: string,
+  params: Record<string, unknown> | undefined,
+): boolean {
+  if (path === '/callback/:id' || path === '/callback/:id/oauth-proxy')
+    return params?.id === 'strava';
+  return path === '/callback/strava' || path === '/callback/strava/oauth-proxy';
+}
+
 export function callbackScopeParam(url: string | undefined): string | null {
   if (!url) return null;
   try {
