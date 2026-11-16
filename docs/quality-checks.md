@@ -90,8 +90,10 @@ iOS 27:
   it a text filter shown as a chip:
   `FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip`.
 - Header search on the Map: a place selects and pins without filtering;
-  long-press, the panel's text-filter row, chips and clearing:
+  long-press explicitly applies the place filter:
   `FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest`.
+- Combined place/text filters retain their chips and clear independently:
+  `FilterPanelUITests/testHeaderSearchCombinesPlaceAndTextFiltersAndClearsThemIndependently`.
 - Visited-place clustering, filtering and contextual activity picking:
   `ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking`.
 - Offline matched places on the map/profile, repeated encounters, style replacement and selection preservation:
@@ -155,8 +157,20 @@ Those additional journeys are not certified by a passing PR smoke run.
 | Limit                                       | PR profile | Full profile |
 | ------------------------------------------- | ---------- | ------------ |
 | Cold `build-for-testing`                    | 18 minutes | 18 minutes   |
-| `test-without-building`                     | 12 minutes | 45 minutes   |
-| CI job, including setup and artifact upload | 35 minutes | 75 minutes   |
+| `test-without-building`                     | 20 minutes | 45 minutes   |
+| CI job, including setup and artifact upload | 48 minutes | 75 minutes   |
+
+The PR profile retains twelve UI journeys and all 36 selected app-hosted suites.
+The November 15 main run hit the former 15-minute runtime deadline after a
+header-search case exhausted XCTest's rounded two-minute allowance during
+teardown. The runner restarted and the wrapper interrupted the later passing
+List journey, leaving no readable result summary. Header selection/context-menu
+and combined place/text-filter editing now run as separate test methods, with
+all assertions retained. The 20-minute runtime bound includes runner startup
+and slow hosted execution; the 48-minute job bound also covers a five-minute
+boot, the separate 18-minute cold build, setup and evidence upload. Individual
+test timeouts and zero-failure/zero-skip validation remain unchanged; no failed
+tests are automatically retried or accepted.
 
 Both workflows cache Swift packages, compiled products and compiler modules.
 Cache compatibility includes the runner architecture, Xcode/SDK/OS fingerprint,
@@ -174,7 +188,7 @@ for the same pull request are cancelled. `summary.json` records separate boot,
 build and test durations, and failures print their test identifiers and messages
 in the Actions log.
 
-Both profiles retain three-minute simulator boot readiness, disabled parallel
+Both profiles retain five-minute simulator boot readiness, disabled parallel
 test execution, and enabled per-test timeouts configured with a 90-second default
 and a 180-second maximum. XCTest rounds execution allowances up to whole minutes;
 the maximum caps a test's preferred allowance rather than granting extra time to

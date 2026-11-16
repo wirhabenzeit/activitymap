@@ -210,13 +210,21 @@ final class FilterPanelUITests: XCTestCase {
         picked.name = "Place picked from search"; picked.lifetime = .keepAlways; add(picked)
 
         // Long-press offers the place filter instead.
-        app.openHeaderSearch()
-        app.typeText("Pil")
-        XCTAssertTrue(place.waitForExistence(timeout: 5))
-        place.press(forDuration: 1.2)
-        let filterToPlace = app.buttons["Filter to this place"]
-        XCTAssertTrue(filterToPlace.waitForExistence(timeout: 5), app.debugDescription)
-        filterToPlace.tap()
+        filterToPilatus(app)
+        app.buttons["browse-filters"].firstMatch.tap()
+        let count = app.filterResultCount
+        XCTAssertTrue(count.waitForExistence(timeout: 5), app.debugDescription)
+        XCTAssertEqual(count.label, "2 of 3 activities · 1 active")
+        XCTAssertTrue(app.buttons["Place: Pilátus. View details"].exists)
+    }
+
+    // Keep selection/context-menu and filter editing in separate launches.
+    // The former combined case reached XCTest's two-minute deadline during
+    // teardown on slow hosted runners even when every assertion passed.
+    func testHeaderSearchCombinesPlaceAndTextFiltersAndClearsThemIndependently() {
+        let app = launchSheet(orientation: .portrait, header: true)
+        defer { app.terminate() }
+        filterToPilatus(app)
 
         // The last row applies the text filter and offers to clear it.
         app.openHeaderSearch()
@@ -239,7 +247,19 @@ final class FilterPanelUITests: XCTestCase {
         XCTAssertTrue(clear.waitForExistence(timeout: 5), app.debugDescription)
         clear.tap()
         app.buttons["browse-filters"].firstMatch.tap()
+        XCTAssertTrue(app.filterResultCount.waitForExistence(timeout: 5), app.debugDescription)
         XCTAssertEqual(app.filterResultCount.label, "3 of 3 activities", "Search clears the text filter")
+    }
+
+    private func filterToPilatus(_ app: XCUIApplication) {
+        app.openHeaderSearch()
+        app.typeText("Pil")
+        let place = app.buttons[Self.pilatus]
+        XCTAssertTrue(place.waitForExistence(timeout: 5), app.debugDescription)
+        place.press(forDuration: 1.2)
+        let filterToPlace = app.buttons["Filter to this place"]
+        XCTAssertTrue(filterToPlace.waitForExistence(timeout: 5), app.debugDescription)
+        filterToPlace.tap()
     }
 
     private func launchSheet(orientation: UIDeviceOrientation, header: Bool = false) -> XCUIApplication {

@@ -162,7 +162,8 @@ jobs:
     concurrency:
       group: ios-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-    timeout-minutes: 42
+    # 5m boot + 18m cold build + 20m runtime, with setup/upload headroom.
+    timeout-minutes: 48
     env:
       IOS_TEST_PROFILE: pr
     steps:
