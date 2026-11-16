@@ -29,6 +29,10 @@ jobs:
             native=false
             while IFS= read -r -d '' path; do
               case "$path" in
+                # Web-only files under shared/ that nothing in ios/ or the
+                # native generators reads. Must precede the shared/* match.
+                shared/map-styles/*|shared/README.md|shared/stats-rules.md)
+                  ;;
                 ios/*|shared/*|src/contracts/*|openapi/*|src/lib/streams/*|src/server/strava/stream*)
                   native=true; break ;;
                 scripts/quality/native-harness.mjs|scripts/quality/process.mjs|scripts/quality/harness.test.mjs)
@@ -162,8 +166,9 @@ jobs:
     concurrency:
       group: ios-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-    # 5m boot + 18m cold build + 20m runtime, with setup/upload headroom.
-    timeout-minutes: 48
+    # Boot (up to 2 x 6m attempts) overlaps the 18m cold build; then 12m of
+    # tests, with setup/upload headroom.
+    timeout-minutes: 40
     env:
       IOS_TEST_PROFILE: pr
     steps:

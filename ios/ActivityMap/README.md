@@ -335,7 +335,7 @@ xcodebuild test -project ios/ActivityMap/ActivityMap.xcodeproj \
   -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
 ```
 
-Required iOS CI builds the app and runs the selected unit/app-hosted suites plus seven real UI smoke methods on an owned simulator when native-related files change. The full UI matrix is available through the manual full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
+Required iOS CI builds the app and runs the selected unit/app-hosted suites plus four real UI smoke methods on an owned simulator when native-related files change. The full UI matrix runs nightly and on request through the full workflow; see the bounded runtime commands below for exact profile boundaries. Broader rendered checks remain separate. Tests use isolated memory stores and a temporary disk store, and the host's `--unit-testing` argument prevents sign-in restoration and automatic Mapbox initialization. The rendered map tests use a local style and synthetic geometry. SwiftUI hosts inject that style through `mapStyleOverride` before creating the map, so subsequent view updates cannot replace it with a remote basemap. No credentials, cached basemap or local server are required.
 
 To exercise real local API pages through the Swift engine into a temporary disk store, start the normal local server, sign in once to get a bearer session for a connected account, and run the opt-in test with that session and the account's activity and photo counts:
 
@@ -511,13 +511,13 @@ IOS_TEST_PROFILE=full pnpm test:ios
 ```
 
 The local default is `full`. On iOS 27, `pr` builds the real app and runs all 32
-selected unit/app-hosted suites plus seven real UI smoke methods: offline matched places, the places overview, native GPX
-sharing/cancellation, List previous pull, Map next pull, Stats content/edge
-Back and standard Sport mix compact/expanded content. Pull-request CI and pushes
+selected unit/app-hosted suites plus four real UI smoke methods: List search
+filter chip, offline matched places, native GPX sharing/cancellation and List
+previous pull. Pull-request CI and pushes
 to main select this profile only for native,
 shared contract/fixture or native tooling/workflow changes; unavailable diffs run
 it conservatively. Web-only changes skip the native app job. It has an
-18-minute cold-build limit, eight-minute test limit and 35-minute job limit.
+18-minute cold-build limit, 12-minute test limit and 40-minute job limit.
 This is not the full UI matrix.
 
 The full profile runs 39 selected suites, including all 57 UI methods, with the
@@ -525,7 +525,7 @@ same 18-minute build limit, a 45-minute test limit and a 75-minute manual CI job
 The seven action-matrix configurations run as independent methods so each has
 its own result and execution allowance.
 Request it through [Full iOS runtime](../../.github/workflows/ios-full.yml) in
-Actions, choosing the branch or tag; it has no automatic schedule. Per-test
+Actions, choosing the branch or tag; it also runs nightly on the default branch. Per-test
 allowances remain configured at 90 seconds by default and 180 seconds maximum
 in both profiles. The wrapper owns a fresh simulator, requires positive passing
 results with zero failures/skips for the selected boundary, and saves logs plus

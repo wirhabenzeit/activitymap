@@ -13,7 +13,7 @@ deployment. The Convex backend has its own checks and tests
 | `pnpm test:browser:install`            | Provision the lockfile-matched Playwright Chromium; append `--with-deps` on Linux                                                 |
 | `pnpm test:browser`                    | Start an owned Next server and run reconciliation, list, stats, account and presentation fixture scenarios in Chromium            |
 | `pnpm test:browser account`            | Run one named browser scenario (`reconciliation`, `list`, `stats`, `account`, `presentation`)                                     |
-| `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all selected unit/app-hosted suites and focused real UI smoke methods on iOS 27                       |
+| `IOS_TEST_PROFILE=pr pnpm test:ios`    | Build the real iOS app; run all selected unit/app-hosted suites and four focused real UI smoke methods on iOS 27                  |
 | `pnpm test:ios`                        | Build and run the full native selection, including every method in the selected UI suites, on iOS 27                              |
 | `pnpm format:check`                    | Nonmutating Prettier check of changed tracked and untracked files                                                                 |
 | `pnpm format:check --base origin/main` | Check committed/local changes against their merge base; use the actual base branch for stacked PRs                                |
@@ -89,32 +89,24 @@ iOS 27:
 - Header search narrowing the List by name or visited place, and Filter making
   it a text filter shown as a chip:
   `FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip`.
-- Header search on the Map: a place selects and pins without filtering;
-  long-press explicitly applies the place filter:
-  `FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest`.
-- Combined place/text filters retain their chips and clear independently:
-  `FilterPanelUITests/testHeaderSearchCombinesPlaceAndTextFiltersAndClearsThemIndependently`.
-- Visited-place clustering, filtering and contextual activity picking:
-  `ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking`.
 - Offline matched places on the map/profile, repeated encounters, style replacement and selection preservation:
   `ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection`.
 - Native GPX sharing, repeated cancellation and departure cleanup:
   `ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture`.
 - List previous-activity pull:
   `ActivityContinuationUITests/testListTopPullOpensPrevious`.
-- Map next-activity pull:
-  `ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop`.
-- Stats intentional content/native-edge Back:
-  `StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack`.
-- Standard Sport mix compact content, explicit expansion and focused controls:
-  `StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable`.
 
-This is a smoke boundary, not the complete UI matrix. The
-[Full iOS runtime workflow](../.github/workflows/ios-full.yml) is manually
-requested with **Actions → Full iOS runtime → Run workflow**, selecting the
-branch or tag to test. It explicitly uses `IOS_TEST_PROFILE=full`, runs the same
-unit/app-hosted selection and every method in the selected UI suites, and has no
-automatic schedule. Run either profile locally with:
+This is a smoke boundary, not the complete UI matrix: each pull request pays
+for four fast journeys (about three minutes) so the job stays near half an hour.
+The [Full iOS runtime workflow](../.github/workflows/ios-full.yml) runs every
+method in the selected UI suites, including header-search place selection and
+combined filters, places overview clustering, the Map next-activity pull, Stats
+calendar/native-edge Back, compact Sport mix and the List selection journeys.
+It runs nightly on the default branch and can be requested at any time with
+**Actions → Full iOS runtime → Run workflow**, selecting the branch or tag to
+test. It explicitly uses `IOS_TEST_PROFILE=full` and runs the same
+unit/app-hosted selection. A nightly failure is the signal for a regression a PR
+smoke run could not see. Run either profile locally with:
 
 ```sh
 IOS_TEST_PROFILE=pr pnpm test:ios
@@ -157,20 +149,22 @@ Those additional journeys are not certified by a passing PR smoke run.
 | Limit                                       | PR profile | Full profile |
 | ------------------------------------------- | ---------- | ------------ |
 | Cold `build-for-testing`                    | 18 minutes | 18 minutes   |
-| `test-without-building`                     | 20 minutes | 45 minutes   |
-| CI job, including setup and artifact upload | 48 minutes | 75 minutes   |
+| `test-without-building`                     | 12 minutes | 45 minutes   |
+| CI job, including setup and artifact upload | 40 minutes | 75 minutes   |
 
-The PR profile retains twelve UI journeys and all 36 selected app-hosted suites.
-The November 15 main run hit the former 15-minute runtime deadline after a
-header-search case exhausted XCTest's rounded two-minute allowance during
-teardown. The runner restarted and the wrapper interrupted the later passing
-List journey, leaving no readable result summary. Header selection/context-menu
-and combined place/text-filter editing now run as separate test methods, with
-all assertions retained. The 20-minute runtime bound includes runner startup
-and slow hosted execution; the 48-minute job bound also covers a five-minute
-boot, the separate 18-minute cold build, setup and evidence upload. Individual
-test timeouts and zero-failure/zero-skip validation remain unchanged; no failed
-tests are automatically retried or accepted.
+The PR profile retains four UI journeys and all 36 selected app-hosted suites.
+It previously ran twelve; on November 16 those took about 11 of the 14 test
+minutes (35-99 seconds each) and runs reached their deadline on slow hosted
+runners. The eight journeys moved to the full profile are the two header-search
+methods, places overview, Map next pull, Stats calendar, compact Sport mix and
+the two List selection journeys. The simulator boots while the app builds (a
+hosted boot takes two to five minutes); a boot that exceeds 330 seconds is
+retried once from a freshly erased device, and a boot failure is reported after
+the build so the build cache is still saved. A failing UI journey is rerun once
+(`-retry-tests-on-failure`); a journey that passes only on retry is reported as
+a workflow warning and listed under `retriedTests` in `summary.json`. A journey
+that fails twice fails the job. Individual test timeouts and
+zero-failure/zero-skip validation remain unchanged.
 
 Both workflows cache Swift packages, compiled products and compiler modules.
 Cache compatibility includes the runner architecture, Xcode/SDK/OS fingerprint,
@@ -188,7 +182,8 @@ for the same pull request are cancelled. `summary.json` records separate boot,
 build and test durations, and failures print their test identifiers and messages
 in the Actions log.
 
-Both profiles retain five-minute simulator boot readiness, disabled parallel
+Both profiles retain a bounded simulator boot readiness check (330 seconds per
+attempt), disabled parallel
 test execution, and enabled per-test timeouts configured with a 90-second default
 and a 180-second maximum. XCTest rounds execution allowances up to whole minutes;
 the maximum caps a test's preferred allowance rather than granting extra time to

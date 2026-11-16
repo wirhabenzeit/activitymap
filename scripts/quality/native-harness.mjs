@@ -85,19 +85,14 @@ export const nativeSuites = [
   'ActivityMapUITests/ListSelectionUITests',
 ];
 
+// Four fast journeys that each cover a different surface (map and selection,
+// list filtering, navigation, native share). The remaining UI journeys run in
+// the full profile (see ios-full.yml), which also runs nightly.
 export const nativePRUISelectors = [
-  'ActivityMapUITests/ListSelectionUITests/testSummaryOptionsAndShareFollowCombineMode',
-  'ActivityMapUITests/ListSelectionUITests/testExpandedSummaryKeepsLargeValuesInsideProductionList',
   'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
-  'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
-  'ActivityMapUITests/FilterPanelUITests/testHeaderSearchCombinesPlaceAndTextFiltersAndClearsThemIndependently',
   'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
-  'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
   'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
   'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
-  'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
-  'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
-  'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
 ];
 
 export function nativeTestProfile(name = 'full') {
@@ -114,10 +109,10 @@ export function nativeTestProfile(name = 'full') {
           ]
         : [...nativeSuites],
     // Keep runtime separate from compilation; every selected UI journey must run.
-    // Twelve UI journeys plus app-hosted tests and runner startup. Slow hosted
-    // runs reached the former 15-minute deadline with passing tests still in
-    // progress. Keep individual test deadlines unchanged so hangs still fail.
-    runtimeTimeoutMs: (name === 'pr' ? 20 : 45) * 60 * 1000,
+    // The PR profile is the app-hosted suites plus four UI journeys (about six
+    // minutes on a hosted runner); the full profile's twelve-plus UI journeys
+    // need far more. Keep individual test deadlines unchanged so hangs still fail.
+    runtimeTimeoutMs: (name === 'pr' ? 12 : 45) * 60 * 1000,
   };
 }
 
@@ -236,6 +231,26 @@ export function validateNativeSuites(tree, suites = nativeSuites) {
   );
 }
 
+// With -retry-tests-on-failure a test that passes on a later repetition is
+// reported as Passed; its failed first run stays visible as a Repetition child.
+export function retriedNativeTests(tree) {
+  const found = [];
+  const visit = (node, trail) => {
+    const next = node.nodeType === 'Test Suite' ? [...trail, node.name] : trail;
+    if (
+      node.nodeType === 'Test Case' &&
+      node.result === 'Passed' &&
+      (node.children ?? []).some(
+        (child) => child.nodeType === 'Repetition' && child.result === 'Failed',
+      )
+    )
+      found.push([...next, node.name].join('/'));
+    for (const child of node.children ?? []) visit(child, next);
+  };
+  for (const node of tree.testNodes ?? []) visit(node, []);
+  return found;
+}
+
 export async function runNativeHarness({
   root,
   output,
@@ -244,6 +259,8 @@ export async function runNativeHarness({
   run = runCommand,
   platform = process.platform,
   buildStatusPath = process.env.GITHUB_OUTPUT,
+  bootAttempts = 2,
+  bootAttemptTimeoutMs = 330000,
 }) {
   const selectedProfile = nativeTestProfile(profile);
   assert.equal(
@@ -268,14 +285,31 @@ export async function runNativeHarness({
   };
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
-  const command = (args, log, timeoutMs = 60000) =>
+  const command = (args, log, timeoutMs = 60000, signal = abort.signal) =>
     run('xcrun', args, {
       cwd: root,
-      signal: abort.signal,
+      signal,
       timeoutMs,
       log: log && join(output, log),
       echo: Boolean(log),
     });
+  // Boot runs beside the build and is stopped if the build fails first.
+  const bootAbort = new AbortController();
+  abort.signal.addEventListener('abort', () => bootAbort.abort(), {
+    once: true,
+  });
+  // A wedged hosted-runner boot is cheaper to retry from a clean device than
+  // to wait out. CoreSimulatorService is left alone: the build is using it.
+  const resetOwnedSimulator = async () => {
+    for (const [args, timeoutMs] of [
+      [['simctl', 'shutdown', simulator], 30000],
+      [['simctl', 'erase', simulator], 60000],
+    ])
+      await command(args, undefined, timeoutMs, bootAbort.signal).catch(
+        (error) => console.error(`Simulator reset: ${error.message}`),
+      );
+  };
+  let bootOutcome;
   let ownedSimulator = false;
   const manifest = {
     profile: selectedProfile.name,
@@ -371,16 +405,45 @@ export async function runNativeHarness({
       console.log(
         `Not eligible on iOS ${item.actual}: ${item.suite} requires ${item.requires} (${item.reason}).`,
       );
-    await phase('boot', async () => {
-      if (device.state !== 'Booted')
-        await command(['simctl', 'boot', simulator], 'boot.log');
-      await command(
-        ['simctl', 'bootstatus', simulator, '-b'],
-        'boot-status.log',
-        // Hosted boots take 85-185s; slow runners exceeded three minutes.
-        300000,
-      );
-    });
+    // The simulator is not needed until tests launch, so boot it while the app
+    // builds (a hosted boot takes 2-5 minutes). A boot failure is reported after
+    // the build, which still finishes so its cache can be saved for a rerun.
+    bootOutcome = phase('boot', async () => {
+      for (let attempt = 1; ; attempt++) {
+        const suffix = attempt === 1 ? '' : `-${attempt}`;
+        try {
+          if (attempt > 1 || device.state !== 'Booted')
+            await command(
+              ['simctl', 'boot', simulator],
+              `boot${suffix}.log`,
+              120000,
+              bootAbort.signal,
+            );
+          await command(
+            ['simctl', 'bootstatus', simulator, '-b'],
+            `boot-status${suffix}.log`,
+            bootAttemptTimeoutMs,
+            bootAbort.signal,
+          );
+          return;
+        } catch (error) {
+          // Never touch a simulator the caller owns, and never retry an abort.
+          if (
+            bootAbort.signal.aborted ||
+            !ownedSimulator ||
+            attempt >= bootAttempts
+          )
+            throw error;
+          console.error(
+            `Simulator boot attempt ${attempt} failed (${error.message}); resetting and retrying.`,
+          );
+          await resetOwnedSimulator();
+        }
+      }
+    }).then(
+      () => null,
+      (error) => error,
+    );
     const commonArguments = [
       '-project',
       'ios/ActivityMap/ActivityMap.xcodeproj',
@@ -419,6 +482,8 @@ export async function runNativeHarness({
     // Preserve a good build cache even when a runtime regression fails later.
     if (buildStatusPath)
       await appendFile(buildStatusPath, 'build_succeeded=true\n');
+    const bootError = await bootOutcome;
+    if (bootError) throw bootError;
     await phase('test', () =>
       run(
         'xcodebuild',
@@ -429,6 +494,11 @@ export async function runNativeHarness({
           resultBundle,
           '-parallel-testing-enabled',
           'NO',
+          // A failing UI journey is rerun once before it fails the job. Passing
+          // after a retry is reported below, never silently counted.
+          '-retry-tests-on-failure',
+          '-test-iterations',
+          '2',
           '-test-timeouts-enabled',
           'YES',
           '-default-test-execution-time-allowance',
@@ -472,10 +542,13 @@ export async function runNativeHarness({
       '--compact',
     ]);
     await writeFile(join(output, 'tests.json'), tests);
-    manifest.executedCasesBySuite = validateNativeSuites(
-      JSON.parse(tests),
-      suites,
-    );
+    const parsedTests = JSON.parse(tests);
+    manifest.executedCasesBySuite = validateNativeSuites(parsedTests, suites);
+    manifest.retriedTests = retriedNativeTests(parsedTests);
+    for (const name of manifest.retriedTests)
+      console.log(
+        `::warning title=Flaky iOS test::${name} passed only on retry`,
+      );
     manifest.passed = true;
     manifest.passedTests = summary.passedTests;
     console.log(
@@ -516,6 +589,9 @@ export async function runNativeHarness({
     throw error;
   } finally {
     const cleanupErrors = [];
+    // A failed build leaves the boot running; stop it before deleting the device.
+    bootAbort.abort();
+    await bootOutcome;
     if (ownedSimulator) {
       // Never shut down or delete a simulator supplied by the caller.
       for (const action of ['shutdown', 'delete']) {

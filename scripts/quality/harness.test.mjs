@@ -34,6 +34,7 @@ import {
   nativeSuiteEligibility,
   nativeSuites,
   nativeTestProfile,
+  retriedNativeTests,
   runNativeHarness,
   selectNativeSimulator,
   validateNativeSuites,
@@ -103,25 +104,17 @@ test('native profiles retain all unit suites and select exactly the intended PR 
     suite.startsWith('ActivityMapTests/'),
   );
   const expectedUI = [
-    'ActivityMapUITests/ListSelectionUITests/testSummaryOptionsAndShareFollowCombineMode',
-    'ActivityMapUITests/ListSelectionUITests/testExpandedSummaryKeepsLargeValuesInsideProductionList',
     'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
-    'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
-    'ActivityMapUITests/FilterPanelUITests/testHeaderSearchCombinesPlaceAndTextFiltersAndClearsThemIndependently',
     'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
-    'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
     'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
     'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
-    'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
-    'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
-    'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
   ];
   assert.equal(unitSuites.length, 36);
   assert.deepEqual(nativePRUISelectors, expectedUI);
   assert.deepEqual(pr.suites, [...unitSuites, ...expectedUI]);
-  assert.equal(new Set(pr.suites).size, 48);
+  assert.equal(new Set(pr.suites).size, 40);
   assert.equal(pr.name, 'pr');
-  assert.equal(pr.runtimeTimeoutMs, 20 * 60 * 1000);
+  assert.equal(pr.runtimeTimeoutMs, 12 * 60 * 1000);
   assert.deepEqual(full.suites, nativeSuites);
   assert.equal(full.suites.length, 44);
   assert.equal(full.name, 'full');
@@ -155,7 +148,7 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
       (item) => item.actual === '26.2' && item.requires === 'iOS 27+',
     ),
   );
-  assert.equal(result.suites.length, 43);
+  assert.equal(result.suites.length, 38);
   assert(
     result.suites.includes(
       'ActivityMapTests/StatsCalendarScrollRenderingTests',
@@ -306,6 +299,56 @@ test('timeouts stop the owned child and retain a distinct failure status', async
   assert.equal(result.timedOut, true);
   assert.equal(result.signal, 'SIGTERM');
 });
+
+test(
+  'a timeout whose process group cannot be signalled still stops the child without throwing',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const original = process.kill;
+    // macOS reports EPERM for groups it cannot fully signal; the group kill
+    // used to throw from a timer and crash the harness past its cleanup.
+    t.mock.method(process, 'kill', (pid, signal) => {
+      if (pid < 0 && signal !== 0)
+        throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
+      return original(pid, signal);
+    });
+    const result = await startCommand(
+      process.execPath,
+      ['-e', 'setInterval(()=>{},1000)'],
+      { timeoutMs: 50, echo: false },
+    ).done;
+    assert.equal(result.exitCode, 124);
+    assert.equal(result.timedOut, true);
+  },
+);
+
+test(
+  'a descendant holding the output pipes open does not delay or time out a finished command',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const root = await temporary(t);
+    const pidFile = join(root, 'holder.pid');
+    const holder = `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));setInterval(() => {}, 1000);`;
+    const parent = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(holder)}], {stdio:'inherit'}).unref();console.log('parent done')`;
+    t.after(async () => {
+      try {
+        process.kill(Number(await readFile(pidFile, 'utf8')), 'SIGKILL');
+      } catch {
+        /* Already gone. */
+      }
+    });
+    const started = Date.now();
+    const result = await startCommand(process.execPath, ['-e', parent], {
+      // A deadline that fires after the process exits must not matter.
+      timeoutMs: 4000,
+      echo: false,
+    }).done;
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.timedOut, false);
+    assert.match(result.output, /parent done/);
+    assert(Date.now() - started < 3500, 'waited for the lingering pipe holder');
+  },
+);
 
 test('missing executables reject without cleanup trying to kill an absent PID', async () => {
   const command = startCommand(
@@ -468,8 +511,270 @@ for (const failure of [
       build.filter((arg) => arg.startsWith('-only-testing:')),
       suites.map((suite) => `-only-testing:${suite}`),
     );
+    const test = calls.find(({ args }) => args[0] === 'test-without-building');
+    if (failure === 'build-for-testing') assert.equal(test, undefined);
+    else {
+      const flags = test.args;
+      assert(flags.includes('-retry-tests-on-failure'));
+      assert.equal(flags[flags.indexOf('-test-iterations') + 1], '2');
+    }
   });
 }
+
+// Boot runs beside the build, so these fixtures make the stubbed build wait for
+// the boot to finish (or for a later boot attempt to begin) before it returns.
+function bootHarness({
+  bootstatusFailures,
+  lastBootstatus,
+  buildFails = false,
+}) {
+  const calls = [];
+  const events = [];
+  let bootstatus = 0;
+  let finishBoot;
+  const bootFinished = new Promise((resolve) => (finishBoot = resolve));
+  const runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0';
+  const phone = { name: 'iPhone 17 Pro', identifier: 'phone17' };
+  const run = async (command, args, options) => {
+    calls.push({ command, args });
+    if (command === 'xcodebuild') {
+      if (args[0] === '-version') return 'Xcode 27.1\nBuild version 27A9275';
+      if (args[0] === 'build-for-testing') {
+        events.push('build started');
+        if (buildFails) {
+          await new Promise((resolve) => setImmediate(resolve));
+          throw Object.assign(new Error('Xcode failed'), { exitCode: 65 });
+        }
+        await bootFinished;
+        events.push('build finished');
+        return '';
+      }
+      events.push('tests started');
+      throw Object.assign(new Error('Xcode failed'), { exitCode: 65 });
+    }
+    if (args[1] === 'bootstatus') {
+      events.push('bootstatus');
+      if (buildFails)
+        // Hold the boot open until the harness aborts it, like a real boot.
+        return new Promise((resolve, reject) =>
+          options?.signal?.addEventListener('abort', () =>
+            reject(Object.assign(new Error('aborted'), { exitCode: 143 })),
+          ),
+        );
+      const failing = ++bootstatus <= bootstatusFailures;
+      // The boot sequence is over after this call: release the stubbed build.
+      if (bootstatus === lastBootstatus) setImmediate(finishBoot);
+      if (failing)
+        throw Object.assign(new Error('xcrun failed (timeout)'), {
+          exitCode: 124,
+        });
+      return '';
+    }
+    if (args[1] === 'create') return 'owned-phone\n';
+    if (args[2] === 'runtimes')
+      return JSON.stringify({
+        runtimes: [
+          {
+            identifier: runtime,
+            version: '27.0',
+            isAvailable: true,
+            supportedDeviceTypes: [phone],
+          },
+        ],
+      });
+    if (args[2] === 'devicetypes')
+      return JSON.stringify({ devicetypes: [phone] });
+    if (args[2] === 'devices')
+      return JSON.stringify({
+        devices: {
+          [runtime]: [
+            { udid: 'owned-phone', isAvailable: true, state: 'Shutdown' },
+          ],
+        },
+      });
+    return '';
+  };
+  return { calls, events, run };
+}
+
+for (const [bootstatusFailures, bootPasses] of [
+  [1, true],
+  [2, false],
+]) {
+  test(`native boot ${bootPasses ? 'recovers from one wedged boot' : 'gives up after two wedged boots'} by resetting only the owned simulator`, async (t) => {
+    const root = await temporary(t);
+    const output = join(root, 'evidence');
+    const { calls, events, run } = bootHarness({
+      bootstatusFailures,
+      lastBootstatus: 2,
+    });
+    await assert.rejects(
+      runNativeHarness({
+        root,
+        output,
+        profile: 'pr',
+        run,
+        platform: 'darwin',
+        buildStatusPath: join(root, 'step-output'),
+      }),
+      // A recovered boot proceeds to the stubbed failing tests; otherwise the
+      // build finishes and then the boot failure is reported.
+      bootPasses ? { exitCode: 65 } : { exitCode: 124 },
+    );
+    const summary = JSON.parse(
+      await readFile(join(output, 'summary.json'), 'utf8'),
+    );
+    assert.equal(summary.phases.boot.passed, bootPasses);
+    assert.equal(summary.phases.build.passed, true);
+    // The build still completes after a boot failure so its cache is saved.
+    assert.equal(
+      await readFile(join(root, 'step-output'), 'utf8'),
+      'build_succeeded=true\n',
+    );
+    assert.equal(events.includes('tests started'), bootPasses);
+    const sequence = calls
+      .filter(({ args }) =>
+        ['boot', 'bootstatus', 'shutdown', 'erase', 'delete'].includes(args[1]),
+      )
+      .map(({ args }) => args[1]);
+    assert.deepEqual(sequence, [
+      'boot',
+      'bootstatus',
+      'shutdown',
+      'erase',
+      'boot',
+      'bootstatus',
+      'shutdown',
+      'delete',
+    ]);
+    for (const { args } of calls.filter(({ args }) => args[1] === 'erase'))
+      assert.equal(args[2], 'owned-phone');
+  });
+}
+
+test('native boot starts before the build finishes and tests wait for it', async (t) => {
+  const root = await temporary(t);
+  const { events, run } = bootHarness({
+    bootstatusFailures: 0,
+    lastBootstatus: 1,
+  });
+  await assert.rejects(
+    runNativeHarness({
+      root,
+      output: join(root, 'evidence'),
+      profile: 'pr',
+      run,
+      platform: 'darwin',
+      buildStatusPath: join(root, 'step-output'),
+    }),
+    { exitCode: 65 },
+  );
+  assert.deepEqual(events.slice(0, 4), [
+    'build started',
+    'bootstatus',
+    'build finished',
+    'tests started',
+  ]);
+});
+
+test('native build failure stops the boot before deleting the owned simulator', async (t) => {
+  const root = await temporary(t);
+  const { calls, run } = bootHarness({
+    bootstatusFailures: 0,
+    buildFails: true,
+  });
+  await assert.rejects(
+    runNativeHarness({
+      root,
+      output: join(root, 'evidence'),
+      profile: 'pr',
+      run,
+      platform: 'darwin',
+      buildStatusPath: join(root, 'step-output'),
+    }),
+    { exitCode: 65 },
+  );
+  const order = calls
+    .filter(({ args }) =>
+      ['bootstatus', 'shutdown', 'delete'].includes(args[1]),
+    )
+    .map(({ args }) => args[1]);
+  // The aborted boot is not retried, and cleanup runs afterwards.
+  assert.deepEqual(order, ['bootstatus', 'shutdown', 'delete']);
+});
+
+test('native boot never resets a simulator supplied by the caller', async (t) => {
+  const root = await temporary(t);
+  const { calls, run } = bootHarness({
+    bootstatusFailures: 1,
+    lastBootstatus: 1,
+  });
+  const runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0';
+  const wrapped = async (command, args, options) =>
+    args?.[2] === 'devices'
+      ? JSON.stringify({
+          devices: {
+            [runtime]: [
+              { udid: 'caller-phone', isAvailable: true, state: 'Booted' },
+            ],
+          },
+        })
+      : run(command, args, options);
+  await assert.rejects(
+    runNativeHarness({
+      root,
+      output: join(root, 'evidence'),
+      simulator: 'caller-phone',
+      profile: 'pr',
+      run: wrapped,
+      platform: 'darwin',
+      buildStatusPath: join(root, 'step-output'),
+    }),
+    { exitCode: 124 },
+  );
+  assert.deepEqual(
+    calls.filter(({ args }) =>
+      ['shutdown', 'erase', 'delete', 'create'].includes(args[1]),
+    ),
+    [],
+  );
+});
+
+test('native retried tests are reported only when a failed repetition later passed', () => {
+  const testCase = (name, repetitions) => ({
+    nodeType: 'Test Case',
+    name,
+    result: repetitions.at(-1),
+    children: repetitions.map((result, index) => ({
+      nodeType: 'Repetition',
+      name: index ? `Retry ${index}` : 'First Run',
+      result,
+    })),
+  });
+  const tree = {
+    testNodes: [
+      {
+        nodeType: 'Unit test bundle',
+        name: 'UITests',
+        children: [
+          {
+            nodeType: 'Test Suite',
+            name: 'FilterPanelUITests',
+            children: [
+              testCase('testFlaky()', ['Failed', 'Passed']),
+              testCase('testSteady()', ['Passed']),
+              testCase('testBroken()', ['Failed', 'Failed']),
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual(retriedNativeTests(tree), [
+    'FilterPanelUITests/testFlaky()',
+  ]);
+  assert.deepEqual(retriedNativeTests({}), []);
+});
 
 // Exercise the real ownership/finally boundary before a browser or server exists.
 test('early startup failure cleans its workspace and still writes evidence', async (t) => {
