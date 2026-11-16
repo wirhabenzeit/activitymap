@@ -2,14 +2,14 @@
 
 Captured 15 November 2026 UTC for issues [561](https://github.com/wirhabenzeit/activitymap/issues/561) and [562](https://github.com/wirhabenzeit/activitymap/issues/562). These are real provider renders, with equal map container sizes and camera parameters in each pair. No app renderer or production configuration changed.
 
-| Pair | Camera | Full capture |
-| --- | --- | --- |
-| Mapbox Streets v12 / OpenFreeMap Liberty | Zürich, 8.5417 / 47.3769, zoom 13 | [Street](streets-zurich.jpg) |
-| Mapbox Light v11 / OpenFreeMap Positron | Same Zürich camera | [Light](light-zurich.jpg) |
-| Mapbox Dark v11 / OpenFreeMap Dark | Same Zürich camera | [Dark](dark-zurich.jpg) |
-| Mapbox Outdoors v12 / MapTiler Outdoor v4 | Interlaken, 7.86 / 46.68, zoom 11 | [Outdoor](outdoor-interlaken.jpg) |
-| Mapbox Satellite v9 / MapTiler Satellite v4 | Interlaken, zoom 12 | [Satellite](satellite-interlaken.jpg) |
-| Mapbox Outdoors + Mapbox DEM / MapTiler Outdoor + Mapterhorn | Jungfrau region, 7.98 / 46.59, zoom 11.8, pitch 65°, bearing 155°, exaggeration 1.5 | [Terrain](terrain-jungfrau.jpg) |
+| Pair                                                         | Camera                                                                              | Full capture                          |
+| ------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ------------------------------------- |
+| Mapbox Streets v12 / OpenFreeMap Liberty                     | Zürich, 8.5417 / 47.3769, zoom 13                                                   | [Street](streets-zurich.jpg)          |
+| Mapbox Light v11 / OpenFreeMap Positron                      | Same Zürich camera                                                                  | [Light](light-zurich.jpg)             |
+| Mapbox Dark v11 / OpenFreeMap Dark                           | Same Zürich camera                                                                  | [Dark](dark-zurich.jpg)               |
+| Mapbox Outdoors v12 / MapTiler Outdoor v4                    | Interlaken, 7.86 / 46.68, zoom 11                                                   | [Outdoor](outdoor-interlaken.jpg)     |
+| Mapbox Satellite v9 / MapTiler Satellite v4                  | Interlaken, zoom 12                                                                 | [Satellite](satellite-interlaken.jpg) |
+| Mapbox Outdoors + Mapbox DEM / MapTiler Outdoor + Mapterhorn | Jungfrau region, 7.98 / 46.59, zoom 11.8, pitch 65°, bearing 155°, exaggeration 1.5 | [Terrain](terrain-jungfrau.jpg)       |
 
 2D pairs use pitch/bearing zero; their measured geographic bounds matched. Full screenshots are 2560×1600 from a 1280×800 viewport. Individual map crops retain 1256×1408 pixels and feed the before/after comparison. JPEG copies are compressed from browser screenshots, with no styling or colour alterations.
 

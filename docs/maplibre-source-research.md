@@ -8,17 +8,17 @@ Use OpenFreeMap for general vector maps, MapTiler for outdoor cartography and gl
 
 Keep the existing IDs initially, change their labels and URLs, and regenerate Swift with `pnpm map-catalog:generate`. IDs are persisted by `src/store/index.ts`, accepted in shared map URLs as `mbase` by `src/lib/map-share.ts`, and used for native icons by `BaseStyle.swift`. Renaming them requires aliases/migration on both clients.
 
-| Existing ID | Proposed replacement | Cost category |
-| --- | --- | --- |
-| `mapboxStreet` | OpenFreeMap Liberty, `https://tiles.openfreemap.org/styles/liberty`; keep as default | Free public service |
-| `mapboxLight` | OpenFreeMap Positron, `https://tiles.openfreemap.org/styles/positron` | Free public service |
-| `mapboxDark` | OpenFreeMap Dark, `https://tiles.openfreemap.org/styles/dark` | Free public service |
-| `mapboxOutdoors` | MapTiler Outdoor style over HTTPS, including its contour source and hillshade | Shared MapTiler request allowance |
-| `mapboxSatellite` | MapTiler Satellite over HTTPS, provisional pending production imagery quality checks; retain swisstopo imagery as a separate Swiss choice | Shared MapTiler request allowance |
-| `mapboxStreet3d` | Replace the Studio design with Liberty plus a standard `fill-extrusion` building layer where building heights exist; use the app's existing terrain switch independently | Free public service |
-| `mapboxTopolight` | Positron with grayscale cartography and Mapterhorn hillshade, matching the inspected current Studio style | Free public services |
-| Web terrain | Mapterhorn HTTPS XYZ DEM, independently of selected basemap | Public service; native compatibility gate below |
-| Native terrain | Retain current Mapbox DEM until a real third-party DEM rendering test passes | Existing native SDK billing remains |
+| Existing ID       | Proposed replacement                                                                                                                                                     | Cost category                                   |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| `mapboxStreet`    | OpenFreeMap Liberty, `https://tiles.openfreemap.org/styles/liberty`; keep as default                                                                                     | Free public service                             |
+| `mapboxLight`     | OpenFreeMap Positron, `https://tiles.openfreemap.org/styles/positron`                                                                                                    | Free public service                             |
+| `mapboxDark`      | OpenFreeMap Dark, `https://tiles.openfreemap.org/styles/dark`                                                                                                            | Free public service                             |
+| `mapboxOutdoors`  | MapTiler Outdoor style over HTTPS, including its contour source and hillshade                                                                                            | Shared MapTiler request allowance               |
+| `mapboxSatellite` | MapTiler Satellite over HTTPS, provisional pending production imagery quality checks; retain swisstopo imagery as a separate Swiss choice                                | Shared MapTiler request allowance               |
+| `mapboxStreet3d`  | Replace the Studio design with Liberty plus a standard `fill-extrusion` building layer where building heights exist; use the app's existing terrain switch independently | Free public service                             |
+| `mapboxTopolight` | Positron with grayscale cartography and Mapterhorn hillshade, matching the inspected current Studio style                                                                | Free public services                            |
+| Web terrain       | Mapterhorn HTTPS XYZ DEM, independently of selected basemap                                                                                                              | Public service; native compatibility gate below |
+| Native terrain    | Retain current Mapbox DEM until a real third-party DEM rendering test passes                                                                                             | Existing native SDK billing remains             |
 
 The custom styles should be **replaced**, rather than copied from Studio: their source schemas and sprite names cannot simply be pointed at new tiles. The 3D replacement must use the chosen tileset's actual building height fields. If it adds no useful distinction from Street plus the 3D control, consolidate it later with an ID alias. Direct inspection found that current Topolight is grayscale mapping plus hillshade, without contour layers. Its prototype uses OpenFreeMap and Mapterhorn; see the [seven versioned style prototypes](../shared/map-styles/README.md).
 
@@ -44,11 +44,11 @@ Configure web `raster-dem` with `encoding: 'terrarium'`, `tileSize: 512` and the
 
 Elevation alternatives:
 
-| Source | Suitability |
-| --- | --- |
+| Source                                                            | Suitability                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [AWS Terrain Tiles](https://registry.opendata.aws/terrain-tiles/) | Public global bare-earth data, no AWS account required, updates driven by community feedback. [Terrarium PNG](https://github.com/tilezen/joerd/blob/master/docs/formats.md) can serve as a web fallback at `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png`, tileSize 256. Do not assume Alpine/Norwegian fine-resolution coverage; inspect provenance and samples. Native support still needs testing. |
-| MapTiler terrain-rgb | Hosted commercial alternative, uses the Mapbox RGB encoding rather than Terrarium. Adds billable tile traffic. Verify current TileJSON, resolution and native decoding before choosing it as fallback. |
-| Self-hosted DEM on R2 | Provides control over encoding and availability, but requires extraction, storage, serving, attribution and updates. Model its archive size separately from vector tiles; the small vector storage estimate below does not cover a terrain planet. |
+| MapTiler terrain-rgb                                              | Hosted commercial alternative, uses the Mapbox RGB encoding rather than Terrarium. Adds billable tile traffic. Verify current TileJSON, resolution and native decoding before choosing it as fallback.                                                                                                                                                                                                                           |
+| Self-hosted DEM on R2                                             | Provides control over encoding and availability, but requires extraction, storage, serving, attribution and updates. Model its archive size separately from vector tiles; the small vector storage estimate below does not cover a terrain planet.                                                                                                                                                                               |
 
 ## Provider comparison
 
@@ -70,13 +70,13 @@ No actual map-load count, tile count or bill is available. The following are pla
 
 Assumptions: 20 map opens/user/month, 40 billable MapTiler request units/open when using paid maps, and 40% of opens on Outdoor/Satellite combined. Thus `Q = users × opens × requestUnits × paidShare`: 64,000 units/month at 200 users, 640,000 at 2,000. These inputs include paid contours/hillshade/imagery source requests, rather than just initial map draws. Replace them with measured traffic; long panning sessions and 512 px raster imagery can increase them materially.
 
-| Scenario | 200 users | 2,000 users |
-| --- | ---: | ---: |
-| OpenFreeMap general styles and Street 3D | $0 | $0 |
-| Public Mapterhorn web terrain | $0 service fee modeled | $0 service fee modeled |
-| MapTiler paid map pool, 40% usage | $30 | $51 |
-| MapTiler stress case, all opens paid, 80 units/open | $30 | $435 |
-| R2 vector hosting alternative only, assumptions below | about $6.67 | about $6.67 |
+| Scenario                                              |              200 users |            2,000 users |
+| ----------------------------------------------------- | ---------------------: | ---------------------: |
+| OpenFreeMap general styles and Street 3D              |                     $0 |                     $0 |
+| Public Mapterhorn web terrain                         | $0 service fee modeled | $0 service fee modeled |
+| MapTiler paid map pool, 40% usage                     |                    $30 |                    $51 |
+| MapTiler stress case, all opens paid, 80 units/open   |                    $30 |                   $435 |
+| R2 vector hosting alternative only, assumptions below |            about $6.67 |            about $6.67 |
 
 MapTiler formula: `$30 + max(0, Q − 500,000) × $0.15 / 1,000`. Outdoors and Satellite **share** this allowance and subscription; do not charge $30 to each row. Free rows have no incremental provider charge at either scale. Public service cost assumptions exclude sponsorship and do not imply an SLA. Paid-source pool cost at 10× is `$30 + 140,000 × 0.00015 = $51`. Existing native Mapbox SDK charges and unchanged regional provider costs are excluded; replacing web data does not eliminate native MAU billing.
 
@@ -100,14 +100,14 @@ R2 is **not selected for the initial migration**, so no infrastructure has been 
 
 ## Attribution to carry into implementation
 
-| New source | Visible credit and linked detail |
-| --- | --- |
-| OpenFreeMap | `OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors`, linking to [OpenFreeMap](https://openfreemap.org/), [OpenMapTiles](https://openmaptiles.org/) and [OSM copyright](https://www.openstreetmap.org/copyright). Preserve attribution from source metadata. |
-| MapTiler Outdoor | `© MapTiler · © OpenStreetMap contributors`, linking to [MapTiler copyright](https://www.maptiler.com/copyright/) and OSM copyright. |
-| MapTiler Satellite | Preserve the imagery source's returned attribution and link to [MapTiler copyright](https://www.maptiler.com/copyright/), including the underlying imagery suppliers; retain OSM credit if labels use OSM. |
-| Mapterhorn | `Terrain: Mapterhorn · © swisstopo · © Kartverket` for the principal CH/NO inputs, with an accessible linked [full global source/licence list](https://mapterhorn.com/attribution/). Include other regional producers when their terrain is used; this short CH/NO credit is not a complete global attribution manifest. |
-| Protomaps if later adopted | `© OpenStreetMap contributors` with OSM copyright link; preserve any additional selected dataset and font/sprite licence notices. The download is distributed as an ODbL Produced Work. |
-| AWS terrain if used as fallback | `Terrain: Mapzen / AWS Terrain Tiles` plus the applicable underlying dataset credits from [the attribution manifest](https://github.com/tilezen/joerd/blob/master/docs/attribution.md). |
+| New source                      | Visible credit and linked detail                                                                                                                                                                                                                                                                                         |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| OpenFreeMap                     | `OpenFreeMap · © OpenMapTiles · © OpenStreetMap contributors`, linking to [OpenFreeMap](https://openfreemap.org/), [OpenMapTiles](https://openmaptiles.org/) and [OSM copyright](https://www.openstreetmap.org/copyright). Preserve attribution from source metadata.                                                    |
+| MapTiler Outdoor                | `© MapTiler · © OpenStreetMap contributors`, linking to [MapTiler copyright](https://www.maptiler.com/copyright/) and OSM copyright.                                                                                                                                                                                     |
+| MapTiler Satellite              | Preserve the imagery source's returned attribution and link to [MapTiler copyright](https://www.maptiler.com/copyright/), including the underlying imagery suppliers; retain OSM credit if labels use OSM.                                                                                                               |
+| Mapterhorn                      | `Terrain: Mapterhorn · © swisstopo · © Kartverket` for the principal CH/NO inputs, with an accessible linked [full global source/licence list](https://mapterhorn.com/attribution/). Include other regional producers when their terrain is used; this short CH/NO credit is not a complete global attribution manifest. |
+| Protomaps if later adopted      | `© OpenStreetMap contributors` with OSM copyright link; preserve any additional selected dataset and font/sprite licence notices. The download is distributed as an ODbL Produced Work.                                                                                                                                  |
+| AWS terrain if used as fallback | `Terrain: Mapzen / AWS Terrain Tiles` plus the applicable underlying dataset credits from [the attribution manifest](https://github.com/tilezen/joerd/blob/master/docs/attribution.md).                                                                                                                                  |
 
 [MapTiler attribution rules](https://docs.maptiler.com/guides/map-design/attribution/add-attribution/) require text credits, and its logo on Free accounts. Use the existing map attribution surface, checking that sheets do not obscure required credits. Native Mapbox SDK attribution remains while that SDK is used. Copy exact provider TileJSON credits and review all font/sprite licences before shipping; source labels alone do not certify licence compliance.
 

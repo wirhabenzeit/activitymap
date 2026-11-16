@@ -63,10 +63,7 @@ await writeFile(
   join(directory, 'actions.ts'),
   'export const updateActivity=()=>{}; export const deleteActivities=()=>{};',
 );
-await writeFile(
-  join(directory, 'env.ts'),
-  'export const env={};',
-);
+await writeFile(join(directory, 'env.ts'), 'export const env={};');
 await writeFile(
   join(directory, 'photos.ts'),
   'export function usePhotos(){ return {data:window.photoFixtures}; }',

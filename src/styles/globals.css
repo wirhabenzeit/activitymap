@@ -273,7 +273,8 @@
 }
 .matched-place-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
 .matched-place-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
-.matched-place-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
+.matched-place-popup.maplibregl-popup-anchor-bottom-right
+  .maplibregl-popup-tip {
   border-top-color: hsl(var(--popover));
 }
 .matched-place-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,

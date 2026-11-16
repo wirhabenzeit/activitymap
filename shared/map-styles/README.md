@@ -2,15 +2,15 @@
 
 Seven first-pass styles mirror the roles of the seven Mapbox entries in the production catalogue. They are separate from `shared/map-catalog.json`, which iOS still reads with the Mapbox SDK. The web renders them with MapLibre under the same catalogue IDs (see [Web use](#web-use)).
 
-| Existing ID | Prototype | Source and intended appearance |
-| --- | --- | --- |
-| `mapboxStreet` | ActivityMap Street | OpenFreeMap Liberty, cyan water, pale roads, restrained buildings and labels; flat buildings |
-| `mapboxStreet3d` | ActivityMap Street 3D | Same palette with height-based building extrusions from zoom 15 |
-| `mapboxOutdoors` | ActivityMap Outdoor | MapTiler Outdoor v4 with the dimmed hiking paths previously previewed |
-| `mapboxLight` | ActivityMap Light | OpenFreeMap Positron with a softer neutral palette and reduced building contrast |
-| `mapboxTopolight` | ActivityMap Topolight | Positron with grayscale cartography and Mapterhorn hillshade |
-| `mapboxDark` | ActivityMap Dark | OpenFreeMap Dark with a charcoal background, legible light labels and subdued roads/rail |
-| `mapboxSatellite` | ActivityMap Satellite | MapTiler Satellite v4, imagery only, matching the role of satellite-v9 |
+| Existing ID       | Prototype             | Source and intended appearance                                                               |
+| ----------------- | --------------------- | -------------------------------------------------------------------------------------------- |
+| `mapboxStreet`    | ActivityMap Street    | OpenFreeMap Liberty, cyan water, pale roads, restrained buildings and labels; flat buildings |
+| `mapboxStreet3d`  | ActivityMap Street 3D | Same palette with height-based building extrusions from zoom 15                              |
+| `mapboxOutdoors`  | ActivityMap Outdoor   | MapTiler Outdoor v4 with the dimmed hiking paths previously previewed                        |
+| `mapboxLight`     | ActivityMap Light     | OpenFreeMap Positron with a softer neutral palette and reduced building contrast             |
+| `mapboxTopolight` | ActivityMap Topolight | Positron with grayscale cartography and Mapterhorn hillshade                                 |
+| `mapboxDark`      | ActivityMap Dark      | OpenFreeMap Dark with a charcoal background, legible light labels and subdued roads/rail     |
+| `mapboxSatellite` | ActivityMap Satellite | MapTiler Satellite v4, imagery only, matching the role of satellite-v9                       |
 
 Inspection of the actual custom Studio styles changed the earlier research proposal: Street 3D contains building extrusions; Topolight contains grayscale mapping plus hillshade, without contours. Topolight therefore does not need the paid Outdoor contour source. These are independently tuned adaptations of the replacement providers' base styles, not copies of the Mapbox style JSON.
 

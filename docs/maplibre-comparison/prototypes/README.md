@@ -2,15 +2,15 @@
 
 These captures compare the actual current Mapbox catalogue styles with the new [ActivityMap definitions](../../../shared/map-styles/README.md). Left: current. Right: prototype. Captured 15 November 2026 UTC. Matching 628×704 CSS-pixel map containers; screenshots at 2× scale, with JPEG copies and map-only crops.
 
-| Style | Camera | Full comparison |
-| --- | --- | --- |
-| Street | Zürich, 8.5417 / 47.3769, zoom 13 | [Street](mapboxStreet-pair.jpg) |
-| Street 3D | Zürich, zoom 15.8, pitch 55°, bearing 25° | [Street 3D](mapboxStreet3d-pair.jpg) |
-| Outdoor | Interlaken, 7.86 / 46.68, zoom 11 | [Outdoor](mapboxOutdoors-pair.jpg) |
-| Light | Zürich, zoom 13 | [Light](mapboxLight-pair.jpg) |
-| Topolight | Interlaken, zoom 11 | [Topolight](mapboxTopolight-pair.jpg) |
-| Dark | Zürich, zoom 13 | [Dark](mapboxDark-pair.jpg) |
-| Satellite | Interlaken, zoom 12 | [Satellite](mapboxSatellite-pair.jpg) |
+| Style     | Camera                                    | Full comparison                       |
+| --------- | ----------------------------------------- | ------------------------------------- |
+| Street    | Zürich, 8.5417 / 47.3769, zoom 13         | [Street](mapboxStreet-pair.jpg)       |
+| Street 3D | Zürich, zoom 15.8, pitch 55°, bearing 25° | [Street 3D](mapboxStreet3d-pair.jpg)  |
+| Outdoor   | Interlaken, 7.86 / 46.68, zoom 11         | [Outdoor](mapboxOutdoors-pair.jpg)    |
+| Light     | Zürich, zoom 13                           | [Light](mapboxLight-pair.jpg)         |
+| Topolight | Interlaken, zoom 11                       | [Topolight](mapboxTopolight-pair.jpg) |
+| Dark      | Zürich, zoom 13                           | [Dark](mapboxDark-pair.jpg)           |
+| Satellite | Interlaken, zoom 12                       | [Satellite](mapboxSatellite-pair.jpg) |
 
 Other cameras use pitch/bearing zero. Renderer versions: Mapbox GL JS 3.15.0 and MapLibre GL JS 5.6.2. Public MapTiler documentation demo access was used for candidate Outdoor/Satellite, and the app's existing public Mapbox token for baselines. No credentials are stored in these files. Temporary comparison tabs were closed.
 

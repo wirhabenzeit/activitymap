@@ -1,19 +1,77 @@
 <style>
-#map-style-comparison { font-family: var(--font-sans); color: var(--foreground); }
-#map-style-comparison .controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:12px; }
-#map-style-comparison .names { display:flex; justify-content:space-between; gap:16px; margin:12px 0 8px; }
-#map-style-comparison .names span { flex:1; }
-#map-style-comparison .names span:last-child { text-align:right; }
-#map-style-comparison .camera { color:var(--muted-foreground); margin:8px 0; }
-#map-style-comparison .maps { position:relative; aspect-ratio:628/704; overflow:hidden; }
-#map-style-comparison .maps img { display:block; width:100%; height:100%; object-fit:contain; }
-#map-style-comparison .maps .current { position:absolute; inset:0; clip-path:inset(0 50% 0 0); }
-#map-style-comparison .divider { position:absolute; left:50%; top:0; bottom:0; border-left:2px solid var(--foreground); pointer-events:none; }
-#map-style-comparison .scrub { display:flex; align-items:center; gap:12px; margin:12px 0; }
-#map-style-comparison input { flex:1; min-width:80px; }
-#map-style-comparison .note { margin:12px 0; line-height:1.5; }
-#map-style-comparison .credits { font-size:12px; line-height:1.5; margin-top:12px; }
-#map-style-comparison a { color:var(--primary); }
+  #map-style-comparison {
+    font-family: var(--font-sans);
+    color: var(--foreground);
+  }
+  #map-style-comparison .controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  #map-style-comparison .names {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 12px 0 8px;
+  }
+  #map-style-comparison .names span {
+    flex: 1;
+  }
+  #map-style-comparison .names span:last-child {
+    text-align: right;
+  }
+  #map-style-comparison .camera {
+    color: var(--muted-foreground);
+    margin: 8px 0;
+  }
+  #map-style-comparison .maps {
+    position: relative;
+    aspect-ratio: 628/704;
+    overflow: hidden;
+  }
+  #map-style-comparison .maps img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  #map-style-comparison .maps .current {
+    position: absolute;
+    inset: 0;
+    clip-path: inset(0 50% 0 0);
+  }
+  #map-style-comparison .divider {
+    position: absolute;
+    left: 50%;
+    top: 0;
+    bottom: 0;
+    border-left: 2px solid var(--foreground);
+    pointer-events: none;
+  }
+  #map-style-comparison .scrub {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  #map-style-comparison input {
+    flex: 1;
+    min-width: 80px;
+  }
+  #map-style-comparison .note {
+    margin: 12px 0;
+    line-height: 1.5;
+  }
+  #map-style-comparison .credits {
+    font-size: 12px;
+    line-height: 1.5;
+    margin-top: 12px;
+  }
+  #map-style-comparison a {
+    color: var(--primary);
+  }
 </style>
 <div id="map-style-comparison">
   <div class="controls">
@@ -28,95 +86,207 @@
     </select>
   </div>
   <section data-pair="streets">
-    <div class="names"><span>Mapbox Streets v12</span><span>OpenFreeMap Liberty</span></div>
+    <div class="names">
+      <span>Mapbox Streets v12</span><span>OpenFreeMap Liberty</span>
+    </div>
     <div class="camera">Zürich · zoom 13 · north up · flat</div>
-    <div class="maps" role="img" aria-label="Matched street maps of central Zürich. Mapbox on the left of the divider, OpenFreeMap on the right.">
-      <img src="streets-zurich-alternative.jpg" alt="OpenFreeMap Liberty in Zürich">
-      <img class="current" src="streets-zurich-mapbox.jpg" alt="Mapbox Streets v12 in Zürich">
+    <div
+      class="maps"
+      role="img"
+      aria-label="Matched street maps of central Zürich. Mapbox on the left of the divider, OpenFreeMap on the right."
+    >
+      <img
+        src="streets-zurich-alternative.jpg"
+        alt="OpenFreeMap Liberty in Zürich"
+      />
+      <img
+        class="current"
+        src="streets-zurich-mapbox.jpg"
+        alt="Mapbox Streets v12 in Zürich"
+      />
       <div class="divider"></div>
     </div>
   </section>
   <section data-pair="light" hidden>
-    <div class="names"><span>Mapbox Light v11</span><span>OpenFreeMap Positron</span></div>
+    <div class="names">
+      <span>Mapbox Light v11</span><span>OpenFreeMap Positron</span>
+    </div>
     <div class="camera">Zürich · zoom 13 · north up · flat</div>
-    <div class="maps" role="img" aria-label="Matched light maps of central Zürich. Mapbox on the left, OpenFreeMap on the right.">
-      <img src="light-zurich-alternative.jpg" alt="OpenFreeMap Positron in Zürich">
-      <img class="current" src="light-zurich-mapbox.jpg" alt="Mapbox Light v11 in Zürich">
+    <div
+      class="maps"
+      role="img"
+      aria-label="Matched light maps of central Zürich. Mapbox on the left, OpenFreeMap on the right."
+    >
+      <img
+        src="light-zurich-alternative.jpg"
+        alt="OpenFreeMap Positron in Zürich"
+      />
+      <img
+        class="current"
+        src="light-zurich-mapbox.jpg"
+        alt="Mapbox Light v11 in Zürich"
+      />
       <div class="divider"></div>
     </div>
   </section>
   <section data-pair="dark" hidden>
-    <div class="names"><span>Mapbox Dark v11</span><span>OpenFreeMap Dark</span></div>
+    <div class="names">
+      <span>Mapbox Dark v11</span><span>OpenFreeMap Dark</span>
+    </div>
     <div class="camera">Zürich · zoom 13 · north up · flat</div>
-    <div class="maps" role="img" aria-label="Matched dark maps of central Zürich. Mapbox on the left, OpenFreeMap on the right.">
-      <img src="dark-zurich-alternative.jpg" alt="OpenFreeMap Dark in Zürich">
-      <img class="current" src="dark-zurich-mapbox.jpg" alt="Mapbox Dark v11 in Zürich">
+    <div
+      class="maps"
+      role="img"
+      aria-label="Matched dark maps of central Zürich. Mapbox on the left, OpenFreeMap on the right."
+    >
+      <img src="dark-zurich-alternative.jpg" alt="OpenFreeMap Dark in Zürich" />
+      <img
+        class="current"
+        src="dark-zurich-mapbox.jpg"
+        alt="Mapbox Dark v11 in Zürich"
+      />
       <div class="divider"></div>
     </div>
   </section>
   <section data-pair="outdoor" hidden>
-    <div class="names"><span>Mapbox Outdoors v12</span><span>MapTiler Outdoor v4</span></div>
+    <div class="names">
+      <span>Mapbox Outdoors v12</span><span>MapTiler Outdoor v4</span>
+    </div>
     <div class="camera">Interlaken · zoom 11 · north up · flat</div>
-    <div class="maps" role="img" aria-label="Matched outdoor maps of Interlaken. Mapbox on the left, MapTiler on the right.">
-      <img src="outdoor-interlaken-alternative.jpg" alt="MapTiler Outdoor v4 in Interlaken">
-      <img class="current" src="outdoor-interlaken-mapbox.jpg" alt="Mapbox Outdoors v12 in Interlaken">
+    <div
+      class="maps"
+      role="img"
+      aria-label="Matched outdoor maps of Interlaken. Mapbox on the left, MapTiler on the right."
+    >
+      <img
+        src="outdoor-interlaken-alternative.jpg"
+        alt="MapTiler Outdoor v4 in Interlaken"
+      />
+      <img
+        class="current"
+        src="outdoor-interlaken-mapbox.jpg"
+        alt="Mapbox Outdoors v12 in Interlaken"
+      />
       <div class="divider"></div>
     </div>
   </section>
   <section data-pair="satellite" hidden>
-    <div class="names"><span>Mapbox Satellite v9</span><span>MapTiler Satellite v4</span></div>
+    <div class="names">
+      <span>Mapbox Satellite v9</span><span>MapTiler Satellite v4</span>
+    </div>
     <div class="camera">Interlaken · zoom 12 · north up · flat</div>
-    <div class="maps" role="img" aria-label="Matched satellite imagery around Interlaken. Mapbox on the left, MapTiler on the right.">
-      <img src="satellite-interlaken-alternative.jpg" alt="MapTiler Satellite demo imagery in Interlaken">
-      <img class="current" src="satellite-interlaken-mapbox.jpg" alt="Mapbox Satellite imagery in Interlaken">
+    <div
+      class="maps"
+      role="img"
+      aria-label="Matched satellite imagery around Interlaken. Mapbox on the left, MapTiler on the right."
+    >
+      <img
+        src="satellite-interlaken-alternative.jpg"
+        alt="MapTiler Satellite demo imagery in Interlaken"
+      />
+      <img
+        class="current"
+        src="satellite-interlaken-mapbox.jpg"
+        alt="Mapbox Satellite imagery in Interlaken"
+      />
       <div class="divider"></div>
     </div>
   </section>
   <section data-pair="terrain" hidden>
-    <div class="names"><span>Mapbox Outdoors + DEM</span><span>MapTiler Outdoor + Mapterhorn</span></div>
-    <div class="camera">Jungfrau region · zoom 11.8 · pitch 65° · bearing 155° · exaggeration 1.5×</div>
-    <div class="maps" role="img" aria-label="3D terrain in the Jungfrau region with equal camera parameters. Mapbox terrain and Outdoor on the left, Mapterhorn terrain and MapTiler Outdoor on the right. Both data and cartography differ.">
-      <img src="terrain-jungfrau-alternative.jpg" alt="MapTiler Outdoor draped over Mapterhorn terrain">
-      <img class="current" src="terrain-jungfrau-mapbox.jpg" alt="Mapbox Outdoors draped over Mapbox terrain">
+    <div class="names">
+      <span>Mapbox Outdoors + DEM</span
+      ><span>MapTiler Outdoor + Mapterhorn</span>
+    </div>
+    <div class="camera">
+      Jungfrau region · zoom 11.8 · pitch 65° · bearing 155° · exaggeration 1.5×
+    </div>
+    <div
+      class="maps"
+      role="img"
+      aria-label="3D terrain in the Jungfrau region with equal camera parameters. Mapbox terrain and Outdoor on the left, Mapterhorn terrain and MapTiler Outdoor on the right. Both data and cartography differ."
+    >
+      <img
+        src="terrain-jungfrau-alternative.jpg"
+        alt="MapTiler Outdoor draped over Mapterhorn terrain"
+      />
+      <img
+        class="current"
+        src="terrain-jungfrau-mapbox.jpg"
+        alt="Mapbox Outdoors draped over Mapbox terrain"
+      />
       <div class="divider"></div>
     </div>
   </section>
   <div class="scrub">
     <label for="reveal-position">Mapbox</label>
-    <input class="form-range" id="reveal-position" type="range" min="0" max="100" value="50" aria-label="Reveal Mapbox portion of the comparison" aria-valuetext="50 percent Mapbox, 50 percent alternative">
+    <input
+      class="form-range"
+      id="reveal-position"
+      type="range"
+      min="0"
+      max="100"
+      value="50"
+      aria-label="Reveal Mapbox portion of the comparison"
+      aria-valuetext="50 percent Mapbox, 50 percent alternative"
+    />
     <span>Alternative</span>
   </div>
-  <p id="comparison-note" class="note" aria-live="polite">Liberty shows more building footprints and stronger road colouring at this scale.</p>
+  <p id="comparison-note" class="note" aria-live="polite">
+    Liberty shows more building footprints and stronger road colouring at this
+    scale.
+  </p>
   <div class="credits">
-    Live-provider captures, 15 November 2026 UTC. Mapbox GL JS 3.15.0 / MapLibre GL JS 5.6.2.<br>
-    <a href="https://www.mapbox.com/about/maps/">© Mapbox</a> · <a href="https://www.openstreetmap.org/copyright">© OpenStreetMap contributors</a> · <a href="https://openfreemap.org/">OpenFreeMap</a> · <a href="https://openmaptiles.org/">© OpenMapTiles</a> · <a href="https://www.maptiler.com/copyright/">© MapTiler and imagery suppliers</a> · <a href="https://mapterhorn.com/attribution/">© Mapterhorn and elevation data providers</a>
+    Live-provider captures, 15 November 2026 UTC. Mapbox GL JS 3.15.0 / MapLibre
+    GL JS 5.6.2.<br />
+    <a href="https://www.mapbox.com/about/maps/">© Mapbox</a> ·
+    <a href="https://www.openstreetmap.org/copyright"
+      >© OpenStreetMap contributors</a
+    >
+    · <a href="https://openfreemap.org/">OpenFreeMap</a> ·
+    <a href="https://openmaptiles.org/">© OpenMapTiles</a> ·
+    <a href="https://www.maptiler.com/copyright/"
+      >© MapTiler and imagery suppliers</a
+    >
+    ·
+    <a href="https://mapterhorn.com/attribution/"
+      >© Mapterhorn and elevation data providers</a
+    >
   </div>
 </div>
 <script>
-(() => {
-  const root = document.getElementById('map-style-comparison');
-  const select = root.querySelector('#style-pair');
-  const slider = root.querySelector('#reveal-position');
-  const note = root.querySelector('#comparison-note');
-  const notes = {
-    streets: 'Liberty shows more building footprints and stronger road colouring at this scale.',
-    light: 'Positron has more visible building detail and darker labels than Mapbox Light.',
-    dark: 'OpenFreeMap Dark is substantially darker here; label and route contrast need review.',
-    outdoor: 'MapTiler emphasises trail networks, contours and relief. The bright trails may compete with activity routes.',
-    satellite: 'The public MapTiler demo is visibly softer here. Verify production imagery coverage and resolution before choosing it.',
-    terrain: 'Both terrain sources rendered. This compares the complete proposed stack; different hillshade and contour styles also affect apparent relief.'
-  };
-  const update = () => {
-    root.querySelectorAll('[data-pair]').forEach(panel => {
-      panel.hidden = panel.dataset.pair !== select.value;
-      panel.querySelector('.current').style.clipPath = `inset(0 ${100 - Number(slider.value)}% 0 0)`;
-      panel.querySelector('.divider').style.left = `${slider.value}%`;
-    });
-    slider.setAttribute('aria-valuetext', `${slider.value} percent Mapbox, ${100 - Number(slider.value)} percent alternative`);
-    note.textContent = notes[select.value];
-  };
-  select.addEventListener('change', update);
-  slider.addEventListener('input', update);
-  update();
-})();
+  (() => {
+    const root = document.getElementById('map-style-comparison');
+    const select = root.querySelector('#style-pair');
+    const slider = root.querySelector('#reveal-position');
+    const note = root.querySelector('#comparison-note');
+    const notes = {
+      streets:
+        'Liberty shows more building footprints and stronger road colouring at this scale.',
+      light:
+        'Positron has more visible building detail and darker labels than Mapbox Light.',
+      dark: 'OpenFreeMap Dark is substantially darker here; label and route contrast need review.',
+      outdoor:
+        'MapTiler emphasises trail networks, contours and relief. The bright trails may compete with activity routes.',
+      satellite:
+        'The public MapTiler demo is visibly softer here. Verify production imagery coverage and resolution before choosing it.',
+      terrain:
+        'Both terrain sources rendered. This compares the complete proposed stack; different hillshade and contour styles also affect apparent relief.',
+    };
+    const update = () => {
+      root.querySelectorAll('[data-pair]').forEach((panel) => {
+        panel.hidden = panel.dataset.pair !== select.value;
+        panel.querySelector('.current').style.clipPath =
+          `inset(0 ${100 - Number(slider.value)}% 0 0)`;
+        panel.querySelector('.divider').style.left = `${slider.value}%`;
+      });
+      slider.setAttribute(
+        'aria-valuetext',
+        `${slider.value} percent Mapbox, ${100 - Number(slider.value)} percent alternative`,
+      );
+      note.textContent = notes[select.value];
+    };
+    select.addEventListener('change', update);
+    slider.addEventListener('input', update);
+    update();
+  })();
 </script>
