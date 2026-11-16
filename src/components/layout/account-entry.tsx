@@ -1,6 +1,5 @@
 'use client';
 
-import { Loader2 } from 'lucide-react';
 import * as React from 'react';
 
 import { SettingsDialog } from '~/components/settings/settings-dialog';
@@ -55,15 +54,16 @@ export function AccountButton({ className }: { className?: string }) {
           <AvatarFallback className="bg-header-foreground/20 text-sm font-semibold text-header-foreground uppercase">
             {initial}
           </AvatarFallback>
-          {/* Stays mounted, so the rotation never restarts between pages. */}
-          <Loader2
-            aria-hidden
-            className={cn(
-              'absolute inset-0 m-auto size-8 animate-spin text-white transition-opacity duration-300 motion-reduce:animate-none',
-              loading ? 'opacity-100' : 'opacity-0',
-            )}
-          />
         </Avatar>
+        {/* A ring around the avatar, outside its clipped circle. Stays
+            mounted, so the rotation never restarts between pages. */}
+        <span
+          aria-hidden
+          className={cn(
+            'pointer-events-none absolute inset-0 m-auto size-10 animate-spin rounded-full border-2 border-white/30 border-t-white transition-opacity duration-300 motion-reduce:animate-none',
+            loading ? 'opacity-100' : 'opacity-0',
+          )}
+        />
       </Button>
       <span role="status" className="sr-only">
         {loading ? 'Loading activities' : ''}
