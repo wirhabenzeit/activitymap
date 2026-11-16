@@ -249,7 +249,7 @@ try {
       window.__ACTIVITYMAP_GALLERY_MAP__?.isStyleLoaded() &&
       document.querySelector('[data-route-fit="idle"]'),
   );
-  // Hit an actual overlap through the Mapbox canvas, exercising the picking control.
+  // Hit an actual overlap through the MapLibre canvas, exercising the picking control.
   await page.evaluate(() =>
     window.__ACTIVITYMAP_GALLERY_MAP__.jumpTo({
       center: [8.535, 47.356],

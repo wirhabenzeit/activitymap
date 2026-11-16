@@ -1,5 +1,5 @@
 // Verifies real share dialogs, detail actions and List inspection against local
-// fixture activities. Map hit results are supplied without a live Mapbox query.
+// fixture activities. Map hit results are supplied without a live map query.
 import assert from 'node:assert/strict';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';

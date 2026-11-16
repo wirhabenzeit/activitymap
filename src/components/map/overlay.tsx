@@ -1,14 +1,15 @@
 'use client';
 'use no memo';
 
+import { type Map as MapLibreMap } from 'maplibre-gl';
 import { type ReactElement, cloneElement, memo } from 'react';
 import { createPortal } from 'react-dom';
 import {
   type ControlPosition,
   type IControl,
   useControl,
-} from 'react-map-gl/mapbox';
-import { type Map as MapboxMap } from 'mapbox-gl';
+} from 'react-map-gl/maplibre';
+
 type Config = {
   position: ControlPosition;
   redraw?: () => void;
@@ -20,7 +21,7 @@ type OverlayProps = {
 };
 
 class OverlayControl implements IControl {
-  _map: MapboxMap | null = null;
+  _map: MapLibreMap | null = null;
   _container: HTMLElement | null = null;
   _position: ControlPosition = 'bottom-right';
   _redraw?: () => void;
@@ -30,10 +31,10 @@ class OverlayControl implements IControl {
     if (redraw !== undefined) this._redraw = redraw;
   }
 
-  onAdd(map: MapboxMap) {
+  onAdd(map: MapLibreMap) {
     this._map = map;
     this._container = document.createElement('div');
-    this._container.className = 'mapboxgl-ctrl mapboxgl-ctrl-group';
+    this._container.className = 'maplibregl-ctrl maplibregl-ctrl-group';
 
     if (this._redraw !== undefined) {
       map.on('move', this._redraw);

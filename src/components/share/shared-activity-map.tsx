@@ -1,7 +1,7 @@
 'use client';
 
 import { Gauge, Mountain, Route, Timer } from 'lucide-react';
-import type { Expression } from 'mapbox-gl';
+import type { ExpressionSpecification } from 'maplibre-gl';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import ReactMapGL, {
   FullscreenControl,
@@ -10,16 +10,18 @@ import ReactMapGL, {
   type MapRef,
   NavigationControl,
   Source,
-} from 'react-map-gl/mapbox';
+} from 'react-map-gl/maplibre';
 
 import { ElevationPlot } from '~/components/list/elevation-plot';
 import type { SharedActivityDTO } from '~/contracts/share/activity';
+import { useBaseMapStyle } from '~/hooks/use-base-map-style';
 import {
   useDateFormat,
   useDisplayUnits,
 } from '~/hooks/use-display-preferences';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import { formatLocalTime } from '~/lib/local-date-time';
+import { transformMapRequest } from '~/lib/map-glyphs';
 import {
   routeBounds,
   routeFitPadding,
@@ -36,20 +38,21 @@ import {
 } from '~/lib/speed-display';
 import { formatMeasurement } from '~/lib/units';
 import { categorySettings, colorMap, iconMap } from '~/settings/category';
-import { baseMaps, defaultMapPosition } from '~/settings/map';
+import { defaultMapPosition } from '~/settings/map';
 
 type SharedActivityMapProps = {
   activities: SharedActivityDTO[];
   expiresAt: string;
 };
 
-const routeColor: Expression = ['match', ['get', 'sportType']];
-for (const setting of Object.values(categorySettings)) {
-  for (const sportType of setting.alias) {
-    routeColor.push(sportType, setting.color);
-  }
-}
-routeColor.push('#6A4C93');
+const routeColor = [
+  'match',
+  ['get', 'sportType'],
+  ...Object.values(categorySettings).flatMap((setting) =>
+    setting.alias.flatMap((sportType) => [sportType, setting.color]),
+  ),
+  '#6A4C93',
+] as unknown as ExpressionSpecification;
 
 function formatDuration(seconds: number | null): string {
   if (seconds === null) return '—';
@@ -181,6 +184,8 @@ export function SharedActivityMap({
   expiresAt,
 }: SharedActivityMapProps) {
   const mapRef = useRef<MapRef>(null);
+  // Recipients always see the default street map, whatever the sender uses.
+  const mapStyle = useBaseMapStyle('mapboxStreet');
   const panelRef = useRef<HTMLDivElement>(null);
   const routes = useMemo(
     () => buildSharedRouteCollection(activities),
@@ -247,77 +252,82 @@ export function SharedActivityMap({
       className="relative h-dvh w-dvw overflow-hidden"
       aria-label="Shared track map"
     >
-      <ReactMapGL
-        ref={mapRef}
-        initialViewState={defaultMapPosition}
-        mapStyle={baseMaps.mapboxStreet.url}
-        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-        interactiveLayerIds={['shared-route-hit']}
-        onClick={handleRouteClick}
-        onLoad={fitRoutes}
-        cursor="pointer"
-        reuseMaps
-      >
-        <NavigationControl position="top-right" showCompass />
-        <FullscreenControl position="top-right" />
-        <Source id="shared-routes" type="geojson" data={routes}>
-          <Layer
-            id="shared-route-outline"
-            type="line"
-            paint={{
-              'line-color': '#111827',
-              'line-width': 7,
-              'line-opacity': 0.9,
-            }}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-          />
-          <Layer
-            id="shared-route-line"
-            type="line"
-            paint={{ 'line-color': routeColor, 'line-width': 4 }}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-          />
-          <Layer
-            id="shared-route-selected"
-            type="line"
-            filter={['==', ['get', 'id'], selectedActivity?.id ?? '']}
-            paint={{ 'line-color': '#ffffff', 'line-width': 2 }}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-          />
-          <Layer
-            id="shared-route-hit"
-            type="line"
-            paint={{
-              'line-color': '#000000',
-              'line-width': 20,
-              'line-opacity': 0,
-            }}
-            layout={{ 'line-cap': 'round', 'line-join': 'round' }}
-          />
-        </Source>
-        {cursor && (
-          <Source
-            id="shared-elevation-cursor"
-            type="geojson"
-            data={{
-              type: 'Feature',
-              properties: {},
-              geometry: { type: 'Point', coordinates: [cursor[1], cursor[0]] },
-            }}
-          >
+      {mapStyle !== undefined && (
+        <ReactMapGL
+          ref={mapRef}
+          initialViewState={defaultMapPosition}
+          mapStyle={mapStyle}
+          transformRequest={transformMapRequest}
+          interactiveLayerIds={['shared-route-hit']}
+          onClick={handleRouteClick}
+          onLoad={fitRoutes}
+          cursor="pointer"
+          reuseMaps
+        >
+          <NavigationControl position="top-right" showCompass />
+          <FullscreenControl position="top-right" />
+          <Source id="shared-routes" type="geojson" data={routes}>
             <Layer
-              id="shared-elevation-cursor"
-              type="circle"
+              id="shared-route-outline"
+              type="line"
               paint={{
-                'circle-radius': 6,
-                'circle-color': '#ffffff',
-                'circle-stroke-color': '#111827',
-                'circle-stroke-width': 3,
+                'line-color': '#111827',
+                'line-width': 7,
+                'line-opacity': 0.9,
               }}
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+            />
+            <Layer
+              id="shared-route-line"
+              type="line"
+              paint={{ 'line-color': routeColor, 'line-width': 4 }}
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+            />
+            <Layer
+              id="shared-route-selected"
+              type="line"
+              filter={['==', ['get', 'id'], selectedActivity?.id ?? '']}
+              paint={{ 'line-color': '#ffffff', 'line-width': 2 }}
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
+            />
+            <Layer
+              id="shared-route-hit"
+              type="line"
+              paint={{
+                'line-color': '#000000',
+                'line-width': 20,
+                'line-opacity': 0,
+              }}
+              layout={{ 'line-cap': 'round', 'line-join': 'round' }}
             />
           </Source>
-        )}
-      </ReactMapGL>
+          {cursor && (
+            <Source
+              id="shared-elevation-cursor"
+              type="geojson"
+              data={{
+                type: 'Feature',
+                properties: {},
+                geometry: {
+                  type: 'Point',
+                  coordinates: [cursor[1], cursor[0]],
+                },
+              }}
+            >
+              <Layer
+                id="shared-elevation-cursor"
+                type="circle"
+                paint={{
+                  'circle-radius': 6,
+                  'circle-color': '#ffffff',
+                  'circle-stroke-color': '#111827',
+                  'circle-stroke-width': 3,
+                }}
+              />
+            </Source>
+          )}
+        </ReactMapGL>
+      )}
 
       <div
         className="pointer-events-none absolute inset-x-0 bottom-0 z-10 flex flex-col p-3 sm:p-5"

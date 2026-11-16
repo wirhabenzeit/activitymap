@@ -1,6 +1,6 @@
 'use client';
 
-import { Marker } from 'react-map-gl/mapbox';
+import { Marker } from 'react-map-gl/maplibre';
 
 import { PlaceSymbol } from '~/components/place-symbol';
 import { usePlaceLibrary } from '~/hooks/use-place-library';

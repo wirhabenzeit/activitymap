@@ -74,10 +74,7 @@ await writeFile(
   join(directory, 'actions.ts'),
   'export const updateActivity=()=>{}; export const deleteActivities=()=>{};',
 );
-await writeFile(
-  join(directory, 'env.ts'),
-  'export const env={NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN:"pk.offline-test"};',
-);
+await writeFile(join(directory, 'env.ts'), 'export const env={};');
 await writeFile(
   join(directory, 'photos.ts'),
   'export function usePhotos(){ return {data:window.photoFixtures}; }',
@@ -117,7 +114,7 @@ const bundleConfig = {
     contents: `
 import React, {useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import Map from 'react-map-gl/mapbox';
+import Map from 'react-map-gl/maplibre';
 import {PhotoLightbox} from '~/components/list/photo';
 import PhotoLayer from '~/components/map/photo';
 import {Dialog, DialogContent, DialogTitle, DialogTrigger} from '~/components/ui/dialog';
@@ -137,7 +134,7 @@ function App(){
  <h1>Activity photos</h1><div data-testid="row" onClick={()=>window.rowClicks=(window.rowClicks||0)+1}>
  <PhotoLightbox photos={photos} title="Afternoon on the ridge" className="h-20" /></div>
  <Dialog><DialogTrigger>Open activity detail</DialogTrigger><DialogContent><DialogTitle>Activity detail</DialogTitle><PhotoLightbox photos={photos} title="Detail photos"/></DialogContent></Dialog>
- <div style={{height:260,marginTop:32}}><Map ref={ref=>window.photoMap=ref} onIdle={()=>window.mapReady=true} initialViewState={{latitude:0,longitude:0,zoom:10}} mapboxAccessToken="pk.offline-test"
+ <div style={{height:260,marginTop:32}}><Map ref={ref=>window.photoMap=ref} onIdle={()=>window.mapReady=true} initialViewState={{latitude:0,longitude:0,zoom:10}}
  mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e6e9e3'}}]}}><PhotoLayer photos={window.photoFixtures} visibleIDs={[1]}/></Map></div>
  <button onClick={()=>window.underlyingClicks=(window.underlyingClicks||0)+1}>Underlying action</button>
  </div>;

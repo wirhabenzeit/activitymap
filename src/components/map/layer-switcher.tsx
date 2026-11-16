@@ -19,7 +19,13 @@ import { useSelectedActivityPlaces } from '~/hooks/use-activity-places';
 import type { Activity } from '~/lib/activity';
 import { validPhotoLocation } from '~/lib/photo-gallery';
 import type { Photo } from '~/server/records';
-import { baseMaps, overlayMaps as overlayMapSettings } from '~/settings/map';
+import {
+  type BaseMapId,
+  baseMaps,
+  isBaseMapAvailable,
+  overlayMaps as overlayMapSettings,
+  renderableBaseMap,
+} from '~/settings/map';
 import { useShallowStore } from '~/store';
 
 export function DropdownMenuRadioGroupDemo() {
@@ -104,7 +110,7 @@ export function LayerSwitcher({
     <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <MapControlIconButton aria-label="Map layers">
-          {/* The Mapbox control group is always white; keep the glyph dark. */}
+          {/* The MapLibre control group is always white; keep the glyph dark. */}
           <Layers color="black" />
         </MapControlIconButton>
       </DropdownMenuTrigger>
@@ -145,18 +151,21 @@ export function LayerSwitcher({
         <DropdownMenuLabel>Base Map</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuRadioGroup
-          value={baseMap}
-          onValueChange={(value) => setBaseMap(value as keyof typeof baseMaps)}
+          // A stored map this deployment cannot render shows as its fallback.
+          value={renderableBaseMap(baseMap)}
+          onValueChange={(value) => setBaseMap(value as BaseMapId)}
         >
           {(
             Object.entries(baseMaps) as Array<
-              [keyof typeof baseMaps, (typeof baseMaps)[keyof typeof baseMaps]]
+              [BaseMapId, (typeof baseMaps)[BaseMapId]]
             >
-          ).map(([key, setting]) => (
-            <DropdownMenuRadioItem value={key} key={key}>
-              {setting.label}
-            </DropdownMenuRadioItem>
-          ))}
+          )
+            .filter(([key]) => isBaseMapAvailable(key))
+            .map(([key, setting]) => (
+              <DropdownMenuRadioItem value={key} key={key}>
+                {setting.label}
+              </DropdownMenuRadioItem>
+            ))}
         </DropdownMenuRadioGroup>
         <DropdownMenuLabel>Overlays</DropdownMenuLabel>
         <DropdownMenuSeparator />

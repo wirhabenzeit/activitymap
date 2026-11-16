@@ -1,7 +1,12 @@
 'use client';
 
-import { type MapMouseEvent, Point, type PointLike } from 'mapbox-gl';
-import { type IControl, useControl } from 'react-map-gl/mapbox';
+import {
+  type Map as MapLibreMap,
+  type MapMouseEvent,
+  Point,
+  type PointLike,
+} from 'maplibre-gl';
+import { type IControl, useControl } from 'react-map-gl/maplibre';
 
 import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
 
@@ -10,6 +15,7 @@ const styles = `
     background: rgba(56, 135, 190, 0.1);
     border: 2px solid #3887be;
     position: absolute;
+    pointer-events: none;
     top: 0;
     left: 0;
     width: 0;
@@ -41,7 +47,7 @@ export class SelectionControl implements IControl {
   source: string;
   selectionHandler: (ids: number[]) => void;
   canvas?: HTMLElement;
-  map?: mapboxgl.Map;
+  map?: MapLibreMap;
   start?: Point;
   current?: Point;
   box?: HTMLDivElement;
@@ -72,11 +78,12 @@ export class SelectionControl implements IControl {
     return;
   }
 
-  mousePos = (e: MapMouseEvent) => {
+  mousePos = (e: MapMouseEvent | MouseEvent) => {
     if (!this.rect || !this.canvas) return new Point(0, 0);
+    const event = e instanceof MouseEvent ? e : e.originalEvent;
     return new Point(
-      e.originalEvent.clientX - this.rect.left - this.canvas.clientLeft,
-      e.originalEvent.clientY - this.rect.top - this.canvas.clientTop,
+      event.clientX - this.rect.left - this.canvas.clientLeft,
+      event.clientY - this.rect.top - this.canvas.clientTop,
     );
   };
 
@@ -119,7 +126,7 @@ export class SelectionControl implements IControl {
     return this.layers.filter((layer) => styleLayerIds.has(layer));
   };
 
-  onAdd(map: mapboxgl.Map) {
+  onAdd(map: MapLibreMap) {
     this.map = map;
     this.canvas = map.getCanvasContainer();
     this.rect = this.canvas.getBoundingClientRect();
@@ -139,8 +146,12 @@ export class SelectionControl implements IControl {
     if (!(e.originalEvent.shiftKey && e.originalEvent.button === 0)) return;
 
     this.map?.dragPan.disable();
+    // The canvas may move with the panel layout after the add; measure now.
+    this.rect = this.canvas?.getBoundingClientRect();
     this.map?.on('mousemove', this.onMouseMove);
-    this.map?.on('mouseup', this.onMouseUp);
+    // MapLibre does not report a map mouseup reliably while a box drag is in
+    // progress, and the button may be released outside the map.
+    window.addEventListener('mouseup', this.onMouseUp, { once: true });
     this.start = this.mousePos(e);
   };
 
@@ -164,7 +175,7 @@ export class SelectionControl implements IControl {
     this.box.style.height = maxY - minY + 'px';
   };
 
-  onMouseUp = (e: MapMouseEvent) => {
+  onMouseUp = (e: MouseEvent) => {
     this.finish([this.start!, this.mousePos(e)]);
     // Avoid the following click event from overriding the box selection.
     this.suppressClickUntil = Date.now() + 250;
@@ -173,7 +184,7 @@ export class SelectionControl implements IControl {
   finish = (bbox: [PointLike, PointLike]) => {
     // Remove these events now that finish has been called.
     this.map?.off('mousemove', this.onMouseMove);
-    this.map?.off('mouseup', this.onMouseUp);
+    window.removeEventListener('mouseup', this.onMouseUp);
 
     if (this.box?.parentNode) {
       this.box.parentNode.removeChild(this.box);
@@ -198,7 +209,7 @@ export class SelectionControl implements IControl {
     this.map?.dragPan.enable();
   };
 
-  onRemove(map: mapboxgl.Map) {
+  onRemove(map: MapLibreMap) {
     map.off('mousedown', this.mouseDown);
     map.off('click', this.click);
     this._container.parentNode?.removeChild(this._container);

@@ -1,4 +1,4 @@
-import { type LngLatBounds, type ViewState } from 'react-map-gl/mapbox';
+import { type LngLatBounds, type ViewState } from 'react-map-gl/maplibre';
 import { type StateCreator } from 'zustand';
 
 import type { PlaceFilter } from '~/lib/place-library';

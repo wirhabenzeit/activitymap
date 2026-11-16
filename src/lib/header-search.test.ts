@@ -67,7 +67,7 @@ const setup = () => {
         ({
           ...createFilterSlice(...args),
           ...createSelectionSlice(...args),
-          // The map slice imports mapbox; these are its search-facing parts.
+          // The map slice imports maplibre; these are its search-facing parts.
           routeFitRequest: null,
           placeFlyRequest: null,
           searchPlace: null,

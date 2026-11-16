@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDown, ChevronUp, X } from 'lucide-react';
 import { useState } from 'react';
-import { Marker, Popup, useMap } from 'react-map-gl/mapbox';
+import { Marker, Popup, useMap } from 'react-map-gl/maplibre';
 
 import { PlaceSymbol } from '~/components/place-symbol';
 import { Button } from '~/components/ui/button';

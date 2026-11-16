@@ -1,0 +1,120 @@
+{
+  "version": 8,
+  "name": "ActivityMap Satellite",
+  "sources": {
+    "satellite": {
+      "url": "https://api.maptiler.com/tiles/satellite-v2/tiles.json?key={MAPTILER_KEY}",
+      "type": "raster"
+    }
+  },
+  "layers": [
+    {
+      "id": "Satellite",
+      "type": "raster",
+      "source": "satellite",
+      "layout": {
+        "visibility": "visible"
+      },
+      "paint": {
+        "raster-hue-rotate": 0,
+        "raster-opacity": 1
+      }
+    }
+  ],
+  "metadata": {
+    "maptiler": {
+      "copyright": "You are licensed to use the style or its derivate for serving map tiles exclusively with MapTiler Server or MapTiler Cloud and in accordance with their licenses and terms. If you plan to use the style in a different way, contact us at sales@maptiler.com.",
+      "groups": [
+        {
+          "icon": "administrative",
+          "id": "administrative",
+          "layers": [
+            "Place labels",
+            "State labels z9",
+            "Continent labels",
+            "Country border",
+            "Country dark border",
+            "Other border z9",
+            "Disputed border",
+            "Capital city labels",
+            "City labels",
+            "Other dark border z9",
+            "Country labels disputed",
+            "Country labels",
+            "Town labels",
+            "Village labels",
+            "Airport labels",
+            "State labels z7",
+            "State labels z3",
+            "Other border z3",
+            "Other dark border z4",
+            "Other border z7",
+            "Other dark border z7",
+            "Country border z<9",
+            "Country dark border z<9",
+            "Other border z3 z<9",
+            "Other dark border z4 z<9",
+            "Other border z7 z<9"
+          ],
+          "name": "Administrative"
+        },
+        {
+          "icon": "roads",
+          "id": "roads",
+          "layers": [
+            "Road",
+            "Road labels",
+            "Railway",
+            "Path",
+            "Tunnel",
+            "Pathway labels"
+          ],
+          "name": "Roads"
+        },
+        {
+          "icon": "water",
+          "id": "water",
+          "layers": [
+            "Lake labels",
+            "Sea labels",
+            "Sea labels (lines)",
+            "Ocean labels",
+            "Bay labels (lines)",
+            "Bay labels",
+            "Strait labels"
+          ],
+          "name": "Water"
+        },
+        {
+          "icon": "satellite",
+          "id": "satellite",
+          "layers": [
+            "Satellite"
+          ],
+          "name": "Satellite"
+        }
+      ],
+      "halo": {
+        "scale": 1,
+        "stops": [
+          [
+            0,
+            "rgba(255, 255, 255, 0.25)"
+          ],
+          [
+            0.25,
+            "rgba(255, 255, 255, 0)"
+          ]
+        ]
+      },
+      "space": {
+        "color": "#031F30",
+        "preset": "milkyway-colored"
+      },
+      "spaceColor": "#031F30"
+    },
+    "activitymap:prototype": 1,
+    "activitymap:catalog-id": "mapboxSatellite",
+    "activitymap:upstream": "satellite"
+  }
+}

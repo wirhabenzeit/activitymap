@@ -1,0 +1,281 @@
+<style>
+  #activitymap-prototypes {
+    color: var(--foreground);
+    font-family: var(--font-sans);
+  }
+  #activitymap-prototypes .controls {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+  #activitymap-prototypes .labels {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 8px;
+  }
+  #activitymap-prototypes .camera {
+    color: var(--muted-foreground);
+    margin-bottom: 12px;
+  }
+  #activitymap-prototypes .maps {
+    position: relative;
+    aspect-ratio: 628/704;
+    overflow: hidden;
+  }
+  #activitymap-prototypes .maps img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  #activitymap-prototypes .maps .current {
+    position: absolute;
+    inset: 0;
+    clip-path: inset(0 50% 0 0);
+  }
+  #activitymap-prototypes .divider {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    border-left: 2px solid var(--foreground);
+    pointer-events: none;
+  }
+  #activitymap-prototypes .scrub {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  #activitymap-prototypes input {
+    flex: 1;
+    min-width: 60px;
+  }
+  #activitymap-prototypes .credits {
+    margin-top: 12px;
+    font-size: 12px;
+  }
+  #activitymap-prototypes a {
+    color: var(--primary);
+  }
+</style>
+<div id="activitymap-prototypes">
+  <div class="controls">
+    <label class="form-label" for="prototype-style">Style</label>
+    <select class="form-select" id="prototype-style">
+      <option value="mapboxStreet">Street</option>
+      <option value="mapboxStreet3d">Street 3D</option>
+      <option value="mapboxOutdoors">Outdoor</option>
+      <option value="mapboxLight">Light</option>
+      <option value="mapboxTopolight" selected>Topolight</option>
+      <option value="mapboxDark">Dark</option>
+      <option value="mapboxSatellite">Satellite</option>
+    </select>
+  </div>
+  <div class="labels">
+    <span>Current Mapbox style</span><span>ActivityMap prototype</span>
+  </div>
+  <div class="camera" id="prototype-camera">
+    Interlaken · zoom 11 · north up · flat
+  </div>
+  <div
+    class="maps"
+    role="img"
+    aria-label="Matched current and replacement maps. Current Mapbox style on the left of the divider, ActivityMap prototype on the right."
+  >
+    <img
+      class="replacement"
+      src="mapboxTopolight-prototype.jpg"
+      alt="ActivityMap Topolight prototype"
+    />
+    <img
+      class="current"
+      src="mapboxTopolight-current.jpg"
+      alt="Current Mapbox Topolight"
+    />
+    <div class="divider"></div>
+  </div>
+  <div class="scrub">
+    <span>Current</span>
+    <input
+      class="form-range"
+      type="range"
+      min="0"
+      max="100"
+      value="50"
+      aria-label="Reveal current Mapbox style"
+      aria-valuetext="50 percent current, 50 percent prototype"
+    />
+    <span>Prototype</span>
+  </div>
+  <p id="prototype-note" aria-live="polite">
+    Topolight matches the original grayscale and hillshade role with OpenFreeMap
+    and Mapterhorn.
+  </p>
+  <div class="credits">
+    <a href="https://www.mapbox.com/about/maps/">© Mapbox</a> ·
+    <a href="https://www.openstreetmap.org/copyright"
+      >© OpenStreetMap contributors</a
+    >
+    · <a href="https://openfreemap.org/">OpenFreeMap</a> ·
+    <a href="https://openmaptiles.org/">© OpenMapTiles</a> ·
+    <a href="https://www.maptiler.com/copyright/"
+      >© MapTiler and imagery suppliers</a
+    >
+    ·
+    <a href="https://mapterhorn.com/attribution/"
+      >© Mapterhorn and elevation providers</a
+    >
+  </div>
+  <div hidden id="prototype-assets">
+    <img
+      data-style="mapboxStreet"
+      data-side="current"
+      src="mapboxStreet-current.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxStreet"
+      data-side="prototype"
+      src="mapboxStreet-prototype.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxStreet3d"
+      data-side="current"
+      src="mapboxStreet3d-current.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxStreet3d"
+      data-side="prototype"
+      src="mapboxStreet3d-prototype.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxOutdoors"
+      data-side="current"
+      src="mapboxOutdoors-current.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxOutdoors"
+      data-side="prototype"
+      src="mapboxOutdoors-prototype.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxLight"
+      data-side="current"
+      src="mapboxLight-current.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxLight"
+      data-side="prototype"
+      src="mapboxLight-prototype.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxTopolight"
+      data-side="current"
+      src="mapboxTopolight-current.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxTopolight"
+      data-side="prototype"
+      src="mapboxTopolight-prototype.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxDark"
+      data-side="current"
+      src="mapboxDark-current.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxDark"
+      data-side="prototype"
+      src="mapboxDark-prototype.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxSatellite"
+      data-side="current"
+      src="mapboxSatellite-current.jpg"
+      alt=""
+    />
+    <img
+      data-style="mapboxSatellite"
+      data-side="prototype"
+      src="mapboxSatellite-prototype.jpg"
+      alt=""
+    />
+  </div>
+</div>
+<script>
+  (() => {
+    const root = document.getElementById('activitymap-prototypes');
+    const select = root.querySelector('select');
+    const slider = root.querySelector('input');
+    const descriptions = {
+      mapboxStreet: [
+        'Zürich · zoom 13 · north up · flat',
+        'Street keeps cyan water and pale roads, with quieter building detail.',
+      ],
+      mapboxStreet3d: [
+        'Zürich · zoom 15.8 · pitch 55° · bearing 25°',
+        'Street 3D uses building height data from OpenMapTiles; coverage and geometry differ from Mapbox.',
+      ],
+      mapboxOutdoors: [
+        'Interlaken · zoom 11 · north up · flat',
+        'Outdoor carries forward the dimmed hiking trails while retaining contours and hillshade.',
+      ],
+      mapboxLight: [
+        'Zürich · zoom 13 · north up · flat',
+        'Light softens the neutral background, water and buildings for activity overlays.',
+      ],
+      mapboxTopolight: [
+        'Interlaken · zoom 11 · north up · flat',
+        'Topolight matches the original grayscale and hillshade role with OpenFreeMap and Mapterhorn.',
+      ],
+      mapboxDark: [
+        'Zürich · zoom 13 · north up · flat',
+        'Dark uses charcoal surfaces and brighter labels to improve readability.',
+      ],
+      mapboxSatellite: [
+        'Interlaken · zoom 12 · north up · flat',
+        'Satellite stays imagery-only. The softer demo imagery remains a source-quality decision.',
+      ],
+    };
+    const update = () => {
+      const id = select.value;
+      for (const [side, selector] of [
+        ['current', '.maps .current'],
+        ['prototype', '.maps .replacement'],
+      ]) {
+        const target = root.querySelector(selector);
+        target.src = root.querySelector(
+          `[data-style="${id}"][data-side="${side}"]`,
+        ).src;
+        target.alt = `${side === 'current' ? 'Current Mapbox' : 'ActivityMap prototype'} ${select.selectedOptions[0].textContent}`;
+      }
+      root.querySelector('.maps .current').style.clipPath =
+        `inset(0 ${100 - Number(slider.value)}% 0 0)`;
+      root.querySelector('.divider').style.left = `${slider.value}%`;
+      slider.setAttribute(
+        'aria-valuetext',
+        `${slider.value} percent current, ${100 - Number(slider.value)} percent prototype`,
+      );
+      root.querySelector('#prototype-camera').textContent = descriptions[id][0];
+      root.querySelector('#prototype-note').textContent = descriptions[id][1];
+    };
+    select.addEventListener('change', update);
+    slider.addEventListener('input', update);
+    update();
+  })();
+</script>

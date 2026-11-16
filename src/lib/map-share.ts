@@ -1,4 +1,4 @@
-import { type ViewState } from 'react-map-gl/mapbox';
+import { type ViewState } from 'react-map-gl/maplibre';
 
 import { baseMaps, defaultMapPosition, overlayMaps } from '~/settings/map';
 

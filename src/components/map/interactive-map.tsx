@@ -1,7 +1,11 @@
 'use client';
 
 import { ArrowLeft, Box } from 'lucide-react';
-import { LngLat, type SkyLayer } from 'mapbox-gl';
+import {
+  type ExpressionSpecification,
+  type FilterSpecification,
+  LngLat,
+} from 'maplibre-gl';
 import { useSearchParams } from 'next/navigation';
 import React, {
   useCallback,
@@ -18,7 +22,7 @@ import ReactMapGL, {
   NavigationControl,
   Source,
   type ViewState,
-} from 'react-map-gl/mapbox';
+} from 'react-map-gl/maplibre';
 
 import { SelectionBar } from '~/components/activity-selection-controls';
 import { ActivityCard, ActivityCardContent } from '~/components/list/card';
@@ -38,6 +42,7 @@ import PhotoLayer from '~/components/map/photo';
 import { Selection } from '~/components/map/selection-control';
 import { Button } from '~/components/ui/button';
 import { useActivityGeoJsonFromActivities } from '~/hooks/use-activities';
+import { useBaseMapStyle } from '~/hooks/use-base-map-style';
 import { useBrowsingIDs } from '~/hooks/use-browsing-activities';
 import { useBrowsingLibrary } from '~/hooks/use-browsing-library';
 import { usePhotos } from '~/hooks/use-photos';
@@ -45,8 +50,15 @@ import type { Activity } from '~/lib/activity';
 import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
 import { sortActivities } from '~/lib/activity-presentation';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+import { transformMapRequest } from '~/lib/map-glyphs';
 import { observeMapResize } from '~/lib/map-resize';
 import { parseMapShareParams } from '~/lib/map-share';
+import {
+  TERRAIN_SOURCE_ID,
+  mapSky,
+  terrainFor,
+  terrainSource,
+} from '~/lib/map-style';
 import { semanticAction } from '~/lib/presentation/icons';
 import {
   canFrameRoute,
@@ -61,7 +73,6 @@ import { cn, groupBy } from '~/lib/utils';
 import { categorySettings } from '~/settings/category';
 import {
   type OverlaySetting,
-  baseMaps,
   defaultMapPosition,
   overlayMaps,
 } from '~/settings/map';
@@ -71,16 +82,6 @@ import { useShallowStore } from '~/store';
 import { ActivityPlacesLayers } from './activity-places-layers';
 import { ElevationRouteMarker } from './elevation-route-marker';
 import { PlaceFilterPin } from './place-filter-pin';
-
-const skyLayer: SkyLayer = {
-  id: 'sky',
-  type: 'sky',
-  paint: {
-    'sky-type': 'atmosphere',
-    'sky-atmosphere-sun': [0.0, 0.0],
-    'sky-atmosphere-sun-intensity': 15,
-  },
-};
 
 type OverlayMapId = keyof typeof overlayMaps;
 
@@ -126,6 +127,17 @@ const ROUTE_LINE_LAYOUT = {
   'line-cap': 'round',
 } as const;
 
+/** Sport colour per route, black for unknown sport types. */
+const sportColorExpression = (): ExpressionSpecification =>
+  [
+    'match',
+    ['get', 'sport_type'],
+    ...Object.values(categorySettings).flatMap((value) =>
+      value.alias.flatMap((alias) => [alias, value.color]),
+    ),
+    '#000000',
+  ] as unknown as ExpressionSpecification;
+
 const RouteLayer = React.memo(function RouteLayer({
   activities,
   filterIDs,
@@ -140,44 +152,22 @@ const RouteLayer = React.memo(function RouteLayer({
 
   const geoJson = useActivityGeoJsonFromActivities(activities);
 
-  const color: mapboxgl.Expression = ['match', ['get', 'sport_type']];
-  Object.entries(categorySettings).forEach(([, value]) => {
-    value.alias.forEach((alias) => {
-      color.push(alias, value.color);
-    });
-  });
-  color.push('#000000');
+  const color = sportColorExpression();
 
-  const filter: mapboxgl.FilterSpecification = ['in', 'id', ...filterIDs];
-  const selectedFilter: mapboxgl.FilterSpecification = [
-    'in',
-    'id',
-    ...selected,
-  ];
-  const unselectedFilter: mapboxgl.FilterSpecification = [
-    '!in',
-    'id',
-    ...selected,
-  ];
-  const filterAll: mapboxgl.FilterSpecification = [
-    'all',
-    filter,
-    unselectedFilter,
-  ];
-  const filterSel: mapboxgl.FilterSpecification = [
-    'all',
-    filter,
-    selectedFilter,
-  ];
-  const filterHigh: mapboxgl.FilterSpecification = [
+  const filter: FilterSpecification = ['in', 'id', ...filterIDs];
+  const selectedFilter: FilterSpecification = ['in', 'id', ...selected];
+  const unselectedFilter: FilterSpecification = ['!in', 'id', ...selected];
+  const filterAll: FilterSpecification = ['all', filter, unselectedFilter];
+  const filterSel: FilterSpecification = ['all', filter, selectedFilter];
+  const filterHigh: FilterSpecification = [
     'all',
     filter,
     ['==', 'id', highlighted],
   ];
   const line = (
     id: string,
-    lineFilter: mapboxgl.FilterSpecification,
-    lineColor: mapboxgl.Expression | string,
+    lineFilter: FilterSpecification,
+    lineColor: ExpressionSpecification | string,
     width: number,
   ) => (
     <Layer
@@ -187,7 +177,6 @@ const RouteLayer = React.memo(function RouteLayer({
       paint={{
         'line-color': lineColor,
         'line-width': width,
-        'line-emissive-strength': 1,
       }}
       layout={ROUTE_LINE_LAYOUT}
       filter={lineFilter}
@@ -485,7 +474,7 @@ export default function InteractiveMap() {
         latitude: center.lat,
         zoom: camera.zoom,
         bearing: camera.bearing ?? map.getBearing(),
-        pitch: camera.pitch ?? map.getPitch(),
+        pitch: map.getPitch(),
         padding,
       };
       setViewport(target);
@@ -648,7 +637,7 @@ export default function InteractiveMap() {
     [overlays],
   );
 
-  const mapSettingBase = baseMaps[baseMap];
+  const baseMapStyle = useBaseMapStyle(baseMap);
 
   const photoDict = useMemo(
     () => groupBy(photos, (photo) => photo.activity_id),
@@ -800,101 +789,87 @@ export default function InteractiveMap() {
       className="relative h-full w-full"
       data-route-fit={routeFitRequest ? 'pending' : 'idle'}
     >
-      <ReactMapGL
-        reuseMaps={true}
-        ref={mapRefLoc}
-        styleDiffing={false}
-        boxZoom={false}
-        {...viewport}
-        onMove={({ viewState }) => setViewport(viewState)}
-        onMoveEnd={({ viewState }) => {
-          const map = mapRefLoc.current?.getMap();
-          if (map) {
-            const bounds = map.getBounds();
-            if (bounds) {
-              setPosition(viewState, bounds);
+      {/* Mount once the first style is ready, so app layers never meet a
+          glyph-less placeholder style. */}
+      {baseMapStyle !== undefined && (
+        <ReactMapGL
+          reuseMaps={true}
+          ref={mapRefLoc}
+          styleDiffing={false}
+          boxZoom={false}
+          {...viewport}
+          onMove={({ viewState }) => setViewport(viewState)}
+          onMoveEnd={({ viewState }) => {
+            const map = mapRefLoc.current?.getMap();
+            if (map) {
+              const bounds = map.getBounds();
+              if (bounds) {
+                setPosition(viewState, bounds);
+              }
             }
-          }
-        }}
-        onLoad={() => {
-          setMapLoaded(true);
-          tryAutoCenterOnLatestActivity();
-        }}
-        projection={'globe'}
-        mapStyle={
-          mapSettingBase?.type === 'vector' ? mapSettingBase.url : undefined
-        }
-        terrain={{ source: 'mapbox-dem', exaggeration: threeDim ? 1.5 : 0 }}
-        onMouseEnter={onMouseEnter}
-        onMouseLeave={onMouseLeave}
-        mapboxAccessToken={process.env.NEXT_PUBLIC_MAPBOX_TOKEN}
-        cursor={cursor}
-        interactiveLayerIds={activeInteractiveLayerIds}
-      >
-        {mapSettingBase?.type === 'raster' && (
-          <Source
-            type="raster"
-            tiles={[mapSettingBase.url]}
-            tileSize={mapSettingBase.tileSize}
-            attribution={mapSettingBase.attribution}
-          >
-            <Layer id="baseMap" type="raster" paint={{ 'raster-opacity': 1 }} />
-          </Source>
-        )}
-        <Source
-          id="mapbox-dem"
-          type="raster-dem"
-          url="mapbox://mapbox.mapbox-terrain-dem-v1"
-          tileSize={512}
-          maxzoom={14}
-        />
-        <Layer {...skyLayer} />
-        <NavigationControl position="top-right" />
-        <GeolocateControl position="top-right" />
-        <FullscreenControl position="top-right" />
-        <Selection onSelection={handleMapPick} />
-        <Overlay position="top-left">
-          <LayerSwitcher
+          }}
+          onLoad={() => {
+            setMapLoaded(true);
+            tryAutoCenterOnLatestActivity();
+          }}
+          projection="globe"
+          mapStyle={baseMapStyle}
+          transformRequest={transformMapRequest}
+          sky={mapSky}
+          terrain={terrainFor(threeDim)}
+          onMouseEnter={onMouseEnter}
+          onMouseLeave={onMouseLeave}
+          cursor={cursor}
+          interactiveLayerIds={activeInteractiveLayerIds}
+        >
+          <Source id={TERRAIN_SOURCE_ID} {...terrainSource} />
+          <NavigationControl position="top-right" />
+          <GeolocateControl position="top-right" />
+          <FullscreenControl position="top-right" />
+          <Selection onSelection={handleMapPick} />
+          <Overlay position="top-left">
+            <LayerSwitcher
+              activities={activityDict}
+              visibleIds={visibleIDs}
+              photos={photos}
+            />
+          </Overlay>
+          <Overlay position="top-left">
+            <MapControlIconButton
+              onClick={() => {
+                // Terrain follows the control; the pressed state follows the
+                // real tilt, so tilting with the compass control stays in sync.
+                hydrateMapState({ threeDim: !pitched });
+                mapRefLoc.current
+                  ?.getMap()
+                  .easeTo({ pitch: pitched ? 0 : MAP_3D_PITCH });
+              }}
+              aria-label="3D map"
+              title="3D map"
+              aria-pressed={pitched}
+            >
+              <Box color={pitched ? 'hsl(var(--header-background))' : 'gray'} />
+            </MapControlIconButton>
+          </Overlay>
+          {overlayMapComponents}
+          <RouteLayer activities={activities} filterIDs={visibleIDs} />
+          <ElevationRouteMarker
             activities={activityDict}
-            visibleIds={visibleIDs}
-            photos={photos}
+            visibleIDs={visibleIDSet}
           />
-        </Overlay>
-        <Overlay position="top-left">
-          <MapControlIconButton
-            onClick={() => {
-              // Terrain follows the control; the pressed state follows the
-              // real tilt, so tilting with the compass control stays in sync.
-              hydrateMapState({ threeDim: !pitched });
-              mapRefLoc.current
-                ?.getMap()
-                .easeTo({ pitch: pitched ? 0 : MAP_3D_PITCH });
-            }}
-            aria-label="3D map"
-            title="3D map"
-            aria-pressed={pitched}
-          >
-            <Box color={pitched ? 'hsl(var(--header-background))' : 'gray'} />
-          </MapControlIconButton>
-        </Overlay>
-        {overlayMapComponents}
-        <RouteLayer activities={activities} filterIDs={visibleIDs} />
-        <ElevationRouteMarker
-          activities={activityDict}
-          visibleIDs={visibleIDSet}
-        />
-        <ActivityPlacesLayers
-          activities={activityDict}
-          selectedIds={visibleSelected}
-          visibleIds={visibleIDs}
-          showAllPlaces={showPlaces}
-          inspectedActivityId={detailId || undefined}
-          onPickActivities={handleMapPick}
-          highlighted={highlighted}
-        />
-        {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}
-        <PlaceFilterPin />
-      </ReactMapGL>
+          <ActivityPlacesLayers
+            activities={activityDict}
+            selectedIds={visibleSelected}
+            visibleIds={visibleIDs}
+            showAllPlaces={showPlaces}
+            inspectedActivityId={detailId || undefined}
+            onPickActivities={handleMapPick}
+            highlighted={highlighted}
+          />
+          {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}
+          <PlaceFilterPin />
+        </ReactMapGL>
+      )}
       {selected.length > 0 && (
         <div
           ref={panelRef}

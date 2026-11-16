@@ -6,3 +6,6 @@ coverage/
 pnpm-lock.yaml
 public/
 **/*.generated.*
+# Written by pnpm map-styles:generate / frozen provider snapshots.
+shared/map-styles/generated/
+shared/map-styles/upstream/

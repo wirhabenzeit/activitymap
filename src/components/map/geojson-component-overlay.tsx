@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Source, Layer, useControl } from 'react-map-gl/mapbox';
-import type { MapMouseEvent, PointLike } from 'mapbox-gl';
 import type {
   Feature,
   FeatureCollection,
   GeoJsonProperties,
   Geometry,
 } from 'geojson';
-import type mapboxgl from 'mapbox-gl';
+import type { MapMouseEvent, PointLike } from 'maplibre-gl';
+import type { IControl, Map as MapLibreMap } from 'maplibre-gl';
+import React, { useEffect, useState } from 'react';
+import { Layer, Source, useControl } from 'react-map-gl/maplibre';
+
 import { FeatureInfoCard } from './feature-info-card';
 
 type OverlayFeature = Feature<Geometry, GeoJsonProperties>;
@@ -17,8 +18,8 @@ type GeoJSONInteractionOptions = {
   onFeatureClick?: (feature: OverlayFeature, event: MapMouseEvent) => void;
 };
 
-export class GeoJSONInteractionControl implements mapboxgl.IControl {
-  private map?: mapboxgl.Map;
+export class GeoJSONInteractionControl implements IControl {
+  private map?: MapLibreMap;
   private container: HTMLElement;
   private layerId: string;
   private onFeatureClick?: (
@@ -32,7 +33,7 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
     this.container = document.createElement('div');
   }
 
-  onAdd(map: mapboxgl.Map) {
+  onAdd(map: MapLibreMap) {
     this.map = map;
     this.map.on('click', this.click);
 
@@ -42,7 +43,6 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
   onRemove() {
     if (this.map) {
       this.map.off('click', this.click);
-
     }
   }
 
@@ -87,11 +87,10 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
         {
           type: 'Feature',
           geometry: firstFeature.geometry,
-          properties: (firstFeature.properties ?? {}),
+          properties: firstFeature.properties ?? {},
         },
         e,
       );
-
     }
   };
 }
@@ -117,102 +116,101 @@ export const GeoJSONComponentOverlay: React.FC<
   opacity = 0.8,
   interactive: _interactive = false,
 }) => {
-    const [fetchedData, setFetchedData] = useState<FeatureCollection | null>(
-      null,
-    );
-    const [error, setError] = useState<string | null>(null);
-    const geoJSONData = typeof data === 'object' ? data : fetchedData;
-    const [selectedFeature, setSelectedFeature] = useState<OverlayFeature | null>(null);
+  const [fetchedData, setFetchedData] = useState<FeatureCollection | null>(
+    null,
+  );
+  const [error, setError] = useState<string | null>(null);
+  const geoJSONData = typeof data === 'object' ? data : fetchedData;
+  const [selectedFeature, setSelectedFeature] = useState<OverlayFeature | null>(
+    null,
+  );
 
-    const onFeatureClick = (feature: OverlayFeature, _event: MapMouseEvent) => {
+  const onFeatureClick = (feature: OverlayFeature, _event: MapMouseEvent) => {
+    setSelectedFeature(feature);
+  };
 
-      setSelectedFeature(feature);
+  useControl(
+    () =>
+      new GeoJSONInteractionControl({
+        layerId: `${id}-line-layer`,
+        onFeatureClick,
+      }),
+  );
+
+  // Log when interactivity is enabled
+
+  // Log when component mounts/unmounts
+  useEffect(() => {
+    if (typeof data !== 'string') {
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadData = async () => {
+      try {
+        const response = await fetch(data, { cache: 'no-cache' });
+        if (!response.ok) {
+          throw new Error(`Failed to fetch GeoJSON: ${response.status}`);
+        }
+        const jsonData = (await response.json()) as FeatureCollection;
+        if (cancelled) {
+          return;
+        }
+        setFetchedData(jsonData);
+        setError(null);
+      } catch (err) {
+        if (cancelled) {
+          return;
+        }
+        const message =
+          err instanceof Error ? err.message : 'Failed to load GeoJSON';
+        console.error('Error loading GeoJSON:', err);
+        setError(message);
+      }
     };
 
-    useControl(
-      () =>
-        new GeoJSONInteractionControl({
-          layerId: `${id}-line-layer`,
-          onFeatureClick,
-        }),
-    );
+    void loadData();
 
-    // Log when interactivity is enabled
+    return () => {
+      cancelled = true;
+    };
+  }, [data]);
 
+  // Add debugging for the render phase
 
-    // Log when component mounts/unmounts
-    useEffect(() => {
-      if (typeof data !== 'string') {
-        return;
-      }
+  if (error) {
+    console.error(`Error loading GeoJSON data for ${id}: ${error}`);
+    return null;
+  }
 
-      let cancelled = false;
+  if (!geoJSONData) {
+    return null;
+  }
 
-      const loadData = async () => {
-        try {
-          const response = await fetch(data, { cache: 'no-cache' });
-          if (!response.ok) {
-            throw new Error(`Failed to fetch GeoJSON: ${response.status}`);
-          }
-          const jsonData = (await response.json()) as FeatureCollection;
-          if (cancelled) {
-            return;
-          }
-          setFetchedData(jsonData);
-          setError(null);
-        } catch (err) {
-          if (cancelled) {
-            return;
-          }
-          const message =
-            err instanceof Error ? err.message : 'Failed to load GeoJSON';
-          console.error('Error loading GeoJSON:', err);
-          setError(message);
-        }
-      };
+  // The interaction control is now handled by the GeoJSONInteraction component
 
-      void loadData();
-
-      return () => {
-        cancelled = true;
-      };
-    }, [data]);
-
-    // Add debugging for the render phase
-
-
-    if (error) {
-      console.error(`Error loading GeoJSON data for ${id}: ${error}`);
-      return null;
-    }
-
-    if (!geoJSONData) {
-      return null;
-    }
-
-    // The interaction control is now handled by the GeoJSONInteraction component
-
-    return (
-      <>
-        <Source id={`${id}-source`} type="geojson" data={geoJSONData}>
-          <Layer
-            id={`${id}-line-layer`}
-            type="line"
-            paint={{
-              'line-color': color,
-              'line-width': lineWidth,
-              'line-opacity': opacity,
-            }}
-          />
-        </Source>
-        {selectedFeature && (
-          <FeatureInfoCard
-            feature={selectedFeature}
-            onClose={() => setSelectedFeature(null)}
-          />
-        )}
-      </>
-    );
-  };
+  return (
+    <>
+      <Source id={`${id}-source`} type="geojson" data={geoJSONData}>
+        <Layer
+          id={`${id}-line-layer`}
+          type="line"
+          paint={{
+            'line-color': color,
+            'line-width': lineWidth,
+            'line-opacity': opacity,
+          }}
+        />
+      </Source>
+      {selectedFeature && (
+        <FeatureInfoCard
+          feature={selectedFeature}
+          onClose={() => setSelectedFeature(null)}
+        />
+      )}
+    </>
+  );
+};
 
 export default GeoJSONComponentOverlay;

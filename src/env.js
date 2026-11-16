@@ -36,7 +36,9 @@ export const env = createEnv({
    * `NEXT_PUBLIC_`.
    */
   client: {
-    NEXT_PUBLIC_MAPBOX_TOKEN: z.string(),
+    // Public, referrer-restricted MapTiler key for the Outdoors and Satellite
+    // base maps. Without it the web hides those two maps.
+    NEXT_PUBLIC_MAPTILER_KEY: z.string().optional(),
     NEXT_PUBLIC_ENV: z.enum(['development', 'production']).optional(),
   },
 
@@ -59,7 +61,7 @@ export const env = createEnv({
     OAUTH_PROXY_SECRET: process.env.OAUTH_PROXY_SECRET,
     OAUTH_PROXY_PRODUCTION_URL: process.env.OAUTH_PROXY_PRODUCTION_URL,
     PUBLIC_URL: process.env.PUBLIC_URL,
-    NEXT_PUBLIC_MAPBOX_TOKEN: process.env.NEXT_PUBLIC_MAPBOX_TOKEN,
+    NEXT_PUBLIC_MAPTILER_KEY: process.env.NEXT_PUBLIC_MAPTILER_KEY,
     NEXT_PUBLIC_ENV: process.env.NEXT_PUBLIC_ENV,
   },
   createFinalSchema: (shape) =>

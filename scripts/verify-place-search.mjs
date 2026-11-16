@@ -30,7 +30,6 @@ await build({
     'process.env': '{}',
     'process.env.NODE_ENV': '"development"',
     'process.env.NEXT_PUBLIC_ENV': '"development"',
-    'process.env.NEXT_PUBLIC_MAPBOX_TOKEN': '"pk.synthetic"',
   },
   plugins: [
     {

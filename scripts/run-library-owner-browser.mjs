@@ -143,7 +143,6 @@ function environment(base) {
     BETTER_AUTH_SECRET: 'library-owner-isolated-fixture-secret',
     ACTIVITYMAP_EXTERNAL_EFFECTS: '',
     NEXT_PUBLIC_ENV: 'development',
-    NEXT_PUBLIC_MAPBOX_TOKEN: 'pk.offline-fixture',
     PUBLIC_URL: base,
     LIBRARY_OWNER_PREPARED: '1',
     LIBRARY_OWNER_RUN_ID: summary.runId,

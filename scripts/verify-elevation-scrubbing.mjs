@@ -1,4 +1,4 @@
-// Isolated browser integration: production chart + Mapbox marker, deterministic
+// Isolated browser integration: production chart + MapLibre marker, deterministic
 // summaries and activity/auth hooks. No backend, credentials or raw streams.
 import assert from 'node:assert/strict';
 import { mkdtemp, readFile, writeFile } from 'node:fs/promises';
@@ -33,7 +33,10 @@ await build({
   jsx: 'automatic',
   outfile: join(directory, 'fixture.js'),
   alias: { '~': join(repo, 'src') },
-  define: { 'process.env.NODE_ENV': '"development"' },
+  define: {
+    'process.env.NODE_ENV': '"development"',
+    'process.env.NEXT_PUBLIC_MAPTILER_KEY': 'undefined',
+  },
   plugins: [
     {
       name: 'activity-fixtures',
@@ -64,7 +67,7 @@ await build({
     contents: `
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import Map, { Source, Layer } from 'react-map-gl/mapbox';
+import Map, { Source, Layer } from 'react-map-gl/maplibre';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ElevationChart } from '~/components/list/elevation-chart';
 import { ElevationRouteMarker } from '~/components/map/elevation-route-marker';
@@ -90,7 +93,7 @@ function App(){
  const visible=useShallowStore(state=>state.showProfile);
  const eligible=useShallowStore(state=>state.visible);
  return <QueryClientProvider client={client}>
- <Map ref={ref=>{if(ref){window.fixtureMap=ref.getMap();return observeMapResize(window.fixtureMap);}}} onIdle={()=>window.mapReady=true} initialViewState={{latitude:47.002,longitude:8.003,zoom:14}} mapboxAccessToken="pk.offline-test"
+ <Map ref={ref=>{if(ref){window.fixtureMap=ref.getMap();return observeMapResize(window.fixtureMap);}}} onIdle={()=>window.mapReady=true} initialViewState={{latitude:47.002,longitude:8.003,zoom:14}}
  style={{height:260,width:'100%'}} mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#eef1ed'}}]}}>
  <Source type="geojson" data={{type:'Feature',properties:{},geometry:{type:'LineString',coordinates:latlng.map(([lat,lng])=>[lng,lat])}}}>
  <Layer type="line" paint={{'line-color':'#ed9933','line-width':5}} />
@@ -125,7 +128,7 @@ try {
     hasTouch: true,
   });
   const page = await context.newPage();
-  // Mapbox telemetry is irrelevant to this local-style test.
+  // The fixture uses an inline style; no external request is needed.
   await page.route('https://**', (route) => route.abort());
   const errors = [];
   page.on('pageerror', (error) => {
@@ -172,7 +175,7 @@ try {
     'absolute',
     'The application stylesheet positions the map cursor as an overlay',
   );
-  const mapBounds = await page.locator('.mapboxgl-map').boundingBox();
+  const mapBounds = await page.locator('.maplibregl-map').boundingBox();
   assert.ok(
     first.y >= mapBounds.y &&
       first.y + first.height <= mapBounds.y + mapBounds.height,

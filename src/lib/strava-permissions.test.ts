@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import {
   callbackScopeParam,
   grantedStravaScope,
+  isStravaSignInCallback,
   stravaPermissionNotes,
   stravaPermissionsFromScope,
   stravaPermissionsLimited,
@@ -73,4 +75,24 @@ void test('no scope parameter leaves the stored grant untouched', () => {
   assert.equal(grantedStravaScope(null), null);
   assert.equal(grantedStravaScope(undefined), null);
   assert.equal(grantedStravaScope(['read']), null);
+});
+
+void test('direct and proxied Strava callbacks both count as sign-in', () => {
+  const strava = { id: 'strava' };
+  assert.equal(isStravaSignInCallback('/callback/:id', strava), true);
+  assert.equal(
+    isStravaSignInCallback('/callback/:id/oauth-proxy', strava),
+    true,
+  );
+  assert.equal(isStravaSignInCallback('/callback/strava', undefined), true);
+  assert.equal(
+    isStravaSignInCallback('/callback/strava/oauth-proxy', undefined),
+    true,
+  );
+  assert.equal(
+    isStravaSignInCallback('/callback/:id', { id: 'google' }),
+    false,
+  );
+  assert.equal(isStravaSignInCallback('/sign-in/social', strava), false);
+  assert.equal(isStravaSignInCallback('/callback/stravax', undefined), false);
 });
