@@ -64,3 +64,39 @@ variables if that is not true for every branch.
 The Strava callback remains
 `https://activitymap.cc/api/auth/callback/strava`. Preview URLs do
 not need to be registered with Strava.
+
+## Seeding Preview data
+
+Preview cannot import from Strava: the provider gateway runs only with
+automated external effects enabled, and the Convex ingestion worker would
+need a fixed, unprotected app origin. Instead, the Preview Convex deployment
+is seeded from a filtered production snapshot:
+
+```sh
+ACTIVITYMAP_ADMIN_ATHLETE_IDS=123456 pnpm preview:seed            # export, filter, import
+ACTIVITYMAP_ADMIN_ATHLETE_IDS=123456 pnpm preview:seed --dry-run  # report counts only
+```
+
+The Convex CLI must be logged in with access to both deployments. Production
+is only exported. The import replaces all data in the Preview deployment
+(`activitymap-backend-preview`), and the script refuses any other target.
+
+What is copied (`scripts/preview-seed/filter.mjs`):
+
+- The libraries of the given athletes (default
+  `ACTIVITYMAP_ADMIN_ATHLETE_IDS`): owners, activities, recordings and their
+  stored files, photos, stats and change history.
+- The shared place catalogue.
+- Those athletes' user and Strava account records, **without** tokens.
+  Sessions, verifications and JWT keys are never copied.
+
+Share links, ingestion queues, provider events, rate limits, budgets and
+nonces are emptied. A new table in `backend/convex/schema.ts` stops the seed
+until it has a rule. After seeding, sign in on any Preview: Better Auth finds
+the copied Strava account, stores Preview's own tokens on it and attaches the
+session to the seeded user, whose library then appears without an import.
+
+The copy is a snapshot; run the seed again to refresh it. Edits made on a
+Preview still reach Strava. Preview and Production hold separate tokens for
+the same Strava app and athlete; if production syncing for a seeded athlete
+reports a rejected credential after Preview use, sign in again on Production.
