@@ -211,6 +211,8 @@ const RouteLayer = React.memo(function RouteLayer({
   );
 });
 
+const NO_PADDING = { top: 0, bottom: 0, left: 0, right: 0 };
+
 export default function InteractiveMap() {
   const searchParams = useSearchParams();
   const sharedMapState = useMemo(
@@ -365,20 +367,61 @@ export default function InteractiveMap() {
     const map = mapRefLoc.current?.getMap();
     if (!map) return;
     // Centre the chosen place beside any results panel, close enough to see
-    // the routes around it. Reduced motion jumps instead of flying.
+    // the routes around it. The map is controlled: moving it only through the
+    // map instance is undone by the next render, so set the viewport like the
+    // route fit does.
     const panel = panelRef.current?.getBoundingClientRect();
     const padding = routeFitPadding(
       map.getContainer().getBoundingClientRect(),
       panel?.width && panel.height ? panel : null,
     );
     hasAutoCenteredOnLatest.current = true;
-    map.flyTo({
-      center: [placeFlyRequest.longitude, placeFlyRequest.latitude],
-      zoom: Math.min(Math.max(map.getZoom(), 13), 15),
-      ...(padding && { padding }),
-    });
+    // Let the camera helper place the point in the clear area, then apply the
+    // result without map padding (see the route fit).
+    const { longitude, latitude } = placeFlyRequest;
+    const zoom = Math.min(Math.max(map.getZoom(), 13), 15);
+    const camera = map.cameraForBounds(
+      [
+        [longitude - 0.00005, latitude - 0.00005],
+        [longitude + 0.00005, latitude + 0.00005],
+      ],
+      {
+        padding: padding ?? NO_PADDING,
+        maxZoom: zoom,
+        // The clear area's offset points along the screen, not north.
+        bearing: map.getBearing(),
+        pitch: map.getPitch(),
+      },
+    );
+    const center = camera?.center ? LngLat.convert(camera.center) : null;
+    const target: ViewState = {
+      longitude: center?.lng ?? longitude,
+      latitude: center?.lat ?? latitude,
+      zoom,
+      bearing: map.getBearing(),
+      pitch: map.getPitch(),
+      padding: NO_PADDING,
+    };
+    setViewport(target);
     completePlaceFly(placeFlyRequest.id);
-  }, [placeFlyRequest, mapLoaded, completePlaceFly]);
+    // Controlled camera changes do not reliably emit onMoveEnd; persist the
+    // view once React has applied it to the map.
+    // The request is completed above, which re-runs this effect, so the loop
+    // is bounded by its tries rather than cancelled by cleanup.
+    let tries = 0;
+    const record = () => {
+      const center = map.getCenter();
+      const bounds = map.getBounds();
+      if (
+        bounds &&
+        Math.abs(map.getZoom() - target.zoom) < 0.0001 &&
+        Math.abs(center.lat - target.latitude) < 0.0001
+      )
+        setPosition(target, bounds);
+      else if (++tries < 60) requestAnimationFrame(record);
+    };
+    requestAnimationFrame(record);
+  }, [placeFlyRequest, mapLoaded, completePlaceFly, setPosition]);
 
   useEffect(() => {
     if (!routeFitRequest || !mapLoaded || activitiesPending) return;
@@ -475,7 +518,9 @@ export default function InteractiveMap() {
         zoom: camera.zoom,
         bearing: camera.bearing ?? map.getBearing(),
         pitch: map.getPitch(),
-        padding,
+        // cameraForBounds already folded the padding into center and zoom;
+        // applying it to the map as well would offset the routes twice.
+        padding: NO_PADDING,
       };
       setViewport(target);
       const record = () => {
