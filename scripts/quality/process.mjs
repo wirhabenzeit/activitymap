@@ -2,6 +2,8 @@ import { spawn } from 'node:child_process';
 import { createWriteStream } from 'node:fs';
 import { constants } from 'node:os';
 
+const pipeGraceMs = 2000;
+
 export function startCommand(
   command,
   args,
@@ -29,8 +31,17 @@ export function startCommand(
         );
         return true;
       } catch (error) {
-        if (error.code !== 'ESRCH') throw error;
-        return false;
+        if (error.code === 'ESRCH') return false;
+        // macOS reports EPERM for a process group whose members it cannot
+        // signal (for example an exited descendant). This runs inside timers,
+        // where a throw would crash the harness before it writes evidence or
+        // cleans up, so fall back to the child alone and never throw.
+        if (error.code !== 'EPERM') throw error;
+        try {
+          return child.kill(value);
+        } catch {
+          return false;
+        }
       }
     };
     if (!kill('SIGTERM')) return;
@@ -65,8 +76,12 @@ export function startCommand(
   signal?.addEventListener('abort', stop, { once: true });
   if (signal?.aborted) stop();
   const done = new Promise((resolve, reject) => {
-    child.on('error', reject);
-    child.on('close', (code, terminationSignal) =>
+    let settled = false;
+    let lingering;
+    const settle = (code, terminationSignal) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(lingering);
       resolve({
         code,
         signal: terminationSignal,
@@ -75,8 +90,23 @@ export function startCommand(
         exitCode: timedOut
           ? 124
           : (code ?? 128 + (constants.signals[terminationSignal] ?? 1)),
-      }),
-    );
+      });
+    };
+    child.on('error', reject);
+    // The deadline bounds the process, not its pipes: once it has exited there
+    // is nothing left to stop, so a late timer must not signal anything.
+    child.on('exit', (code, terminationSignal) => {
+      clearTimeout(timer);
+      // A descendant that inherited our pipes can keep 'close' from firing
+      // long after the process finished; give buffered output a moment, then
+      // stop waiting for it.
+      lingering = setTimeout(() => {
+        child.stdout.destroy();
+        child.stderr.destroy();
+        settle(code, terminationSignal);
+      }, pipeGraceMs);
+    });
+    child.on('close', settle);
   }).finally(async () => {
     clearTimeout(timer);
     await termination;

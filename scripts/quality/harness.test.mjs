@@ -307,6 +307,56 @@ test('timeouts stop the owned child and retain a distinct failure status', async
   assert.equal(result.signal, 'SIGTERM');
 });
 
+test(
+  'a timeout whose process group cannot be signalled still stops the child without throwing',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const original = process.kill;
+    // macOS reports EPERM for groups it cannot fully signal; the group kill
+    // used to throw from a timer and crash the harness past its cleanup.
+    t.mock.method(process, 'kill', (pid, signal) => {
+      if (pid < 0 && signal !== 0)
+        throw Object.assign(new Error('kill EPERM'), { code: 'EPERM' });
+      return original(pid, signal);
+    });
+    const result = await startCommand(
+      process.execPath,
+      ['-e', 'setInterval(()=>{},1000)'],
+      { timeoutMs: 50, echo: false },
+    ).done;
+    assert.equal(result.exitCode, 124);
+    assert.equal(result.timedOut, true);
+  },
+);
+
+test(
+  'a descendant holding the output pipes open does not delay or time out a finished command',
+  { skip: process.platform === 'win32' },
+  async (t) => {
+    const root = await temporary(t);
+    const pidFile = join(root, 'holder.pid');
+    const holder = `require('node:fs').writeFileSync(${JSON.stringify(pidFile)}, String(process.pid));setInterval(() => {}, 1000);`;
+    const parent = `require('node:child_process').spawn(process.execPath, ['-e', ${JSON.stringify(holder)}], {stdio:'inherit'}).unref();console.log('parent done')`;
+    t.after(async () => {
+      try {
+        process.kill(Number(await readFile(pidFile, 'utf8')), 'SIGKILL');
+      } catch {
+        /* Already gone. */
+      }
+    });
+    const started = Date.now();
+    const result = await startCommand(process.execPath, ['-e', parent], {
+      // A deadline that fires after the process exits must not matter.
+      timeoutMs: 4000,
+      echo: false,
+    }).done;
+    assert.equal(result.exitCode, 0);
+    assert.equal(result.timedOut, false);
+    assert.match(result.output, /parent done/);
+    assert(Date.now() - started < 3500, 'waited for the lingering pipe holder');
+  },
+);
+
 test('missing executables reject without cleanup trying to kill an absent PID', async () => {
   const command = startCommand(
     '/activitymap-quality-command-does-not-exist',

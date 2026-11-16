@@ -265,7 +265,7 @@ export async function runNativeHarness({
   platform = process.platform,
   buildStatusPath = process.env.GITHUB_OUTPUT,
   bootAttempts = 2,
-  bootAttemptTimeoutMs = 240000,
+  bootAttemptTimeoutMs = 330000,
   restartSimulatorService = process.env.CI === 'true',
 }) {
   const selectedProfile = nativeTestProfile(profile);
@@ -420,7 +420,11 @@ export async function runNativeHarness({
         const suffix = attempt === 1 ? '' : `-${attempt}`;
         try {
           if (attempt > 1 || device.state !== 'Booted')
-            await command(['simctl', 'boot', simulator], `boot${suffix}.log`);
+            await command(
+              ['simctl', 'boot', simulator],
+              `boot${suffix}.log`,
+              120000,
+            );
           await command(
             ['simctl', 'bootstatus', simulator, '-b'],
             `boot-status${suffix}.log`,
