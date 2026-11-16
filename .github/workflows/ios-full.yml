@@ -2,6 +2,9 @@ name: Full iOS runtime
 
 on:
   workflow_dispatch:
+  # The PR profile runs four UI journeys; this runs the rest every night.
+  schedule:
+    - cron: '23 2 * * *'
 
 permissions:
   contents: read

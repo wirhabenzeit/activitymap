@@ -104,25 +104,17 @@ test('native profiles retain all unit suites and select exactly the intended PR 
     suite.startsWith('ActivityMapTests/'),
   );
   const expectedUI = [
-    'ActivityMapUITests/ListSelectionUITests/testSummaryOptionsAndShareFollowCombineMode',
-    'ActivityMapUITests/ListSelectionUITests/testExpandedSummaryKeepsLargeValuesInsideProductionList',
     'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
-    'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
-    'ActivityMapUITests/FilterPanelUITests/testHeaderSearchCombinesPlaceAndTextFiltersAndClearsThemIndependently',
     'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
-    'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
     'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
     'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
-    'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
-    'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
-    'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
   ];
   assert.equal(unitSuites.length, 36);
   assert.deepEqual(nativePRUISelectors, expectedUI);
   assert.deepEqual(pr.suites, [...unitSuites, ...expectedUI]);
-  assert.equal(new Set(pr.suites).size, 48);
+  assert.equal(new Set(pr.suites).size, 40);
   assert.equal(pr.name, 'pr');
-  assert.equal(pr.runtimeTimeoutMs, 20 * 60 * 1000);
+  assert.equal(pr.runtimeTimeoutMs, 12 * 60 * 1000);
   assert.deepEqual(full.suites, nativeSuites);
   assert.equal(full.suites.length, 44);
   assert.equal(full.name, 'full');
@@ -156,7 +148,7 @@ test('native PR eligibility names excluded methods precisely and retains ordinar
       (item) => item.actual === '26.2' && item.requires === 'iOS 27+',
     ),
   );
-  assert.equal(result.suites.length, 43);
+  assert.equal(result.suites.length, 38);
   assert(
     result.suites.includes(
       'ActivityMapTests/StatsCalendarScrollRenderingTests',
@@ -528,21 +520,55 @@ for (const failure of [
   });
 }
 
-function bootHarness({ bootstatusFailures }) {
+// Boot runs beside the build, so these fixtures make the stubbed build wait for
+// the boot to finish (or for a later boot attempt to begin) before it returns.
+function bootHarness({
+  bootstatusFailures,
+  lastBootstatus,
+  buildFails = false,
+}) {
   const calls = [];
+  const events = [];
   let bootstatus = 0;
+  let finishBoot;
+  const bootFinished = new Promise((resolve) => (finishBoot = resolve));
   const runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0';
   const phone = { name: 'iPhone 17 Pro', identifier: 'phone17' };
-  const run = async (command, args) => {
+  const run = async (command, args, options) => {
     calls.push({ command, args });
     if (command === 'xcodebuild') {
       if (args[0] === '-version') return 'Xcode 27.1\nBuild version 27A9275';
+      if (args[0] === 'build-for-testing') {
+        events.push('build started');
+        if (buildFails) {
+          await new Promise((resolve) => setImmediate(resolve));
+          throw Object.assign(new Error('Xcode failed'), { exitCode: 65 });
+        }
+        await bootFinished;
+        events.push('build finished');
+        return '';
+      }
+      events.push('tests started');
       throw Object.assign(new Error('Xcode failed'), { exitCode: 65 });
     }
-    if (args[1] === 'bootstatus' && ++bootstatus <= bootstatusFailures)
-      throw Object.assign(new Error('xcrun failed (timeout)'), {
-        exitCode: 124,
-      });
+    if (args[1] === 'bootstatus') {
+      events.push('bootstatus');
+      if (buildFails)
+        // Hold the boot open until the harness aborts it, like a real boot.
+        return new Promise((resolve, reject) =>
+          options?.signal?.addEventListener('abort', () =>
+            reject(Object.assign(new Error('aborted'), { exitCode: 143 })),
+          ),
+        );
+      const failing = ++bootstatus <= bootstatusFailures;
+      // The boot sequence is over after this call: release the stubbed build.
+      if (bootstatus === lastBootstatus) setImmediate(finishBoot);
+      if (failing)
+        throw Object.assign(new Error('xcrun failed (timeout)'), {
+          exitCode: 124,
+        });
+      return '';
+    }
     if (args[1] === 'create') return 'owned-phone\n';
     if (args[2] === 'runtimes')
       return JSON.stringify({
@@ -567,7 +593,7 @@ function bootHarness({ bootstatusFailures }) {
       });
     return '';
   };
-  return { calls, run };
+  return { calls, events, run };
 }
 
 for (const [bootstatusFailures, bootPasses] of [
@@ -577,7 +603,10 @@ for (const [bootstatusFailures, bootPasses] of [
   test(`native boot ${bootPasses ? 'recovers from one wedged boot' : 'gives up after two wedged boots'} by resetting only the owned simulator`, async (t) => {
     const root = await temporary(t);
     const output = join(root, 'evidence');
-    const { calls, run } = bootHarness({ bootstatusFailures });
+    const { calls, events, run } = bootHarness({
+      bootstatusFailures,
+      lastBootstatus: 2,
+    });
     await assert.rejects(
       runNativeHarness({
         root,
@@ -586,31 +615,34 @@ for (const [bootstatusFailures, bootPasses] of [
         run,
         platform: 'darwin',
         buildStatusPath: join(root, 'step-output'),
-        restartSimulatorService: true,
       }),
-      // The first outcome fails later, at the stubbed xcodebuild build.
+      // A recovered boot proceeds to the stubbed failing tests; otherwise the
+      // build finishes and then the boot failure is reported.
       bootPasses ? { exitCode: 65 } : { exitCode: 124 },
     );
     const summary = JSON.parse(
       await readFile(join(output, 'summary.json'), 'utf8'),
     );
     assert.equal(summary.phases.boot.passed, bootPasses);
+    assert.equal(summary.phases.build.passed, true);
+    // The build still completes after a boot failure so its cache is saved.
+    assert.equal(
+      await readFile(join(root, 'step-output'), 'utf8'),
+      'build_succeeded=true\n',
+    );
+    assert.equal(events.includes('tests started'), bootPasses);
     const sequence = calls
-      .filter(({ command, args }) =>
-        command === 'killall'
-          ? true
-          : ['boot', 'bootstatus', 'shutdown', 'erase', 'delete'].includes(
-              args[1],
-            ),
+      .filter(({ args }) =>
+        ['boot', 'bootstatus', 'shutdown', 'erase', 'delete'].includes(args[1]),
       )
-      .map(({ command, args }) =>
-        command === 'killall' ? 'killall' : args[1],
-      );
-    const recovery = ['shutdown', 'killall', 'erase', 'boot', 'bootstatus'];
+      .map(({ args }) => args[1]);
     assert.deepEqual(sequence, [
       'boot',
       'bootstatus',
-      ...recovery,
+      'shutdown',
+      'erase',
+      'boot',
+      'bootstatus',
       'shutdown',
       'delete',
     ]);
@@ -619,11 +651,65 @@ for (const [bootstatusFailures, bootPasses] of [
   });
 }
 
+test('native boot starts before the build finishes and tests wait for it', async (t) => {
+  const root = await temporary(t);
+  const { events, run } = bootHarness({
+    bootstatusFailures: 0,
+    lastBootstatus: 1,
+  });
+  await assert.rejects(
+    runNativeHarness({
+      root,
+      output: join(root, 'evidence'),
+      profile: 'pr',
+      run,
+      platform: 'darwin',
+      buildStatusPath: join(root, 'step-output'),
+    }),
+    { exitCode: 65 },
+  );
+  assert.deepEqual(events.slice(0, 4), [
+    'build started',
+    'bootstatus',
+    'build finished',
+    'tests started',
+  ]);
+});
+
+test('native build failure stops the boot before deleting the owned simulator', async (t) => {
+  const root = await temporary(t);
+  const { calls, run } = bootHarness({
+    bootstatusFailures: 0,
+    buildFails: true,
+  });
+  await assert.rejects(
+    runNativeHarness({
+      root,
+      output: join(root, 'evidence'),
+      profile: 'pr',
+      run,
+      platform: 'darwin',
+      buildStatusPath: join(root, 'step-output'),
+    }),
+    { exitCode: 65 },
+  );
+  const order = calls
+    .filter(({ args }) =>
+      ['bootstatus', 'shutdown', 'delete'].includes(args[1]),
+    )
+    .map(({ args }) => args[1]);
+  // The aborted boot is not retried, and cleanup runs afterwards.
+  assert.deepEqual(order, ['bootstatus', 'shutdown', 'delete']);
+});
+
 test('native boot never resets a simulator supplied by the caller', async (t) => {
   const root = await temporary(t);
-  const { calls, run } = bootHarness({ bootstatusFailures: 1 });
+  const { calls, run } = bootHarness({
+    bootstatusFailures: 1,
+    lastBootstatus: 1,
+  });
   const runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0';
-  const wrapped = async (command, args) =>
+  const wrapped = async (command, args, options) =>
     args?.[2] === 'devices'
       ? JSON.stringify({
           devices: {
@@ -632,7 +718,7 @@ test('native boot never resets a simulator supplied by the caller', async (t) =>
             ],
           },
         })
-      : run(command, args);
+      : run(command, args, options);
   await assert.rejects(
     runNativeHarness({
       root,

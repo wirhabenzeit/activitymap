@@ -85,19 +85,14 @@ export const nativeSuites = [
   'ActivityMapUITests/ListSelectionUITests',
 ];
 
+// Four fast journeys that each cover a different surface (map and selection,
+// list filtering, navigation, native share). The remaining UI journeys run in
+// the full profile (see ios-full.yml), which also runs nightly.
 export const nativePRUISelectors = [
-  'ActivityMapUITests/ListSelectionUITests/testSummaryOptionsAndShareFollowCombineMode',
-  'ActivityMapUITests/ListSelectionUITests/testExpandedSummaryKeepsLargeValuesInsideProductionList',
   'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
-  'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
-  'ActivityMapUITests/FilterPanelUITests/testHeaderSearchCombinesPlaceAndTextFiltersAndClearsThemIndependently',
   'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
-  'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
   'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
   'ActivityMapUITests/ActivityContinuationUITests/testListTopPullOpensPrevious',
-  'ActivityMapUITests/ActivityContinuationUITests/testMapBottomPullAdvancesOnceAndReturnsToTop',
-  'ActivityMapUITests/StatsUITests/testCalendarRetainsIntentionalContentAndNativeEdgeBack',
-  'ActivityMapUITests/StatsUITests/testCompactSportMixRequiresExplicitExpansionAndFocusedSettingsRemainReachable',
 ];
 
 export function nativeTestProfile(name = 'full') {
@@ -114,10 +109,10 @@ export function nativeTestProfile(name = 'full') {
           ]
         : [...nativeSuites],
     // Keep runtime separate from compilation; every selected UI journey must run.
-    // Twelve UI journeys plus app-hosted tests and runner startup. Slow hosted
-    // runs reached the former 15-minute deadline with passing tests still in
-    // progress. Keep individual test deadlines unchanged so hangs still fail.
-    runtimeTimeoutMs: (name === 'pr' ? 20 : 45) * 60 * 1000,
+    // The PR profile is the app-hosted suites plus four UI journeys (about six
+    // minutes on a hosted runner); the full profile's twelve-plus UI journeys
+    // need far more. Keep individual test deadlines unchanged so hangs still fail.
+    runtimeTimeoutMs: (name === 'pr' ? 12 : 45) * 60 * 1000,
   };
 }
 
@@ -266,7 +261,6 @@ export async function runNativeHarness({
   buildStatusPath = process.env.GITHUB_OUTPUT,
   bootAttempts = 2,
   bootAttemptTimeoutMs = 330000,
-  restartSimulatorService = process.env.CI === 'true',
 }) {
   const selectedProfile = nativeTestProfile(profile);
   assert.equal(
@@ -291,35 +285,31 @@ export async function runNativeHarness({
   };
   process.once('SIGINT', onInterrupt);
   process.once('SIGTERM', onTerminate);
-  const command = (args, log, timeoutMs = 60000) =>
+  const command = (args, log, timeoutMs = 60000, signal = abort.signal) =>
     run('xcrun', args, {
       cwd: root,
-      signal: abort.signal,
+      signal,
       timeoutMs,
       log: log && join(output, log),
       echo: Boolean(log),
     });
-  // A wedged hosted-runner boot is cheaper to retry from a clean device than to
-  // wait out; a normal boot takes under three minutes.
+  // Boot runs beside the build and is stopped if the build fails first.
+  const bootAbort = new AbortController();
+  abort.signal.addEventListener('abort', () => bootAbort.abort(), {
+    once: true,
+  });
+  // A wedged hosted-runner boot is cheaper to retry from a clean device than
+  // to wait out. CoreSimulatorService is left alone: the build is using it.
   const resetOwnedSimulator = async () => {
-    const attempt = (args, timeoutMs = 30000) =>
-      run(args[0], args.slice(1), {
-        cwd: root,
-        signal: abort.signal,
-        timeoutMs,
-        echo: false,
-      }).catch((error) => console.error(`Simulator reset: ${error.message}`));
-    await attempt(['xcrun', 'simctl', 'shutdown', simulator]);
-    // CoreSimulatorService wedges on hosted runners; restarting it is only
-    // safe where nothing else uses the machine's simulators.
-    if (restartSimulatorService)
-      await attempt([
-        'killall',
-        '-9',
-        'com.apple.CoreSimulator.CoreSimulatorService',
-      ]);
-    await attempt(['xcrun', 'simctl', 'erase', simulator], 60000);
+    for (const [args, timeoutMs] of [
+      [['simctl', 'shutdown', simulator], 30000],
+      [['simctl', 'erase', simulator], 60000],
+    ])
+      await command(args, undefined, timeoutMs, bootAbort.signal).catch(
+        (error) => console.error(`Simulator reset: ${error.message}`),
+      );
   };
+  let bootOutcome;
   let ownedSimulator = false;
   const manifest = {
     profile: selectedProfile.name,
@@ -415,7 +405,10 @@ export async function runNativeHarness({
       console.log(
         `Not eligible on iOS ${item.actual}: ${item.suite} requires ${item.requires} (${item.reason}).`,
       );
-    await phase('boot', async () => {
+    // The simulator is not needed until tests launch, so boot it while the app
+    // builds (a hosted boot takes 2-5 minutes). A boot failure is reported after
+    // the build, which still finishes so its cache can be saved for a rerun.
+    bootOutcome = phase('boot', async () => {
       for (let attempt = 1; ; attempt++) {
         const suffix = attempt === 1 ? '' : `-${attempt}`;
         try {
@@ -424,17 +417,19 @@ export async function runNativeHarness({
               ['simctl', 'boot', simulator],
               `boot${suffix}.log`,
               120000,
+              bootAbort.signal,
             );
           await command(
             ['simctl', 'bootstatus', simulator, '-b'],
             `boot-status${suffix}.log`,
             bootAttemptTimeoutMs,
+            bootAbort.signal,
           );
           return;
         } catch (error) {
           // Never touch a simulator the caller owns, and never retry an abort.
           if (
-            abort.signal.aborted ||
+            bootAbort.signal.aborted ||
             !ownedSimulator ||
             attempt >= bootAttempts
           )
@@ -445,7 +440,10 @@ export async function runNativeHarness({
           await resetOwnedSimulator();
         }
       }
-    });
+    }).then(
+      () => null,
+      (error) => error,
+    );
     const commonArguments = [
       '-project',
       'ios/ActivityMap/ActivityMap.xcodeproj',
@@ -484,6 +482,8 @@ export async function runNativeHarness({
     // Preserve a good build cache even when a runtime regression fails later.
     if (buildStatusPath)
       await appendFile(buildStatusPath, 'build_succeeded=true\n');
+    const bootError = await bootOutcome;
+    if (bootError) throw bootError;
     await phase('test', () =>
       run(
         'xcodebuild',
@@ -589,6 +589,9 @@ export async function runNativeHarness({
     throw error;
   } finally {
     const cleanupErrors = [];
+    // A failed build leaves the boot running; stop it before deleting the device.
+    bootAbort.abort();
+    await bootOutcome;
     if (ownedSimulator) {
       // Never shut down or delete a simulator supplied by the caller.
       for (const action of ['shutdown', 'delete']) {

@@ -166,9 +166,9 @@ jobs:
     concurrency:
       group: ios-${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
       cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-    # 2 x 7m boot attempts (xcode-27 image boots take up to ~5m) + 18m cold
-    # build + 20m runtime, with setup/upload headroom.
-    timeout-minutes: 56
+    # Boot (up to 2 x 6m attempts) overlaps the 18m cold build; then 12m of
+    # tests, with setup/upload headroom.
+    timeout-minutes: 40
     env:
       IOS_TEST_PROFILE: pr
     steps:
