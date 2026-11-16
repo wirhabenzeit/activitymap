@@ -34,6 +34,7 @@ import {
   nativeSuiteEligibility,
   nativeSuites,
   nativeTestProfile,
+  retriedNativeTests,
   runNativeHarness,
   selectNativeSimulator,
   validateNativeSuites,
@@ -467,8 +468,176 @@ for (const failure of [
       build.filter((arg) => arg.startsWith('-only-testing:')),
       suites.map((suite) => `-only-testing:${suite}`),
     );
+    const test = calls.find(({ args }) => args[0] === 'test-without-building');
+    if (failure === 'build-for-testing') assert.equal(test, undefined);
+    else {
+      const flags = test.args;
+      assert(flags.includes('-retry-tests-on-failure'));
+      assert.equal(flags[flags.indexOf('-test-iterations') + 1], '2');
+    }
   });
 }
+
+function bootHarness({ bootstatusFailures }) {
+  const calls = [];
+  let bootstatus = 0;
+  const runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0';
+  const phone = { name: 'iPhone 17 Pro', identifier: 'phone17' };
+  const run = async (command, args) => {
+    calls.push({ command, args });
+    if (command === 'xcodebuild') {
+      if (args[0] === '-version') return 'Xcode 27.1\nBuild version 27A9275';
+      throw Object.assign(new Error('Xcode failed'), { exitCode: 65 });
+    }
+    if (args[1] === 'bootstatus' && ++bootstatus <= bootstatusFailures)
+      throw Object.assign(new Error('xcrun failed (timeout)'), {
+        exitCode: 124,
+      });
+    if (args[1] === 'create') return 'owned-phone\n';
+    if (args[2] === 'runtimes')
+      return JSON.stringify({
+        runtimes: [
+          {
+            identifier: runtime,
+            version: '27.0',
+            isAvailable: true,
+            supportedDeviceTypes: [phone],
+          },
+        ],
+      });
+    if (args[2] === 'devicetypes')
+      return JSON.stringify({ devicetypes: [phone] });
+    if (args[2] === 'devices')
+      return JSON.stringify({
+        devices: {
+          [runtime]: [
+            { udid: 'owned-phone', isAvailable: true, state: 'Shutdown' },
+          ],
+        },
+      });
+    return '';
+  };
+  return { calls, run };
+}
+
+for (const [bootstatusFailures, bootPasses] of [
+  [1, true],
+  [2, false],
+]) {
+  test(`native boot ${bootPasses ? 'recovers from one wedged boot' : 'gives up after two wedged boots'} by resetting only the owned simulator`, async (t) => {
+    const root = await temporary(t);
+    const output = join(root, 'evidence');
+    const { calls, run } = bootHarness({ bootstatusFailures });
+    await assert.rejects(
+      runNativeHarness({
+        root,
+        output,
+        profile: 'pr',
+        run,
+        platform: 'darwin',
+        buildStatusPath: join(root, 'step-output'),
+        restartSimulatorService: true,
+      }),
+      // The first outcome fails later, at the stubbed xcodebuild build.
+      bootPasses ? { exitCode: 65 } : { exitCode: 124 },
+    );
+    const summary = JSON.parse(
+      await readFile(join(output, 'summary.json'), 'utf8'),
+    );
+    assert.equal(summary.phases.boot.passed, bootPasses);
+    const sequence = calls
+      .filter(({ command, args }) =>
+        command === 'killall'
+          ? true
+          : ['boot', 'bootstatus', 'shutdown', 'erase', 'delete'].includes(
+              args[1],
+            ),
+      )
+      .map(({ command, args }) =>
+        command === 'killall' ? 'killall' : args[1],
+      );
+    const recovery = ['shutdown', 'killall', 'erase', 'boot', 'bootstatus'];
+    assert.deepEqual(sequence, [
+      'boot',
+      'bootstatus',
+      ...recovery,
+      'shutdown',
+      'delete',
+    ]);
+    for (const { args } of calls.filter(({ args }) => args[1] === 'erase'))
+      assert.equal(args[2], 'owned-phone');
+  });
+}
+
+test('native boot never resets a simulator supplied by the caller', async (t) => {
+  const root = await temporary(t);
+  const { calls, run } = bootHarness({ bootstatusFailures: 1 });
+  const runtime = 'com.apple.CoreSimulator.SimRuntime.iOS-27-0';
+  const wrapped = async (command, args) =>
+    args?.[2] === 'devices'
+      ? JSON.stringify({
+          devices: {
+            [runtime]: [
+              { udid: 'caller-phone', isAvailable: true, state: 'Booted' },
+            ],
+          },
+        })
+      : run(command, args);
+  await assert.rejects(
+    runNativeHarness({
+      root,
+      output: join(root, 'evidence'),
+      simulator: 'caller-phone',
+      profile: 'pr',
+      run: wrapped,
+      platform: 'darwin',
+      buildStatusPath: join(root, 'step-output'),
+    }),
+    { exitCode: 124 },
+  );
+  assert.deepEqual(
+    calls.filter(({ args }) =>
+      ['shutdown', 'erase', 'delete', 'create'].includes(args[1]),
+    ),
+    [],
+  );
+});
+
+test('native retried tests are reported only when a failed repetition later passed', () => {
+  const testCase = (name, repetitions) => ({
+    nodeType: 'Test Case',
+    name,
+    result: repetitions.at(-1),
+    children: repetitions.map((result, index) => ({
+      nodeType: 'Repetition',
+      name: index ? `Retry ${index}` : 'First Run',
+      result,
+    })),
+  });
+  const tree = {
+    testNodes: [
+      {
+        nodeType: 'Unit test bundle',
+        name: 'UITests',
+        children: [
+          {
+            nodeType: 'Test Suite',
+            name: 'FilterPanelUITests',
+            children: [
+              testCase('testFlaky()', ['Failed', 'Passed']),
+              testCase('testSteady()', ['Passed']),
+              testCase('testBroken()', ['Failed', 'Failed']),
+            ],
+          },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual(retriedNativeTests(tree), [
+    'FilterPanelUITests/testFlaky()',
+  ]);
+  assert.deepEqual(retriedNativeTests({}), []);
+});
 
 // Exercise the real ownership/finally boundary before a browser or server exists.
 test('early startup failure cleans its workspace and still writes evidence', async (t) => {

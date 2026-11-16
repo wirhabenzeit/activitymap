@@ -236,6 +236,26 @@ export function validateNativeSuites(tree, suites = nativeSuites) {
   );
 }
 
+// With -retry-tests-on-failure a test that passes on a later repetition is
+// reported as Passed; its failed first run stays visible as a Repetition child.
+export function retriedNativeTests(tree) {
+  const found = [];
+  const visit = (node, trail) => {
+    const next = node.nodeType === 'Test Suite' ? [...trail, node.name] : trail;
+    if (
+      node.nodeType === 'Test Case' &&
+      node.result === 'Passed' &&
+      (node.children ?? []).some(
+        (child) => child.nodeType === 'Repetition' && child.result === 'Failed',
+      )
+    )
+      found.push([...next, node.name].join('/'));
+    for (const child of node.children ?? []) visit(child, next);
+  };
+  for (const node of tree.testNodes ?? []) visit(node, []);
+  return found;
+}
+
 export async function runNativeHarness({
   root,
   output,
@@ -244,6 +264,9 @@ export async function runNativeHarness({
   run = runCommand,
   platform = process.platform,
   buildStatusPath = process.env.GITHUB_OUTPUT,
+  bootAttempts = 2,
+  bootAttemptTimeoutMs = 240000,
+  restartSimulatorService = process.env.CI === 'true',
 }) {
   const selectedProfile = nativeTestProfile(profile);
   assert.equal(
@@ -276,6 +299,27 @@ export async function runNativeHarness({
       log: log && join(output, log),
       echo: Boolean(log),
     });
+  // A wedged hosted-runner boot is cheaper to retry from a clean device than to
+  // wait out; a normal boot takes under three minutes.
+  const resetOwnedSimulator = async () => {
+    const attempt = (args, timeoutMs = 30000) =>
+      run(args[0], args.slice(1), {
+        cwd: root,
+        signal: abort.signal,
+        timeoutMs,
+        echo: false,
+      }).catch((error) => console.error(`Simulator reset: ${error.message}`));
+    await attempt(['xcrun', 'simctl', 'shutdown', simulator]);
+    // CoreSimulatorService wedges on hosted runners; restarting it is only
+    // safe where nothing else uses the machine's simulators.
+    if (restartSimulatorService)
+      await attempt([
+        'killall',
+        '-9',
+        'com.apple.CoreSimulator.CoreSimulatorService',
+      ]);
+    await attempt(['xcrun', 'simctl', 'erase', simulator], 60000);
+  };
   let ownedSimulator = false;
   const manifest = {
     profile: selectedProfile.name,
@@ -372,14 +416,31 @@ export async function runNativeHarness({
         `Not eligible on iOS ${item.actual}: ${item.suite} requires ${item.requires} (${item.reason}).`,
       );
     await phase('boot', async () => {
-      if (device.state !== 'Booted')
-        await command(['simctl', 'boot', simulator], 'boot.log');
-      await command(
-        ['simctl', 'bootstatus', simulator, '-b'],
-        'boot-status.log',
-        // Hosted boots take 85-185s; slow runners exceeded three minutes.
-        300000,
-      );
+      for (let attempt = 1; ; attempt++) {
+        const suffix = attempt === 1 ? '' : `-${attempt}`;
+        try {
+          if (attempt > 1 || device.state !== 'Booted')
+            await command(['simctl', 'boot', simulator], `boot${suffix}.log`);
+          await command(
+            ['simctl', 'bootstatus', simulator, '-b'],
+            `boot-status${suffix}.log`,
+            bootAttemptTimeoutMs,
+          );
+          return;
+        } catch (error) {
+          // Never touch a simulator the caller owns, and never retry an abort.
+          if (
+            abort.signal.aborted ||
+            !ownedSimulator ||
+            attempt >= bootAttempts
+          )
+            throw error;
+          console.error(
+            `Simulator boot attempt ${attempt} failed (${error.message}); resetting and retrying.`,
+          );
+          await resetOwnedSimulator();
+        }
+      }
     });
     const commonArguments = [
       '-project',
@@ -429,6 +490,11 @@ export async function runNativeHarness({
           resultBundle,
           '-parallel-testing-enabled',
           'NO',
+          // A failing UI journey is rerun once before it fails the job. Passing
+          // after a retry is reported below, never silently counted.
+          '-retry-tests-on-failure',
+          '-test-iterations',
+          '2',
           '-test-timeouts-enabled',
           'YES',
           '-default-test-execution-time-allowance',
@@ -472,10 +538,13 @@ export async function runNativeHarness({
       '--compact',
     ]);
     await writeFile(join(output, 'tests.json'), tests);
-    manifest.executedCasesBySuite = validateNativeSuites(
-      JSON.parse(tests),
-      suites,
-    );
+    const parsedTests = JSON.parse(tests);
+    manifest.executedCasesBySuite = validateNativeSuites(parsedTests, suites);
+    manifest.retriedTests = retriedNativeTests(parsedTests);
+    for (const name of manifest.retriedTests)
+      console.log(
+        `::warning title=Flaky iOS test::${name} passed only on retry`,
+      );
     manifest.passed = true;
     manifest.passedTests = summary.passedTests;
     console.log(
