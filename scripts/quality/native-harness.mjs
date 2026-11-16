@@ -90,6 +90,7 @@ export const nativePRUISelectors = [
   'ActivityMapUITests/ListSelectionUITests/testExpandedSummaryKeepsLargeValuesInsideProductionList',
   'ActivityMapUITests/FilterPanelUITests/testListSearchNarrowsRowsAndBecomesAFilterChip',
   'ActivityMapUITests/FilterPanelUITests/testHeaderSearchSelectsAPlaceAndFiltersOnlyOnRequest',
+  'ActivityMapUITests/FilterPanelUITests/testHeaderSearchCombinesPlaceAndTextFiltersAndClearsThemIndependently',
   'ActivityMapUITests/ActivityPlacesUITests/testOfflineMapProfileStyleAndSelection',
   'ActivityMapUITests/ActivityPlacesUITests/testPlacesOverviewClusteringFilteringAndContextualActivityPicking',
   'ActivityMapUITests/ActivityActionUITests/testGPXSharePresentsNativelyAndCleansUpRepeatedCancellationAndDeparture',
@@ -113,10 +114,10 @@ export function nativeTestProfile(name = 'full') {
           ]
         : [...nativeSuites],
     // Keep runtime separate from compilation; every selected UI journey must run.
-    // The PR suite now holds ten UI journeys (40-55s each on hosted runners)
-    // and passed in 477-665s; a slow runner reached the old 12-minute limit
-    // during the last journey with every test passing.
-    runtimeTimeoutMs: (name === 'pr' ? 15 : 45) * 60 * 1000,
+    // Twelve UI journeys plus app-hosted tests and runner startup. Slow hosted
+    // runs reached the former 15-minute deadline with passing tests still in
+    // progress. Keep individual test deadlines unchanged so hangs still fail.
+    runtimeTimeoutMs: (name === 'pr' ? 20 : 45) * 60 * 1000,
   };
 }
 
