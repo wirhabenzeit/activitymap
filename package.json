@@ -47,7 +47,9 @@
     "test:browsing-ui": "tsx --test src/components/list/*.test.tsx",
     "test:activity-places-ui": "node scripts/verify-activity-places.mjs",
     "test:place-search-ui": "node scripts/verify-place-search.mjs",
-    "test:place-debug-ui": "node scripts/verify-place-debug.mjs"
+    "test:place-debug-ui": "node scripts/verify-place-debug.mjs",
+    "map-styles:generate": "node scripts/generate-map-styles.mjs",
+    "map-styles:check": "node scripts/generate-map-styles.mjs --check"
   },
   "dependencies": {
     "@dwayneparton/geojson-to-gpx": "^0.2.0",

@@ -1,0 +1,693 @@
+{
+  "style": "MapTiler Outdoor v4",
+  "purpose": "Preview of quieter hiking trails; apply paint overrides by layer ID to the original style",
+  "layers": [
+    {
+      "id": "Trail outline",
+      "paint": {
+        "line-blur": 0.5,
+        "line-color": "hsl(9, 0%, 100%)",
+        "line-offset": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0,
+          14,
+          [
+            "match",
+            [
+              "get",
+              "color"
+            ],
+            "orange",
+            0.25,
+            "purple",
+            0.75,
+            "black",
+            1.25,
+            "brown",
+            1.75,
+            "blue",
+            2.25,
+            "green",
+            2.75,
+            "yellow",
+            3.25,
+            0
+          ],
+          18,
+          [
+            "match",
+            [
+              "get",
+              "color"
+            ],
+            "orange",
+            1,
+            "purple",
+            2,
+            "black",
+            3,
+            "brown",
+            4,
+            "blue",
+            5,
+            "green",
+            6,
+            "yellow",
+            8,
+            0
+          ]
+        ],
+        "line-opacity": 0.15,
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          [
+            "*",
+            [
+              "case",
+              [
+                "==",
+                [
+                  "get",
+                  "color"
+                ],
+                null
+              ],
+              0,
+              2
+            ],
+            0.7
+          ],
+          12,
+          [
+            "*",
+            [
+              "case",
+              [
+                "==",
+                [
+                  "get",
+                  "color"
+                ],
+                null
+              ],
+              1.5,
+              3
+            ],
+            0.7
+          ],
+          14,
+          [
+            "*",
+            [
+              "case",
+              [
+                "==",
+                [
+                  "get",
+                  "color"
+                ],
+                null
+              ],
+              2.5,
+              4
+            ],
+            0.7
+          ],
+          18,
+          [
+            "*",
+            [
+              "case",
+              [
+                "==",
+                [
+                  "get",
+                  "color"
+                ],
+                null
+              ],
+              4,
+              8
+            ],
+            0.7
+          ]
+        ]
+      }
+    },
+    {
+      "id": "Other trails",
+      "paint": {
+        "line-color": "hsl(33, 12%, 48%)",
+        "line-dasharray": [
+          5,
+          2
+        ],
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1.2
+          ],
+          [
+            "zoom"
+          ],
+          13,
+          0.5249999999999999,
+          16,
+          0.7,
+          20,
+          1.4
+        ]
+      }
+    },
+    {
+      "id": "Yellow trail",
+      "paint": {
+        "line-color": "hsl(45, 22%, 46%)",
+        "line-offset": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0,
+          14,
+          3.25,
+          18,
+          8
+        ],
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Green trail",
+      "paint": {
+        "line-color": "hsl(104, 20%, 40%)",
+        "line-offset": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0,
+          14,
+          2.75,
+          18,
+          6
+        ],
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Blue trail",
+      "paint": {
+        "line-color": "hsl(226, 20%, 46%)",
+        "line-offset": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0,
+          14,
+          2.25,
+          18,
+          5
+        ],
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Brown trail",
+      "paint": {
+        "line-color": "hsl(35, 20%, 41%)",
+        "line-offset": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0,
+          14,
+          1.75,
+          18,
+          4
+        ],
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Black trail",
+      "paint": {
+        "line-color": "hsl(9, 0%, 35%)",
+        "line-offset": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0,
+          14,
+          1.25,
+          18,
+          3
+        ],
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Purple trail",
+      "paint": {
+        "line-color": "hsl(290, 20%, 46%)",
+        "line-offset": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0,
+          14,
+          0.75,
+          18,
+          2
+        ],
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Orange trail",
+      "paint": {
+        "line-color": "hsl(35, 24%, 45%)",
+        "line-offset": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          11,
+          0,
+          14,
+          0.75,
+          18,
+          1
+        ],
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Red trail",
+      "paint": {
+        "line-color": "hsl(19, 24%, 45%)",
+        "line-offset": 0,
+        "line-opacity": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          9,
+          0,
+          10,
+          0.09000000000000001,
+          11,
+          0.45
+        ],
+        "line-width": [
+          "interpolate",
+          [
+            "exponential",
+            1
+          ],
+          [
+            "zoom"
+          ],
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Longdistance trail outline",
+      "paint": {
+        "line-color": "hsla(9, 85%, 100%, 0.75)",
+        "line-opacity": 0.15,
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          5,
+          0,
+          8,
+          1.4,
+          14,
+          2.8,
+          18,
+          5.6
+        ]
+      }
+    },
+    {
+      "id": "Longdistance trail",
+      "paint": {
+        "line-color": "hsl(19, 24%, 45%)",
+        "line-opacity": 0.45,
+        "line-width": [
+          "interpolate",
+          [
+            "linear"
+          ],
+          [
+            "zoom"
+          ],
+          5,
+          0.35,
+          8,
+          1.0499999999999998,
+          10,
+          1.4,
+          12,
+          1.75,
+          14,
+          1.4,
+          18,
+          2.0999999999999996
+        ]
+      }
+    },
+    {
+      "id": "Trail labels",
+      "paint": {
+        "icon-opacity": 0.55,
+        "text-color": "hsl(30, 14%, 39%)",
+        "text-halo-color": "hsl(9, 0%, 100%)",
+        "text-halo-width": 2,
+        "text-opacity": 0.6
+      }
+    },
+    {
+      "id": "Longdistance trail labels",
+      "paint": {
+        "icon-color": "hsl(19, 83%, 41%)",
+        "icon-halo-color": "hsl(9, 0%, 100%)",
+        "icon-halo-width": 2,
+        "icon-opacity": 0.55,
+        "text-color": "hsl(30, 14%, 39%)",
+        "text-halo-color": "hsl(9, 0%, 100%)",
+        "text-halo-width": 2,
+        "text-opacity": 0.6
+      }
+    }
+  ]
+}
