@@ -1,26 +1,41 @@
-import { LngLatBounds } from 'mapbox-gl';
+import { LngLatBounds } from 'maplibre-gl';
 import type React from 'react';
 
-import mapCatalog from '../../shared/map-catalog.json';
 import GeoJSONComponentOverlay from '~/components/map/geojson-component-overlay';
+
+import mapCatalog from '../../shared/map-catalog.json';
 
 type BaseMapCommon = {
   label: string;
-  url: string;
   visible: boolean;
   attribution?: string;
 };
 
 type RasterBaseMapSetting = BaseMapCommon & {
   type: 'raster';
+  url: string;
   tileSize: number;
 };
 
+/** A remote style-spec v8 URL that MapLibre can load directly. */
 type VectorBaseMapSetting = BaseMapCommon & {
   type: 'vector';
+  url: string;
 };
 
-export type BaseMapSetting = RasterBaseMapSetting | VectorBaseMapSetting;
+/**
+ * A style template from shared/map-styles/generated, loaded on demand by
+ * `~/lib/map-style`. Templates that need MapTiler stay hidden until the web
+ * key is configured.
+ */
+type TemplateBaseMapSetting = BaseMapCommon & {
+  type: 'template';
+  template: WebStyleTemplateId;
+  requiresMapTilerKey: boolean;
+};
+
+export type BaseMapSetting =
+  RasterBaseMapSetting | VectorBaseMapSetting | TemplateBaseMapSetting;
 
 type RasterOverlaySetting = {
   label: string;
@@ -43,19 +58,6 @@ type ComponentOverlaySetting = {
 };
 
 export type OverlaySetting = RasterOverlaySetting | ComponentOverlaySetting;
-
-type MapSetting = {
-  label: string;
-  url?: string;
-  type: 'raster' | 'vector' | 'component';
-  visible: boolean;
-  overlay: boolean;
-  tileSize?: number;
-  opacity?: number;
-  attribution?: string;
-  component?: React.ComponentType<Record<string, unknown>>;
-  props?: Record<string, unknown>;
-};
 
 type SharedBaseMapDefinition =
   | {
@@ -97,36 +99,87 @@ const sharedBaseMapCatalog = mapCatalog.baseMaps as SharedBaseMapCatalog;
 const sharedRasterOverlayCatalog =
   mapCatalog.rasterOverlays as SharedRasterOverlayCatalog;
 
-const webStyleURL = (url: string): string =>
-  url.startsWith('mapbox://styles/mapbox/') ? `${url}?optimize=true` : url;
+/**
+ * iOS still renders the catalogue's `mapbox://` styles with the Mapbox SDK.
+ * The web replaces those entries, under the same persisted and shared IDs,
+ * with the MapLibre templates generated from shared/map-styles.
+ */
+export const webStyleTemplates = {
+  mapboxStreet: { label: 'Street', requiresMapTilerKey: false },
+  mapboxStreet3d: { label: 'Street 3D', requiresMapTilerKey: false },
+  mapboxOutdoors: { label: 'Outdoors', requiresMapTilerKey: true },
+  mapboxLight: { label: 'Light', requiresMapTilerKey: false },
+  mapboxTopolight: { label: 'Topo Light', requiresMapTilerKey: false },
+  mapboxDark: { label: 'Dark', requiresMapTilerKey: false },
+  mapboxSatellite: { label: 'Satellite', requiresMapTilerKey: true },
+} as const satisfies Partial<
+  Record<keyof typeof mapCatalog.baseMaps, WebStyleTemplate>
+>;
+
+type WebStyleTemplate = { label: string; requiresMapTilerKey: boolean };
+export type WebStyleTemplateId = keyof typeof webStyleTemplates;
+
+const isWebStyleTemplateId = (id: string): id is WebStyleTemplateId =>
+  id in webStyleTemplates;
+
+export const mapTilerKey: string | undefined =
+  process.env.NEXT_PUBLIC_MAPTILER_KEY?.trim()
+    ? process.env.NEXT_PUBLIC_MAPTILER_KEY.trim()
+    : undefined;
 
 export const baseMaps = Object.fromEntries(
   Object.entries(sharedBaseMapCatalog).map(([id, definition]) => [
     id,
-    definition.type === 'style'
+    isWebStyleTemplateId(id)
       ? {
-          label: definition.label,
-          url: webStyleURL(definition.url),
-          type: 'vector' as const,
+          label: webStyleTemplates[id].label,
+          type: 'template' as const,
+          template: id,
+          requiresMapTilerKey: webStyleTemplates[id].requiresMapTilerKey,
           visible: definition.visible,
-          ...(definition.attribution === undefined
-            ? {}
-            : { attribution: definition.attribution }),
         }
-      : {
-          label: definition.label,
-          url: definition.url,
-          type: 'raster' as const,
-          visible: definition.visible,
-          tileSize: definition.tileSize,
-          ...(definition.attribution === undefined
-            ? {}
-            : { attribution: definition.attribution }),
-        },
+      : definition.type === 'style'
+        ? {
+            label: definition.label,
+            url: definition.url,
+            type: 'vector' as const,
+            visible: definition.visible,
+            ...(definition.attribution === undefined
+              ? {}
+              : { attribution: definition.attribution }),
+          }
+        : {
+            label: definition.label,
+            url: definition.url,
+            type: 'raster' as const,
+            visible: definition.visible,
+            tileSize: definition.tileSize,
+            ...(definition.attribution === undefined
+              ? {}
+              : { attribution: definition.attribution }),
+          },
   ]),
 ) as {
   readonly [Key in keyof SharedBaseMapCatalog]: BaseMapSetting;
 };
+
+export type BaseMapId = keyof typeof baseMaps;
+
+/** The base maps this deployment can render, in catalogue order. */
+export const isBaseMapAvailable = (id: BaseMapId): boolean => {
+  const setting = baseMaps[id];
+  return (
+    setting.type !== 'template' ||
+    !setting.requiresMapTilerKey ||
+    mapTilerKey !== undefined
+  );
+};
+
+export const defaultBaseMap: BaseMapId = 'mapboxStreet';
+
+/** A persisted or shared ID can name a map this deployment lacks. */
+export const renderableBaseMap = (id: BaseMapId): BaseMapId =>
+  id in baseMaps && isBaseMapAvailable(id) ? id : defaultBaseMap;
 
 const sharedOverlayMaps = Object.fromEntries(
   Object.entries(sharedRasterOverlayCatalog).map(([id, definition]) => [
@@ -172,23 +225,6 @@ export const overlayMaps = {
   ...webNativeOverlayMaps,
   ...sharedOverlayMaps,
 } as const satisfies Record<string, OverlaySetting>;
-
-export const mapSettings: Record<string, MapSetting> = {
-  ...Object.entries(baseMaps).reduce(
-    (acc, [key, value]) => ({
-      ...acc,
-      [key]: { ...value, overlay: false },
-    }),
-    {} as Record<string, MapSetting>,
-  ),
-  ...Object.entries(overlayMaps).reduce(
-    (acc, [key, value]) => ({
-      ...acc,
-      [key]: { ...value, overlay: true },
-    }),
-    {} as Record<string, MapSetting>,
-  ),
-};
 
 export const defaultMapPosition = {
   zoom: 7,

@@ -32,7 +32,10 @@ await build({
   jsx: 'automatic',
   outfile: join(temp, 'fixture.js'),
   alias: { '~': join(root, 'src') },
-  define: { 'process.env.NODE_ENV': '"development"' },
+  define: {
+    'process.env.NODE_ENV': '"development"',
+    'process.env.NEXT_PUBLIC_MAPTILER_KEY': 'undefined',
+  },
   plugins: [
     {
       name: 'fixture-auth',
@@ -57,7 +60,7 @@ export const useShallowStore=selector=>state(useShallow(selector));window.fixtur
     loader: 'tsx',
     contents: `
 import React from 'react';import {createRoot} from 'react-dom/client';
-import Map from 'react-map-gl/mapbox';import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import Map from 'react-map-gl/maplibre';import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {ActivityPlacesLayers} from '~/components/map/activity-places-layers';
 import {PlaceDebugSettings} from '~/components/settings/place-debug-settings';
 import {usePlaceDebug} from '~/store/place-debug';import {useShallowStore} from '~/store';
@@ -66,7 +69,7 @@ const activities=new globalThis.Map([[1,{id:1,name:'Test hike',streamsMetadata:{
 window.debugStore=usePlaceDebug;
 function App(){const s=useShallowStore(state=>state);return <QueryClientProvider client={client}>
 <div style={{padding:12}}><PlaceDebugSettings check={true}/></div>
-<Map preserveDrawingBuffer={true} initialViewState={{longitude:8.003,latitude:47.001,zoom:14}} mapboxAccessToken="pk.offline-test" style={{height:650,width:'100%'}} mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e9efea'}}]}}>
+<Map preserveDrawingBuffer={true} initialViewState={{longitude:8.003,latitude:47.001,zoom:14}} style={{height:650,width:'100%'}} mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e9efea'}}]}}>
 <ActivityPlacesLayers activities={activities} selectedIds={s.selected} highlighted={s.highlighted}/></Map>
 </QueryClientProvider>;}createRoot(document.getElementById('root')).render(<App/>);
 

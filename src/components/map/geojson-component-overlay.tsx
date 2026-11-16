@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Source, Layer, useControl } from 'react-map-gl/mapbox';
-import type { MapMouseEvent, PointLike } from 'mapbox-gl';
+import { Source, Layer, useControl } from 'react-map-gl/maplibre';
+import type { MapMouseEvent, PointLike } from 'maplibre-gl';
 import type {
   Feature,
   FeatureCollection,
   GeoJsonProperties,
   Geometry,
 } from 'geojson';
-import type mapboxgl from 'mapbox-gl';
+import type { IControl, Map as MapLibreMap } from 'maplibre-gl';
 import { FeatureInfoCard } from './feature-info-card';
 
 type OverlayFeature = Feature<Geometry, GeoJsonProperties>;
@@ -17,8 +17,8 @@ type GeoJSONInteractionOptions = {
   onFeatureClick?: (feature: OverlayFeature, event: MapMouseEvent) => void;
 };
 
-export class GeoJSONInteractionControl implements mapboxgl.IControl {
-  private map?: mapboxgl.Map;
+export class GeoJSONInteractionControl implements IControl {
+  private map?: MapLibreMap;
   private container: HTMLElement;
   private layerId: string;
   private onFeatureClick?: (
@@ -32,7 +32,7 @@ export class GeoJSONInteractionControl implements mapboxgl.IControl {
     this.container = document.createElement('div');
   }
 
-  onAdd(map: mapboxgl.Map) {
+  onAdd(map: MapLibreMap) {
     this.map = map;
     this.map.on('click', this.click);
 

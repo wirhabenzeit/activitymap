@@ -1,6 +1,6 @@
 # MapLibre source choices and web migration plan
 
-Research for [#561](https://github.com/wirhabenzeit/activitymap/issues/561), preparing [#562](https://github.com/wirhabenzeit/activitymap/issues/562). Reviewed 15 November 2026. These are proposed choices; the production catalogue and renderers have not changed.
+Research for [#561](https://github.com/wirhabenzeit/activitymap/issues/561), preparing [#562](https://github.com/wirhabenzeit/activitymap/issues/562). Reviewed 15 November 2026. The web now renders these choices with MapLibre (see [shared/map-styles](../shared/map-styles/README.md#web-use)); the shared catalogue and iOS still use Mapbox.
 
 Use OpenFreeMap for general vector maps, MapTiler for outdoor cartography and global satellite imagery, and Mapterhorn for web terrain. Keep the existing Swiss and Norwegian sources. Defer self-hosting on R2: it is inexpensive, but introduces operations without replacing either satellite imagery or outdoor contours. Native terrain needs a separate compatibility decision before replacing its Mapbox DEM.
 

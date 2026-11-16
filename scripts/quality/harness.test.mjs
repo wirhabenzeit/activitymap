@@ -188,7 +188,7 @@ test('fixture startup drops inherited service credentials', () => {
       ACTIVITYMAP_EXTERNAL_EFFECTS: 'enabled',
       VERCEL_ENV: 'production',
       AUTH_STRAVA_SECRET: 'secret',
-      NEXT_PUBLIC_MAPBOX_TOKEN: 'real',
+      NEXT_PUBLIC_MAPTILER_KEY: 'real',
     },
     'http://127.0.0.1:4321',
   );
@@ -199,6 +199,7 @@ test('fixture startup drops inherited service credentials', () => {
   assert.equal(environment.ACTIVITYMAP_EXTERNAL_EFFECTS, '');
   assert.equal(environment.ACTIVITYMAP_CONVEX_SITE, undefined);
   assert.equal(environment.ACTIVITYMAP_CONVEX_SIGNING_KEY, undefined);
+  assert.equal(environment.NEXT_PUBLIC_MAPTILER_KEY, undefined);
   assert.equal(environment.PUBLIC_URL, 'http://127.0.0.1:4321');
 });
 

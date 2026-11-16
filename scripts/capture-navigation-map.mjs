@@ -99,45 +99,34 @@ export default function Review() {
     const observation = { width, height, errors: [], mapErrors: [], steps: [] };
     report.observations.push(observation);
     try {
-      // Render synthetic routes without a token, tile requests or a live basemap.
-      await context.route('https://api.mapbox.com/**', async (request) => {
-        if (request.request().url().includes('/styles/v1/')) {
-          await request.fulfill({
+      // Render synthetic routes without live tiles: the bundled street style
+      // loads, but its vector tiles, glyphs and sprites resolve to empty
+      // offline stand-ins, and terrain uses the flat offline tile.
+      await context.route('https://tiles.openfreemap.org/**', (request) => {
+        const url = new URL(request.request().url());
+        if (url.pathname === '/planet')
+          return request.fulfill({
             json: {
-              version: 8,
-              sources: {},
-              layers: [
-                {
-                  id: 'background',
-                  type: 'background',
-                  paint: { 'background-color': '#e5e8df' },
-                },
-              ],
-            },
-          });
-        } else if (
-          request.request().url().includes('/v4/') &&
-          request.request().url().includes('.json')
-        ) {
-          await request.fulfill({
-            json: {
-              tilejson: '2.2.0',
-              tiles: [
-                'https://api.mapbox.com/navigation-audit-dem/{z}/{x}/{y}.png',
-              ],
+              tilejson: '3.0.0',
+              tiles: ['https://tiles.openfreemap.org/offline/{z}/{x}/{y}.pbf'],
               minzoom: 0,
               maxzoom: 14,
             },
           });
-        } else if (request.request().url().includes('/navigation-audit-dem/')) {
-          await request.fulfill({
+        if (url.pathname.endsWith('.json'))
+          return request.fulfill({ json: {} });
+        if (url.pathname.endsWith('.png'))
+          return request.fulfill({
             contentType: 'image/png',
             body: offlineTile,
           });
-        } else await request.fulfill({ status: 200, body: '{}' });
+        return request.fulfill({
+          contentType: 'application/x-protobuf',
+          body: Buffer.alloc(0),
+        });
       });
-      await context.route('https://events.mapbox.com/**', (request) =>
-        request.fulfill({ status: 200, body: '{}' }),
+      await context.route('https://tiles.mapterhorn.com/**', (request) =>
+        request.fulfill({ contentType: 'image/png', body: offlineTile }),
       );
       await context.addInitScript(
         ({ activities, selectedIDs }) => {

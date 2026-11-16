@@ -3,7 +3,7 @@
 import { Camera } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Marker, useMap } from 'react-map-gl/mapbox';
+import { Marker, useMap } from 'react-map-gl/maplibre';
 
 import {
   type MapPhotoGroup,
@@ -30,7 +30,7 @@ export default function PhotoLayer({
   return <MapPhotos key={scope} photos={photos} visibleIDs={visibleIDs} />;
 }
 
-/** The same surface is exercised by the browser fixture with real Mapbox projection. */
+/** The same surface is exercised by the browser fixture with real MapLibre projection. */
 export function MapPhotos({
   photos,
   visibleIDs,

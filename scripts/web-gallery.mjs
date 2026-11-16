@@ -320,7 +320,7 @@ try {
               selectedIDs: s.selectedIDs,
               detailID: s.detailID ?? null,
               search: s.search ?? '',
-              basemap: 'mapbox',
+              basemap: 'maplibre',
               contentSize: v.largeText ? '150% browser text' : 'default',
               durationMs: Date.now() - started,
               framing,

@@ -2,14 +2,16 @@
 
 import type { FeatureCollection, Point } from 'geojson';
 import { Clock, Loader2, MapPin, X } from 'lucide-react';
+import type { MapLayerMouseEvent } from 'maplibre-gl';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Layer, Marker, Popup, Source, useMap } from 'react-map-gl/mapbox';
+import { Layer, Marker, Popup, Source, useMap } from 'react-map-gl/maplibre';
 
 import { PlaceSymbol } from '~/components/place-symbol';
 import { useSelectedActivityPlaces } from '~/hooks/use-activity-places';
 import { useDisplayUnits } from '~/hooks/use-display-preferences';
 import type { Activity } from '~/lib/activity';
 import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
+import { APP_LABEL_FONT } from '~/lib/map-glyphs';
 import {
   groupMapPlaces,
   mapPlaceClusterKind,
@@ -260,7 +262,7 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
   }, [map]);
   useEffect(() => {
     if (!map || !query.userId) return;
-    const click = (event: mapboxgl.MapLayerMouseEvent) => {
+    const click = (event: MapLayerMouseEvent) => {
       if (event.originalEvent.shiftKey) return;
       const id: unknown = event.features?.[0]?.properties?.id;
       if (typeof id === 'string') openPlace(id);
@@ -348,8 +350,6 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
           }}
-          // Keep route places legible when terrain would otherwise hide them.
-          paint={{ 'icon-occlusion-opacity': 1 }}
         />
         <Layer
           id="matched-places-labels"
@@ -360,12 +360,12 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
             'text-size': 12,
             'text-anchor': 'top',
             'text-offset': [0, 1.4],
+            'text-font': APP_LABEL_FONT,
           }}
           paint={{
             'text-color': '#111827',
             'text-halo-color': '#ffffff',
             'text-halo-width': 1.5,
-            'text-occlusion-opacity': 1,
           }}
         />
         <Layer
@@ -378,7 +378,7 @@ export const MatchedPlacesLayer = memo(function MatchedPlacesLayer({
             'icon-allow-overlap': true,
             'icon-ignore-placement': true,
           }}
-          paint={{ 'icon-opacity': 0, 'icon-occlusion-opacity': 1 }}
+          paint={{ 'icon-opacity': 0 }}
         />
       </Source>
       {showAllPlaces &&

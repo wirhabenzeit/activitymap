@@ -134,7 +134,7 @@ export function buildStyle(id, upstream, trailOverrides) {
     "sky",
     "projection",
   ])
-    delete style[field];
+    Reflect.deleteProperty(style, field);
   style.metadata = {
     ...style.metadata,
     "activitymap:prototype": 1,

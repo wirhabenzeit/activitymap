@@ -1,6 +1,6 @@
 // Development-only capture bridge. No data is fetched or persisted by this module.
 import type { QueryClient } from '@tanstack/react-query';
-import type { Map as MapboxMap } from 'mapbox-gl';
+import type { Map as MapLibreMap } from 'maplibre-gl';
 import { activityDTOSchema } from '~/contracts/v1/activity';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import { store } from '~/store';
@@ -13,7 +13,7 @@ declare global {
       search?: string;
     };
     __ACTIVITYMAP_GALLERY_READY__?: boolean;
-    __ACTIVITYMAP_GALLERY_MAP__?: MapboxMap;
+    __ACTIVITYMAP_GALLERY_MAP__?: MapLibreMap;
   }
 }
 

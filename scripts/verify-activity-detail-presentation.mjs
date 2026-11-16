@@ -15,7 +15,10 @@ const directory = await mkdtemp(join(tmpdir(), 'activity-detail-presentation-'))
 await build({
   absWorkingDir: repo, bundle: true, format: 'iife', platform: 'browser', jsx: 'automatic',
   outfile: join(directory, 'fixture.js'), alias: { '~': join(repo, 'src') },
-  define: { 'process.env.NODE_ENV': '"development"' },
+  define: {
+    'process.env.NODE_ENV': '"development"',
+    'process.env.NEXT_PUBLIC_MAPTILER_KEY': 'undefined',
+  },
   stdin: { resolveDir: repo, loader: 'tsx', contents: `
 import React from 'react';
 import { createRoot } from 'react-dom/client';

@@ -1,4 +1,4 @@
-// Production place hooks, Mapbox layers and elevation UI, served locally with
+// Production place hooks, MapLibre layers and elevation UI, served locally with
 // invented synchronized bundles. Backend jobs own matching, so the page must
 // never request places directly. Real SQL/authorization is proved separately by
 // db:test-on-demand-places; no credentials, raw tracks or outside services here.
@@ -34,7 +34,10 @@ await build({
   jsx: 'automatic',
   outfile: join(temp, 'fixture.js'),
   alias: { '~': join(root, 'src') },
-  define: { 'process.env.NODE_ENV': '"development"' },
+  define: {
+    'process.env.NODE_ENV': '"development"',
+    'process.env.NEXT_PUBLIC_MAPTILER_KEY': 'undefined',
+  },
   plugins: [
     {
       name: 'fixture-auth',
@@ -60,7 +63,7 @@ export const useShallowStore=selector=>state(useShallow(selector));window.fixtur
     loader: 'tsx',
     contents: `
 import React from 'react';import {createRoot} from 'react-dom/client';
-import Map,{Source,Layer} from 'react-map-gl/mapbox';import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
+import Map,{Source,Layer} from 'react-map-gl/maplibre';import {QueryClient,QueryClientProvider} from '@tanstack/react-query';
 import {ElevationChart} from '~/components/list/elevation-chart';import {MatchedPlacesLayer} from '~/components/map/matched-places-layer';
 import {Selection} from '~/components/map/selection-control';import {useShallowStore} from '~/store';
 import {encodeStreamSummary} from '~/lib/streams/compact-summary';import {streamSummaryQueryKey} from '~/lib/activity-stream-summary';
@@ -87,7 +90,7 @@ window.placePicks=[];
 function App(){const s=useShallowStore(state=>state);const ids=s.visible?s.selected:[];
 const routeMetadata=React.useMemo(()=>s.streamRevision?{...metadata,revision:s.streamRevision}:metadata,[s.streamRevision]);
 const activities=React.useMemo(()=>new globalThis.Map([[1,{id:1,streamsMetadata:routeMetadata}],[2,{id:2,streamsMetadata:metadata}]]),[routeMetadata]);return <QueryClientProvider client={client}>
-<Map preserveDrawingBuffer={true} ref={ref=>{if(ref)window.fixtureMap=ref.getMap();}} onIdle={()=>window.mapReady=true} initialViewState={{longitude:8.001,latitude:47.001,zoom:14}} mapboxAccessToken="pk.offline-test" style={{height:260,width:'100%'}} mapStyle={{version:8,glyphs:window.location.origin+'/fonts/{fontstack}/{range}.pbf',sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e9efea'}}]}}>
+<Map preserveDrawingBuffer={true} ref={ref=>{if(ref)window.fixtureMap=ref.getMap();}} onIdle={()=>window.mapReady=true} initialViewState={{longitude:8.001,latitude:47.001,zoom:14}} style={{height:260,width:'100%'}} mapStyle={{version:8,glyphs:window.location.origin+'/fonts/{fontstack}/{range}.pbf',sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e9efea'}}]}}>
 <Source id="routeSource" type="geojson" data={{type:'Feature',id:1,properties:{},geometry:{type:'LineString',coordinates:latlng.map(([lat,lng])=>[lng,lat])}}}><Layer id="routeLayerBG" type="line" paint={{'line-color':'#777','line-width':5}}/></Source>
 <Selection onSelection={ids=>{window.selectionCalls++;window.fixtureState.getState().pickActivities(ids);}}/>
 <MatchedPlacesLayer activities={activities} selectedIds={ids} visibleIds={s.visibleIDs??ids} showAllPlaces={s.showAllPlaces??false} inspectedActivityId={s.inspectedActivityId} highlighted={s.highlighted}
@@ -223,8 +226,8 @@ try {
   await page.waitForFunction(
     () =>
       window.mapReady &&
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-        3,
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 3,
   );
   assert.equal(await page.getByTestId('elevation-place-marker').count(), 5);
   assert.deepEqual(
@@ -313,11 +316,11 @@ try {
         layers: ['matched-places-points'],
       }).length === 3,
   );
-  assert.equal(await page.locator('.mapboxgl-popup').count(), 1);
+  assert.equal(await page.locator('.maplibregl-popup').count(), 1);
   const symbols = await page.evaluate(() =>
     window.fixtureMap
       .getSource('matched-places')
-      ._data.features.map((feature) => feature.properties.icon),
+      ._data.geojson.features.map((feature) => feature.properties.icon),
   );
   assert.equal(
     new Set(symbols).size,
@@ -394,7 +397,7 @@ try {
       .evaluate((element) => getComputedStyle(element).backgroundColor),
     'rgb(10, 10, 10)',
   );
-  assert.equal(await page.locator('.mapboxgl-popup').count(), 1);
+  assert.equal(await page.locator('.maplibregl-popup').count(), 1);
   assert.equal(
     await page
       .getByRole('button', { name: 'Close place', exact: true })
@@ -448,7 +451,7 @@ try {
   await page.mouse.move(scrubX, scrubY, { steps: 8 });
   await page.mouse.up();
   assert.equal(
-    await page.locator('.mapboxgl-popup').count(),
+    await page.locator('.maplibregl-popup').count(),
     1,
     'Scrubbing out and back does not dismiss the place',
   );
@@ -456,7 +459,7 @@ try {
     .getByRole('slider')
     .click({ position: { x: 100, y: surface.height - 8 } });
   assert.equal(
-    await page.locator('.mapboxgl-popup').count(),
+    await page.locator('.maplibregl-popup').count(),
     0,
     'A chart tap dismisses the place and its map card',
   );
@@ -468,7 +471,7 @@ try {
     .click();
   await page.keyboard.press('Escape');
   assert.equal(
-    await page.locator('.mapboxgl-popup').count(),
+    await page.locator('.maplibregl-popup').count(),
     0,
     'Escape dismisses a place',
   );
@@ -490,8 +493,8 @@ try {
   await page.evaluate(() => window.fixtureState.setState({ selected: [1, 2] }));
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      3,
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 3,
   );
   await page.getByText('2 selected routes', { exact: true }).waitFor();
   await page.evaluate(() => window.fixtureState.setState({ visible: false }));
@@ -501,8 +504,8 @@ try {
   await page.evaluate(() => window.fixtureState.setState({ visible: true }));
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      3,
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 3,
   );
   await page.getByRole('button', { name: 'Close place', exact: true }).click();
   // Closing redraws the place symbols; a click before the map has the place
@@ -511,7 +514,7 @@ try {
     const map = window.fixtureMap;
     const p = map.project([8.001, 47.001]);
     return (
-      !document.querySelector('.mapboxgl-popup') &&
+      !document.querySelector('.maplibregl-popup') &&
       map.queryRenderedFeatures(p, { layers: ['matched-places-hit'] }).length
     );
   });
@@ -557,8 +560,8 @@ try {
   );
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-        3 &&
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 3 &&
       ['peak', 'pass', 'hut'].every((kind) =>
         window.fixtureMap.hasImage('matched-place-' + kind),
       ),
@@ -592,8 +595,8 @@ try {
   );
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      0,
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 0,
   );
   await page
     .locator('[data-map-place]')
@@ -605,8 +608,8 @@ try {
   );
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      3,
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 3,
   );
   assert.equal(
     requests.length,
@@ -720,8 +723,8 @@ try {
     .waitFor();
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      1,
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 1,
   );
   const beforeSyncedReplacements = requests.length;
   await page.evaluate(
@@ -735,8 +738,8 @@ try {
   );
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      0,
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 0,
   );
   assert.equal(await page.getByTestId('elevation-place-marker').count(), 0);
   assert.equal(
@@ -761,8 +764,8 @@ try {
   );
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data?.features.length ===
-      0,
+      window.fixtureMap.getSource('matched-places')?._data?.geojson?.features
+        .length === 0,
   );
   assert.equal(
     await page.getByTestId('elevation-place-marker').count(),
@@ -843,6 +846,10 @@ try {
   );
   await page.screenshot({ path: join(output, 'places-overview.png') });
   await page.evaluate(() => window.fixtureMap.jumpTo({ zoom: 18 }));
+  // MapLibre opens compact attribution until the first drag; collapse it as
+  // a user would so it does not cover the place list.
+  const attribution = page.locator('.maplibregl-compact-show summary');
+  if (await attribution.count()) await attribution.click();
   await overviewCluster.click();
   await page
     .getByRole('button', { name: 'Synced summit', exact: true })
@@ -854,7 +861,7 @@ try {
     .getByRole('button', { name: 'Explore 2 visited places', exact: true })
     .waitFor();
   assert.equal(
-    await page.locator('.mapboxgl-popup a[href^="/list?activity="]').count(),
+    await page.locator('.maplibregl-popup a[href^="/list?activity="]').count(),
     0,
     'Place tooltip contains no activity list',
   );
@@ -873,8 +880,8 @@ try {
   );
   await page.waitForFunction(
     () =>
-      window.fixtureMap.getSource('matched-places')?._data.features.length ===
-      1,
+      window.fixtureMap.getSource('matched-places')?._data.geojson?.features
+        .length === 1,
   );
   await page.screenshot({ path: join(output, 'places-focused.png') });
   await page.waitForFunction(
@@ -991,8 +998,8 @@ try {
   await page.waitForFunction(
     () =>
       document.querySelectorAll('[data-place-cluster]').length === 0 &&
-      window.fixtureMap.getSource('matched-places')?._data.features.length ===
-        0,
+      window.fixtureMap.getSource('matched-places')?._data.geojson?.features
+        .length === 0,
   );
   await page.evaluate(() => window.fixtureState.setState({ visibleIDs: [1] }));
   await page
@@ -1025,7 +1032,8 @@ try {
   // The other account shows only its own synchronized places.
   await page.waitForFunction(() => {
     const names = (
-      window.fixtureMap.getSource('matched-places')?._data.features ?? []
+      window.fixtureMap.getSource('matched-places')?._data.geojson?.features ??
+      []
     ).map((feature) => feature.properties.name);
     return (
       names.includes('Other account peak') &&
@@ -1091,7 +1099,7 @@ try {
     ),
   );
   console.log(
-    'PASS web places: actual Mapbox layers, profile annotations, synchronized bundles without requests, keyboard focus, multi-selection, filters, account isolation, stream replacement, pending, unavailable and coverage states.',
+    'PASS web places: actual MapLibre layers, profile annotations, synchronized bundles without requests, keyboard focus, multi-selection, filters, account isolation, stream replacement, pending, unavailable and coverage states.',
   );
   console.log(`Evidence: ${output}`);
 } catch (error) {

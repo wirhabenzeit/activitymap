@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 /* Load map overlay positioning with the root stylesheet, including lazy maps. */
-@import 'mapbox-gl/dist/mapbox-gl.css';
+@import 'maplibre-gl/dist/maplibre-gl.css';
 
 @plugin 'tailwindcss-animate';
 
@@ -262,8 +262,8 @@
   }
 }
 
-/* Keep place cards in the product theme, including Mapbox's arrow. */
-.matched-place-popup .mapboxgl-popup-content {
+/* Keep place cards in the product theme, including MapLibre's arrow. */
+.matched-place-popup .maplibregl-popup-content {
   padding: 0;
   border: 1px solid hsl(var(--border));
   border-radius: 12px;
@@ -271,19 +271,19 @@
   color: hsl(var(--popover-foreground));
   box-shadow: 0 4px 20px #0002;
 }
-.matched-place-popup.mapboxgl-popup-anchor-bottom .mapboxgl-popup-tip,
-.matched-place-popup.mapboxgl-popup-anchor-bottom-left .mapboxgl-popup-tip,
-.matched-place-popup.mapboxgl-popup-anchor-bottom-right .mapboxgl-popup-tip {
+.matched-place-popup.maplibregl-popup-anchor-bottom .maplibregl-popup-tip,
+.matched-place-popup.maplibregl-popup-anchor-bottom-left .maplibregl-popup-tip,
+.matched-place-popup.maplibregl-popup-anchor-bottom-right .maplibregl-popup-tip {
   border-top-color: hsl(var(--popover));
 }
-.matched-place-popup.mapboxgl-popup-anchor-top .mapboxgl-popup-tip,
-.matched-place-popup.mapboxgl-popup-anchor-top-left .mapboxgl-popup-tip,
-.matched-place-popup.mapboxgl-popup-anchor-top-right .mapboxgl-popup-tip {
+.matched-place-popup.maplibregl-popup-anchor-top .maplibregl-popup-tip,
+.matched-place-popup.maplibregl-popup-anchor-top-left .maplibregl-popup-tip,
+.matched-place-popup.maplibregl-popup-anchor-top-right .maplibregl-popup-tip {
   border-bottom-color: hsl(var(--popover));
 }
-.matched-place-popup.mapboxgl-popup-anchor-left .mapboxgl-popup-tip {
+.matched-place-popup.maplibregl-popup-anchor-left .maplibregl-popup-tip {
   border-right-color: hsl(var(--popover));
 }
-.matched-place-popup.mapboxgl-popup-anchor-right .mapboxgl-popup-tip {
+.matched-place-popup.maplibregl-popup-anchor-right .maplibregl-popup-tip {
   border-left-color: hsl(var(--popover));
 }

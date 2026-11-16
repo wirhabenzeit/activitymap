@@ -34,7 +34,10 @@ const bundle = await build({
   write: false,
   format: 'iife',
   jsx: 'automatic',
-  define: { 'process.env.NODE_ENV': '"production"' },
+  define: {
+    'process.env.NODE_ENV': '"production"',
+    'process.env.NEXT_PUBLIC_MAPTILER_KEY': 'undefined',
+  },
   alias: {
     '~/store': stubs,
     '~/hooks/use-activities': stubs,

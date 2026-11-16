@@ -65,7 +65,7 @@ await writeFile(
 );
 await writeFile(
   join(directory, 'env.ts'),
-  'export const env={NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN:"pk.offline-test"};',
+  'export const env={};',
 );
 await writeFile(
   join(directory, 'photos.ts'),
@@ -106,12 +106,12 @@ const bundleConfig = {
     contents: `
 import React, {useState} from 'react';
 import {createRoot} from 'react-dom/client';
-import Map, {Source,Layer} from 'react-map-gl/mapbox';
+import Map, {Source,Layer} from 'react-map-gl/maplibre';
 import {MapPhotos} from '~/components/map/photo';
 import {Selection} from '~/components/map/selection-control';
 import {LayerSwitcher} from '~/components/map/layer-switcher';
 import {store,useShallowStore} from '~/store';
-import 'mapbox-gl/dist/mapbox-gl.css';
+import 'maplibre-gl/dist/maplibre-gl.css';
 const photo=(id,activity,location)=>({unique_id:id,activity_id:activity,athlete_id:1,activity_name:'Activity '+activity,caption:'Caption '+id,created_at:new Date('2026-01-01'),location,
  urls:{256:'${baseURL}/thumb-1',1600:'${baseURL}/full-1'},sizes:{256:[256,256],1600:[1600,900]}});
 const fixture=[photo('a',1,[46,8]),photo('b',2,[46,8]),photo('c',1,[46.15,8.15]),photo('unlocated',1,null),photo('invalid',1,[91,8]),photo('offscreen',1,[0,0])];
@@ -123,7 +123,7 @@ function App(){
  const [photos,setPhotos]=useState(fixture), [visible,setVisible]=useState([1,2]), [revision,setRevision]=useState(0);
  const show=useShallowStore(state=>state.showPhotos);
  window.setVisible=setVisible;window.setPhotos=setPhotos;window.photoFixtures=fixture;window.resetScope=()=>setRevision(x=>x+1);
- return <Map ref={ref=>window.photoMap=ref} onIdle={()=>window.mapReady=true} initialViewState={{latitude:46,longitude:8,zoom:10}} mapboxAccessToken="pk.offline-test"
+ return <Map ref={ref=>window.photoMap=ref} onIdle={()=>window.mapReady=true} initialViewState={{latitude:46,longitude:8,zoom:10}}
  preserveDrawingBuffer style={{height:'100vh',width:'100vw'}} mapStyle={{version:8,sources:{},layers:[{id:'background',type:'background',paint:{'background-color':'#e6e9e3'}}]}}>
  <Source id="routeSource" type="geojson" data={{type:'FeatureCollection',features:[{type:'Feature',id:1,properties:{},geometry:{type:'LineString',coordinates:[[7.9,46],[8.1,46]]}}]}}>
  <Layer id="routeLayerBG" type="line" paint={{'line-color':'#237b4b','line-width':12}}/></Source>

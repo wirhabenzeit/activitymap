@@ -52,7 +52,6 @@ export function fixtureEnvironment(inherited, base) {
     AUTH_SECRET: 'browser-fixture-secret-at-least-32-characters',
     BETTER_AUTH_SECRET: 'browser-fixture-secret-at-least-32-characters',
     ACTIVITYMAP_EXTERNAL_EFFECTS: '',
-    NEXT_PUBLIC_MAPBOX_TOKEN: 'pk.browser-fixture-unused',
     NEXT_PUBLIC_ENV: 'development',
     PUBLIC_URL: base,
     TZ: 'Europe/Zurich',

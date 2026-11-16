@@ -45,7 +45,10 @@ createRoot(document.getElementById('root')).render(<MergeActivitiesProvider><Too
   format: 'iife',
   platform: 'browser',
   jsx: 'automatic',
-  define: { 'process.env.NODE_ENV': '"test"' },
+  define: {
+    'process.env.NODE_ENV': '"test"',
+    'process.env.NEXT_PUBLIC_MAPTILER_KEY': 'undefined',
+  },
   plugins: [
     {
       name: 'fixture-mocks',
