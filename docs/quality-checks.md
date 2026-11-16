@@ -182,7 +182,8 @@ for the same pull request are cancelled. `summary.json` records separate boot,
 build and test durations, and failures print their test identifiers and messages
 in the Actions log.
 
-Both profiles retain five-minute simulator boot readiness, disabled parallel
+Both profiles retain a bounded simulator boot readiness check (330 seconds per
+attempt), disabled parallel
 test execution, and enabled per-test timeouts configured with a 90-second default
 and a 180-second maximum. XCTest rounds execution allowances up to whole minutes;
 the maximum caps a test's preferred allowance rather than granting extra time to
