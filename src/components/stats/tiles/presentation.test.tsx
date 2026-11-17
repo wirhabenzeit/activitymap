@@ -21,7 +21,7 @@ void test('imperial axes choose precision after conversion', () => {
     format.formatShort(0.4, 'distance', 0.2),
   );
 });
-void test('choices retain labels, one tab stop, selection, and touch targets with compact desktop metrics', () => {
+void test('compact choice faces stay separate from their larger touch targets', () => {
   for (const compact of [false, true]) {
     const html = renderToStaticMarkup(
       createElement(StatsChoices, {
@@ -40,7 +40,13 @@ void test('choices retain labels, one tab stop, selection, and touch targets wit
     if (compact) {
       assert.equal((html.match(/pointer-coarse:min-h-11/g) ?? []).length, 2);
       assert.equal((html.match(/pointer-coarse:min-w-11/g) ?? []).length, 2);
-      assert.equal((html.match(/min-h-7/g) ?? []).length, 2);
+      assert.equal((html.match(/data-stats-choice-face/g) ?? []).length, 2);
+      assert.match(html, /before:h-8/);
+      assert.match(
+        html,
+        /<span[^>]*data-stats-choice-face[^>]*bg-background[^>]*>time<\/span>/,
+      );
+      assert.doesNotMatch(html, /<button[^>]*bg-background/);
       assert.equal((html.match(/min-w-7/g) ?? []).length, 2);
     }
   }
