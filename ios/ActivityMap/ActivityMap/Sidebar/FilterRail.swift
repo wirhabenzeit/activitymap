@@ -33,7 +33,7 @@ struct FilterRail: View {
     }
 
     private func item(for part: FilterPart) -> some View {
-        let active = part.isActive(store)
+        let active = scope == .stats ? store.activeStatsFilterCount > 0 : part.isActive(store)
         return Button { open = part } label: {
             Image(systemName: part.symbol)
                 .font(.body.weight(active ? .semibold : .regular))

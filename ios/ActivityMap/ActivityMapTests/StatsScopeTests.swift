@@ -66,6 +66,7 @@ actor GatedStatsBuild {
         let visible = try #require(store.filteredActivities.first?.id)
         store.replaceSelection(with: [visible]); store.inspect(visible)
         let selection = store.selection, range = store.dateDayRange, camera = store.mapContext.scopeRevision
+        let originalFilterCount = store.activeFilterCount
         let list = store.listPresentation.settings
         let scoped = try #require(await store.stats.engine(for: store))
         #expect(scoped.activities.contains { $0.day < StatsDates.day("2026-03-01") })
@@ -73,7 +74,7 @@ actor GatedStatsBuild {
         #expect(store.dateDayRange == range)
         #expect(store.selectedActivityIDs == selection.selectedIDs && store.activeActivityID == selection.activeID && store.inspectedActivityID == selection.inspectedID)
         #expect(store.mapContext.scopeRevision == camera && store.listPresentation.settings == list)
-        #expect(store.activeFilterCount == 1)
+        #expect(store.activeFilterCount == originalFilterCount)
         #expect(store.filteredActivities.allSatisfy { range!.contains($0.localDayKey) })
         #expect(try #require(await store.stats.engine(for: store)).activities.count == store.activities.count)
     }
@@ -99,8 +100,8 @@ actor GatedStatsBuild {
         #expect(store.activitiesRevision == revision && store.mapContext.scopeRevision == geometryRevision)
         #expect(store.activities.allSatisfy { $0.coordinates.isEmpty && $0.streams == nil && $0.photosState == nil })
         store.distanceFilter = NumericFilter(value: 2000)
-        if case .totals(let totals) = await store.stats.result(.totals, for: store) { #expect(totals.count == 0) } else { Issue.record("Missing filtered totals") }
-        #expect(store.stats.aggregationCount == 2)
+        if case .totals(let totals) = await store.stats.result(.totals, for: store) { #expect(totals.count == Double(rows.filter { $0.localDayKey >= "2026-01-01" && $0.localDayKey <= "2026-09-30" }.count)) } else { Issue.record("Missing filtered totals") }
+        #expect(store.stats.aggregationCount == 1)
     }
     @Test func concurrentIdenticalDemandCoalescesAndRapidChangesFenceOldWork() async throws {
         let gate = GatedStatsBuild(), controller = StatsController(build: { await gate.build($0) })
@@ -112,7 +113,7 @@ actor GatedStatsBuild {
         #expect(controller.aggregationCount == 1)
         var obsolete: [Task<StatsEngine?, Never>] = []
         for value in 0..<30 {
-            store.searchText = "filter \(value)"
+            store.statsSports = value.isMultiple(of: 2) ? [.ride] : [.run]
             obsolete.append(Task { await controller.engine(for: store) })
             await Task.yield()
         }
@@ -219,7 +220,7 @@ actor GatedStatsBuild {
         let completed = SyncFixtures.complete([try Fixtures.activity(["id": "2"])])
         let ready = SyncController(activities: store, source: { _ in completed }, invalidate: { _ in })
         ready.setSession(SyncFixtures.session(id: "bob"), storage: storage); await ready.refresh()
-        store.activeSportTypes = []
+        store.statsSports = []
         #expect(StatsPresentation(store: store, sync: ready).state == .noMatches)
     }
     @Test func anonymousRecordTiesAndHillOrderUseTheirOwnContracts() {
@@ -245,8 +246,8 @@ actor GatedStatsBuild {
         store.commuteOnly = false; store.privateFilter = false; store.flaggedFilter = false
         store.durationFilter = NumericFilter(value: 7000)
         let engine = try #require(await store.stats.engine(for: store))
-        #expect(engine.activities.map(\.id) == [2])
-        #expect(engine.totals(today: StatsDates.day(known.startDateLocal)).time == 0.5)
+        #expect(engine.activities.map(\.id) == [1, 2])
+        #expect(engine.totals(today: StatsDates.day(known.startDateLocal)).time == Double((unknown.movingTime ?? 0) + (known.movingTime ?? 0)) / 3600)
     }
 
     @Test func reportingDayChangeRejectsInFlightOldWindowButReusesCompletedIndex() async throws {

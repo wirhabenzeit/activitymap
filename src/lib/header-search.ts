@@ -5,7 +5,6 @@ import {
   effectiveActivityPlaces,
   normalizePlaceSearch,
 } from '~/lib/place-library';
-import { filterStatsActivities } from '~/lib/stats/filter-scope';
 import type { RootState } from '~/store';
 import {
   type FilterState,
@@ -95,7 +94,9 @@ export function textFilterCount(
   const scope = { ...state, search: text };
   return includeDate
     ? activities.filter((activity) => applyFilters(scope, activity)).length
-    : filterStatsActivities(activities, scope).length;
+    : activities.filter((activity) =>
+        applyFilters({ ...scope, dateRange: undefined }, activity),
+      ).length;
 }
 
 type Store = Pick<StoreApi<RootState>, 'getState'>;
@@ -125,8 +126,7 @@ export function selectFromSearch(
   return hits;
 }
 
-/** The panel's last row and Enter. Map fits the result; Stats stays put and
- * recalculates. Clearing leaves the camera where it is: fitting every
+/** The panel's last row and Enter. Map fits the result; other workspaces open Map. Clearing leaves the camera where it is: fitting every
  * activity would zoom out to the world. */
 export function applyTextFilter(
   store: Store,

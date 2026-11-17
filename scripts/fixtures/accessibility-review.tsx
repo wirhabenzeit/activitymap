@@ -16,7 +16,7 @@ import { useLibrarySnapshot } from '~/hooks/use-library-snapshot';
 import { registerLibrarySync } from '~/lib/sync/library-sync';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import { upsertActivityDTOs } from '~/lib/sync/v1-store';
-import { store } from '~/store';
+import { store, useShallowStore } from '~/store';
 
 import fixture from '../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
 
@@ -34,6 +34,12 @@ const source = activityDTOSchema.parse({
 const scope = 'auth:accessibility-review';
 
 function Surface({ client }: { client: QueryClient }) {
+  const sportFilters = useShallowStore((state) => ({
+    value: state.sportGroup,
+    onChange: state.setSportGroup,
+    sportType: state.sportType,
+    onSportTypeChange: state.setSportType,
+  }));
   const library = useLibrarySnapshot();
   const [ready, setReady] = useState(false);
   const [commands, setCommands] = useState(0);
@@ -140,7 +146,7 @@ function Surface({ client }: { client: QueryClient }) {
       </section>
       <section aria-label="Sport filter states">
         <SidebarProvider className="min-h-0">
-          <CategoryFilter />
+          <CategoryFilter {...sportFilters} />
         </SidebarProvider>
       </section>
       <Toaster />

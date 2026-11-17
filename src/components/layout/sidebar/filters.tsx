@@ -61,14 +61,16 @@ import {
   useFormattingLocale,
 } from '~/hooks/use-display-preferences';
 import { message } from '~/lib/presentation/messages';
-import { isStatsRoute } from '~/lib/stats/route';
 import { measurementScale, measurementUnit } from '~/lib/units';
 import { cn } from '~/lib/utils';
+import { workspaceFor } from '~/lib/workspace';
 import { categorySettings } from '~/settings/category';
 import { binaryFilters, inequalityFilters } from '~/settings/filter';
 import { useShallowStore } from '~/store';
 import {
   type BinaryFilterMode,
+  type CategoryGroup,
+  type CategoryGroupState,
   type DateRange,
   calendarDateFromLocalDate,
   calendarDateToLocalDate,
@@ -87,14 +89,23 @@ import {
   todayCalendarDate,
 } from './date-range';
 
-export function CategoryFilter() {
-  const { sportType, sportGroup, setSportGroup, setSportType } =
-    useShallowStore((state) => ({
-      sportType: state.sportType,
-      sportGroup: state.sportGroup,
-      setSportGroup: state.setSportGroup,
-      setSportType: state.setSportType,
-    }));
+export function CategoryFilter({
+  value: sportGroup,
+  onChange: setSportGroup,
+  sportType,
+  onSportTypeChange: setSportType,
+  groupsOnly = false,
+}: {
+  value: Record<CategoryGroup, CategoryGroupState>;
+  onChange: (
+    update: React.SetStateAction<Record<CategoryGroup, CategoryGroupState>>,
+  ) => void;
+  sportType?: Record<SportType, boolean>;
+  onSportTypeChange?: (
+    update: React.SetStateAction<Record<SportType, boolean>>,
+  ) => void;
+  groupsOnly?: boolean;
+}) {
   const [clicks, setClicks] = useState(0);
   const [key, setKey] = useState<keyof typeof categorySettings | undefined>(
     undefined,
@@ -191,40 +202,44 @@ export function CategoryFilter() {
                 />
               ) : null}
             </SidebarMenuButton>
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <SidebarMenuAction aria-label={`Choose ${name} activity types`}>
-                  <MoreHorizontal />
-                </SidebarMenuAction>
-              </DropdownMenuTrigger>
-              <PreferenceMenuContent side="right" align="start">
-                <DropdownMenuItem
-                  onSelect={() =>
-                    setSportGroup((group) =>
-                      isolateSportGroup(group, id as keyof typeof group),
-                    )
-                  }
-                >
-                  {message('filters.onlyGroup', { group: name })}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {(
-                  Object.entries(
-                    Object.fromEntries(alias.map((a) => [a, sportType[a]])),
-                  ) as [SportType, boolean][]
-                ).map(([key, selected]) => (
-                  <PreferenceMenuCheckboxItem
-                    checked={selected}
-                    key={key}
-                    onCheckedChange={() =>
-                      setSportType((type) => ({ ...type, [key]: !type[key] }))
+            {!groupsOnly && sportType && setSportType && (
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <SidebarMenuAction
+                    aria-label={`Choose ${name} activity types`}
+                  >
+                    <MoreHorizontal />
+                  </SidebarMenuAction>
+                </DropdownMenuTrigger>
+                <PreferenceMenuContent side="right" align="start">
+                  <DropdownMenuItem
+                    onSelect={() =>
+                      setSportGroup((group) =>
+                        isolateSportGroup(group, id as keyof typeof group),
+                      )
                     }
                   >
-                    {key}
-                  </PreferenceMenuCheckboxItem>
-                ))}
-              </PreferenceMenuContent>
-            </DropdownMenu>
+                    {message('filters.onlyGroup', { group: name })}
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  {(
+                    Object.entries(
+                      Object.fromEntries(alias.map((a) => [a, sportType[a]])),
+                    ) as [SportType, boolean][]
+                  ).map(([key, selected]) => (
+                    <PreferenceMenuCheckboxItem
+                      checked={selected}
+                      key={key}
+                      onCheckedChange={() =>
+                        setSportType((type) => ({ ...type, [key]: !type[key] }))
+                      }
+                    >
+                      {key}
+                    </PreferenceMenuCheckboxItem>
+                  ))}
+                </PreferenceMenuContent>
+              </DropdownMenu>
+            )}
           </SidebarMenuItem>
         ),
       )}
@@ -474,7 +489,6 @@ function DayRangeFields({
 }
 
 export function MonthPicker() {
-  const pathname = usePathname();
   const [dates, setDates] = useShallowStore((state) => [
     state.dateRange,
     state.setDateRange,
@@ -493,8 +507,6 @@ export function MonthPicker() {
       : undefined;
   const dateFormat = useDateFormat();
   const locale = useFormattingLocale();
-
-  if (isStatsRoute(pathname)) return null;
 
   const rangeLabel = dates
     ? formatDateRangeLabel(dates, dateFormat, locale)
@@ -677,14 +689,12 @@ export function SearchFilter() {
 }
 
 export function SelectedActivitiesFilter() {
-  const pathname = usePathname();
   const { onlySelected, setOnlySelected } = useShallowStore((state) => ({
     onlySelected: state.onlySelected,
     setOnlySelected: state.setOnlySelected,
   }));
   const count = useShallowStore((state) => state.selected.length);
   const { state } = useSidebar();
-  if (isStatsRoute(pathname)) return null;
   const content = (
     <label className="flex min-h-10 cursor-pointer items-center justify-between gap-2 text-sm">
       Only selected activities
@@ -718,12 +728,13 @@ export function SelectedActivitiesFilter() {
   return <SidebarMenuItem className="mx-2">{content}</SidebarMenuItem>;
 }
 
-/** Stats clears only its own filters; browsing also clears the reporting
- * period and "only selected". */
+/** Reset the current workspace without touching the other scopes. */
 function useResetFilters() {
   const pathname = usePathname();
   return useShallowStore((state) =>
-    isStatsRoute(pathname) ? state.resetActivityFilters : state.resetFilters,
+    workspaceFor(pathname) === 'stats'
+      ? state.resetStatsScope
+      : state.resetFilters,
   );
 }
 
@@ -754,7 +765,9 @@ export function ResetFilters() {
 /** Result count and active-restriction count, like the native filter panel,
  * with the reset beside the count while any filter is active. */
 export function FilterSummary() {
-  return useHasBrowsingLibrary() ? <FilterSummaryContent /> : null;
+  const workspace = workspaceFor(usePathname());
+  const hasLibrary = useHasBrowsingLibrary();
+  return workspace === 'stats' || hasLibrary ? <FilterSummaryContent /> : null;
 }
 
 function FilterSummaryContent() {
@@ -769,10 +782,12 @@ function FilterSummaryContent() {
     >
       <div className="min-w-0">
         <p className="text-sm font-semibold">
-          {message('filters.resultCount', {
-            shown: result.shown,
-            total: result.total,
-          })}
+          {result.unit === 'sports'
+            ? `${result.shown} of ${result.total} sports`
+            : message('filters.resultCount', {
+                shown: result.shown,
+                total: result.total,
+              })}
         </p>
         {active > 0 && (
           <p className="text-xs text-muted-foreground">

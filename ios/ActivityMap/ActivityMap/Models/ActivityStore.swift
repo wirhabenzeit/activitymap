@@ -159,6 +159,7 @@ final class ActivityStore {
         browsingPreferences?.activate(scope)
         placeUserID = scope?.userID
         applyFilters(browsingPreferences?.filters() ?? ActivityFilterState(), resetSelectedOnly: true)
+        statsSports = browsingPreferences?.statsSports(fallback: initialStatsSports) ?? initialStatsSports
         mapContext.restoreCamera(browsingPreferences?.camera())
         mapContext.saveCamera = { [weak self] in
             guard let self else { return }
@@ -323,11 +324,29 @@ final class ActivityStore {
         return result
     }
 
-    /// Full authorized metadata; map/list dates and selection never narrow Stats.
-    var statsActivities: [Activity] {
-        let query = TextQuery(searchText)
-        return activities.filter { matchesFilters($0, query: query, includeDate: false) }
+    private var savedStatsSports: Set<ActivityCategory>?
+    private var initialStatsSports: Set<ActivityCategory> {
+        let groups = Set(activeSportTypes.map(\.category))
+        return groups.isEmpty ? Set(ActivityCategory.allCases) : groups
     }
+    var statsSports: Set<ActivityCategory> {
+        get {
+            if let savedStatsSports { return savedStatsSports }
+            let initial = initialStatsSports
+            savedStatsSports = initial
+            browsingPreferences?.save(statsSports: initial)
+            return initial
+        }
+        set {
+            savedStatsSports = newValue
+            browsingPreferences?.save(statsSports: newValue)
+        }
+    }
+    var statsActivities: [Activity] {
+        let sports = statsSports
+        return activities.filter { sports.contains($0.category) }
+    }
+    func resetStatsScope() { statsSports = Set(ActivityCategory.allCases) }
 
     /// The text filter, header search and List narrowing share one rule: the
     /// activity's name (ignoring case, keeping accents, as on the web: shared
@@ -409,7 +428,7 @@ final class ActivityStore {
         return count + (onlySelected ? 1 : 0)
     }
 
-    var activeStatsFilterCount: Int { activeFilterCount - (dateDayRange == nil ? 0 : 1) - (onlySelected ? 1 : 0) }
+    var activeStatsFilterCount: Int { statsSports == Set(ActivityCategory.allCases) ? 0 : 1 }
 
     private func matches(_ filter: NumericFilter, _ value: Double?) -> Bool {
         guard let value, value.isFinite, filter.value.isFinite else { return false }
@@ -452,14 +471,7 @@ final class ActivityStore {
         applyFilters(ActivityFilterState(), resetSelectedOnly: true)
     }
 
-    /// Preserve saved browsing dates, selected-only scope, Combine, selected
-    /// IDs, inspection, camera and list context; clear only Stats predicates.
-    func resetStatsActivityFilters() {
-        filterResetRevision &+= 1
-        var next = ActivityFilterState()
-        next.dateDayRange = filters.dateDayRange
-        applyFilters(next)
-    }
+    func resetStatsActivityFilters() { resetStatsScope() }
 
     func toggleSportType(_ sportType: SportType) {
         if activeSportTypes.contains(sportType) {
@@ -546,6 +558,7 @@ final class ActivityStore {
         browsingPreferences?.save(filters: filters)
         browsingPreferences?.save(camera: mapContext.camera)
         browsingPreferences?.activate(nil)
+        savedStatsSports = nil
         mapContext.saveCamera = nil
         applyFilters(ActivityFilterState(), resetSelectedOnly: true)
         selectedPlace = nil

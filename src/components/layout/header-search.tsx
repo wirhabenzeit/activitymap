@@ -28,6 +28,7 @@ import { type LibraryPlace, searchLibraryPlaces } from '~/lib/place-library';
 import { primaryPlaceKind } from '~/lib/place-symbols';
 import { formatMeasurement } from '~/lib/units';
 import { cn } from '~/lib/utils';
+import { workspaceFor } from '~/lib/workspace';
 import { aliasMap, categorySettings } from '~/settings/category';
 import { store, useShallowStore } from '~/store';
 import { useHeaderSearch } from '~/store/header-search';
@@ -206,7 +207,7 @@ function PanelSearch() {
   const pathname = usePathname();
   const router = useRouter();
   const listId = React.useId();
-  const onStats = pathname?.startsWith('/stats') ?? false;
+  const outsideActivities = workspaceFor(pathname) !== 'activities';
   const {
     query: { data: activities = [] },
     filterIDs,
@@ -271,17 +272,20 @@ function PanelSearch() {
       .setPlace({ id: place.id, name: place.name, userId: library.userId });
     if (pathname === '/map')
       store.getState().requestPlaceFly(place.latitude, place.longitude);
-    end();
+    if (outsideActivities) toMap();
+    else end();
   };
   const applyFilter = () => {
     const text = query.trim();
     if (!text) return;
     applyTextFilter(store, text, activities, pathname === '/map');
-    end();
+    if (outsideActivities) toMap();
+    else end();
   };
   const clearFilter = () => {
     store.getState().setSearch('');
-    end();
+    if (outsideActivities) toMap();
+    else end();
   };
   const choose = (option: Option) => {
     if (option.kind === 'activity') pickActivity(option.activity);
@@ -329,7 +333,7 @@ function PanelSearch() {
           replaces={replaces}
           count={
             replaces
-              ? textFilterCount(store.getState(), activities, trimmed, !onStats)
+              ? textFilterCount(store.getState(), activities, trimmed, true)
               : 0
           }
           activeIndex={activeIndex}

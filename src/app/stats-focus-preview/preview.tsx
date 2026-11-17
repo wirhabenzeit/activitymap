@@ -7,18 +7,14 @@ import { useMemo, useState } from 'react';
 import { AppSidebar } from '~/components/layout/app-sidebar';
 import { StatsTileGrid } from '~/components/stats/tiles';
 import { StatsActivityInspector } from '~/components/stats/tiles/activity-inspector';
-import { FilterScope } from '~/components/stats/tiles/scope';
 import { Separator } from '~/components/ui/separator';
 import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
 import { activityDTOSchema } from '~/contracts/v1/activity';
-import {
-  filterStatsActivities,
-  statsFilterScope,
-} from '~/lib/stats/filter-scope';
 import { dayFromISODate } from '~/lib/stats/tile-data';
 import { toStatsActivity } from '~/lib/stats/tile-series';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import { useShallowStore } from '~/store';
+import { filterByStatsSports } from '~/store/stats-scope';
 
 import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
 
@@ -36,31 +32,20 @@ function PreviewStats() {
       ),
     [],
   );
-  const filters = useShallowStore((state) => ({
-    sportType: state.sportType,
-    sportGroup: state.sportGroup,
-    dateRange: state.dateRange,
-    values: state.values,
-    binary: state.binary,
-    search: state.search,
-    place: state.place,
-  }));
-  const reset = useShallowStore((state) => state.resetActivityFilters);
+  const sports = useShallowStore((state) => state.statsSports);
   const stats = useMemo(
-    () => filterStatsActivities(activities, filters).map(toStatsActivity),
-    [activities, filters],
+    () => filterByStatsSports(activities, sports).map(toStatsActivity),
+    [activities, sports],
   );
-  const scope = statsFilterScope(filters);
+  const singleSport = Object.values(sports).filter(Boolean).length === 1;
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <FilterScope labels={scope.labels} onReset={reset} />
       <div className="min-h-0 flex-1">
         <StatsActivityInspector activities={activities} preview>
           {(open, detailsOpen, inspection) => (
             <StatsTileGrid
               activities={stats}
-              filtered={scope.filtered}
-              singleSport={scope.singleSport}
+              singleSport={singleSport}
               reportingDay={dayFromISODate('2026-09-22')}
               onOpenActivity={open}
               detailsOpen={detailsOpen}

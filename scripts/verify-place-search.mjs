@@ -75,7 +75,7 @@ import {TextPlaceFilterChips} from '~/components/text-place-filter-chips';
 import {store,useShallowStore} from '~/store';
 import {useHeaderSearch} from '~/store/header-search';
 import {BrowsingProvider,useBrowsingLibrary} from '~/hooks/use-browsing-library';
-import {filterStatsActivities} from '~/lib/stats/filter-scope';
+import {filterByStatsSports} from '~/store/stats-scope';
 import {dtoToActivityWithPlaces} from '~/lib/sync/v1-mappers';
 import {activityDTOSchema} from '~/contracts/v1/activity';
 import fixture from './shared/place-library-fixtures.v1.json';
@@ -85,7 +85,7 @@ window.fixtureDTOs=fixture.activities.map(row=>activityDTOSchema.parse({...base.
 window.fixtureState=store;window.headerSearch=useHeaderSearch;store.getState().initializeAuth({currentUser:{id:'alice',stravaConnected:true}});store.setState({selected:[1,3]});
 window.replacePlaces=()=>{window.fixtureDTOs=window.fixtureDTOs.map(a=>({...a,placeMatches:a.placeMatches?{...a.placeMatches,places:[]}:null}));for(const fn of listeners)fn();};
 function Header(){const {active,begin}=useHeaderSearch();return <header data-testid="header" style={{position:'relative',display:'flex',alignItems:'center',height:56}} className="bg-header-background text-header-foreground px-2">{active?<HeaderSearchBar/>:<HeaderSearchButton onBegin={begin}/>}</header>;}
-function Results(){const s=useShallowStore(s=>s);const {query:{data=[]},filterIDs}=useBrowsingLibrary();window.resultRenders++;React.useLayoutEffect(()=>{window.committedIDs=filterIDs;},[filterIDs]);return <section style={{padding:20}}><TextPlaceFilterChips/><p data-testid="ids">{filterIDs.join(',')}</p><p data-testid="stats">{filterStatsActivities(data,s).map(a=>a.id).join(',')}</p>
+function Results(){const s=useShallowStore(s=>s);const {query:{data=[]},filterIDs}=useBrowsingLibrary();window.resultRenders++;React.useLayoutEffect(()=>{window.committedIDs=filterIDs;},[filterIDs]);return <section style={{padding:20}}><TextPlaceFilterChips/><p data-testid="ids">{filterIDs.join(',')}</p><p data-testid="stats">{filterByStatsSports(data,s.statsSports).map(a=>a.id).join(',')}</p>
 <button onClick={()=>s.resetFilters()}>Clear filters</button><button onClick={()=>store.setState({dateRange:{start:'2026-01-01',end:'2026-12-31'}})}>Year 2026</button><button onClick={()=>store.setState({dateRange:{start:'2020-01-01',end:'2020-12-31'}})}>Year 2020</button>
 <button onClick={()=>s.initializeAuth({currentUser:{id:'other',stravaConnected:true}})}>Other account</button></section>;}
 function App(){return <main style={{maxWidth:520}}><Header/><Results/></main>;}
@@ -283,7 +283,10 @@ try {
     1,
     'place filter restores for the same account',
   );
-  assert.equal(await page.getByTestId('stats').textContent(), '1,2');
+  assert.equal(
+    await page.getByTestId('stats').textContent(),
+    await page.evaluate(() => window.fixtureDTOs.map((a) => a.id).join(',')),
+  );
   await page
     .getByRole('button', { name: 'Place: Pilátus. View details' })
     .click();

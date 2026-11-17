@@ -6,16 +6,13 @@ import { immer } from 'zustand/middleware/immer';
 import { type StateCreator, createStore } from 'zustand/vanilla';
 
 import { activityDTOSchema } from '~/contracts/v1/activity';
-import {
-  filterStatsActivities,
-  statsFilterScope,
-} from '~/lib/stats/filter-scope';
 import { dtoToActivityWithPlaces } from '~/lib/sync/v1-mappers';
 import {
   type FilterSlice,
   applyFilters,
   createFilterSlice,
 } from '~/store/filter';
+import { allStatsSports, filterByStatsSports } from '~/store/stats-scope';
 
 import fixture from '../../shared/place-library-fixtures.v1.json';
 import base from '../../shared/sync-integrity-fixtures.v1.json';
@@ -119,11 +116,8 @@ void test('place filters intersect text/sport/date constraints and Stats retain 
     fixture.expected.browsingIds,
   );
   assert.deepEqual(
-    filterStatsActivities(activities, store.getState()).map((a) => a.id),
-    fixture.expected.statsIds,
-  );
-  assert.ok(
-    statsFilterScope(store.getState()).labels.includes('Place: Pilátus'),
+    filterByStatsSports(activities, allStatsSports()).map((a) => a.id),
+    activities.map((a) => a.id),
   );
   store.getState().setSearch('Morning');
   assert.equal(
@@ -131,14 +125,14 @@ void test('place filters intersect text/sport/date constraints and Stats retain 
     0,
   );
   assert.deepEqual(
-    filterStatsActivities(activities, store.getState()).map((a) => a.id),
-    [1],
+    filterByStatsSports(activities, allStatsSports()).map((a) => a.id),
+    activities.map((a) => a.id),
   );
   store.getState().setSearch('Pilatus');
   assert.deepEqual(
-    filterStatsActivities(activities, store.getState()).map((a) => a.id),
-    [1, 2],
-    'text also matches the names of visited places',
+    filterByStatsSports(activities, allStatsSports()).map((a) => a.id),
+    activities.map((a) => a.id),
+    'activity text filters do not narrow stats',
   );
   store.getState().resetActivityFilters();
   assert.equal(store.getState().place, undefined);

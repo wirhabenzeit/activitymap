@@ -72,7 +72,6 @@ export type TileContext = {
   dateFormat?: DateFormat;
   activities: StatsActivity[];
   today: number;
-  filtered?: boolean;
   singleSport?: boolean;
   onOpenActivity?: (id: number) => void;
   onExpand?: () => void;
@@ -1513,7 +1512,7 @@ function RecordsDetail({ context }: { context: TileContext }) {
   return (
     <div className="space-y-4">
       <p className="text-xs text-muted-foreground" data-stats-records-scope>
-        {context.filtered ? 'Filtered activities' : 'Across all sports'}
+        Selected sports
         {' · Use Filters to adjust these rankings.'}
       </p>
       <Activity mode={showBothPeriods ? 'hidden' : 'visible'}>

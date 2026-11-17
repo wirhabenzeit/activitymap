@@ -53,7 +53,7 @@ import { Measure } from './charts';
 import { StatsChoices } from './choices';
 import { statsFormat } from './format';
 import { tilePalette } from './format';
-import { FilterScope, useStatsActivities } from './scope';
+import { useStatsActivities } from './scope';
 import {
   type TileContext,
   type TileSummary,
@@ -86,12 +86,11 @@ const optionOf = (options: TileOptions, tile: StatsTile) =>
   options[tile.id] ?? toggleOf(tile)?.options[0];
 
 export default function StatsTiles() {
-  const { query, activities, scope, reset } = useStatsActivities();
+  const { query, activities, singleSport } = useStatsActivities();
   const empty = activities.length === 0;
   const loading = isStatsHistoryLoading(query, empty);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <FilterScope labels={scope.labels} onReset={reset} />
       {query.isError && (
         <div role="alert" className="px-4 py-3 text-sm">
           Could not load activity history.{' '}
@@ -128,8 +127,7 @@ export default function StatsTiles() {
               {(open, detailsOpen, inspection) => (
                 <StatsTileGrid
                   activities={activities}
-                  filtered={scope.filtered}
-                  singleSport={scope.singleSport}
+                  singleSport={singleSport}
                   onOpenActivity={open}
                   detailsOpen={detailsOpen}
                   {...inspection}
@@ -145,7 +143,6 @@ export default function StatsTiles() {
 
 export function StatsTileGrid({
   activities,
-  filtered = false,
   singleSport = false,
   onOpenActivity,
   detailsOpen = false,
@@ -154,7 +151,6 @@ export function StatsTileGrid({
   reportingDay,
 }: {
   activities: StatsActivity[];
-  filtered?: boolean;
   singleSport?: boolean;
   onOpenActivity?: (id: number) => void;
   detailsOpen?: boolean;
@@ -186,7 +182,6 @@ export function StatsTileGrid({
       units,
       dateFormat,
       today: reportingDay ?? today,
-      filtered,
       singleSport,
       onOpenActivity,
       availableWidth,
@@ -202,7 +197,6 @@ export function StatsTileGrid({
       units,
       dateFormat,
       resolvedTheme,
-      filtered,
       singleSport,
       onOpenActivity,
       availableWidth,

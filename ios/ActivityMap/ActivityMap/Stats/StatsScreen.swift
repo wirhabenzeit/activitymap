@@ -160,7 +160,7 @@ private struct StatsDashboardGrid: View, Equatable {
                         }
                     } else if let empty = presentation.empty {
                         BrowsingEmptyView(state: empty, recover: { recovery in
-                            if recovery == .clearFilters { store.resetStatsActivityFilters() }
+                            if recovery == .clearFilters { store.resetStatsScope() }
                         }, scrolls: false)
                     }
                 }
