@@ -32,9 +32,13 @@ export function ExplorerActivities({
   hideTotal?: boolean;
 }) {
   const { formatWithUnit } = statsFormat(context.units);
+  // Reserve the panel even on empty days so the data disclosure below stays put.
   return (
-    <section aria-label={ariaLabel} className="mt-4 border-t pt-4">
-      <div className="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+    <section
+      aria-label={ariaLabel}
+      className="mt-4 flex h-48 flex-col border-t pt-4 sm:h-64"
+    >
+      <div className="mb-2 flex shrink-0 flex-wrap items-baseline justify-between gap-2">
         <h2
           className={
             comfortable ? 'text-base font-medium' : 'text-sm font-medium'
@@ -64,7 +68,7 @@ export function ExplorerActivities({
           No matching activities in this period.
         </p>
       ) : (
-        <div className="max-h-72 divide-y divide-muted overflow-y-auto overscroll-contain">
+        <div className="min-h-0 flex-1 divide-y divide-muted overflow-y-auto overscroll-contain">
           {[...activities].sort(compareStatsActivities).map((a, index) => (
             <ActivityRow
               key={a.id ?? index}

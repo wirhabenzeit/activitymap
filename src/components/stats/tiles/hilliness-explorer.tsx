@@ -19,6 +19,7 @@ import { StatsChoices } from './choices';
 import { ExplorerChart } from './explorer-chart';
 import { ExplorerHeader } from './explorer-layout';
 import { monthName, statsFormat } from './format';
+import { HeadlineValue } from './headline-value';
 import type { TileContext } from './tiles';
 
 export function HillinessExplorer({ context }: { context: TileContext }) {
@@ -115,14 +116,15 @@ export function HillinessExplorer({ context }: { context: TileContext }) {
       <ExplorerHeader context={context} title="Hilliness" />
       <div className="mb-3">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <strong className="text-4xl font-semibold tracking-tight tabular-nums">
-            {formatHilliness(chart.current / 100)} {hillinessUnit}
-          </strong>
-          <span className="text-base text-muted-foreground">
+          <HeadlineValue
+            value={formatHilliness(chart.current / 100)}
+            unit={hillinessUnit}
+          />
+          <span className="text-sm text-muted-foreground">
             {categorySettings[sport].name} · last 12 months
           </span>
         </p>
-        <p className="mt-1 text-base">
+        <p className="mt-1 text-sm">
           Previous 12 months:{' '}
           {activities.some(
             (activity) =>

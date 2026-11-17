@@ -53,6 +53,7 @@ import { Measure } from './charts';
 import { StatsChoices } from './choices';
 import { statsFormat } from './format';
 import { tilePalette } from './format';
+import { HeadlineValue } from './headline-value';
 import { useStatsActivities } from './scope';
 import {
   type TileContext,
@@ -472,19 +473,12 @@ function Headline({
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <div
-          className={cn(
-            'max-w-full min-w-0 shrink-0 font-mono leading-tight font-medium tracking-tight tabular-nums',
-            size === 'tile' && 'mt-1 text-[20px]',
-            size === 'large' && 'mt-1 text-[32px]',
-          )}
-        >
-          {summary.value}
-          {summary.unit && (
-            <small className="ml-1 font-sans text-[13px] font-normal tracking-normal text-muted-foreground">
-              {summary.unit}
-            </small>
-          )}
+        <div className="mt-1 max-w-full min-w-0 shrink-0">
+          <HeadlineValue
+            value={summary.value}
+            unit={summary.unit}
+            size={size}
+          />
         </div>
         {controls}
       </div>

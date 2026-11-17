@@ -22,11 +22,13 @@ import type { StatsMetric } from '~/settings/stats-tiles.generated';
 import { ExplorerActivities } from './explorer-activities';
 import { ExplorerChart } from './explorer-chart';
 import {
+  ExplorerData,
   ExplorerHeader,
   ExplorerSportLegend,
   HistoricalRangeControl,
 } from './explorer-layout';
 import { monthName, statsFormat } from './format';
+import { HeadlineValue } from './headline-value';
 import type { TileContext } from './tiles';
 
 const chartTitles: Record<StatsMetric, { cumulative: string; daily: string }> =
@@ -59,13 +61,14 @@ export function YearExplorer({
     0,
   );
   const [showRange, setShowRange] = useHistoricalRangePreference('year');
-  const [showAll, setShowAll] = useState(false);
   const [hoverMonth, setHoverMonth] = useState<number | null>(null);
   const [hoverComparison, setHoverComparison] = useState<string | null>(null);
   const date = dateOfDay(context.today);
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth();
-  const { formatWithUnit, formatShort } = statsFormat(context.units);
+  const { formatWithUnit, formatShort, formatMetric, metricUnit } = statsFormat(
+    context.units,
+  );
   const dateLabel = formatPreferredDate(date, context.dateFormat, undefined, {
     month: 'short',
     day: 'numeric',
@@ -152,11 +155,6 @@ export function YearExplorer({
       line.key === String(comparison?.start) ||
       line.key === hoverComparison,
   );
-  const rows = showAll
-    ? data.rows
-    : data.rows.filter(
-        (row, index) => index < 3 || row.start === comparison?.start,
-      );
   const sports = sportOrder.filter((sport) =>
     columns.some(
       (column) =>
@@ -177,14 +175,15 @@ export function YearExplorer({
       <ExplorerHeader context={context} title={`${year} so far`} />
       <div className="mb-3">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <strong className="text-4xl font-semibold tracking-tight tabular-nums">
-            {formatWithUnit(current.elapsed, metric)}
-          </strong>
-          <span className="text-base text-muted-foreground">
+          <HeadlineValue
+            value={formatMetric(current.elapsed, metric)}
+            unit={metricUnit[metric]}
+          />
+          <span className="text-sm text-muted-foreground">
             through {dateLabel}
           </span>
         </p>
-        <p className="mt-1 text-base" aria-live="polite">
+        <p className="mt-1 text-sm" aria-live="polite">
           {comparisonSentence}
         </p>
       </div>
@@ -272,103 +271,95 @@ export function YearExplorer({
         comfortable
         hideTotal
       />
-      <section aria-label="Yearly comparisons" className="mt-7 border-t pt-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-base font-medium">Recorded years</h2>
-          {data.rows.length > 3 && (
-            <button
-              type="button"
-              aria-expanded={showAll}
-              onClick={() => setShowAll((value) => !value)}
-              className="min-h-9 rounded px-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2"
-            >
-              {showAll ? 'View fewer years' : 'View all years'}
-            </button>
-          )}
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm tabular-nums">
-            <thead className="border-b text-muted-foreground">
-              <tr>
-                <th scope="col" className="pb-2 text-left font-normal">
-                  Year
-                </th>
-                <th scope="col" className="px-3 pb-2 text-right font-normal">
-                  Through {dateLabel}
-                </th>
-                <th scope="col" className="pb-2 text-right font-normal">
-                  Full year
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.start}
-                  data-comparison-row={row.start}
-                  data-active={
-                    String(row.start) ===
-                    (hoverComparison ?? String(comparison?.start))
-                  }
-                  className={cn(
-                    'border-b border-muted',
-                    hoverComparison === String(row.start)
-                      ? 'bg-header-background/10'
-                      : row.start === comparison?.start && 'bg-muted/40',
-                  )}
-                  onPointerEnter={() => setHoverComparison(String(row.start))}
-                  onPointerLeave={() => setHoverComparison(null)}
-                >
-                  <th scope="row" className="text-left font-normal">
-                    {row.start === current.start ? (
-                      <span className="block py-3 font-medium">
-                        {year}{' '}
-                        <span className="ml-1 font-normal text-muted-foreground">
-                          so far
-                        </span>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label={`Compare ${dateOfDay(row.start).getUTCFullYear()}`}
-                        aria-pressed={row.start === comparison?.start}
-                        onClick={() => setComparison(row.start)}
-                        onFocus={() => setHoverComparison(String(row.start))}
-                        onBlur={() => setHoverComparison(null)}
-                        className="min-h-11 w-full py-2 text-left focus-visible:outline-2"
-                      >
-                        {dateOfDay(row.start).getUTCFullYear()}
-                        {row.start === comparison?.start && (
-                          <span className="ml-2 text-muted-foreground">
-                            Comparing
-                          </span>
-                        )}
-                        {row.incomplete && (
-                          <span className="ml-2 text-muted-foreground">
-                            Partial history
-                          </span>
-                        )}
-                      </button>
-                    )}
+      <ExplorerData>
+        <section aria-label="Yearly comparisons">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-base font-medium">Recorded years</h2>
+          </div>
+          <div className="max-h-80 overflow-auto">
+            <table className="w-full text-sm whitespace-nowrap tabular-nums">
+              <thead className="border-b text-muted-foreground">
+                <tr>
+                  <th scope="col" className="pb-2 text-left font-normal">
+                    Year
                   </th>
-                  <td className="px-3 py-3 text-right">
-                    {formatWithUnit(row.elapsed, metric)}
-                  </td>
-                  <td className="py-3 text-right text-muted-foreground">
-                    {row.start === current.start
-                      ? '—'
-                      : formatWithUnit(row.total, metric)}
-                  </td>
+                  <th scope="col" className="px-3 pb-2 text-right font-normal">
+                    Through {dateLabel}
+                  </th>
+                  <th scope="col" className="pb-2 text-right font-normal">
+                    Full year
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Comparisons use the same calendar date in each year. Hover a year to
-          preview its line; select it to compare.
-        </p>
-      </section>
+              </thead>
+              <tbody>
+                {data.rows.map((row) => (
+                  <tr
+                    key={row.start}
+                    data-comparison-row={row.start}
+                    data-active={
+                      String(row.start) ===
+                      (hoverComparison ?? String(comparison?.start))
+                    }
+                    className={cn(
+                      'border-b border-muted',
+                      hoverComparison === String(row.start)
+                        ? 'bg-header-background/10'
+                        : row.start === comparison?.start && 'bg-muted/40',
+                    )}
+                    onPointerEnter={() => setHoverComparison(String(row.start))}
+                    onPointerLeave={() => setHoverComparison(null)}
+                  >
+                    <th scope="row" className="text-left font-normal">
+                      {row.start === current.start ? (
+                        <span className="block py-3 font-medium">
+                          {year}{' '}
+                          <span className="ml-1 font-normal text-muted-foreground">
+                            so far
+                          </span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Compare ${dateOfDay(row.start).getUTCFullYear()}`}
+                          aria-pressed={row.start === comparison?.start}
+                          onClick={() => setComparison(row.start)}
+                          onFocus={() => setHoverComparison(String(row.start))}
+                          onBlur={() => setHoverComparison(null)}
+                          className="min-h-11 w-full py-2 text-left focus-visible:outline-2"
+                        >
+                          {dateOfDay(row.start).getUTCFullYear()}
+                          {row.start === comparison?.start && (
+                            <span className="ml-2 text-muted-foreground">
+                              Comparing
+                            </span>
+                          )}
+                          {row.incomplete && (
+                            <span className="ml-2 text-muted-foreground">
+                              Partial history
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </th>
+                    <td className="px-3 py-3 text-right font-mono">
+                      {formatWithUnit(row.elapsed, metric)}
+                    </td>
+                    <td className="py-3 text-right font-mono text-muted-foreground">
+                      {row.start === current.start
+                        ? '—'
+                        : formatWithUnit(row.total, metric)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Comparisons use the same calendar date in each year. Hover a year to
+            preview its line; select it to compare.
+          </p>
+        </section>
+      </ExplorerData>
     </div>
   );
 }

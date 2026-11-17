@@ -45,13 +45,14 @@ void test('the shared capability matrix matches actual visible and expandable we
   );
 });
 
-void test('wide Training volume exposes totals and Records exposes both ranges', () => {
+void test('Training volume keeps totals optional and Records exposes both ranges', () => {
   const wide = { ...context, focusWidth: 1100 };
   const volume = renderToStaticMarkup(
     tileView('weeklyVolume')!.detail!(wide, 'distance') as ReactElement,
   );
   assert.match(volume, /Period totals by sport/);
-  assert.doesNotMatch(volume, /<details/);
+  assert.match(volume, /<details[^>]*data-explorer-data/);
+  assert.doesNotMatch(volume, /<details[^>]* open/);
   const records = renderToStaticMarkup(
     tileView('records')!.detail!(wide, undefined) as ReactElement,
   );
@@ -63,7 +64,8 @@ void test('wide Training volume exposes totals and Records exposes both ranges',
     tileView('weeklyVolume')!.detail!(context, 'distance') as ReactElement,
   );
   assert.match(narrow, /Period totals by sport/);
-  assert.doesNotMatch(narrow, /<details/);
+  assert.match(narrow, /<details[^>]*data-explorer-data/);
+  assert.doesNotMatch(narrow, /<details[^>]* open/);
 });
 
 const today = dayFromISODate('2026-09-01');
@@ -366,7 +368,8 @@ void test('expanded training history exposes bounded presets and period totals',
   assert.doesNotMatch(html, /role="combobox"/);
   assert.match(html, /2\.0 h/);
   assert.match(html, /Period totals/);
-  assert.doesNotMatch(html, /<details|<summary/);
+  assert.match(html, /<details[^>]*data-explorer-data/);
+  assert.doesNotMatch(html, /<details[^>]* open/);
   assert.doesNotMatch(html, /Latest week incomplete/);
   assert.match(html, /Period totals by sport/);
   assert.match(html, /scope="col"[^>]*>Ride/);
@@ -747,8 +750,9 @@ void test('month hierarchy tells the comparison story and keeps history secondar
   assert.doesNotMatch(html, /746%|Shaded:/);
   assert.match(html, /Historical range/);
   assert.match(html, /checked=""/);
-  assert.equal((html.match(/data-comparison-row=/g) ?? []).length, 3);
-  assert.match(html, /View all months/);
+  assert.equal((html.match(/data-comparison-row=/g) ?? []).length, 12);
+  assert.match(html, /Show data/);
+  assert.doesNotMatch(html, /<details[^>]* open/);
   assert(
     html.indexOf('Selected day activities') <
       html.indexOf('Monthly comparisons'),
@@ -802,7 +806,7 @@ void test('month chart labels reporting date, future dates and pinned day separa
   assert.equal((html.match(/data-explorer-period=/g) ?? []).length, 30);
 });
 
-void test('year hierarchy aligns its blue cumulative trend and monthly comparison before history', () => {
+void test('year hierarchy aligns its cumulative trend and monthly comparison before history', () => {
   const html = renderToStaticMarkup(
     tileView('yearToDate')!.detail!(
       {
@@ -831,7 +835,7 @@ void test('year hierarchy aligns its blue cumulative trend and monthly compariso
   assert.match(html, /Sep 2026: 155 km; 2025: 18 km/);
   assert.match(html, /data-selected-date="true"[^>]*>Sep<\/text>/);
   assert.match(html, /Sep 2026 · 155 km · 1 activity/);
-  assert.equal((html.match(/data-comparison-row=/g) ?? []).length, 3);
+  assert.equal((html.match(/data-comparison-row=/g) ?? []).length, 4);
   assert(
     html.indexOf('Selected month activities') <
       html.indexOf('Yearly comparisons'),

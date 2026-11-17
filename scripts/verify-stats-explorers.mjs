@@ -66,6 +66,56 @@ try {
           .getAttribute('data-explorer-period'),
         key,
       );
+      const data = focus.locator('[data-explorer-data]');
+      if (await data.count()) {
+        assert.equal(await data.getAttribute('open'), null);
+        assert.equal(await data.locator('table').isVisible(), false);
+        const anchor = () =>
+          data.evaluate(
+            (node) =>
+              node.getBoundingClientRect().top +
+              node.closest('[data-stats-focus-scroll]').scrollTop,
+          );
+        const top = await anchor();
+        const rowKeys = () =>
+          data
+            .locator('tbody tr')
+            .evaluateAll((rows) =>
+              rows.map(
+                (row) => row.dataset.comparisonRow ?? row.dataset.volumeRow,
+              ),
+            );
+        const keys = await rowKeys();
+        await data.locator('summary').focus();
+        await page.keyboard.press('Enter');
+        assert.equal(await data.locator('table').isVisible(), true);
+        const periods = focus.locator(
+          '[data-explorer-period]:not([aria-disabled="true"])',
+        );
+        for (const index of [
+          0,
+          Math.floor((await periods.count()) / 2),
+          (await periods.count()) - 1,
+        ]) {
+          const period = periods.nth(index);
+          await period.click();
+          assert.equal(await period.getAttribute('aria-pressed'), 'true');
+          assert(
+            Math.abs((await anchor()) - top) < 1,
+            `${tile}: data stays anchored at ${width}`,
+          );
+          assert.deepEqual(
+            await rowKeys(),
+            keys,
+            `${tile}: data rows stay stable`,
+          );
+        }
+        await data.locator('summary').click();
+        assert.equal(await data.locator('table').isVisible(), false);
+        await focus.locator('[data-stats-focus-scroll]').evaluate((node) => {
+          node.scrollTop = 0;
+        });
+      }
       await page.screenshot({
         path: join(output, `${tile}-${width}.png`),
         animations: 'disabled',
@@ -131,7 +181,7 @@ try {
     /Select a day to see its activities/,
   );
 
-  assert.equal(await focus.locator('[data-comparison-row]').count(), 3);
+  assert.equal(await focus.locator('[data-comparison-row]').count(), 12);
   const typical = focus.getByRole('checkbox', {
     name: 'Historical range',
   });
@@ -177,9 +227,10 @@ try {
     ticks.every((pair) => pair.length === 2 && pair[0] === pair[1]),
     'Both date axes share exact plotting coordinates',
   );
-  await focus.getByRole('button', { name: 'View all months' }).click();
+  const monthData = focus.locator('[data-explorer-data]');
+  assert.equal(await monthData.getAttribute('open'), null);
+  await monthData.locator('summary').click();
   assert.equal(await focus.locator('[data-comparison-row]').count(), 12);
-  await focus.getByRole('button', { name: 'View fewer months' }).click();
   const filterToggle = page.getByRole('button', {
     name: 'Filters',
     exact: true,
@@ -202,7 +253,7 @@ try {
     /5 of 5 sports/,
   );
   console.log(
-    'Month hierarchy, optional range, aligned axes, compact history and independent sport scope pass',
+    'Month hierarchy, optional range, aligned axes, optional history and independent sport scope pass',
   );
   const row = focus.locator('[data-comparison-row]').nth(2);
   const key = await row.getAttribute('data-comparison-row');
@@ -260,7 +311,7 @@ try {
     '2026 so far',
   );
   assert.equal(await focus.locator('[data-current-endpoint]').count(), 1);
-  assert.equal(await focus.locator('[data-comparison-row]').count(), 3);
+  assert((await focus.locator('[data-comparison-row]').count()) >= 3);
   const yearRange = focus.getByRole('checkbox', { name: 'Historical range' });
   assert.equal(await yearRange.isChecked(), true);
   await focus.getByRole('button', { name: 'About historical range' }).focus();
@@ -316,6 +367,7 @@ try {
     'Year and month range preferences are independent',
   );
   await load('training-volume');
+  await focus.locator('[data-explorer-data] summary').click();
   const volumeRow = focus.locator('[data-volume-row]').nth(3);
   const period = await volumeRow.getAttribute('data-volume-row');
   await volumeRow.hover();
@@ -375,7 +427,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    'PASS: four expanded views at 1440/1024/402px, keyboard activation, linked hover/pinning, sport and period drill-down, stable activity drawer and focus return.',
+    'PASS: four expanded views at 1440/1024/402px, keyboard activation, linked hover/pinning, sport and period drill-down, anchored optional data, stable table rows, stable activity drawer and focus return.',
   );
 } catch (error) {
   await evidence.finish(error);

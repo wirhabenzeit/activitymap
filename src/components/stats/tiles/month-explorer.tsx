@@ -23,7 +23,9 @@ import type { StatsMetric } from '~/settings/stats-tiles.generated';
 
 import { ExplorerActivities } from './explorer-activities';
 import { ExplorerChart } from './explorer-chart';
+import { ExplorerData, ExplorerHeader } from './explorer-layout';
 import { monthName, statsFormat } from './format';
+import { HeadlineValue } from './headline-value';
 import type { TileContext } from './tiles';
 
 const chartTitles: Record<StatsMetric, { cumulative: string; daily: string }> =
@@ -50,10 +52,11 @@ export function MonthExplorer({
     0,
   );
   const [showRange, setShowRange] = useMonthRangePreference();
-  const [showAll, setShowAll] = useState(false);
   const [hoverDay, setHoverDay] = useState<number | null>(null);
   const [hoverComparison, setHoverComparison] = useState<string | null>(null);
-  const { formatWithUnit, formatShort } = statsFormat(context.units);
+  const { formatWithUnit, formatShort, formatMetric, metricUnit } = statsFormat(
+    context.units,
+  );
   const date = dateOfDay(context.today);
   const longMonth = (day: number) =>
     formatPreferredDate(dateOfDay(day), context.dateFormat, undefined, {
@@ -149,40 +152,23 @@ export function MonthExplorer({
       line.key === String(comparison.start) ||
       line.key === hoverComparison,
   );
-  const rows = showAll
-    ? data.rows
-    : data.rows.filter(
-        (row, index) => index < 3 || row.start === comparison.start,
-      );
   const sports = sportOrder.filter((sport) =>
     data.rhythm.days.some((day) => day.bySport[sport] > 0),
   );
   return (
     <div data-period-explorer="month" className="mx-auto max-w-5xl">
-      <header
-        className="mb-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-2"
-        data-month-header
-      >
-        <div className="flex min-w-0 items-center gap-2">
-          {context.focusControls?.back}
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {longMonth(current.start)}
-          </h1>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {context.focusControls?.metric}
-        </div>
-      </header>
+      <ExplorerHeader context={context} title={longMonth(current.start)} />
       <div className="mb-3">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <strong className="text-4xl font-semibold tracking-tight tabular-nums">
-            {formatWithUnit(current.elapsed, metric)}
-          </strong>
-          <span className="text-base text-muted-foreground">
+          <HeadlineValue
+            value={formatMetric(current.elapsed, metric)}
+            unit={metricUnit[metric]}
+          />
+          <span className="text-sm text-muted-foreground">
             through {dateLabel(context.today)}
           </span>
         </p>
-        <p className="mt-1 text-base" aria-live="polite">
+        <p className="mt-1 text-sm" aria-live="polite">
           {comparisonSentence}
         </p>
       </div>
@@ -290,94 +276,88 @@ export function MonthExplorer({
         comfortable
         hideTotal
       />
-      <section aria-label="Monthly comparisons" className="mt-7 border-t pt-4">
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-base font-medium">Recent months</h2>
-          <button
-            type="button"
-            aria-expanded={showAll}
-            onClick={() => setShowAll((value) => !value)}
-            className="min-h-9 rounded px-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2"
-          >
-            {showAll ? 'View fewer months' : 'View all months'}
-          </button>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm tabular-nums">
-            <thead className="border-b text-muted-foreground">
-              <tr>
-                <th scope="col" className="pb-2 text-left font-normal">
-                  Month
-                </th>
-                <th scope="col" className="px-3 pb-2 text-right font-normal">
-                  Through day {date.getUTCDate()}
-                </th>
-                <th scope="col" className="pb-2 text-right font-normal">
-                  Full month
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr
-                  key={row.start}
-                  data-comparison-row={row.start}
-                  data-active={
-                    String(row.start) ===
-                    (hoverComparison ?? String(comparison.start))
-                  }
-                  className={cn(
-                    'border-b border-muted',
-                    row.start === comparison.start && 'bg-muted/40',
-                  )}
-                  onPointerEnter={() => setHoverComparison(String(row.start))}
-                  onPointerLeave={() => setHoverComparison(null)}
-                >
-                  <th scope="row" className="text-left font-normal">
-                    {row.start === current.start ? (
-                      <span className="block py-3 font-medium">
-                        {longMonth(row.start)}{' '}
-                        <span className="ml-1 text-sm font-normal text-muted-foreground">
-                          so far
-                        </span>
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        aria-label={`Compare ${longMonth(row.start)}`}
-                        aria-pressed={row.start === comparison.start}
-                        onClick={() => setComparison(row.start)}
-                        onFocus={() => setHoverComparison(String(row.start))}
-                        onBlur={() => setHoverComparison(null)}
-                        className="min-h-11 w-full py-2 text-left focus-visible:outline-2"
-                      >
-                        {longMonth(row.start)}
-                        {row.start === comparison.start && (
-                          <span className="ml-2 text-sm text-muted-foreground">
-                            Comparing
-                          </span>
-                        )}
-                      </button>
-                    )}
+      <ExplorerData>
+        <section aria-label="Monthly comparisons">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-base font-medium">Recent months</h2>
+          </div>
+          <div className="max-h-80 overflow-auto">
+            <table className="w-full text-sm whitespace-nowrap tabular-nums">
+              <thead className="border-b text-muted-foreground">
+                <tr>
+                  <th scope="col" className="pb-2 text-left font-normal">
+                    Month
                   </th>
-                  <td className="px-3 py-3 text-right">
-                    {formatWithUnit(row.elapsed, metric)}
-                  </td>
-                  <td className="py-3 text-right text-muted-foreground">
-                    {row.start === current.start
-                      ? '—'
-                      : formatWithUnit(row.total, metric)}
-                  </td>
+                  <th scope="col" className="px-3 pb-2 text-right font-normal">
+                    Through day {date.getUTCDate()}
+                  </th>
+                  <th scope="col" className="pb-2 text-right font-normal">
+                    Full month
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Comparisons use the same day of each month. Shorter months use their
-          last day.
-        </p>
-      </section>
+              </thead>
+              <tbody>
+                {data.rows.map((row) => (
+                  <tr
+                    key={row.start}
+                    data-comparison-row={row.start}
+                    data-active={
+                      String(row.start) ===
+                      (hoverComparison ?? String(comparison.start))
+                    }
+                    className={cn(
+                      'border-b border-muted',
+                      row.start === comparison.start && 'bg-muted/40',
+                    )}
+                    onPointerEnter={() => setHoverComparison(String(row.start))}
+                    onPointerLeave={() => setHoverComparison(null)}
+                  >
+                    <th scope="row" className="text-left font-normal">
+                      {row.start === current.start ? (
+                        <span className="block py-3 font-medium">
+                          {longMonth(row.start)}{' '}
+                          <span className="ml-1 text-sm font-normal text-muted-foreground">
+                            so far
+                          </span>
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          aria-label={`Compare ${longMonth(row.start)}`}
+                          aria-pressed={row.start === comparison.start}
+                          onClick={() => setComparison(row.start)}
+                          onFocus={() => setHoverComparison(String(row.start))}
+                          onBlur={() => setHoverComparison(null)}
+                          className="min-h-11 w-full py-2 text-left focus-visible:outline-2"
+                        >
+                          {longMonth(row.start)}
+                          {row.start === comparison.start && (
+                            <span className="ml-2 text-sm text-muted-foreground">
+                              Comparing
+                            </span>
+                          )}
+                        </button>
+                      )}
+                    </th>
+                    <td className="px-3 py-3 text-right font-mono">
+                      {formatWithUnit(row.elapsed, metric)}
+                    </td>
+                    <td className="py-3 text-right font-mono text-muted-foreground">
+                      {row.start === current.start
+                        ? '—'
+                        : formatWithUnit(row.total, metric)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Comparisons use the same day of each month. Shorter months use their
+            last day.
+          </p>
+        </section>
+      </ExplorerData>
     </div>
   );
 }

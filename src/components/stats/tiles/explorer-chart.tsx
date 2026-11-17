@@ -310,11 +310,9 @@ export function ExplorerChart({
                   d={line(s.points) ?? ''}
                   fill="none"
                   className={
-                    titles && s.role === 'current'
-                      ? 'text-header-background'
-                      : s.role === 'current'
-                        ? 'text-foreground'
-                        : 'text-muted-foreground'
+                    s.role === 'current'
+                      ? 'text-foreground'
+                      : 'text-muted-foreground'
                   }
                   stroke="currentColor"
                   strokeWidth={
@@ -368,7 +366,7 @@ export function ExplorerChart({
                             cx={x(last.x)}
                             cy={y(last.y)}
                             r={4.5}
-                            className="fill-header-background"
+                            className="fill-foreground"
                             stroke="hsl(var(--background))"
                             strokeWidth={2}
                           />
@@ -389,7 +387,7 @@ export function ExplorerChart({
                           textAnchor={room ? 'start' : 'end'}
                           className={
                             s.role === 'current'
-                              ? 'fill-header-background'
+                              ? 'fill-foreground'
                               : 'fill-muted-foreground'
                           }
                           fontSize={13}

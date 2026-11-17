@@ -14,8 +14,13 @@ import type { StatsMetric } from '~/settings/stats-tiles.generated';
 import { StatsChoices } from './choices';
 import { ExplorerActivities } from './explorer-activities';
 import { ExplorerChart } from './explorer-chart';
-import { ExplorerHeader, ExplorerSportLegend } from './explorer-layout';
+import {
+  ExplorerData,
+  ExplorerHeader,
+  ExplorerSportLegend,
+} from './explorer-layout';
 import { monthName, statsFormat } from './format';
+import { HeadlineValue } from './headline-value';
 import type { TileContext } from './tiles';
 
 export function VolumeExplorer({
@@ -28,7 +33,6 @@ export function VolumeExplorer({
   const [range, setRange] = useBrowsingState('stats:volumeGrouping', 'weeks');
   const [saved, setSelected] = useBrowsingState('stats:volumePeriod', null);
   const [hover, setHover] = useState<number | null>(null);
-  const [showAll, setShowAll] = useState(false);
   const buckets = useMemo(
     () => volumeHistory(context.activities, context.today, metric, range),
     [context.activities, context.today, metric, range],
@@ -43,7 +47,9 @@ export function VolumeExplorer({
     : buckets.at(-1)!.start;
   const active = hover ?? selected;
   const selectedBucket = buckets.find((b) => b.start === selected)!;
-  const { formatWithUnit, formatShort } = statsFormat(context.units);
+  const { formatWithUnit, formatShort, formatMetric, metricUnit } = statsFormat(
+    context.units,
+  );
   const dateLabel = (day: number) =>
     formatPreferredDate(dateOfDay(day), context.dateFormat, undefined, {
       month: 'short',
@@ -88,19 +94,20 @@ export function VolumeExplorer({
       <ExplorerHeader context={context} title="Training volume" />
       <div className="mb-3">
         <p className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <strong className="text-4xl font-semibold tracking-tight tabular-nums">
-            {formatWithUnit(
+          <HeadlineValue
+            value={formatMetric(
               buckets.reduce((sum, bucket) => sum + bucket.total, 0),
               metric,
             )}
-          </strong>
-          <span className="text-base text-muted-foreground">
+            unit={metricUnit[metric]}
+          />
+          <span className="text-sm text-muted-foreground">
             {range === 'years'
               ? 'over your recorded years'
               : `over 12 ${range}`}
           </span>
         </p>
-        <p className="mt-1 text-base text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           {dateLabel(buckets[0]!.start)} – {dateLabel(buckets.at(-1)!.end)}
         </p>
       </div>
@@ -179,62 +186,46 @@ export function VolumeExplorer({
         hideTotal
         metric={metric}
       />
-      <section
-        aria-label="Period totals"
-        className="mt-7 min-w-0 border-t pt-4"
-      >
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <h2 className="text-base font-medium">Period totals</h2>
-          <button
-            type="button"
-            aria-expanded={showAll}
-            onClick={() => setShowAll((value) => !value)}
-            className="min-h-9 rounded px-2 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline focus-visible:outline-2"
+      <ExplorerData>
+        <section aria-label="Period totals" className="min-w-0">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2 className="text-base font-medium">Period totals</h2>
+          </div>
+          <div
+            className="max-h-80 overflow-auto"
+            tabIndex={0}
+            role="region"
+            aria-label="Period totals by sport"
           >
-            {showAll ? 'View fewer periods' : 'View all periods'}
-          </button>
-        </div>
-        <div
-          className="overflow-x-auto"
-          tabIndex={0}
-          role="region"
-          aria-label="Period totals by sport"
-        >
-          <table className="w-full text-sm whitespace-nowrap">
-            <caption className="sr-only">
-              Period totals by sport, {metric}. Incomplete periods are marked.
-            </caption>
-            <thead className="border-b text-muted-foreground">
-              <tr>
-                <th scope="col" className="p-3 text-left font-normal">
-                  {range === 'weeks'
-                    ? 'Week'
-                    : range === 'months'
-                      ? 'Month'
-                      : 'Year'}
-                </th>
-                {sports.map((s) => (
-                  <th
-                    scope="col"
-                    key={s}
-                    className="px-2 text-right font-normal"
-                  >
-                    {categorySettings[s].name}
+            <table className="w-full text-sm whitespace-nowrap">
+              <caption className="sr-only">
+                Period totals by sport, {metric}. Incomplete periods are marked.
+              </caption>
+              <thead className="border-b text-muted-foreground">
+                <tr>
+                  <th scope="col" className="p-3 text-left font-normal">
+                    {range === 'weeks'
+                      ? 'Week'
+                      : range === 'months'
+                        ? 'Month'
+                        : 'Year'}
                   </th>
-                ))}
-                <th scope="col" className="pr-3 text-right font-normal">
-                  Total
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {[...buckets]
-                .reverse()
-                .filter(
-                  (bucket, index) =>
-                    showAll || index < 4 || bucket.start === selected,
-                )
-                .map((b) => (
+                  {sports.map((s) => (
+                    <th
+                      scope="col"
+                      key={s}
+                      className="px-2 text-right font-normal"
+                    >
+                      {categorySettings[s].name}
+                    </th>
+                  ))}
+                  <th scope="col" className="pr-3 text-right font-normal">
+                    Total
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...buckets].reverse().map((b) => (
                   <tr
                     key={b.start}
                     data-volume-row={b.start}
@@ -275,13 +266,14 @@ export function VolumeExplorer({
                     </td>
                   </tr>
                 ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Hover a row to highlight its bar. Select to see activities.
-        </p>
-      </section>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Hover a row to highlight its bar. Select to see activities.
+          </p>
+        </section>
+      </ExplorerData>
     </div>
   );
 }

@@ -313,9 +313,9 @@ try {
     .getByRole('button', { name: 'By month', exact: true })
     .click();
   assert.equal(
-    await focus.locator('details').count(),
-    0,
-    'Wide period totals should be open',
+    await focus.locator('[data-explorer-data]').getAttribute('open'),
+    null,
+    'Period totals are optional on wide layouts too',
   );
   await focus.getByRole('button', { name: 'Back to stats dashboard' }).click();
   await active(null);
@@ -599,6 +599,7 @@ try {
 
   // A month comparison previews/pins its line, and drill-down preserves geometry.
   await loaded('?tile=this-month');
+  await focus.locator('[data-explorer-data] summary').click();
   const comparisons = focus.locator('[data-comparison-row]');
   const older = comparisons.nth(2);
   const olderKey = await older.getAttribute('data-comparison-row');
@@ -637,6 +638,7 @@ try {
   );
 
   await loaded('?tile=training-volume');
+  await focus.locator('[data-explorer-data] summary').click();
   const periodRow = focus.locator('[data-volume-row]').nth(3);
   const periodKey = await periodRow.getAttribute('data-volume-row');
   await periodRow.hover();
