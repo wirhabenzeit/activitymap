@@ -24,13 +24,18 @@ const defaults = Object.fromEntries(
     .map((key) => [key, null]),
 );
 
-function PreviewStats() {
+type PreviewSnapshot = {
+  activities: Record<string, unknown>[];
+  reportingDate: string;
+};
+
+function PreviewStats({ snapshot }: { snapshot?: PreviewSnapshot }) {
   const activities = useMemo(
     () =>
-      fixture.activities.map((item) =>
+      (snapshot?.activities ?? fixture.activities).map((item) =>
         dtoToActivity(activityDTOSchema.parse({ ...defaults, ...item })),
       ),
-    [],
+    [snapshot],
   );
   const sports = useShallowStore((state) => state.statsSports);
   const stats = useMemo(
@@ -46,7 +51,9 @@ function PreviewStats() {
             <StatsTileGrid
               activities={stats}
               singleSport={singleSport}
-              reportingDay={dayFromISODate('2026-09-22')}
+              reportingDay={dayFromISODate(
+                snapshot?.reportingDate ?? '2026-09-22',
+              )}
               onOpenActivity={open}
               detailsOpen={detailsOpen}
               {...inspection}
@@ -58,8 +65,15 @@ function PreviewStats() {
   );
 }
 
-export default function StatsFocusPreview() {
+export default function StatsFocusPreview({
+  snapshot,
+}: {
+  snapshot?: PreviewSnapshot;
+}) {
   const [client] = useState(() => new QueryClient());
+  const previewURL = snapshot
+    ? '/stats-focus-preview?data=dev'
+    : '/stats-focus-preview';
   return (
     <QueryClientProvider client={client}>
       <SidebarProvider className="flex h-dvh flex-col">
@@ -71,7 +85,7 @@ export default function StatsFocusPreview() {
               className="mx-2 h-8 bg-header-foreground"
             />
             <a
-              href="/stats-focus-preview"
+              href={previewURL}
               aria-label="ActivityMap stats preview"
               className="mr-4 ml-2 flex items-center gap-2 lg:mr-6"
             >
@@ -94,10 +108,10 @@ export default function StatsFocusPreview() {
               >
                 List
               </button>
-              <a href="/stats-focus-preview">Stats</a>
+              <a href={previewURL}>Stats</a>
             </nav>
             <span className="ml-auto px-2 text-xs text-header-foreground/80">
-              Sample preview
+              {snapshot ? 'Dev data preview' : 'Sample preview'}
             </span>
           </div>
         </header>
@@ -106,10 +120,12 @@ export default function StatsFocusPreview() {
           <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <div className="h-14 w-full shrink-0" />
             <div className="min-h-0 w-full flex-1 overflow-hidden">
-              <PreviewStats />
+              <PreviewStats snapshot={snapshot} />
             </div>
             <p className="shrink-0 border-t px-4 py-1 text-xs text-muted-foreground">
-              Local preview · sample activities · September 22, 2026
+              {snapshot
+                ? `Local Convex dev snapshot · ${snapshot.reportingDate}`
+                : 'Local preview · sample activities · September 22, 2026'}
             </p>
           </main>
         </div>

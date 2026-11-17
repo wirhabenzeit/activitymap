@@ -1,15 +1,17 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
+
 import {
   monthActivityRhythm,
-  yearMonthlyRhythm,
   periodTotal,
+  yearMonthlyRhythm,
 } from './period-rhythm';
 import {
+  type StatsActivity,
   dayFromISODate,
   monthVsLastMonth,
   yearToDate,
-  type StatsActivity,
 } from './tile-data';
 
 const make = (
@@ -147,4 +149,30 @@ void test('daily and monthly visuals reconcile with existing period headlines ac
       headline.previous,
     );
   }
+});
+
+void test('monthly bars follow an explicitly selected comparison year at the same date', () => {
+  const rows = yearMonthlyRhythm(
+    [
+      make('2026-01-31', 1),
+      make('2026-02-22', 2),
+      make('2025-02-01', 3, 'ride', 99000),
+      make('2024-01-31', 4, 'run', 20000),
+      make('2024-02-22', 5, 'ride', 30000),
+      make('2024-02-23', 6, 'ride', 40000),
+    ],
+    dayFromISODate('2026-02-22'),
+    'distance',
+    2024,
+  );
+  assert.equal(periodTotal(rows[0]!.previous), 20);
+  assert.equal(periodTotal(rows[1]!.previous), 30);
+  assert.equal(periodTotal(rows[1]!.current), 10);
+  const leap = yearMonthlyRhythm(
+    [make('2023-02-28', 1), make('2023-03-01', 2)],
+    dayFromISODate('2028-02-29'),
+    'distance',
+    2023,
+  );
+  assert.equal(periodTotal(leap[1]!.previous), 10);
 });

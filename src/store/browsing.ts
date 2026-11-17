@@ -2,6 +2,7 @@ import type { PaginationState } from '@tanstack/react-table';
 import { create } from 'zustand';
 
 import type { HistoryRange } from '~/lib/stats/history';
+import type { Sport } from '~/lib/stats/tile-data';
 import type { StatsTileID } from '~/settings/stats-tiles.generated';
 
 export type BrowsingValues = {
@@ -9,8 +10,12 @@ export type BrowsingValues = {
   'stats:options': Partial<Record<StatsTileID, string>>;
   'stats:calendarDay': number | null;
   'stats:monthDay': number | null;
+  'stats:yearMonth': number | null;
   'stats:recordsPeriod': 'currentYear' | 'allTime';
   'stats:volumeGrouping': HistoryRange;
+  'stats:volumePeriod': number | null;
+  'stats:hillinessSport': Sport;
+  'stats:hillinessMonth': number | null;
   'stats:comparison:year': number;
   'stats:comparison:month': number;
 };

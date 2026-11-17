@@ -75,8 +75,11 @@ export function StatsChoices<Option extends string>({
             )?.focus();
           }}
           className={cn(
-            'min-h-11 min-w-11 rounded-[5px] font-medium text-muted-foreground',
-            compact ? 'px-1.5 text-[11px]' : 'px-3 text-xs',
+            'rounded-[5px] font-medium text-muted-foreground',
+            // Tile metrics stay compact on desktop, with full touch targets.
+            compact
+              ? 'min-h-7 min-w-7 px-1.5 py-1 text-[11px] leading-none pointer-coarse:min-h-11 pointer-coarse:min-w-11'
+              : 'min-h-11 min-w-11 px-3 text-xs',
             option === value && 'bg-background text-foreground shadow-xs',
           )}
         >

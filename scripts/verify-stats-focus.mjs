@@ -538,9 +538,9 @@ try {
 
   // Month rhythm and chronological calendar share navigation rules, not selection-on-focus.
   await loaded('?tile=this-month');
-  const monthGrid = focus.locator('[data-stats-month-day]');
+  const monthGrid = focus.locator('[data-explorer-period]');
   const selectedMonthCell = focus.locator(
-    '[data-stats-month-day][aria-pressed="true"]',
+    '[data-explorer-period][aria-pressed="true"]',
   );
   assert.equal(
     await selectedMonthCell.count(),
@@ -556,18 +556,18 @@ try {
     1,
   );
   const selectedMonthDay = Number(
-    await selectedMonthCell.getAttribute('data-stats-month-day'),
+    await selectedMonthCell.getAttribute('data-explorer-period'),
   );
   await selectedMonthCell.focus();
   await page.keyboard.press('ArrowLeft');
   assert.equal(
     await page.evaluate(() =>
-      Number(document.activeElement.dataset.statsMonthDay),
+      Number(document.activeElement.dataset.explorerPeriod),
     ),
     selectedMonthDay - 1,
   );
   assert.equal(
-    Number(await selectedMonthCell.getAttribute('data-stats-month-day')),
+    Number(await selectedMonthCell.getAttribute('data-explorer-period')),
     selectedMonthDay,
     'Arrow browsing does not activate a day',
   );
@@ -575,8 +575,8 @@ try {
   assert.equal(
     Number(
       await focus
-        .locator('[data-stats-month-day][aria-pressed="true"]')
-        .getAttribute('data-stats-month-day'),
+        .locator('[data-explorer-period][aria-pressed="true"]')
+        .getAttribute('data-explorer-period'),
     ),
     selectedMonthDay - 1,
   );
@@ -586,7 +586,7 @@ try {
   await page.keyboard.press('ArrowRight');
   assert.equal(
     await page.evaluate(() =>
-      Number(document.activeElement.dataset.statsMonthDay),
+      Number(document.activeElement.dataset.explorerPeriod),
     ),
     selectedMonthDay - 2,
   );
@@ -594,8 +594,76 @@ try {
     element.dir = 'ltr';
   });
   console.log(
-    'Month grid roving focus, explicit activation and RTL direction pass',
+    'Month timeline roving focus, explicit activation and RTL direction pass',
   );
+
+  // A month comparison previews/pins its line, and drill-down preserves geometry.
+  await loaded('?tile=this-month');
+  const comparisons = focus.locator('[data-comparison-row]');
+  const older = comparisons.nth(2);
+  const olderKey = await older.getAttribute('data-comparison-row');
+  await older.hover();
+  await focus.locator(`[data-explorer-series="${olderKey}"]`).waitFor();
+  assert.equal(await older.getAttribute('data-active'), 'true');
+  await older.getByRole('button').click();
+  await focus.getByRole('heading', { name: 'Recent months' }).hover();
+  assert.equal(
+    await focus.locator(`[data-explorer-series="${olderKey}"]`).count(),
+    1,
+  );
+  await focus.locator(`[data-explorer-period="${selectedMonthDay}"]`).click();
+  const chartBefore = await focus
+    .locator('[data-explorer-chart]')
+    .boundingBox();
+  const outing = focus.locator('[data-stats-activity-id]').first();
+  await outing.click();
+  await dialog.waitFor();
+  assert.equal(
+    (await focus.locator('[data-explorer-chart]').boundingBox()).width,
+    chartBefore.width,
+    'Activity inspection overlays the chart without crossing a layout breakpoint',
+  );
+  assert.equal(
+    await focus
+      .locator(`[data-explorer-period="${selectedMonthDay}"]`)
+      .getAttribute('aria-pressed'),
+    'true',
+  );
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+  assert(await outing.evaluate((el) => el === document.activeElement));
+  console.log(
+    'Linked month comparison, day selection, and stable activity drawer pass',
+  );
+
+  await loaded('?tile=training-volume');
+  const periodRow = focus.locator('[data-volume-row]').nth(3);
+  const periodKey = await periodRow.getAttribute('data-volume-row');
+  await periodRow.hover();
+  assert.equal(
+    await focus
+      .locator(`[data-explorer-period="${periodKey}"]`)
+      .getAttribute('data-active'),
+    'true',
+  );
+  await periodRow.getByRole('button').click();
+  assert.equal(
+    await focus
+      .locator(`[data-explorer-period="${periodKey}"]`)
+      .getAttribute('aria-pressed'),
+    'true',
+  );
+  const lastBar = focus.locator('[data-explorer-period]').last();
+  await lastBar.hover();
+  assert.equal(
+    await focus
+      .locator(
+        `[data-volume-row="${await lastBar.getAttribute('data-explorer-period')}"]`,
+      )
+      .getAttribute('data-active'),
+    'true',
+  );
+  console.log('Volume bars and table share hover and pinned selection');
 
   // Weekday rows browse continuous history, including years outside the face.
   await loaded('?tile=activity-calendar');

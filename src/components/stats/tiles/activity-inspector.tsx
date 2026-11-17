@@ -93,6 +93,7 @@ export function StatsActivityInspector({
     <Measure retainSize className="h-full min-h-0 w-full">
       {({ width }) => (
         <ListDetailTransition
+          overlayPanel
           detailId={detailId ?? 0}
           detail={
             detail ? (

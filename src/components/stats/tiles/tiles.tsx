@@ -9,20 +9,18 @@ import { Activity, type ReactNode, useMemo } from 'react';
 import { useBrowsingState } from '~/hooks/use-browsing-context';
 import { type DateFormat, formatPreferredDate } from '~/lib/date-preferences';
 import { comparisonBand } from '~/lib/stats/comparison-band';
-import { periodComparisons, volumeHistoryAverage } from '~/lib/stats/history';
+import { volumeHistoryAverage } from '~/lib/stats/history';
 import { comparisonPercentage } from '~/lib/stats/presentation-policy';
 import {
   type ActivityRecord,
   type StatsActivity,
   best30Days,
   climbing,
-  dayOf,
   fourWeekVolume,
   mondayOf,
   periodComparison,
   recordRankings,
   records,
-  sameDateLastYear,
   sportMix,
   thisWeek,
   typicalWeek,
@@ -47,7 +45,6 @@ import {
   type StatsTileID,
 } from '~/settings/stats-tiles.generated';
 
-import { ActivityRow } from './activity-row';
 import {
   CumulativeLines,
   type LineSeries,
@@ -63,10 +60,13 @@ import {
   shortDate,
   statsFormat,
 } from './format';
+import { HillinessExplorer } from './hilliness-explorer';
 import { CalendarHistory, VolumeHistory } from './history';
-import { MonthRhythm, YearRhythm } from './period-rhythm';
+import { MonthExplorer } from './month-explorer';
+import { YearExplorer } from './period-explorer';
 
 export type TileContext = {
+  focusControls?: { back: ReactNode; metric: ReactNode };
   units?: UnitSystem;
   models?: StatsTileModels;
   dateFormat?: DateFormat;
@@ -302,103 +302,16 @@ function yearSeries(
 const dayOfYearLabel = (x: number) =>
   shortDate(dateOfDay(yearStart(comparisonYear) + Math.round(x)));
 
-function PeriodComparison({
-  context,
-  option,
-  range,
-}: {
-  context: TileContext;
-  option?: string;
-  range: 'months' | 'years';
-}) {
-  const { formatWithUnit } = statsFormat(context.units);
-  const metric = asMetric(option, 'distance');
-  const date = dateOfDay(context.today);
-  const rows = periodComparisons(
-    context.activities,
-    context.today,
-    metric,
-    range,
-  );
-  const through =
-    range === 'months' ? `day ${date.getUTCDate()}` : shortDate(date);
-  return (
-    <section
-      aria-label={
-        range === 'months' ? 'Monthly comparisons' : 'Yearly comparisons'
-      }
-      className="mt-4"
-    >
-      <h2 className="mb-3 text-sm font-medium">
-        {range === 'months' ? 'Recent months' : 'Recorded years'}
-      </h2>
-      <table className="w-full text-xs tabular-nums">
-        <thead className="border-b text-muted-foreground">
-          <tr>
-            <th className="pb-2 text-left font-medium">
-              {range === 'months' ? 'Month' : 'Year'}
-            </th>
-            <th className="pb-2 pl-3 text-right font-medium">
-              Through {through}
-            </th>
-            <th className="pb-2 pl-3 text-right font-medium">
-              Full {range === 'months' ? 'month' : 'year'}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, index) => {
-            const start = dateOfDay(row.start);
-            return (
-              <tr
-                key={row.start}
-                className={cn(
-                  'border-b border-muted',
-                  index === 0 && 'bg-muted/50 font-medium',
-                )}
-              >
-                <th scope="row" className="py-2 pr-2 text-left font-normal">
-                  {range === 'months'
-                    ? `${monthName(start)} ${start.getUTCFullYear()}`
-                    : start.getUTCFullYear()}
-                  {row.incomplete && (
-                    <span className="block text-[10px] text-muted-foreground">
-                      {index === 0 ? 'In progress' : 'Partial history'}
-                    </span>
-                  )}
-                </th>
-                <td className="py-2 pl-3 text-right">
-                  {formatWithUnit(row.elapsed, metric)}
-                </td>
-                <td className="py-2 pl-3 text-right">
-                  {index === 0 ? '—' : formatWithUnit(row.total, metric)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-      <p className="mt-2 text-[11px] text-muted-foreground">
-        Same calendar date in each period; shorter months end on their last day.
-        Totals follow your activity filters.
-      </p>
-    </section>
-  );
-}
-
 const yearToDateView: TileView = {
+  detail: (context, option) => (
+    <YearExplorer context={context} metric={asMetric(option, 'distance')} />
+  ),
   expandable: true,
   headlineControls: true,
   compactPeriod: ({ today }) => {
     const year = dateOfDay(today).getUTCFullYear();
     return `${year} so far · vs ${year - 1}`;
   },
-  insight: (context, option) => (
-    <YearRhythm context={context} metric={asMetric(option, 'distance')} />
-  ),
-  more: (context, option) => (
-    <PeriodComparison context={context} option={option} range="years" />
-  ),
   period: ({ today }) => {
     const year = dateOfDay(today).getUTCFullYear();
     return `${year} vs ${year - 1}`;
@@ -607,6 +520,9 @@ function monthPair(context: TileContext, metric: StatsMetric): LineSeries[] {
 }
 
 const monthVsLastMonthView: TileView = {
+  detail: (context, option) => (
+    <MonthExplorer context={context} metric={asMetric(option, 'distance')} />
+  ),
   expandable: true,
   headlineControls: true,
   compactPeriod: ({ today }) => {
@@ -616,12 +532,6 @@ const monthVsLastMonthView: TileView = {
     );
     return `${monthName(date)} so far · vs ${monthName(previous)}`;
   },
-  insight: (context, option) => (
-    <MonthRhythm context={context} metric={asMetric(option, 'distance')} />
-  ),
-  more: (context, option) => (
-    <PeriodComparison context={context} option={option} range="months" />
-  ),
   period: ({ today }) => {
     const date = dateOfDay(today);
     const previous = new Date(
@@ -947,6 +857,7 @@ const sportMixView: TileView = {
 // Climbing is a trend: how hilly the last 12 months were, month by month,
 // against the 12 months before.
 const distanceVsElevationView: TileView = {
+  detail: (context) => <HillinessExplorer context={context} />,
   expandable: true,
   period: () => 'Last 12 months',
   summary: ({ activities, today, units = 'metric' }) => {
@@ -1008,79 +919,6 @@ const distanceVsElevationView: TileView = {
           )}
         </FillChart>
       </>
-    );
-  },
-  more: ({
-    activities,
-    today,
-    onOpenActivity,
-    dateFormat,
-    units = 'metric',
-  }) => {
-    const { formatWithUnit, formatHilliness, hillinessUnit } =
-      statsFormat(units);
-
-    const first = sameDateLastYear(today);
-    const hilliest = activities
-      .flatMap((activity) => {
-        const day = dayOf(activity.start_date_local);
-        const km = (activity.distance ?? 0) / 1000;
-        if (day < first || day > today || km < 5) return [];
-        const climb = activity.total_elevation_gain ?? 0;
-        return [
-          {
-            day,
-            sport: activity.sport,
-            id: activity.id,
-            name: activity.name,
-            km,
-            climb,
-            rate: climb / km,
-          },
-        ];
-      })
-      .sort((a, b) => b.rate - a.rate)
-      .slice(0, 5);
-    return (
-      <div className="mt-5">
-        <h4 className="mb-2 text-xs font-medium text-muted-foreground">
-          Hilliest activities ({formatWithUnit(5, 'distance')} or more)
-        </h4>
-        {hilliest.length === 0 && (
-          <p className="text-sm text-muted-foreground">
-            No qualifying activities in the last 12 months.
-          </p>
-        )}
-        <ul className="divide-y divide-muted">
-          {hilliest.map((activity, index) => (
-            <li key={activity.id ?? index}>
-              <ActivityRow
-                activityId={activity.id}
-                sport={activity.sport}
-                name={activity.name}
-                summary={
-                  <>
-                    {formatPreferredDate(
-                      dateOfDay(activity.day),
-                      dateFormat,
-                      undefined,
-                      { month: 'short', day: 'numeric', year: 'numeric' },
-                    )}{' '}
-                    · {formatWithUnit(activity.km, 'distance')} ·{' '}
-                    {formatWithUnit(activity.climb, 'elevation')} climbed
-                  </>
-                }
-                detail={`${formatHilliness(activity.rate)} ${hillinessUnit}`}
-                onOpen={
-                  activity.id !== undefined && onOpenActivity
-                    ? () => onOpenActivity(activity.id!)
-                    : undefined
-                }
-              />
-            </li>
-          ))}
-        </ul>
-      </div>
     );
   },
 };

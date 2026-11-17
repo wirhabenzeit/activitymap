@@ -10,7 +10,6 @@ import {
   dot,
   lineY,
   ruleY,
-  stack,
   text,
 } from '@tanstack/charts';
 import { Chart } from '@tanstack/charts/react';
@@ -21,9 +20,7 @@ import { type CSSProperties, type ReactNode } from 'react';
 
 import { useElementSize } from '~/hooks/use-element-size';
 import { type ComparisonBand } from '~/lib/stats/comparison-band';
-import { type Sport, sportOrder } from '~/lib/stats/tile-data';
 import { dateOfDay, volumeDomain } from '~/lib/stats/tile-series';
-import { categorySettings } from '~/settings/category';
 
 import { type TilePalette, axisTicks, formatShort } from './format';
 
@@ -52,9 +49,6 @@ export function Measure({
     </div>
   );
 }
-
-const sportColors = sportOrder.map((sport) => categorySettings[sport].color);
-const sportName = (sport: Sport) => categorySettings[sport].name;
 
 export type LineSeries = {
   key: string;
@@ -493,188 +487,6 @@ export function VolumeArea({
       width={width}
       height={height}
       ariaLabel="Weekly totals"
-    />
-  );
-}
-
-export type SportBar = { x: string; sport: Sport; value: number };
-
-export function SportArea({
-  rows,
-  width,
-  height,
-  detail,
-  average,
-  incomplete = [],
-  trend = [],
-  trendLabel = '4-week average',
-  palette,
-  valueFormat,
-  axisFormat = formatShort,
-  xTickFormat,
-}: {
-  rows: SportBar[];
-  width: number;
-  height: number;
-  detail: boolean;
-  average?: number;
-  // Periods without a whole period of data, drawn lighter.
-  incomplete?: readonly string[];
-  // A line over the area, such as a rolling average.
-  trend?: { x: string; value: number }[];
-  trendLabel?: string;
-  palette: TilePalette;
-  valueFormat: (value: number) => string;
-  axisFormat?: (value: number, step: number) => string;
-  xTickFormat?: (x: string) => string;
-}) {
-  const xs = Array.from(new Set(rows.map((row) => row.x)));
-  const isIncomplete = (x: string) => incomplete.includes(x);
-  const bars = (source: SportBar[], fillOpacity: number) =>
-    barY(source, {
-      x: 'x',
-      y: 'value',
-      color: 'sport',
-      layout: stack({ order: [...sportOrder] }),
-      inset: 1,
-      fillOpacity,
-    });
-  const totals = xs.map((x) => ({
-    x,
-    value: rows
-      .filter((row) => row.x === x)
-      .reduce((sum, row) => sum + row.value, 0),
-    kind: 'Total',
-  }));
-  // Separate adjacent segments keep both the opening and current partial
-  // periods light, without dropping their contribution or bridging a gap.
-  const segments = xs.slice(0, -1).map((x, index) => {
-    const ends = [x, xs[index + 1]!];
-    return { ends, incomplete: ends.some(isIncomplete) };
-  });
-  const definition = defineChart({
-    marks: [
-      // A lone year still needs a visible footprint at its single period.
-      ...(xs.length === 1
-        ? [bars(rows, isIncomplete(xs[0]!) ? 0.3 : 0.8)]
-        : []),
-      ...segments.flatMap((segment) => [
-        areaY(
-          rows.filter((row) => segment.ends.includes(row.x)),
-          {
-            x: 'x',
-            y: 'value',
-            z: 'sport',
-            color: 'sport',
-            fillOpacity: segment.incomplete ? 0.3 : 0.8,
-            layout: stack({ order: [...sportOrder] }),
-          },
-        ),
-        lineY(
-          totals.filter((row) => segment.ends.includes(row.x)),
-          {
-            x: 'x',
-            y: 'value',
-            stroke: segment.incomplete ? palette.muted : palette.foreground,
-            strokeWidth: 1,
-            ...(segment.incomplete ? { strokeDasharray: '2 3' } : {}),
-          },
-        ),
-      ]),
-      lineY(trend, {
-        x: 'x',
-        y: 'value',
-        stroke: palette.foreground,
-        strokeWidth: 1.5,
-        strokeOpacity: 0.9,
-        strokeDasharray: '4 3',
-      }),
-      ...(average !== undefined && detail
-        ? [
-            ruleY([average], {
-              stroke: palette.muted,
-              strokeDasharray: '4 3',
-            }),
-          ]
-        : []),
-    ],
-    guides: detail,
-    margin: detail ? undefined : { top: 2, right: 0, bottom: 0, left: 0 },
-    scales: {
-      x: {
-        scale: d3.scaleBand<string>().domain(xs).padding(0.2),
-        axis: detail
-          ? { ticks: { format: xTickFormat ?? ((x: string) => x) } }
-          : false,
-      },
-      y: {
-        scale: d3.scaleLinear,
-        nice: true,
-        axis: detail
-          ? {
-              ticks: axisTicks(
-                d3.ticks(
-                  0,
-                  Math.max(
-                    1,
-                    ...totals.map((row) => row.value),
-                    ...trend.map((row) => row.value),
-                    average ?? 0,
-                  ),
-                  5,
-                ),
-                axisFormat,
-              ),
-            }
-          : false,
-      },
-    },
-    color: { domain: [...sportOrder], range: sportColors },
-    tooltip: {
-      use: tooltip,
-      // Tiles clip their content; render the tooltip outside them.
-      portal,
-      items: [
-        {
-          channel: 'group',
-          label: 'Sport',
-          text: (point) =>
-            'sport' in point.datum
-              ? sportName(point.datum.sport)
-              : 'kind' in point.datum
-                ? String(point.datum.kind)
-                : trendLabel,
-        },
-        {
-          id: 'x',
-          label: 'When',
-          text: (point) =>
-            `${(xTickFormat ?? ((x: string) => x))(point.datum.x)}${isIncomplete(point.datum.x) ? ' · incomplete' : ''}`,
-        },
-        {
-          id: 'value',
-          label: 'Value',
-          text: (point) => valueFormat(point.datum.value),
-        },
-        {
-          id: 'total',
-          label: 'Period total',
-          text: (point) =>
-            valueFormat(
-              rows
-                .filter((row) => row.x === point.datum.x)
-                .reduce((sum, row) => sum + row.value, 0),
-            ),
-        },
-      ],
-    },
-  });
-  return (
-    <Chart
-      definition={definition}
-      width={width}
-      height={height}
-      ariaLabel="Totals by sport"
     />
   );
 }

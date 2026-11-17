@@ -17,6 +17,7 @@
     "test:account-deletion-ui": "node scripts/verify-account-deletion.mjs",
     "test:stats-ui": "tsx --test src/components/stats/tiles/*.test.ts src/components/stats/tiles/*.test.tsx",
     "test:stats-focus": "node scripts/verify-stats-focus.mjs",
+    "test:stats-explorers": "node scripts/verify-stats-explorers.mjs",
     "test:list-ui": "node scripts/verify-list-inspection.mjs",
     "cron:deploy": "pnpm dlx wrangler@4 deploy --config cloudflare/cron/wrangler.jsonc",
     "openapi:generate": "tsx scripts/generate-openapi.ts",

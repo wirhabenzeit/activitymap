@@ -17,6 +17,7 @@ export function ActivityRow({
   detail,
   onOpen,
   selected = false,
+  comfortable = false,
 }: {
   activityId?: number;
   sport: Sport;
@@ -25,6 +26,7 @@ export function ActivityRow({
   detail?: ReactNode;
   onOpen?: () => void;
   selected?: boolean;
+  comfortable?: boolean;
 }) {
   const { icon: SportIcon, color, name: sportName } = categorySettings[sport];
   const content = (
@@ -38,7 +40,14 @@ export function ActivityRow({
         <span className="block font-medium break-words">
           {name?.trim() ? name : sportName}
         </span>
-        <span className="block text-xs text-muted-foreground">{summary}</span>
+        <span
+          className={cn(
+            'block text-muted-foreground',
+            comfortable ? 'text-sm' : 'text-xs',
+          )}
+        >
+          {summary}
+        </span>
         {detail && (
           <span className="mt-1 block text-xs tabular-nums">{detail}</span>
         )}
