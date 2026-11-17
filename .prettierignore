@@ -9,3 +9,6 @@ public/
 # Written by pnpm map-styles:generate / frozen provider snapshots.
 shared/map-styles/generated/
 shared/map-styles/upstream/
+
+# Exact bundle copies of shared/map-styles/generated, written by map-catalog:generate.
+ios/ActivityMap/ActivityMap/MapStyles/

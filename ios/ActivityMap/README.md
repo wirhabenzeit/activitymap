@@ -113,7 +113,7 @@ release tags matching `ios/v*`, with these environment secrets:
 | `APP_STORE_CONNECT_KEY_ID`      | Dedicated App Store Connect team API key ID                                                      |
 | `APP_STORE_CONNECT_ISSUER_ID`   | Team API issuer ID                                                                               |
 | `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines                                     |
-| `MAPTILER_KEY`           | Optional public MapTiler key for Outdoors and Satellite                                                     |
+| `MAPTILER_KEY`                  | Optional public MapTiler key for Outdoors and Satellite                                          |
 
 The API key needs the **Developer** role for uploads and beta-build metadata.
 Team API keys apply across the team's apps; they cannot be restricted to one app.
