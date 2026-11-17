@@ -144,15 +144,14 @@ const sportColorExpression = (): ExpressionSpecification =>
 const RouteLayer = React.memo(function RouteLayer({
   activities,
   filterIDs,
+  selected,
+  highlighted,
 }: {
   activities: Activity[];
   filterIDs: number[];
+  selected: number[];
+  highlighted: number;
 }) {
-  const { selected, highlighted } = useShallowStore((state) => ({
-    selected: state.selected,
-    highlighted: state.highlighted,
-  }));
-
   const geoJson = useActivityGeoJsonFromActivities(activities);
 
   const color = sportColorExpression();
@@ -215,8 +214,30 @@ const RouteLayer = React.memo(function RouteLayer({
 });
 
 const NO_PADDING = { top: 0, bottom: 0, left: 0, right: 0 };
+const NO_SUMMARY_ACTIVITIES: never[] = [];
 
-export default function InteractiveMap() {
+/**
+ * While the map is hidden behind another tab it keeps the last value it
+ * showed, so library, filter and selection changes made elsewhere do not
+ * re-tile routes nobody can see. It catches up once it is shown again.
+ */
+function useHeldWhileHidden<T>(value: T, active: boolean): T {
+  const [held, setHeld] = useState(value);
+  if (active && held !== value) setHeld(value);
+  return active ? value : held;
+}
+
+/**
+ * The browsing map. Under the app shell it stays mounted across Map/List/Stats
+ * switches (see `PersistentMap`) and is told whether it is on screen through
+ * `active`: rebuilding the route source on every visit cost ~1 s for a few
+ * thousand activities.
+ */
+export default function InteractiveMap({
+  active = true,
+}: {
+  active?: boolean;
+}) {
   const searchParams = useSearchParams();
   const sharedMapState = useMemo(
     () => parseMapShareParams(searchParams),
@@ -320,7 +341,10 @@ export default function InteractiveMap() {
       }),
     [activityDict, selected],
   );
-  usePrefetchStreamSummaries(selectedSummaryActivities, summaryUserId);
+  usePrefetchStreamSummaries(
+    active ? selectedSummaryActivities : NO_SUMMARY_ACTIVITIES,
+    summaryUserId,
+  );
   const mapRefLoc = useRef<MapRef>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const detailBackButtonRef = useRef<HTMLButtonElement>(null);
@@ -366,7 +390,7 @@ export default function InteractiveMap() {
     !isDefaultViewState(mapPosition);
 
   useEffect(() => {
-    if (!placeFlyRequest || !mapLoaded) return;
+    if (!placeFlyRequest || !mapLoaded || !active) return;
     const map = mapRefLoc.current?.getMap();
     if (!map) return;
     // Centre the chosen place beside any results panel, close enough to see
@@ -424,10 +448,12 @@ export default function InteractiveMap() {
       else if (++tries < 60) requestAnimationFrame(record);
     };
     requestAnimationFrame(record);
-  }, [placeFlyRequest, mapLoaded, completePlaceFly, setPosition]);
+  }, [placeFlyRequest, mapLoaded, active, completePlaceFly, setPosition]);
 
   useEffect(() => {
-    if (!routeFitRequest || !mapLoaded || activitiesPending) return;
+    // Fit only once the map is on screen: its results panel, whose size sets
+    // the padding, is not rendered while hidden.
+    if (!routeFitRequest || !mapLoaded || !active || activitiesPending) return;
     const map = mapRefLoc.current?.getMap();
     if (!map) return;
     let frame = 0,
@@ -558,6 +584,7 @@ export default function InteractiveMap() {
   }, [
     routeFitRequest,
     mapLoaded,
+    active,
     activitiesPending,
     activityDict,
     filterIDSet,
@@ -823,6 +850,16 @@ export default function InteractiveMap() {
     setPickCount((count) => count + 1);
   }, []);
 
+  // What the map layers draw; frozen while another tab is on screen.
+  const shownActivities = useHeldWhileHidden(activities, active);
+  const shownActivityDict = useHeldWhileHidden(activityDict, active);
+  const shownVisibleIDs = useHeldWhileHidden(visibleIDs, active);
+  const shownVisibleIDSet = useHeldWhileHidden(visibleIDSet, active);
+  const shownVisibleSelected = useHeldWhileHidden(visibleSelected, active);
+  const shownSelected = useHeldWhileHidden(selected, active);
+  const shownHighlighted = useHeldWhileHidden(highlighted, active);
+  const shownPhotos = useHeldWhileHidden(photos, active);
+
   // Part of #132: a visitor who arrived via a legacy `/map?user=`/
   // `/map?activities=` share link gets an explicit "no longer works"
   // message instead of a silently empty map - see
@@ -877,9 +914,9 @@ export default function InteractiveMap() {
           <Selection onSelection={handleMapPick} />
           <Overlay position="top-left">
             <LayerSwitcher
-              activities={activityDict}
-              visibleIds={visibleIDs}
-              photos={photos}
+              activities={shownActivityDict}
+              visibleIds={shownVisibleIDs}
+              photos={shownPhotos}
             />
           </Overlay>
           <Overlay position="top-left">
@@ -900,25 +937,32 @@ export default function InteractiveMap() {
             </MapControlIconButton>
           </Overlay>
           {overlayMapComponents}
-          <RouteLayer activities={activities} filterIDs={visibleIDs} />
+          <RouteLayer
+            activities={shownActivities}
+            filterIDs={shownVisibleIDs}
+            selected={shownSelected}
+            highlighted={shownHighlighted}
+          />
           <ElevationRouteMarker
-            activities={activityDict}
-            visibleIDs={visibleIDSet}
+            activities={shownActivityDict}
+            visibleIDs={shownVisibleIDSet}
           />
           <ActivityPlacesLayers
-            activities={activityDict}
-            selectedIds={visibleSelected}
-            visibleIds={visibleIDs}
+            activities={shownActivityDict}
+            selectedIds={shownVisibleSelected}
+            visibleIds={shownVisibleIDs}
             showAllPlaces={showPlaces}
             inspectedActivityId={detailId || undefined}
             onPickActivities={handleMapPick}
-            highlighted={highlighted}
+            highlighted={shownHighlighted}
           />
-          {showPhotos && <PhotoLayer photos={photos} visibleIDs={visibleIDs} />}
+          {showPhotos && (
+            <PhotoLayer photos={shownPhotos} visibleIDs={shownVisibleIDs} />
+          )}
           <PlaceFilterPin />
         </ReactMapGL>
       )}
-      {selected.length > 0 && (
+      {active && selected.length > 0 && (
         <div
           ref={panelRef}
           id="map-route-panel"

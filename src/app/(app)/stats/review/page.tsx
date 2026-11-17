@@ -1,12 +1,14 @@
 // Local, reproducible visual review using the same input and reporting date as SwiftUI.
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
+
 import { notFound } from 'next/navigation';
+
 import { StatsTileGrid } from '~/components/stats/tiles';
 import { activityDTOSchema } from '~/contracts/v1/activity';
-import { dtoToActivity } from '~/lib/sync/v1-mappers';
-import { toStatsActivity } from '~/lib/stats/tile-series';
 import { dayFromISODate } from '~/lib/stats/tile-data';
+import { toStatsActivity } from '~/lib/stats/tile-series';
+import { dtoToActivity } from '~/lib/sync/v1-mappers';
 
 export default async function Page() {
   if (process.env.NODE_ENV !== 'development') notFound();
@@ -33,11 +35,16 @@ export default async function Page() {
     ),
   );
   return (
-    <StatsTileGrid
-      activities={activities}
-      reportingDay={dayFromISODate(
-        process.env.ACTIVITYMAP_STATS_GALLERY_DAY ?? '2026-09-22',
-      )}
-    />
+    <div
+      className="h-full min-h-0 w-full"
+      style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}
+    >
+      <StatsTileGrid
+        activities={activities}
+        reportingDay={dayFromISODate(
+          process.env.ACTIVITYMAP_STATS_GALLERY_DAY ?? '2026-09-22',
+        )}
+      />
+    </div>
   );
 }

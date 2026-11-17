@@ -13,3 +13,20 @@ export function navigationView(
   if (isStatsRoute(pathname)) return 'stats';
   return undefined;
 }
+
+/** The paths of the views the app shell renders itself (see `AppViews`). */
+export const appViewPaths = {
+  map: '/map',
+  list: '/list',
+  stats: '/stats/tiles',
+} as const satisfies Record<NavigationView, string>;
+
+/** The shell view at exactly this path; `/stats/review` and friends are
+ * ordinary pages that Next.js renders. */
+export function appViewForPath(
+  pathname: string | null | undefined,
+): NavigationView | undefined {
+  return (Object.keys(appViewPaths) as NavigationView[]).find(
+    (view) => appViewPaths[view] === pathname,
+  );
+}

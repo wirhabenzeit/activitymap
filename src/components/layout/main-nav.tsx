@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
+import { isPlainClick, switchViewInPage } from '~/lib/app-views';
 import { message } from '~/lib/presentation/messages';
 import { cn } from '~/lib/utils';
 
@@ -46,6 +47,12 @@ export function MainNav() {
           <Link
             key={view}
             href={href}
+            onClick={(event) => {
+              // Between shell views, skip the server round-trip of a route
+              // navigation; see `~/lib/app-views.ts`.
+              if (isPlainClick(event) && switchViewInPage(href))
+                event.preventDefault();
+            }}
             aria-current={currentView === view ? 'page' : undefined}
             className={cn(
               'inline-flex min-h-11 items-center hover:text-header-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4',

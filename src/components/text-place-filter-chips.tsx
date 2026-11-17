@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { PlaceDetail } from '~/components/place-detail';
 import { usePlaceLibrary } from '~/hooks/use-place-library';
+import { navigateToView } from '~/lib/app-views';
 import { store, useShallowStore } from '~/store';
 import { applyFilters } from '~/store/filter';
 
@@ -44,7 +45,7 @@ export function TextPlaceFilterChips() {
         );
     }
     setInspecting(false);
-    router.push(destination === 'map' ? '/map' : '/list');
+    navigateToView(router, destination === 'map' ? '/map' : '/list');
   };
 
   return (

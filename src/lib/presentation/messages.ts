@@ -12,13 +12,21 @@ export function resolveMessageLocale(
 ): 'en' {
   return PRODUCT_LOCALE;
 }
+// Read by every list row's `useSyncExternalStore` snapshot; canonicalising
+// the same navigator language on each render showed up in list profiles.
+const canonicalLocales = new Map<string, string>();
 export function formattingLocale(preferred?: string): string {
   if (!preferred) return PRODUCT_LOCALE;
-  try {
-    return Intl.getCanonicalLocales(preferred)[0] ?? PRODUCT_LOCALE;
-  } catch {
-    return PRODUCT_LOCALE;
+  let locale = canonicalLocales.get(preferred);
+  if (locale === undefined) {
+    try {
+      locale = Intl.getCanonicalLocales(preferred)[0] ?? PRODUCT_LOCALE;
+    } catch {
+      locale = PRODUCT_LOCALE;
+    }
+    canonicalLocales.set(preferred, locale);
   }
+  return locale;
 }
 
 type Message = {

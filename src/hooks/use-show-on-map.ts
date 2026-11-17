@@ -4,6 +4,7 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useCallback } from 'react';
 
 import type { Activity } from '~/lib/activity';
+import { navigateToView } from '~/lib/app-views';
 import { showActivityOnMap } from '~/lib/show-on-map';
 import { store } from '~/store';
 
@@ -38,11 +39,9 @@ export function useShowOnMap(activities: Activity[] | undefined) {
         });
         return;
       }
-      router.push(
-        pathname === '/selection-prototype'
-          ? '/selection-prototype?view=map'
-          : '/map',
-      );
+      if (pathname === '/selection-prototype')
+        router.push('/selection-prototype?view=map');
+      else navigateToView(router, '/map');
     },
     [activities, pathname, router],
   );
