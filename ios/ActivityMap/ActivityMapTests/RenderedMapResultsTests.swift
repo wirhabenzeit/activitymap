@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import SwiftUI
 import Testing
 import UIKit
@@ -7,9 +7,6 @@ import UIKit
 extension RenderedRoutePickingTests {
     @Test(arguments: ["single", "multiple", "compact", "wide", "landscape", "landscape-detail", "wide-detail", "large-text", "hidden", "hidden-request", "no-gps"])
     func renderedMapResults(scenario: String) async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
         var activities = (1...4).map { ActivityStoreSelectionTests.activity($0, route: $0 != 4) }
         let names = ["Morning ride along the river", "Through the forest", "Evening loop", "Indoor training"]
         for i in activities.indices {
@@ -36,9 +33,9 @@ extension RenderedRoutePickingTests {
         host.view.frame = window.bounds
         try await resultsWait { self.mapView(in: host.view) != nil }
         let map = try #require(mapView(in: host.view))
-        try await resultsWait { map.mapboxMap.isStyleLoaded }
+        try await resultsWait { map.renderer.isStyleLoaded }
         try await Task.sleep(for: .milliseconds(100))
-        map.mapboxMap.setCamera(to: CameraOptions(center: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005), zoom: 13))
+        map.renderer.setCamera(to: MapCamera(center: CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005), zoom: 13))
         let single = scenario == "single" || scenario.hasSuffix("-detail") || scenario == "compact" || scenario == "large-text" || scenario == "hidden"
         store.replaceSelection(with: single ? [1] : [1, 2, 3, 4])
         picker.reviewSelection(store: store)
@@ -91,7 +88,7 @@ extension RenderedRoutePickingTests {
                 try await resultsWait { store.mapContext.pendingRequest == nil }
                 try await Task.sleep(for: .milliseconds(650))
             }
-            let points = map.mapboxMap.points(for: activities[0].coordinates)
+            let points = map.renderer.points(for: activities[0].coordinates)
             let layout = MapResultsLayout(size: host.view.bounds.size, topInset: 62, bottomInset: host.view.safeAreaInsets.bottom, detent: .medium)
             if layout.isSidePanel {
                 #expect(points.allSatisfy { $0.x < layout.frame.minX }, "Fit must leave routes to the left of the right-hand panel")
@@ -119,8 +116,8 @@ extension RenderedRoutePickingTests {
         return view.subviews.compactMap { resultsScroll(in: $0) }.first
     }
 
-    private func mapView(in view: UIView) -> MapView? {
-        if let map = view as? MapView { return map }
+    private func mapView(in view: UIView) -> MLNMapView? {
+        if let map = view as? MLNMapView { return map }
         return view.subviews.compactMap { mapView(in: $0) }.first
     }
 

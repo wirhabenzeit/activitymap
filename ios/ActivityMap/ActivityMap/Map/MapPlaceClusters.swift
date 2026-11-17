@@ -1,7 +1,7 @@
-import MapboxMaps
+import MapLibre
 import SwiftUI
 
-struct MapPlaceClusters: MapContent {
+struct MapPlaceClusters: View {
     let groups: [MapPlaceLayout.Group]
     let places: [String: DisplayMatchedPlace]
     let focusedID: String?
@@ -10,19 +10,22 @@ struct MapPlaceClusters: MapContent {
     let select: (DisplayMatchedPlace) -> Void
     let close: () -> Void
 
+    let positions: MapPositionState
+    let proxy: MapProxy
+
     static func offset(_ group: MapPlaceLayout.Group, groups: [MapPlaceLayout.Group], focusedID: String?) -> CGPoint {
         guard let focused = groups.first(where: { $0.id == focusedID }),
               hypot(group.x - focused.x, group.y - focused.y) < MapPlaceLayout.pinSpacing else { return .zero }
         return CGPoint(x: 40, y: 24)
     }
 
-    var body: some MapContent {
-        ForEvery(groups.filter { $0.pointIDs.count > 1 }) { group in
+    var body: some View {
+        ForEach(groups.filter { $0.pointIDs.count > 1 }) { group in
             if let anchor = places[group.id] {
                 let coordinate = CLLocationCoordinate2D(latitude: anchor.place.latitude, longitude: anchor.place.longitude)
                 let offset = Self.offset(group, groups: groups, focusedID: focusedID)
                 let kind = DisplayMatchedPlace.clusterKind(group.pointIDs.compactMap { places[$0] })
-                MapViewAnnotation(coordinate: coordinate) {
+                GeographicOverlay(coordinate: coordinate, positions: positions, proxy: proxy) {
                     Button { openGroup(group) } label: {
                         MapMarkerPin(count: group.pointIDs.count) {
                             if let kind {
@@ -33,14 +36,13 @@ struct MapPlaceClusters: MapContent {
                         }
                     }
                     .buttonStyle(.plain)
+                    .offset(x: offset.x, y: offset.y)
                     .accessibilityLabel("Explore \(group.pointIDs.count) visited places")
                     .accessibilityIdentifier("place-cluster-\(group.id)")
                 }
-                .variableAnchors([ViewAnnotationAnchorConfig(anchor: .center, offsetX: offset.x, offsetY: -offset.y)])
-                .allowOverlap(true).ignoreCameraPadding(true)
 
                 if openGroupID == group.id {
-                    MapViewAnnotation(coordinate: coordinate) {
+                    GeographicOverlay(coordinate: coordinate, positions: positions, proxy: proxy, anchor: .bottom) {
                         VStack(spacing: 0) {
                             HStack {
                                 Text("\(group.pointIDs.count) visited places").font(.caption.weight(.semibold))
@@ -68,8 +70,7 @@ struct MapPlaceClusters: MapContent {
                         .buttonStyle(.plain).frame(width: 240)
                         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12)).padding(.bottom, 20)
                     }
-                    .variableAnchors([ViewAnnotationAnchorConfig(anchor: .bottom), ViewAnnotationAnchorConfig(anchor: .top)])
-                    .allowOverlap(true).ignoreCameraPadding(true).priority(3)
+
                 }
             }
         }

@@ -2,8 +2,11 @@ import { LngLatBounds } from 'maplibre-gl';
 import type React from 'react';
 
 import GeoJSONComponentOverlay from '~/components/map/geojson-component-overlay';
+import { type BaseMapId, canonicalBaseMap } from '~/lib/map-catalog';
 
 import mapCatalog from '../../shared/map-catalog.json';
+
+export { type BaseMapId, baseMapGroups } from '~/lib/map-catalog';
 
 type BaseMapCommon = {
   label: string;
@@ -100,14 +103,13 @@ const sharedRasterOverlayCatalog =
   mapCatalog.rasterOverlays as SharedRasterOverlayCatalog;
 
 /**
- * iOS still renders the catalogue's `mapbox://` styles with the Mapbox SDK.
- * The web replaces those entries, under the same persisted and shared IDs,
- * with the MapLibre templates generated from shared/map-styles.
+ * Both clients render the shared MapLibre templates under the existing
+ * persisted IDs. The web loads templates on demand; iOS bundles the same JSON.
  */
 export const webStyleTemplates = {
   mapboxStreet: { label: 'Street', requiresMapTilerKey: false },
   mapboxStreet3d: { label: 'Street 3D', requiresMapTilerKey: false },
-  mapboxOutdoors: { label: 'Outdoors', requiresMapTilerKey: true },
+  mapboxOutdoors: { label: 'Outdoor', requiresMapTilerKey: true },
   mapboxLight: { label: 'Light', requiresMapTilerKey: false },
   mapboxTopolight: { label: 'Topo Light', requiresMapTilerKey: false },
   mapboxDark: { label: 'Dark', requiresMapTilerKey: false },
@@ -163,8 +165,6 @@ export const baseMaps = Object.fromEntries(
   readonly [Key in keyof SharedBaseMapCatalog]: BaseMapSetting;
 };
 
-export type BaseMapId = keyof typeof baseMaps;
-
 /** The base maps this deployment can render, in catalogue order. */
 export const isBaseMapAvailable = (id: BaseMapId): boolean => {
   const setting = baseMaps[id];
@@ -179,7 +179,9 @@ export const defaultBaseMap: BaseMapId = 'mapboxStreet';
 
 /** A persisted or shared ID can name a map this deployment lacks. */
 export const renderableBaseMap = (id: BaseMapId): BaseMapId =>
-  id in baseMaps && isBaseMapAvailable(id) ? id : defaultBaseMap;
+  id in baseMaps && isBaseMapAvailable(canonicalBaseMap(id))
+    ? canonicalBaseMap(id)
+    : defaultBaseMap;
 
 const sharedOverlayMaps = Object.fromEntries(
   Object.entries(sharedRasterOverlayCatalog).map(([id, definition]) => [

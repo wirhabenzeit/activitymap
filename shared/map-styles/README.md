@@ -1,6 +1,6 @@
 # ActivityMap style prototypes
 
-Seven first-pass styles mirror the roles of the seven Mapbox entries in the production catalogue. They are separate from `shared/map-catalog.json`, which iOS still reads with the Mapbox SDK. The web renders them with MapLibre under the same catalogue IDs (see [Web use](#web-use)).
+Seven first-pass styles mirror the roles of the seven Mapbox entries in the production catalogue. Both clients render these templates with MapLibre under the same catalogue IDs. The web loads them on demand; iOS bundles them via `pnpm map-catalog:generate`.
 
 | Existing ID       | Prototype             | Source and intended appearance                                                               |
 | ----------------- | --------------------- | -------------------------------------------------------------------------------------------- |
@@ -23,7 +23,7 @@ Inspection of the actual custom Studio styles changed the earlier research propo
 
 Run `pnpm map-styles:generate` after editing the builder or snapshots, and `pnpm map-styles:check` to detect stale output. Both run offline. Run `node --test shared/map-styles/build-styles.test.mjs` for the prototype integrity checks.
 
-Use `resolveStyleKey(template, publicKey)` to create an in-memory style for rendering. It returns a copy and resolves source, glyph and sprite URLs, including all entries in sprite arrays. It throws when a paid-source template lacks a key. No account key is committed. Before handing a style to native, resolve the key with native configuration and either pass the JSON to the SDK or publish a complete HTTPS style resource. The web resolves its own copy (`src/lib/map-style.ts`); native does not use the templates yet.
+Use `resolveStyleKey(template, publicKey)` to create an in-memory style for rendering. It returns a copy and resolves source, glyph and sprite URLs, including all entries in sprite arrays. It throws when a paid-source template lacks a key. No account key is committed. Before handing a style to native, resolve the key with native configuration and either pass the JSON to the SDK or publish a complete HTTPS style resource. The web resolves its own copy (`src/lib/map-style.ts`); native uses the same generated templates from its bundle.
 
 Snapshot origins:
 
@@ -43,10 +43,18 @@ Topolight uses 512 pixel Terrarium WebP elevation from Mapterhorn. Its maxzoom 1
 
 Satellite's source is still provisional: the demonstrated imagery around Interlaken was softer than Mapbox. A different palette cannot repair source resolution. Check the intended production account's imagery before adopting it.
 
-Before rollout, also check route contrast with the real activity palette, selected routes and places, high zoom and low zoom, Norway and Alpine border regions, mobile layouts, attribution, and repeated style changes. Native catalogue generation remains open; iOS still renders the Mapbox catalogue styles.
+Before rollout, also check route contrast with the real activity palette, selected routes and places, high zoom and low zoom, Norway and Alpine border regions, mobile layouts, attribution, and repeated style changes. Native bundle and catalogue freshness are verified by `pnpm map-catalog:check`.
 
 ## Web use
 
 `src/settings/map.tsx` maps the seven Mapbox catalogue IDs to these templates on the web, keeping the IDs persisted in local state and in shared `mbase` URLs. `src/lib/map-style.ts` loads each template as its own chunk and substitutes `NEXT_PUBLIC_MAPTILER_KEY`. Without that key the web hides Outdoors and Satellite, and a stored or shared choice of either falls back to Street. Raster catalogue maps become a one-layer style with OpenFreeMap glyphs, so app labels render on every base map.
 
 App labels request the `ActivityMap Sans` fontstack, which `src/lib/map-glyphs.ts` redirects to OpenFreeMap's Noto Sans whatever glyph server the current style names. 3D terrain uses Mapterhorn (Terrarium, 512 px, maxzoom 12) independently of the base map and is removed rather than flattened in 2D.
+
+## Layer picker
+
+`shared/map-catalog.json` owns the ordered picker groups for both clients: Worldwide, Swisstopo and NorgesKart. All six Swiss choices remain selectable, including Aerial using the current `ch.swisstopo.imagerybasemap.vt` endpoint. Street 3D remains a legacy catalogue ID but resolves to Street in the picker; building extrusions follow the 3D/tilt state and are reapplied after a style reload. The separate iOS Standard choice is omitted from the picker, with old saved choices restored to Street.
+
+Outdoor retains its existing MapTiler DEM/hillshade source. Its exaggeration is 0.7 at zoom 6, 0.75 at zoom 12, 0.6 at zoom 16 and 0.45 at zoom 18, preserving trails and contours while making relief more legible in 2D on both clients.
+
+Worldwide contains Outdoor, Street, Light, Dark, Topo Light and Satellite. NorgesKart remains a direct choice. The compact root menu keeps Photos, Places and the Overlays section directly accessible, without extra spacing between base-map groups. The four Swiss overlay toggles are grouped under Swisstopo, using shared `overlayGroups` metadata. Outdoor uses northwest illumination, brighter highlights and stronger neutral shadows for readable 2D relief; this does not add raised terrain geometry on iOS.

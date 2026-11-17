@@ -17,8 +17,10 @@ const sourceURLSchema = z
   .string()
   .min(1)
   .refine(
-    (url) => url.startsWith('https://') || url.startsWith('mapbox://'),
-    'must use https:// or mapbox://',
+    (url) =>
+      url.startsWith('https://') ||
+      /^\/map-styles\/[A-Za-z0-9]+\.json$/.test(url),
+    'must use https:// or /map-styles/<id>.json',
   )
   .refine(
     (url) => !url.includes('access_token') && !/[?&]token=/i.test(url),
@@ -65,6 +67,25 @@ const catalogSchema = z
     version: z.literal(1),
     baseMaps: z.record(catalogIDSchema, baseMapSchema),
     rasterOverlays: z.record(catalogIDSchema, rasterOverlaySchema),
+    baseMapGroups: z.array(
+      z
+        .object({
+          id: catalogIDSchema,
+          label: z.string().min(1),
+          maps: z.array(catalogIDSchema).min(1),
+        })
+        .strict(),
+    ),
+    baseMapAliases: z.record(catalogIDSchema, catalogIDSchema),
+    overlayGroups: z.array(
+      z
+        .object({
+          id: catalogIDSchema,
+          label: z.string().min(1),
+          overlays: z.array(catalogIDSchema).min(1),
+        })
+        .strict(),
+    ),
   })
   .strict();
 
@@ -88,6 +109,37 @@ const duplicateID = rasterOverlays.find(([id]) => baseMapIDs.has(id));
 if (duplicateID) {
   throw new Error(`Map catalogue ID ${duplicateID[0]} is used more than once.`);
 }
+
+const pickerIDs = catalog.baseMapGroups.flatMap((group) => group.maps);
+if (
+  new Set(pickerIDs).size !== pickerIDs.length ||
+  pickerIDs.some((id) => !baseMapIDs.has(id))
+) {
+  throw new Error('Picker groups must contain unique catalogue IDs.');
+}
+for (const [alias, target] of Object.entries(catalog.baseMapAliases)) {
+  if (
+    !baseMapIDs.has(alias) ||
+    !pickerIDs.includes(target) ||
+    pickerIDs.includes(alias)
+  )
+    throw new Error(`Invalid base map alias: ${alias}`);
+}
+if (
+  baseMaps.some(
+    ([id]) => !pickerIDs.includes(id) && !(id in catalog.baseMapAliases),
+  )
+)
+  throw new Error('Every base map must have a picker group or alias.');
+
+const groupedOverlays = catalog.overlayGroups.flatMap(
+  (group) => group.overlays,
+);
+if (
+  new Set(groupedOverlays).size !== groupedOverlays.length ||
+  groupedOverlays.some((id) => !(id in catalog.rasterOverlays))
+)
+  throw new Error('Overlay groups must contain unique overlay IDs.');
 
 const swiftString = (value: string): string => JSON.stringify(value);
 const swiftOptionalString = (value: string | undefined): string =>
@@ -149,7 +201,34 @@ struct SharedRasterOverlayDefinition: Identifiable, Hashable, Sendable {
     let attribution: String?
 }
 
+struct SharedBaseMapGroup: Identifiable, Sendable {
+    let id: String
+    let label: String
+    let maps: [String]
+}
+
+struct SharedOverlayGroup: Identifiable, Sendable {
+    let id: String
+    let label: String
+    let overlays: [String]
+}
+
 enum SharedMapCatalog {
+    static let overlayGroups: [SharedOverlayGroup] = [
+${catalog.overlayGroups.map((group) => `        .init(id: ${swiftString(group.id)}, label: ${swiftString(group.label)}, overlays: [${group.overlays.map(swiftString).join(', ')}])`).join(',\n')}
+    ]
+    static let baseMapGroups: [SharedBaseMapGroup] = [
+${catalog.baseMapGroups.map((group) => `        .init(id: ${swiftString(group.id)}, label: ${swiftString(group.label)}, maps: [${group.maps.map(swiftString).join(', ')}])`).join(',\n')}
+    ]
+    static let baseMapAliases: [String: String] = [
+${Object.entries(catalog.baseMapAliases)
+  .map(
+    ([alias, target]) =>
+      `        ${swiftString(alias)}: ${swiftString(target)}`,
+  )
+  .join(',\n')}
+    ]
+
     static let baseMaps: [SharedBaseMapDefinition] = [
 ${baseMapRows}
     ]
@@ -171,4 +250,25 @@ if (process.argv.includes('--check')) {
   }
 } else {
   await writeFile(swiftOutputPath, generatedSwift);
+}
+
+// Keep the native bundle byte-identical to the shared web templates.
+const { mkdir } = await import('node:fs/promises');
+const bundleDirectory = resolve(
+  repositoryRoot,
+  'ios/ActivityMap/ActivityMap/MapStyles',
+);
+if (!process.argv.includes('--check'))
+  await mkdir(bundleDirectory, { recursive: true });
+for (const [id, baseMap] of baseMaps) {
+  if (!baseMap.url.startsWith('/map-styles/')) continue;
+  const style = await readFile(
+    resolve(repositoryRoot, `shared/map-styles/generated/${id}.json`),
+    'utf8',
+  );
+  const target = resolve(bundleDirectory, `${id}.json`);
+  if (process.argv.includes('--check')) {
+    if ((await readFile(target, 'utf8').catch(() => '')) !== style)
+      throw new Error(`Bundled style is stale: ${id}`);
+  } else await writeFile(target, style);
 }

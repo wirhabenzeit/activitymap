@@ -2,7 +2,7 @@
 set -euo pipefail
 umask 077
 
-for name in IOS_DISTRIBUTION_P12_BASE64 IOS_DISTRIBUTION_P12_PASSWORD IOS_PROVISION_PROFILE_BASE64 APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY MAPBOX_ACCESS_TOKEN; do
+for name in IOS_DISTRIBUTION_P12_BASE64 IOS_DISTRIBUTION_P12_PASSWORD IOS_PROVISION_PROFILE_BASE64 APP_STORE_CONNECT_KEY_ID APP_STORE_CONNECT_ISSUER_ID APP_STORE_CONNECT_PRIVATE_KEY; do
   if [ -z "${!name:-}" ]; then echo "::error::Missing testflight environment secret: $name"; exit 1; fi
 done
 
@@ -16,10 +16,10 @@ p = Path(os.environ['RUNNER_TEMP']) / 'testflight-private'
 for name, filename in [('IOS_DISTRIBUTION_P12_BASE64','distribution.p12'), ('IOS_PROVISION_PROFILE_BASE64','profile.mobileprovision')]:
     (p / filename).write_bytes(base64.b64decode(os.environ[name], validate=True))
 (p / 'AuthKey.p8').write_text(os.environ['APP_STORE_CONNECT_PRIVATE_KEY'])
-token = os.environ['MAPBOX_ACCESS_TOKEN']
-if not token.startswith('pk.') or any(c.isspace() for c in token):
-    raise ValueError('MAPBOX_ACCESS_TOKEN must be a public Mapbox token')
-Path('ios/ActivityMap/Config/Local.xcconfig').write_text('MAPBOX_ACCESS_TOKEN = ' + token + '\n')
+key = os.environ.get('MAPTILER_KEY', '')
+if any(c not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_-' for c in key):
+    raise ValueError('MAPTILER_KEY contains unsupported characters')
+Path('ios/ActivityMap/Config/Local.xcconfig').write_text('MAPTILER_KEY = ' + key + '\n')
 PY
 keychain_password="$(openssl rand -hex 32)"
 security create-keychain -p "$keychain_password" "$keychain"

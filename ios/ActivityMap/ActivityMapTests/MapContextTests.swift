@@ -1,6 +1,6 @@
 import CoreLocation
 import Foundation
-import MapboxMaps
+import MapLibre
 import Testing
 @testable import ActivityMap
 

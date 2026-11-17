@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import UIKit
 
 /// Tight geographic envelope, using the shortest longitude arc rather than
@@ -49,32 +49,62 @@ struct RouteExtent {
 }
 
 enum RouteCameraFitter {
+    private enum FitError: Error { case invalid }
     static func padding(safeArea: UIEdgeInsets, sheetHeight: CGFloat, topOcclusion: CGFloat = 0,
                         leadingOcclusion: CGFloat = 0, trailingOcclusion: CGFloat = 0) -> UIEdgeInsets {
         UIEdgeInsets(top: max(safeArea.top + 64, topOcclusion + 16), left: max(safeArea.left + 24, leadingOcclusion + 16),
                      bottom: max(safeArea.bottom + 80, sheetHeight + 24), right: max(safeArea.right + 80, trailingOcclusion + 16))
     }
 
-    static func camera(extent: RouteExtent, map: MapboxMap, padding: UIEdgeInsets, size: CGSize,
-                       current: MapCamera) throws -> CameraOptions {
-        // Explicit Mercator supports native camera fitting for all catalogue
-        // styles, including the low-zoom default style's globe projection.
-        if map.projection?.name != .mercator {
-            try map.setProjection(StyleProjection(name: .mercator))
+    static func camera(extent: RouteExtent, map: MapController, padding: UIEdgeInsets, size: CGSize,
+                       current: MapCamera) throws -> MapCamera {
+        // Native shape bounds normalize longitudes separately. Fit a translated
+        // envelope when it crosses the date line, then restore its longitude.
+        if extent.corners.contains(where: { abs($0.longitude) > 180 }) {
+            let shift = extent.center.longitude >= 0 ? 180.0 : -180.0
+            let shifted = RouteExtent(coordinates: extent.corners.map {
+                CLLocationCoordinate2D(latitude: $0.latitude, longitude: $0.longitude - shift)
+            })!
+            var result = try camera(extent: shifted, map: map, padding: padding, size: size, current: current)
+            result.center.longitude += shift
+            if result.center.longitude > 180 { result.center.longitude -= 360 }
+            if result.center.longitude < -180 { result.center.longitude += 360 }
+            return result
         }
-        let fitted = try map.camera(
-            for: extent.corners,
-            camera: CameraOptions(center: extent.center, padding: padding, zoom: 0,
-                                  bearing: current.bearing, pitch: current.pitch),
-            coordinatesPadding: .zero, maxZoom: 16, offset: nil
-        )
-        // Keep the projection's principal point inside the visible rectangle.
-        // Coordinate-only padding leaves it at the physical map center, where
-        // the SDK's pitched refinement fails when a sheet covers that point.
-        var refined = map.camera(for: extent.corners, camera: fitted,
-                                 rect: CGRect(origin: .zero, size: size).inset(by: padding))
-        refined.zoom = min(refined.zoom ?? fitted.zoom ?? 16, fitted.zoom ?? 16, 16)
-        return refined
+        var corners = extent.corners.map { coordinate in
+            CLLocationCoordinate2D(latitude: coordinate.latitude,
+                longitude: (coordinate.longitude + 540).truncatingRemainder(dividingBy: 360) - 180)
+        }
+        let shape = MLNPolyline(coordinates: &corners, count: UInt(corners.count))
+        var seed = current
+        seed.center = extent.center
+        // Native fitting adds contentInset to edgePadding. Supply only the
+        // difference so repeated fits never double the existing panel padding.
+        let inset = map.view.contentInset
+        let additional = UIEdgeInsets(top: padding.top - inset.top, left: padding.left - inset.left,
+                                      bottom: padding.bottom - inset.bottom, right: padding.right - inset.right)
+        let native = map.view.camera(map.nativeCamera(seed), fitting: shape, edgePadding: additional)
+        native.pitch = current.pitch
+        let projection = MLNMapProjection(mapView: map.view)
+        let visible = CGRect(origin: .zero, size: size).inset(by: padding)
+        // Refine in an independent projection. Fix the geographic center so
+        // the result does not depend on the map's previous world copy/padding.
+        native.centerCoordinate = extent.center
+        var lower = 0.0, upper = 16.0
+        var zoom = min(16, max(0, MLNZoomLevelForAltitude(native.altitude, native.pitch, native.centerCoordinate.latitude, size)))
+        for _ in 0..<24 {
+            native.altitude = MLNAltitudeForZoomLevel(zoom, native.pitch, native.centerCoordinate.latitude, size)
+            projection.setCamera(native, with: padding)
+            let points = corners.map { projection.convert($0) }
+            guard points.allSatisfy({ $0.x.isFinite && $0.y.isFinite }) else { throw FitError.invalid }
+            if points.allSatisfy({ visible.contains($0) }) { lower = zoom }
+            else { upper = zoom }
+            zoom = (lower + upper) / 2
+        }
+        zoom = max(0, lower - 0.001)
+        return MapCamera(center: native.centerCoordinate, zoom: zoom, bearing: current.bearing,
+                         pitch: current.pitch, padding: padding)
+
     }
 }
 
@@ -82,9 +112,9 @@ enum RouteCameraFitter {
 /// geometry refreshes, repeated body evaluation or sheet detent changes.
 @MainActor
 enum MapNavigation {
-    static func resolve(store: ActivityStore, map: MapboxMap, size: CGSize,
+    static func resolve(store: ActivityStore, map: MapController, size: CGSize,
                         safeArea: UIEdgeInsets, sheetHeight: CGFloat, topOcclusion: CGFloat = 0,
-                        leadingOcclusion: CGFloat = 0, trailingOcclusion: CGFloat = 0) -> CameraOptions? {
+                        leadingOcclusion: CGFloat = 0, trailingOcclusion: CGFloat = 0) -> MapCamera? {
         let context = store.mapContext
         guard let request = context.pendingRequest, map.isStyleLoaded,
               size.width > 0, size.height > 0 else { return nil }
@@ -99,8 +129,7 @@ enum MapNavigation {
             }
             context.recordLocatedPosition(coordinate)
             // Show the nearby streets without pulling an already closer view back out.
-            return CameraOptions(center: coordinate, padding: current.padding, zoom: max(current.zoom, 15),
-                                 bearing: current.bearing, pitch: current.pitch)
+            return MapCamera(center: coordinate, zoom: max(current.zoom, 15), bearing: current.bearing, pitch: current.pitch, padding: current.padding)
         case let .place(latitude, longitude, sheetFraction):
             context.consume(request)
             let coordinate = CLLocationCoordinate2D(latitude: latitude, longitude: longitude)
@@ -110,19 +139,17 @@ enum MapNavigation {
             // Centred between the side insets, close enough to see the routes around it.
             let padding = UIEdgeInsets(top: fitted.top, left: max(safeArea.left, leadingOcclusion), bottom: fitted.bottom,
                                        right: max(safeArea.right, trailingOcclusion))
-            return CameraOptions(center: coordinate, padding: padding, zoom: min(max(current.zoom, 13), 15),
-                                 bearing: current.bearing, pitch: current.pitch)
+            return MapCamera(center: coordinate, zoom: min(max(current.zoom, 13), 15), bearing: current.bearing, pitch: current.pitch, padding: padding)
         case .resetView:
             context.consume(request)
             let initial = MapCamera.initial
-            return CameraOptions(center: initial.center, padding: .zero, zoom: initial.zoom,
-                                 bearing: initial.bearing, pitch: initial.pitch)
+            return MapCamera(center: initial.center, zoom: initial.zoom, bearing: initial.bearing, pitch: initial.pitch, padding: .zero)
         case .resetBearing:
             context.consume(request)
-            return CameraOptions(center: current.center, padding: current.padding, zoom: current.zoom, bearing: 0, pitch: current.pitch)
+            return MapCamera(center: current.center, zoom: current.zoom, bearing: 0, pitch: current.pitch, padding: current.padding)
         case let .pitch(pitch):
             context.consume(request)
-            return CameraOptions(center: current.center, padding: current.padding, zoom: current.zoom, bearing: current.bearing, pitch: pitch)
+            return MapCamera(center: current.center, zoom: current.zoom, bearing: current.bearing, pitch: pitch, padding: current.padding)
         default: break
         }
         let activities: [Activity]
@@ -160,7 +187,7 @@ enum MapNavigation {
         }
         do {
             let camera = try RouteCameraFitter.camera(extent: extent, map: map, padding: padding, size: size, current: current)
-            guard camera.center != nil, let zoom = camera.zoom, zoom.isFinite else { throw CameraError.invalidFit }
+            guard camera.zoom.isFinite else { throw CameraError.invalidFit }
             context.consume(request)
             return camera
         } catch {

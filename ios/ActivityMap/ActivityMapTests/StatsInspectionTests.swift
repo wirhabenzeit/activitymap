@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 import Observation
-import MapboxMaps
+import MapLibre
 import Testing
 @testable import ActivityMap
 
@@ -16,9 +16,6 @@ import Testing
         await StatsDashboardTests.load(state, store)
         let id = try #require(store.activities.first?.id)
         let originalSelected = store.selectedActivityIDs
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try InspectionHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)

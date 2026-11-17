@@ -1,6 +1,6 @@
 import SwiftUI
 import CoreLocation
-import MapboxMaps
+import MapLibre
 import Testing
 import UIKit
 import Vision
@@ -472,9 +472,6 @@ extension RenderedRoutePickingTests {
 
 extension RenderedRoutePickingTests {
     @Test func elevationCursorRendersAndSuspendsPaging() async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         try await storage.apply([.upsertActivity(try Fixtures.activity(["id": "1"]))], scope: Fixtures.scope)
         let fence = await storage.streamFence()
@@ -495,11 +492,11 @@ extension RenderedRoutePickingTests {
         let host = try DetailHarness(root: MapScreen(store: store, picker: picker)
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style)), size: CGSize(width: 768, height: 1024))
         defer { host.close() }
-        for _ in 0..<100 where host.descendants(of: MapView.self).first?.mapboxMap.isStyleLoaded != true {
+        for _ in 0..<100 where host.descendants(of: MLNMapView.self).first?.renderer.isStyleLoaded != true {
             try await Task.sleep(for: .milliseconds(20))
         }
-        let map = try #require(host.descendants(of: MapView.self).first)
-        map.mapboxMap.setCamera(to: CameraOptions(center: activity.coordinates[2], zoom: 14))
+        let map = try #require(host.descendants(of: MLNMapView.self).first)
+        map.renderer.setCamera(to: MapCamera(center: activity.coordinates[2], zoom: 14))
         try await Task.sleep(for: .milliseconds(300))
         let pager = try #require(host.controllers(of: UINavigationController.self).first)
         let scroll = try #require(pager.view.subviews.compactMap { $0 as? UIScrollView }.first)
@@ -521,7 +518,7 @@ extension RenderedRoutePickingTests {
         store.elevationCursor = nil
         try await Task.sleep(for: .milliseconds(100))
         #expect(scroll.isScrollEnabled)
-        #expect(host.descendants(of: MapView.self).first === map, "Scrubbing must reuse the renderer")
+        #expect(host.descendants(of: MLNMapView.self).first === map, "Scrubbing must reuse the renderer")
     }
 
     @Test func elevationDetailSwitchCancelsObsoleteDemand() async throws {
@@ -596,9 +593,6 @@ extension RenderedRoutePickingTests {
 extension RenderedRoutePickingTests {
     @Test(arguments: [1, 2])
     func phoneElevationSharesMediumSheetWithMap(count: Int) async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         try await storage.apply([.upsertActivity(try Fixtures.activity(["id": "1"]))], scope: Fixtures.scope)
         let fence = await storage.streamFence()
@@ -641,10 +635,10 @@ extension RenderedRoutePickingTests {
         host.window.overrideUserInterfaceStyle = count == 2 ? .dark : .light
         host.host.overrideUserInterfaceStyle = count == 2 ? .dark : .light
         defer { host.host.dismiss(animated: false); host.close() }
-        for _ in 0..<100 where host.descendants(of: MapView.self).first?.mapboxMap.isStyleLoaded != true {
+        for _ in 0..<100 where host.descendants(of: MLNMapView.self).first?.renderer.isStyleLoaded != true {
             try await Task.sleep(for: .milliseconds(20))
         }
-        let map = try #require(host.descendants(of: MapView.self).first)
+        let map = try #require(host.descendants(of: MLNMapView.self).first)
         store.showOnMap(1)
         try await Task.sleep(for: .milliseconds(900))
         #expect(picker.detent == .medium, "Show on map must open the elevation profile without a manual sheet expansion")
@@ -659,7 +653,7 @@ extension RenderedRoutePickingTests {
         #expect(picker.detent == .medium)
         store.elevationCursor = .init(owner: UUID(), activityID: 1, cached: cached, point: profile.points[2])
         try await Task.sleep(for: .milliseconds(200))
-        let marker = map.convert(map.mapboxMap.point(for: activity.coordinates[2]), to: host.window)
+        let marker = map.convert(map.renderer.point(for: activity.coordinates[2]), to: host.window)
         #expect(marker.y > 80 && marker.y < sheetFrame.minY - 10, "The scrubbed point must be above the sheet: \(marker), \(sheetFrame)")
         let image = UIGraphicsImageRenderer(bounds: host.window.bounds).image { _ in
             host.window.drawHierarchy(in: host.window.bounds, afterScreenUpdates: true)
@@ -693,7 +687,7 @@ extension RenderedRoutePickingTests {
         try await Task.sleep(for: .milliseconds(200))
         let cursor = try #require(host.descendants(of: UIView.self).first { $0.accessibilityIdentifier == "map-route-position" })
         let cursorFrame = cursor.convert(cursor.bounds, to: map)
-        let projected = map.mapboxMap.point(for: activity.coordinates[0])
+        let projected = map.renderer.point(for: activity.coordinates[0])
         #expect(abs(cursorFrame.midX - projected.x) < 1 && abs(cursorFrame.midY - projected.y) < 1,
                 "Scrubbing updates the dot without moving the camera")
         picker.detent = .expanded

@@ -52,8 +52,6 @@ if [[ -z "$web_only" ]]; then
     [[ -f "$stamp" && "$(cat "$stamp")" == "$expected" ]] || { echo "No matching build; run once without --reuse-build" >&2; exit 1; }
     action=test-without-building
   fi
-  token="${NEXT_PUBLIC_MAPBOX_TOKEN:-${MAPBOX_ACCESS_TOKEN:-}}"
-  [[ "$token" == pk.* ]] || token=""
   TEST_RUNNER_ACTIVITYMAP_GALLERY=1 \
   TEST_RUNNER_ACTIVITYMAP_GALLERY_OUTPUT="$output" \
   TEST_RUNNER_ACTIVITYMAP_GALLERY_LIBRARY="$library" \
@@ -61,7 +59,7 @@ if [[ -z "$web_only" ]]; then
   TEST_RUNNER_ACTIVITYMAP_GALLERY_VARIANTS="$variants" \
   TEST_RUNNER_ACTIVITYMAP_GALLERY_FIXTURE_HASH="$fixture_hash" \
   TEST_RUNNER_ACTIVITYMAP_GALLERY_COMMIT="$commit" \
-  TEST_RUNNER_ACTIVITYMAP_GALLERY_MAPBOX_TOKEN="$token" \
+  TEST_RUNNER_ACTIVITYMAP_GALLERY_LIVE_MAPS="${ACTIVITYMAP_GALLERY_LIVE_MAPS:-0}" \
   xcodebuild "$action" -project "$repo/ios/ActivityMap/ActivityMap.xcodeproj" -scheme ActivityMap \
     -derivedDataPath "$derived" -destination "platform=iOS Simulator,name=$simulator" -parallel-testing-enabled NO \
     -only-testing:ActivityMapTests/ScreenshotGalleryTests CODE_SIGNING_ALLOWED=NO \

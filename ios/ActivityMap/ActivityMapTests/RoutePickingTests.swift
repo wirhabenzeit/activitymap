@@ -1,21 +1,19 @@
 import CoreGraphics
 import CoreLocation
 import Foundation
-import MapboxMaps
+import MapLibre
 import Testing
 @testable import ActivityMap
 
 struct RouteHitTestingTests {
-    private func route(_ id: Int, y: Double, x: Double = -10) -> Feature {
-        var feature = Feature(geometry: .lineString(LineString([
-            CLLocationCoordinate2D(latitude: y, longitude: x),
-            CLLocationCoordinate2D(latitude: y, longitude: x + 20),
-        ])))
-        feature.properties = ["id": .string(String(id))]
+    private func route(_ id: Int, y: Double, x: Double = -10) -> MLNPolylineFeature {
+        var coordinates = [CLLocationCoordinate2D(latitude: y, longitude: x), CLLocationCoordinate2D(latitude: y, longitude: x + 20)]
+        let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
+        feature.attributes = ["id": String(id)]
         return feature
     }
 
-    private func hits(_ features: [Feature], eligible: Set<Int>) -> [Int] {
+    private func hits(_ features: [MLNFeature], eligible: Set<Int>) -> [Int] {
         RouteHitTesting.orderedIDs(features: features, at: .zero, eligibleIDs: eligible) {
             $0.map { CGPoint(x: $0.longitude, y: $0.latitude) }
         }
@@ -32,11 +30,9 @@ struct RouteHitTestingTests {
     }
 
     @Test func fragmentsKeepTheClosestSegmentAndMultilinesDoNotBridgeGaps() {
-        var multi = route(1, y: 0)
-        multi.geometry = .multiLineString(MultiLineString([
-            [CLLocationCoordinate2D(latitude: 0, longitude: -50), CLLocationCoordinate2D(latitude: 0, longitude: -40)],
-            [CLLocationCoordinate2D(latitude: 0, longitude: 40), CLLocationCoordinate2D(latitude: 0, longitude: 50)],
-        ]))
+        let left = route(1, y: 0, x: -60), right = route(1, y: 0, x: 40)
+        let multi = MLNMultiPolylineFeature(polylines: [left, right])
+        multi.attributes = ["id": "1"]
         #expect(hits([multi, route(2, y: 10), route(2, y: 1), route(3, y: 5)], eligible: [1, 2, 3]) == [2, 3])
     }
 
@@ -47,10 +43,11 @@ struct RouteHitTestingTests {
     }
 
     @Test func unknownNonRouteAndMalformedIDsAreRejected() {
-        var malformed = route(1, y: 0)
-        malformed.properties = ["id": .string("01")]
-        var point = route(2, y: 0)
-        point.geometry = .point(Point(CLLocationCoordinate2D(latitude: 0, longitude: 0)))
+        let malformed = route(1, y: 0)
+        malformed.attributes = ["id": "01"]
+        let point = MLNPointFeature()
+        point.coordinate = CLLocationCoordinate2D(latitude: 0, longitude: 0)
+        point.attributes = ["id": "2"]
         #expect(hits([malformed, point, route(99, y: 0)], eligible: [1, 2]).isEmpty)
     }
 
@@ -175,16 +172,14 @@ struct RoutePickerTests {
         cache.update(activities: store.activities, revision: store.activitiesRevision)
         #expect(cache.buildCount == 2)
         store.clearScope()
-        #expect(cache.data == .featureCollection(FeatureCollection(features: [])))
+        #expect((cache.data as? MLNShapeCollectionFeature)?.shapes.isEmpty == true)
     }
 
     @Test func sourceUsesExactStringIDs() throws {
         let id = 9_007_199_254_740_993
-        guard case let .featureCollection(collection) = RouteSource.data(for: [ActivityStoreSelectionTests.activity(id)]) else {
-            Issue.record("Expected feature collection"); return
-        }
-        let feature = try #require(collection.features.first)
-        #expect(feature.identifier == .string(String(id)))
-        #expect(feature.properties?["id"] == .string(String(id)))
+        let collection = try #require(RouteSource.data(for: [ActivityStoreSelectionTests.activity(id)]) as? MLNShapeCollectionFeature)
+        let feature = try #require(collection.shapes.first as? MLNPolylineFeature)
+        #expect(feature.identifier as? String == String(id))
+        #expect(feature.attribute(forKey: "id") as? String == String(id))
     }
 }

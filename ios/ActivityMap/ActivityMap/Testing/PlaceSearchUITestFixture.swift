@@ -1,6 +1,6 @@
 #if DEBUG
 import SwiftUI
-import MapboxMaps
+import MapLibre
 
 /// Synthetic synced-library host; all search, filtering and detail UI is production.
 struct PlaceSearchUITestFixture: View {

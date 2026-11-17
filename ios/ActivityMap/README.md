@@ -13,10 +13,10 @@ the prior completed library. See [matching synchronization](../../docs/on-demand
 
 1. Use Xcode 27 or newer. The app runs on iOS 26 or newer; Xcode 27 is needed to compile optional iOS 27 APIs.
 2. Copy `Config/Local.xcconfig.example` to `Config/Local.xcconfig`.
-3. Add a URL-restricted public Mapbox token to the local file.
+3. Optionally set `MAPTILER_KEY` in the local file for Outdoors and Satellite. Other styles need no key.
 4. Open `ActivityMap.xcodeproj` and run the `ActivityMap` scheme.
 
-Swift Package Manager pins the Mapbox dependency in `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
+Swift Package Manager pins the MapLibre globe prerelease `2026.11.2-globe` exactly in the project and `Package.resolved`. Local Xcode state and credentials are intentionally ignored.
 
 ## Activity action accessibility tests
 
@@ -113,7 +113,7 @@ release tags matching `ios/v*`, with these environment secrets:
 | `APP_STORE_CONNECT_KEY_ID`      | Dedicated App Store Connect team API key ID                                                      |
 | `APP_STORE_CONNECT_ISSUER_ID`   | Team API issuer ID                                                                               |
 | `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines                                     |
-| `MAPBOX_ACCESS_TOKEN`           | Public Mapbox `pk.` token for the native app                                                     |
+| `MAPTILER_KEY`                  | Optional public MapTiler key for Outdoors and Satellite                                          |
 
 The API key needs the **Developer** role for uploads and beta-build metadata.
 Team API keys apply across the team's apps; they cannot be restricted to one app.
@@ -175,7 +175,7 @@ This builds the current checkout (Debug, production server) as **ActivityMap Dev
 
 Use `--release` when judging animation and navigation responsiveness on the phone. The default Debug build disables Swift optimization and can exaggerate chart preparation pauses. The optimized build keeps the same Dev identity, icon, sign-in scheme and production server.
 
-Worktrees have no ignored `Local.xcconfig`, so the script takes `MAPBOX_ACCESS_TOKEN` from the environment or from the main checkout's `Local.xcconfig`. It stops if the built app would have no token, because the map would be blank. Production's `MOBILE_AUTH_REDIRECT_ALLOWLIST` must include `activitymap-dev://auth/callback`.
+Worktrees have no ignored `Local.xcconfig`, so the script takes `MAPTILER_KEY` from the environment or from the main checkout's `Local.xcconfig`. It stops if the built app would have no token, because the map would be blank. Production's `MOBILE_AUTH_REDIRECT_ALLOWLIST` must include `activitymap-dev://auth/callback`.
 
 Running the plain `ActivityMap` scheme on a device from Xcode builds `page.dominik.activitymap`, which replaces the TestFlight app. Use the script instead.
 
@@ -247,21 +247,17 @@ Use Profile to sign in. `AuthController` stores the ActivityMap session in the K
 
 The last map control is **Locate me**. It asks for foreground location access only when tapped and requests one fresh fix. It centers at street-level zoom 15, retaining a closer zoom if already set, and preserves bearing, pitch, camera padding, selection and filters. A blue 26-point marker with a white border remains at the last located position until the next successful fix or scope reset. It does not follow the user. Both this marker and the elevation route cursor are overlays following the map’s projected coordinates above map layers and terrain, so their size and visibility remain stable while zooming or tilting. Panning, another camera command, switching away from Map, or backgrounding the app cancels a pending fix. Denied access offers Settings; restricted access, unavailable fixes and a 15-second fix timeout explain how to retry. Fit selection and Fit route remain available in results.
 
-A 28-point compass appears beyond two degrees from north and hides within one degree, with a 44-point touch target labelled **Reset bearing**. Resetting animates bearing alone. The compass sits beside the control stack and moves outside the iPad/landscape results panel. A fully expanded phone sheet hides it because no usable map target remains.
+MapLibre’s compass appears when the map is rotated; tapping it returns north to the top. It sits beside the control stack and moves outside the iPad/landscape results panel. A fully expanded phone sheet hides it because no usable map target remains.
 
-**3D map** adds a separate Mapbox Terrain-DEM source (`mapbox://mapbox.mapbox-terrain-dem-v1`, padded 514-pixel tiles, maximum source zoom 14) and terrain with 1.5× exaggeration. All 15 current native choices support this source: native Standard, the seven Mapbox catalogue styles and the Swisstopo/Kartverket vector/raster choices. Elevation is independent of the selected basemap, so no shared catalogue or generated catalogue change is needed. The source and terrain are restored after style reloads; 2D also removes terrain embedded in a base style. The button shows loading until tiles arrive or the renderer reaches idle. Failure or a 20-second loading timeout explains that the map remains tilted, then removes elevation; turn 3D off/on to retry. Unknown styles show an unsupported message.
+**3D map** tilts the MapLibre camera to 50 degrees; it does not enable terrain. `MapTerrain.enabled` remains false as an explicit future integration point. The app uses MapLibre’s native compass, placed clear of the map tools and results. A dedicated rotation gesture requires a 10-degree twist, applies 0.7 sensitivity and snaps within 10 degrees of north. Native automatic globe rotation is disabled so panning and pinch zoom keep the bearing steady.
 
-`MapToolsTests` covers permission/fix states, timeouts, cancellation, compass tolerance/layout and terrain event fencing. `RenderedMapToolsTests` uses a local synthetic DEM to check style reloading, camera preservation, terrain errors/retry, fixed marker visibility at zooms 2–22 in 2D/3D, and iPhone/iPad layouts. The opt-in network check uses the public token from the built app's `MBXAccessToken` configuration, verifies nonzero mountain elevation and camera retention across every catalogue style, and captures settled frames under `/tmp/activitymap-map-tools-preview`:
+The native app enables globe projection at runtime for bundled and remote styles. The bundled JSON remains identical to the shared files. Remote styles resolve relative sprite, glyph and source URLs against their original URL before globe projection is added. Photo/place pins and position dots behind the globe are hidden using the SDK's occlusion check.
 
-```sh
-TEST_RUNNER_ACTIVITYMAP_LIVE_MAP_TOOLS=1 xcodebuild test \
-  -project ios/ActivityMap/ActivityMap.xcodeproj -scheme ActivityMap \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' \
-  -parallel-testing-enabled NO -only-testing:ActivityMapTests/LiveMapTerrainTests \
-  CODE_SIGNING_ALLOWED=NO
-```
+`MapLibreView` bridges style loaded, camera movement, idle, frame rendering, gestures and taps. `MapLayerSync` restores route layers, raster sources and place labels after every style load and reconciles data changes. Photos, places, clusters and the filter pin are SwiftUI overlays projected on every rendered frame.
 
-Issues #391–#393 still require physical-device acceptance: grant and deny the location prompt, retry from Settings, exercise restricted/disabled Location Services and foreground re-entry, confirm compass rotation/reset with touch and VoiceOver, and view mountain relief on a network-connected device while toggling 2D/3D and switching styles. Simulator tests and captures do not certify those device checks. Heading and follow-location behavior in broader #223 remain separate work.
+`pnpm map-catalog:generate` regenerates the Swift catalog and copies all seven styles into the app bundle. `pnpm map-catalog:check` verifies both outputs. Outdoors and Satellite appear when `MAPTILER_KEY` is configured, matching the web's availability rule.
+
+Issues #391–#393 still require physical-device acceptance: grant and deny the location prompt, retry from Settings, exercise restricted/disabled Location Services and foreground re-entry, confirm compass rotation/reset with touch and VoiceOver, and confirm pitch and style switching on a network-connected device. Simulator tests and captures do not certify those device checks. Heading and follow-location behavior in broader #223 remain separate work.
 
 ## Share activity maps
 
@@ -398,11 +394,11 @@ The existing 20-activity gallery fixture and reporting date `2026-09-22` are sha
 
 Tap within 22 points of a visible route to select it. A normal tap replaces selection with all nearby routes; a single hit opens detail, while overlapping hits open a chooser ordered by screen distance, then numeric activity ID descending. The results panel has separate deselection and detail controls. List inspection stays independent.
 
-Any selection has a results panel, including one made in List or Stats; its handle shrinks or grows it. There is no separate hide state or floating selection menu. Clearing selection closes the panel and exits Add mode. Add unions the hit set without changing the active route; choose a result explicitly to activate it. An empty-map tap clears selection in either mode. The panel header discloses how many selections are hidden by filters; clearing and changing Add mode remain available even when all selected routes are hidden. Hidden routes are neither rendered nor picked. Pans/zooms use Mapbox's native gesture recognition and cancel any pending hit query; loading/query errors preserve selection.
+Any selection has a results panel, including one made in List or Stats; its handle shrinks or grows it. There is no separate hide state or floating selection menu. Clearing selection closes the panel and exits Add mode. Add unions the hit set without changing the active route; choose a result explicitly to activate it. An empty-map tap clears selection in either mode. The panel header discloses how many selections are hidden by filters; clearing and changing Add mode remain available even when all selected routes are hidden. Hidden routes are neither rendered nor picked. Pans/zooms use MapLibre's native gesture recognition and cancel any pending hit query; loading/query errors preserve selection.
 
 Selected routes have a wider white casing; the active route adds a dark outer casing. All layers share one cached GeoJSON snapshot per activity revision, retained across tab changes and cleared on scope reset. Selection/filter updates change layer filters only. Canonical string feature IDs avoid precision loss through Double. Picking queries only the ordinary activity route layer; raster/POI layers cannot enter the hit set. Native annotation controls consume their own taps before route handling; photo-marker integration remains #219.
 
-`RoutePickingTests` covers hit ordering, tolerance, duplicate tile fragments, partial geometry, filtered/hidden selection, stale responses and geometry reuse with 2,000 activities. `RenderedRoutePickingTests` exercises the production layers and query adapter in the real Mapbox renderer. Physical-device gesture/VoiceOver checks and dense-library performance measurements remain acceptance work; the cache build counter is not a frame-time benchmark. `MapResultsTests` and the rendered results scenarios additionally cover the persistent panel, filtering, GPS-less selections, route switching, camera padding and retained presentation.
+`RoutePickingTests` covers hit ordering, tolerance, duplicate tile fragments, partial geometry, filtered/hidden selection, stale responses and geometry reuse with 2,000 activities. `RenderedRoutePickingTests` exercises the production layers and query adapter in the real MapLibre renderer. Physical-device gesture/VoiceOver checks and dense-library performance measurements remain acceptance work; the cache build counter is not a frame-time benchmark. `MapResultsTests` and the rendered results scenarios additionally cover the persistent panel, filtering, GPS-less selections, route switching, camera padding and retained presentation.
 
 ## Adaptive map results
 
@@ -440,7 +436,7 @@ Map/list switches preserve the actual camera (center, zoom, bearing and pitch), 
 
 **Show on map** adds/activates the activity through the shared selection store and frames its latest geometry. Hidden targets require an explicit **Clear filters and show on map** confirmation; GPS-less activities remain inspectable with framing disabled. The camera menu offers **Fit selection**, **Fit filtered routes**, **Reset bearing** and **Reset map view** separately. Switching 2D/3D retains location and zoom.
 
-Fits reserve space for navigation, safe areas, floating controls and the current results sheet. A sheet covering the map’s center defers the request until it shrinks or closes, as the native fit requires a visible projection center. Requests are consumed once after style readiness; later redraws, filter/selection changes and sheet resizing do not repeatedly fit. Point routes use a small extent and zoom cap of 16; date-line routes use the shortest longitude interval. Framing uses Mercator for consistent native camera fitting across styles.
+Fits reserve space for navigation, safe areas, floating controls and the current results sheet. A sheet covering the map’s center defers the request until it shrinks or closes, as the native fit requires a visible projection center. Requests are consumed once after style readiness; later redraws, filter/selection changes and sheet resizing do not repeatedly fit. Point routes use a small extent and zoom cap of 16; date-line routes use the shortest longitude interval. Framing uses native shape fitting plus a projection refinement pass, including globe views and routes crossing the date line.
 
 The native renderer tests cover phone/tablet frame sizes, sheet padding, point/date-line routes, deferred requests, pitch/reset behavior, and a real SwiftUI map/list round trip with camera and exact list-offset restoration, immediate reuse of all 200 rendered routes without a reload, and renderer disposal on scope reset. Physical-device layout and gesture validation remains part of review.
 
@@ -450,7 +446,7 @@ Portable map sources live in the validated `shared/map-catalog.json` catalogue. 
 
 The v1 wire types are generated the same way. `pnpm api-dtos:generate` derives `Networking/DTO/ActivityMapAPI.generated.swift` from the Zod contracts in `src/contracts/v1`, and `pnpm api-dtos:check` fails CI if the committed Swift no longer matches them. Do not edit that file by hand; change the Zod schema and regenerate. Its hand-written companion `Networking/DTO/APISupport.swift` holds the pieces generics cannot express — the response envelope, paged lists, `JSONValue`, and the date-tolerant JSON decoder.
 
-Each client composes those sources with platform-native additions. The React-based Friflyt GeoJSON layer therefore stays in the web adapter, and Mapbox Standard stays native to iOS. UI implementation, icons, gestures, and locale-aware date, duration, measurement, and number formatting remain native. API payloads remain defined by OpenAPI.
+Each client composes those sources with platform-native additions. The React-based Friflyt GeoJSON layer therefore stays in the web adapter, and iOS bundles the same seven MapLibre style templates as the web. UI implementation, icons, gestures, and locale-aware date, duration, measurement, and number formatting remain native. API payloads remain defined by OpenAPI.
 
 ## Native filters
 

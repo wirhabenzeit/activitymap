@@ -1,50 +1,31 @@
-import MapboxMaps
-import SwiftUI
+import MapLibre
 import UIKit
 
-/// All routes live in one GeoJSON source (mirroring the web map's
-/// `routeSource`); filtering and highlighting are layer filters over it, so
-/// changing filters never re-uploads geometry.
 enum RouteSource {
     static let id = "routeSource"
     static let ordinaryLayerID = "routeLayer"
-
-    static func data(for activities: [Activity]) -> GeoJSONSourceData {
-        let features = activities.compactMap { activity -> Feature? in
+    static func data(for activities: [Activity]) -> MLNShape {
+        MLNShapeCollectionFeature(shapes: activities.compactMap { activity in
             guard activity.coordinates.count > 1 else { return nil }
-            var feature = Feature(geometry: .lineString(LineString(activity.coordinates)))
-            feature.identifier = .string(String(activity.id))
-            feature.properties = [
-                "id": .string(String(activity.id)),
-                "sport_type": .string(activity.sportType.rawValue),
-            ]
+            var coordinates = activity.coordinates
+            let feature = MLNPolylineFeature(coordinates: &coordinates, count: UInt(coordinates.count))
+            feature.identifier = String(activity.id)
+            feature.attributes = ["id": String(activity.id), "sport_type": activity.sportType.rawValue]
             return feature
-        }
-        return .featureCollection(FeatureCollection(features: features))
+        })
     }
-
-    /// `match` on `sport_type`, grouped by category, falling back to black.
-    static let lineColor: Exp = {
-        var arguments: [Exp.Argument] = [.expression(Exp(.get) { "sport_type" })]
-        for category in ActivityCategory.allCases {
-            let sportTypes = SportType.allCases.filter { $0.category == category }
-            guard !sportTypes.isEmpty else { continue }
-            arguments.append(.stringArray(sportTypes.map(\.rawValue)))
-            arguments.append(.string(StyleColor(UIColor(category.color)).rawValue))
+    /// An explicit match preserves UIColor outputs as style colours. A generic
+    /// dictionary lookup treats its values as untyped literals in MapLibre.
+    static let lineColor: NSExpression = {
+        var matches: [NSExpression: NSExpression] = [:]
+        for sport in SportType.allCases {
+            let color = UIColor(named: sport.category.assetName) ?? .black
+            matches[NSExpression(forConstantValue: sport.rawValue)] = NSExpression(forConstantValue: color)
         }
-        arguments.append(.string("#000000"))
-        return Exp(.match, arguments)
+        return NSExpression(forMLNMatchingKey: NSExpression(forKeyPath: "sport_type"),
+                            in: matches, default: NSExpression(forConstantValue: UIColor.black))
     }()
-
-    /// Matches features whose `id` is in `ids`. `match` needs at least one
-    /// label, so an empty set becomes a constant `false`.
-    static func filter(ids: [Int]) -> Exp {
-        guard !ids.isEmpty else { return Exp(.literal) { false } }
-        return Exp(.match) {
-            Exp(.get) { "id" }
-            ids.map(String.init)
-            true
-            false
-        }
+    static func filter(ids: [Int]) -> NSPredicate {
+        NSPredicate(format: "id IN %@", ids.map(String.init))
     }
 }

@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import Observation
 import SwiftUI
 import Testing
@@ -277,9 +277,6 @@ extension RenderedRoutePickingTests {
     }
 
     @Test func filtersAndSettingsStackOverNativeMapSheet() async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: try GalleryLibrary.load().activities)
         store.selectedTab = .map
         store.replaceSelection(with: Array(store.activities.prefix(2).map(\.id)))
@@ -407,9 +404,6 @@ extension RenderedRoutePickingTests {
     }
 
     @Test func listControlsAndInspectionSurviveMapRoundTripWithLazyLargeResults() async throws {
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
         let presentation = ActivityListPresentation(defaults: nil)
         presentation.settings.sort = .init(field: .id, direction: .ascending)
         presentation.settings.visibleMetrics = [.distance, .elapsedTime, .elevationGain, .maxPower]
@@ -537,9 +531,6 @@ extension RenderedRoutePickingTests {
 
     @Test(arguments: [false, true])
     func listMapActionDoesNotPresentSheetOverPushedDetail(globe: Bool) async throws {
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1),
                                                ActivityStoreSelectionTests.activity(2)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
@@ -554,8 +545,8 @@ extension RenderedRoutePickingTests {
             size: CGSize(width: 390, height: 844))
         defer { host.close() }
         try await listWait { host.descendants(of: UICollectionView.self).first?.visibleCells.isEmpty == false
-            && host.descendants(of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
-        let map = try #require(host.descendants(of: MapView.self).first)
+            && host.descendants(of: MLNMapView.self).first?.renderer.isStyleLoaded == true }
+        let map = try #require(host.descendants(of: MLNMapView.self).first)
         let navigation = try #require(host.controllers(of: UINavigationController.self).last)
         store.inspect(2)
         try await listWait { navigation.viewControllers.count == 2 && navigation.transitionCoordinator == nil }
@@ -577,12 +568,12 @@ extension RenderedRoutePickingTests {
             try await Task.sleep(for: .seconds(1))
         }
         let detailController = try #require(navigation.topViewController)
-        let startZoom = map.mapboxMap.cameraState.zoom
+        let startZoom = map.renderer.cameraState.zoom
         var zoomSamples = [startZoom]
         showActivityOnMapFromDetail(2, store: store, navigationController: reference.controller)
         for _ in 0..<45 {
             try await Task.sleep(for: .milliseconds(16))
-            zoomSamples.append(map.mapboxMap.cameraState.zoom)
+            zoomSamples.append(map.renderer.cameraState.zoom)
             if sheets.mapResultsPresented || host.host.presentedViewController != nil {
                 #expect(navigation.viewControllers.count == 1,
                         "The Map sheet must never appear over a still-pushed List detail")
@@ -592,20 +583,19 @@ extension RenderedRoutePickingTests {
         }
         try await listWait { sheets.mapResultsPresented && picker.detailID == 2 }
         try await listWait {
-            guard case .state = map.viewport.status else { return false }
-            return map.mapboxMap.cameraState.zoom > startZoom + 1
+
+            return map.renderer.cameraState.zoom > startZoom + 1
         }
-        let end = map.mapboxMap.cameraState
+        let end = map.renderer.cameraState
         let delta = end.zoom - startZoom
         #expect(zoomSamples.filter { $0 > startZoom + delta * 0.1 && $0 < end.zoom - delta * 0.1 }.count >= 3,
                 "Show on map must move through intermediate cameras while opening results, instead of jumping")
         #expect(zip(zoomSamples, zoomSamples.dropFirst()).allSatisfy { abs($1 - $0) < delta * 0.6 },
                 "No single frame may jump most of the way to the fitted zoom")
-        #expect(host.descendants(of: MapView.self).first === map, "Navigation must retain the loaded map")
-        #expect(map.mapboxMap.projection?.name == .mercator)
+        #expect(host.descendants(of: MLNMapView.self).first === map, "Navigation must retain the loaded map")
         let route = try #require(store.activities.first { $0.id == 2 }).coordinates
         let visible = map.bounds.inset(by: end.padding).insetBy(dx: -2, dy: -2)
-        #expect(map.mapboxMap.points(for: route).allSatisfy { visible.contains($0) },
+        #expect(map.renderer.points(for: route).allSatisfy { visible.contains($0) },
                 "The animation must finish with the route framed above the opening results sheet")
         #expect(store.selectedTab == .map && store.inspectedActivityID == nil)
         #expect(store.activeActivityID == 2 && store.selectedActivityIDs == [2])
@@ -617,27 +607,24 @@ extension RenderedRoutePickingTests {
         // without a tab switch, source change or new selection to wake it up.
         store.mapContext.request(.resetView)
         try await listWait {
-            guard case .state = map.viewport.status else { return false }
+
             return store.mapContext.pendingRequest == nil
-                && abs(map.mapboxMap.cameraState.zoom - MapCamera.initial.zoom) < 0.01
+                && abs(map.renderer.cameraState.zoom - MapCamera.initial.zoom) < 0.01
         }
         store.mapContext.request(.fitSelection)
         try await listWait {
-            guard case .state = map.viewport.status else { return false }
+
             return store.mapContext.pendingRequest == nil
-                && map.mapboxMap.cameraState.zoom > MapCamera.initial.zoom + 1
+                && map.renderer.cameraState.zoom > MapCamera.initial.zoom + 1
         }
-        let fittedArea = map.bounds.inset(by: map.mapboxMap.cameraState.padding).insetBy(dx: -2, dy: -2)
+        let fittedArea = map.bounds.inset(by: map.renderer.cameraState.padding).insetBy(dx: -2, dy: -2)
         let selectedRoute = store.activities.filter { store.selectedActivityIDs.contains($0.id) }.flatMap(\.coordinates)
-        #expect(map.mapboxMap.points(for: selectedRoute).allSatisfy { fittedArea.contains($0) })
-        #expect(host.descendants(of: MapView.self).first === map)
+        #expect(map.renderer.points(for: selectedRoute).allSatisfy { fittedArea.contains($0) })
+        #expect(host.descendants(of: MLNMapView.self).first === map)
     }
 
     @Test(arguments: ["phone", "landscape", "large-text", "split-window"])
     func pushedListDetailReplacesTheShellHeader(scenario: String) async throws {
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
         let store = ActivityStore(activities: (1...100).map { ActivityStoreSelectionTests.activity($0) },
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
@@ -970,9 +957,6 @@ private struct AdaptiveListFixture: View {
 extension RenderedRoutePickingTests {
     @Test(arguments: ["phone", "landscape", "large-text"])
     func mapSelectionControlsDisappearUntilAnotherPick(variant: String) async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
         let store = ActivityStore(activities: (1...3).map { ActivityStoreSelectionTests.activity($0) })
         store.replaceSelection(with: [1, 2])
         let picker = RoutePicker()
@@ -1077,10 +1061,7 @@ extension RenderedRoutePickingTests {
 extension RenderedRoutePickingTests {
     @Test func landscapeBrowsingReclaimsOnlyTheSideOppositeTheIsland() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
         defer {
-            MapboxOptions.accessToken = token
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
         }
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
@@ -1179,9 +1160,6 @@ extension RenderedRoutePickingTests {
 extension RenderedRoutePickingTests {
     @Test(arguments: [false, true])
     func phoneTabsKeepHeaderGeometryAndStatusStyle(hasSelection: Bool) async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: (1...6).map { ActivityStoreSelectionTests.activity($0) })
         let picker = RoutePicker()
         if hasSelection { store.replaceSelection(with: Array(1...6)); picker.detent = .compact }
@@ -1225,10 +1203,7 @@ extension RenderedRoutePickingTests {
 extension RenderedRoutePickingTests {
     @Test func phoneLandscapeBrowseHeaderKeepsCompactGeometry() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
         defer {
-            MapboxOptions.accessToken = token
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
         }
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))
@@ -1282,10 +1257,7 @@ extension RenderedRoutePickingTests {
 extension RenderedRoutePickingTests {
     @Test func landscapeToolbarStaysCompactThroughListAndStatsNavigation() async throws {
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
         defer {
-            MapboxOptions.accessToken = token
             scene.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait))
         }
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: .landscapeRight))

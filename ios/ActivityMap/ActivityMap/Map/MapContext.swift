@@ -1,20 +1,23 @@
-import MapboxMaps
+import CoreLocation
 import Observation
 import SwiftUI
 
 struct MapCamera {
     var center: CLLocationCoordinate2D
     var zoom: CGFloat
-    var bearing: Double
-    var pitch: CGFloat
+    var bearing: Double = 0
+    var pitch: CGFloat = 0
     var padding: UIEdgeInsets = .zero
 
+    init(center: CLLocationCoordinate2D, zoom: CGFloat, bearing: Double = 0, pitch: CGFloat = 0, padding: UIEdgeInsets = .zero) {
+        self.center = center; self.zoom = zoom; self.bearing = bearing; self.pitch = pitch; self.padding = padding
+    }
+    init(center: CLLocationCoordinate2D, padding: UIEdgeInsets, zoom: CGFloat, bearing: Double = 0, pitch: CGFloat = 0) {
+        self.init(center: center, zoom: zoom, bearing: bearing, pitch: pitch, padding: padding)
+    }
     static let initial = MapCamera(center: CLLocationCoordinate2D(latitude: 46.95, longitude: 9.1),
                                    zoom: 6.5, bearing: 0, pitch: 0)
-    var viewport: Viewport {
-        .camera(center: center, zoom: zoom, bearing: bearing, pitch: pitch)
-            .padding(EdgeInsets(top: padding.top, leading: padding.left, bottom: padding.bottom, trailing: padding.right))
-    }
+
 }
 
 /// Survives MapScreen recreation. Actual camera updates are not observable:
@@ -26,7 +29,7 @@ final class MapContext {
     @ObservationIgnored var saveCamera: (() -> Void)?
     var showPhotos = false { didSet { saveAppearance() } }
     var showPlaces = false { didSet { saveAppearance() } }
-    var baseStyle = BaseStyle.standard { didSet { saveAppearance() } }
+    var baseStyle = BaseStyle.street { didSet { saveAppearance() } }
     var activeOverlays = Set(SharedMapCatalog.rasterOverlays.filter(\.visibleByDefault)) { didSet { saveAppearance() } }
 
     private struct Appearance: Codable {
@@ -40,7 +43,7 @@ final class MapContext {
         self.defaults = defaults
         if let data = defaults?.data(forKey: appearanceKey),
            let saved = try? JSONDecoder().decode(Appearance.self, from: data) {
-            baseStyle = BaseStyle.all.first { $0.id == saved.baseStyle } ?? .standard
+            baseStyle = BaseStyle.restored(id: saved.baseStyle)
             activeOverlays = Set(SharedMapCatalog.rasterOverlays.filter { saved.overlays.contains($0.id) })
             showPhotos = saved.photos
             showPlaces = saved.places
@@ -77,7 +80,7 @@ final class MapContext {
         case place(latitude: Double, longitude: Double, sheetFraction: CGFloat)
     }
 
-    func record(_ state: CameraState) {
+    func record(_ state: MapCamera) {
         camera = MapCamera(center: state.center, zoom: state.zoom, bearing: state.bearing, pitch: state.pitch, padding: state.padding)
         let pitched = state.pitch > 1
         if isPitched != pitched { isPitched = pitched }
@@ -113,5 +116,12 @@ final class MapContext {
         navigationError = nil
         scopeRevision += 1
         // Basemap and overlay preferences are device presentation settings.
+    }
+}
+
+extension MapCamera: Equatable {
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.center.latitude == rhs.center.latitude && lhs.center.longitude == rhs.center.longitude
+            && lhs.zoom == rhs.zoom && lhs.bearing == rhs.bearing && lhs.pitch == rhs.pitch && lhs.padding == rhs.padding
     }
 }

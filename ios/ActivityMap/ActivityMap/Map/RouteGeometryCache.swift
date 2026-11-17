@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import Observation
 
 /// Owned by the activity store so switching tabs also reuses this snapshot.
@@ -7,7 +7,7 @@ import Observation
 final class RouteGeometryCache {
     private(set) var revision: Int?
     private(set) var buildCount = 0
-    private(set) var data: GeoJSONSourceData = .featureCollection(FeatureCollection(features: []))
+    private(set) var data: MLNShape = MLNShapeCollectionFeature(shapes: [])
 
     func update(activities: [Activity], revision: Int) {
         guard self.revision != revision else { return }

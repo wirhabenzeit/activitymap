@@ -450,7 +450,7 @@
         "visibility": "visible"
       },
       "paint": {
-        "hillshade-accent-color": "hsl(107, 30%, 86%)",
+        "hillshade-accent-color": "#76836d",
         "hillshade-exaggeration": [
           "interpolate",
           [
@@ -460,28 +460,18 @@
             "zoom"
           ],
           6,
-          0.4,
-          14,
-          0.35,
+          0.7,
+          12,
+          0.75,
+          16,
+          0.6,
           18,
-          0.25
+          0.45
         ],
-        "hillshade-highlight-color": "hsl(200, 10%, 76%)",
-        "hillshade-shadow-color": [
-          "interpolate",
-          [
-            "linear"
-          ],
-          [
-            "zoom"
-          ],
-          0,
-          "hsl(9, 3%, 41%)",
-          13,
-          "hsl(17, 3%, 12%)",
-          15,
-          "hsl(17, 3%, 41%)"
-        ]
+        "hillshade-highlight-color": "#fafbf5",
+        "hillshade-shadow-color": "#454d45",
+        "hillshade-illumination-direction": 315,
+        "hillshade-illumination-anchor": "map"
       }
     },
     {

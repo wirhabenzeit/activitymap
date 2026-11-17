@@ -1,5 +1,6 @@
-// Copy this file to Local.xcconfig and use a URL-restricted public token.
-MAPBOX_ACCESS_TOKEN = pk.your-public-mapbox-token
+// Copy this file to Local.xcconfig and use a public MapTiler key.
+// Restrict native requests with Allowed User-Agent: ActivityMap/1.0.
+MAPTILER_KEY = your-public-maptiler-key
 
 // Base.xcconfig sends simulator builds to localhost and physical-device builds
 // to production. To point a phone at another HTTPS deployment, override only

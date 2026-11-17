@@ -1,7 +1,7 @@
 import SwiftUI
 import Testing
 import UIKit
-import MapboxMaps
+import MapLibre
 @testable import ActivityMap
 
 @MainActor @Suite(.serialized)
@@ -34,9 +34,6 @@ struct RenderedFilterTests {
 
     @Test(arguments: [AppTab.map, .list, .stats])
     func tabletRailStaysAndThePanelSurvivesDestinationSwitches(tab: AppTab) async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = tab
@@ -71,9 +68,6 @@ struct RenderedFilterTests {
     /// including on List where the panel leaves too little for List's detail.
     @Test(arguments: [false, true])
     func filterSidebarSitsBelowTheHeaderOnEveryDestination(expanded: Bool) async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         let sheets = BrowseSheetPresentation()
@@ -99,9 +93,6 @@ struct RenderedFilterTests {
     /// A window too narrow for List's adjacent detail beside the rail pushes
     /// the detail inside its column, still below the browsing header.
     @Test func pushedListDetailKeepsTheHeaderAboveTheRail() async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
@@ -123,9 +114,6 @@ struct RenderedFilterTests {
     }
 
     @Test func resizingDismissesFilterSheetWhenSidebarBecomesAvailable() async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)])
         store.selectedTab = .list
         let sheets = BrowseSheetPresentation()
@@ -151,9 +139,6 @@ struct RenderedFilterTests {
 
     @Test(arguments: [AppTab.map, .list, .stats])
     func narrowTabletUsesFilterSheetAcrossTabs(tab: AppTab) async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)])
         store.selectedTab = tab
         let sheets = BrowseSheetPresentation()
@@ -171,9 +156,6 @@ struct RenderedFilterTests {
 
     @Test(arguments: ["portrait", "landscape"])
     func filtersNeverSqueezeListAndDetail(layout: String) async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
@@ -225,9 +207,6 @@ struct RenderedFilterTests {
 
     @Test(arguments: [false, true])
     func rotatingListWithFiltersAndDetailKeepsTheAdjacentDetail(filtersFirst: Bool) async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list
@@ -261,9 +240,6 @@ struct RenderedFilterTests {
     }
 
     @Test func openingAnActivityCollapsesTheExpandedPanelInPortrait() async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1, route: false)],
                                   listPresentation: ActivityListPresentation(defaults: nil))
         store.selectedTab = .list

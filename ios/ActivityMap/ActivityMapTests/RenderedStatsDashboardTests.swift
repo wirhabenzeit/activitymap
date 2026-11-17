@@ -1,6 +1,6 @@
 import SwiftUI
 import UIKit
-import MapboxMaps
+import MapLibre
 import Testing
 @testable import ActivityMap
 
@@ -23,9 +23,6 @@ import Testing
         await StatsDashboardTests.load(state, store)
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let size = variant == "landscape" ? CGSize(width: 844, height: 390) : CGSize(width: 402, height: 874)
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
             .environment(\.horizontalSizeClass, .compact)
@@ -138,9 +135,6 @@ import Testing
     @Test func phoneStatsHeaderKeepsFiltersInDetailAndSettingsOnDashboard() async throws {
         let (store, _) = try StatsDashboardTests.fixture()
         let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
@@ -514,9 +508,6 @@ import Testing
         }
         let state = StatsDashboardState()
         let size = variant == "landscape" ? CGSize(width: 844, height: 390) : CGSize(width: 402, height: 874)
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
@@ -598,9 +589,6 @@ import Testing
         store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-10-07")), timeZone: .gmt)
         store.selectedTab = .stats
         let state = StatsDashboardState()
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let size = orientation == "portrait" ? CGSize(width: 834, height: 1194) : CGSize(width: 1194, height: 834)
         let sheets = BrowseSheetPresentation()
@@ -665,9 +653,6 @@ import Testing
     func statsFocusKeepsFiltersAndDestinationsUsable(scenario: String) async throws {
         let (store, _) = try StatsDashboardTests.fixture()
         let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let size: CGSize = switch scenario {
         case "landscape": CGSize(width: 1194, height: 834)
         case "phone": CGSize(width: 402, height: 874)
@@ -725,9 +710,6 @@ import Testing
         let (store, _) = try StatsDashboardTests.fixture()
         let state = StatsDashboardState(), sheets = BrowseSheetPresentation()
         sheets.showsFilters = true
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let size = scenario == "landscape" ? CGSize(width: 1194, height: 834) : CGSize(width: 834, height: 1194)
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, sheets: sheets, statsContent: destination)
@@ -771,9 +753,6 @@ import Testing
     @Test func tabletFocusPageSurvivesWindowResize() async throws {
         let (store, _) = try StatsDashboardTests.fixture()
         let state = StatsDashboardState()
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.horizontalSizeClass, .regular)
@@ -1290,9 +1269,6 @@ extension RenderedStatsDashboardTests {
         store.selectedTab = .list
         let state = StatsDashboardState()
         await StatsDashboardTests.load(state, store)
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
@@ -1416,9 +1392,6 @@ extension RenderedStatsDashboardTests {
         store.selectedTab = .stats
         let state = StatsDashboardState()
         await StatsDashboardTests.load(state, store)
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)
@@ -1463,9 +1436,6 @@ extension RenderedStatsDashboardTests {
         store.selectedTab = .stats
         let state = StatsDashboardState()
         await StatsDashboardTests.load(state, store)
-        let previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = previousToken }
         let destination = BrowseStatsDestination { store, _ in AnyView(StatsScreen(store: store, dashboard: state)) }
         let host = try StatsDashboardHarness(root: AppShell(store: store, statsContent: destination)
             .environment(\.statsDetailPresentation, .navigation)

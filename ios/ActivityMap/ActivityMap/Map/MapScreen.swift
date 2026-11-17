@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import SwiftUI
 import UIKit
 
@@ -10,19 +10,14 @@ struct MapScreen: View {
     @Environment(\.dynamicTypeSize) private var typeSize
     @Environment(\.colorScheme) private var colorScheme
     @Environment(\.mapStyleOverride) private var mapStyleOverride
-    @Environment(\.mapTerrainOverride) private var mapTerrainOverride
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.openURL) private var openURL
     @State private var placesOwner = UUID()
-    @State private var viewport: Viewport
-    @State private var acceptsCameraEvents = false
+    @State private var proxy = MapProxy()
     @State private var cameraTransitionID: UUID?
     /// A resolved fit that arrived while the map was updating its content.
     /// Valid only while its transition is still current.
-    @State private var deferredTransition: (id: UUID, viewport: Viewport)?
     @State private var location = MapLocationController()
-    @State private var terrain = MapTerrainState()
-    @State private var compass: MapCompassState
     @State private var positions = MapPositionState()
 
     init(store: ActivityStore, topOcclusion: CGFloat = 0, picker: RoutePicker? = nil) {
@@ -30,8 +25,6 @@ struct MapScreen: View {
         self.topOcclusion = topOcclusion
         self.store = store
         self.context = store.mapContext
-        _viewport = State(initialValue: store.mapContext.camera.viewport)
-        _compass = State(initialValue: MapCompassState(bearing: store.mapContext.camera.bearing))
     }
 
     @Namespace private var photoTransition
@@ -54,24 +47,18 @@ struct MapScreen: View {
         #if DEBUG
         let _ = PerfProbe.count("MapScreen")
         #endif
+        // Observe the geometry snapshot in this body, before GeometryReader's
+        // escaping closure, so its first publication updates native sources.
+        let routes = RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
+            selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
         ZStack(alignment: .bottomTrailing) {
             GeometryReader { geometry in
-                MapReader { proxy in
-                    mapView(proxy: proxy, geometry: geometry)
-                }
+                mapView(proxy: proxy, geometry: geometry, routes: routes)
                 // Keep the map tools anchored below navigation as results resize.
                 mapControls
                     .position(MapResultsLayout.controlsCenter(size: geometry.size,
                         topInset: max(topOcclusion, geometry.safeAreaInsets.top)))
                     .accessibilityIdentifier("map-controls")
-                if let center = MapCompassLayout.center(size: geometry.size,
-                    topInset: max(topOcclusion, geometry.safeAreaInsets.top),
-                    bottomInset: geometry.safeAreaInsets.bottom, showingResults: picker.isPresented,
-                    detent: picker.detent, largeText: typeSize.isAccessibilitySize,
-                    resultsFrame: resultsFrame(in: geometry)) {
-                    MapCompassButton(state: compass) { context.request(.resetBearing) }
-                        .position(center)
-                }
                 // BrowseContent hides this whole map on the list tab. Keep the
                 // results subtree mounted too, preserving its exact scroll offset.
                 // Keep the native presenter mounted before selection changes,
@@ -121,12 +108,6 @@ struct MapScreen: View {
             }
             Button("OK", role: .cancel) { location.errorMessage = nil }
         } message: { Text(location.errorMessage ?? "") }
-        .alert("3D terrain", isPresented: Binding(
-            get: { terrain.errorMessage != nil },
-            set: { if !$0 { terrain.errorMessage = nil } }
-        )) {
-            Button("OK", role: .cancel) { terrain.errorMessage = nil }
-        } message: { Text(terrain.errorMessage ?? "") }
         .onChange(of: store.visibleActivityIDs) { _, _ in picker.reconcile(with: store) }
         .onChange(of: store.activeActivityID) { _, _ in
             picker.reconcile(with: store)
@@ -148,15 +129,12 @@ struct MapScreen: View {
         }
         .onChange(of: store.isCombining) { _, _ in picker.invalidateQuery() }
         .onChange(of: store.onlySelected) { _, _ in picker.invalidateQuery() }
-        .onChange(of: context.baseStyle) { oldStyle, newStyle in
+        .onChange(of: context.baseStyle) { _, _ in
             cameraTransitionID = nil
-            if oldStyle.styleURL != newStyle.styleURL { acceptsCameraEvents = false }
-            configureTerrain(restart: true)
             picker.invalidateQuery()
         }
         .onChange(of: context.activeOverlays) { _, _ in picker.invalidateQuery() }
         .onChange(of: context.scopeRevision) { _, _ in
-            acceptsCameraEvents = false
             cameraTransitionID = nil
             picker.isPresented = false
             resultsGeometry = nil
@@ -167,13 +145,8 @@ struct MapScreen: View {
             pendingPhotoActivity = nil
             lastPhotoAction = nil
             placeGroups = []; placeModels = [:]; openPlaceGroupID = nil; lastPlaceAction = nil
-            viewport = context.camera.viewport
+            proxy.map?.move(to: context.camera, duration: 0)
             location.cancel()
-            compass.record(context.camera.bearing)
-            terrain.configure(enabled: false, supported: terrainConfiguration != nil)
-        }
-        .onChange(of: context.isPitched) { _, _ in
-            configureTerrain()
         }
         .onChange(of: scenePhase) { _, phase in
             // A permission prompt can make the scene inactive. Only leaving
@@ -191,143 +164,57 @@ struct MapScreen: View {
             if let focus = loader.focus, !store.mapPlacesActivityIDs.contains(Int(focus.activityID) ?? -1) { loader.focus = nil }
         }
         .onDisappear { store.activityPlaces?.release(placesOwner) }
-        .onAppear {
-            compass.record(context.camera.bearing)
-            configureTerrain()
-        }
-        .task(id: terrain.includesTerrain ? terrain.sourceID : nil) {
-            guard terrain.status == .loading else { return }
-            let sourceID = terrain.sourceID
-            do { try await Task.sleep(for: .seconds(20)) } catch { return }
-            if terrain.status == .loading { terrain.failed(sourceID: sourceID) }
-        }
         .onDisappear {
             cameraTransitionID = nil
             location.cancel()
             context.cancelLocationRequest()
-            acceptsCameraEvents = false
             picker.invalidateQuery()
         }
     }
 
-    private func mapView(proxy: MapProxy, geometry: GeometryProxy) -> some View {
+    private func mapView(proxy: MapProxy, geometry: GeometryProxy, routes: RouteLayers) -> some View {
         #if DEBUG
         PerfProbe.count("MapScreen.map")
         #endif
-        return Map(viewport: $viewport) {
-            baseContent
-            if terrain.includesTerrain, let configuration = terrainConfiguration {
-                MapTerrainContent(configuration: configuration, sourceID: terrain.sourceID)
-            }
-            RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
-                        selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
-
-            if let loader = store.activityPlaces {
-                MatchedPlacesLayer(places: renderedPlaces, loader: loader, overview: context.showPlaces, onSelect: openPlace)
-                if context.showPlaces {
-                    MapPlaceClusters(groups: placeGroups, places: placeModels, focusedID: loader.focus?.placeID,
-                        openGroupID: openPlaceGroupID, openGroup: { openPlaceGroup($0, map: proxy.map) },
-                        select: openPlace, close: { openPlaceGroupID = nil })
+        let places = renderedPlaces
+        let overlays = context.activeOverlays
+        let pitched = context.isPitched
+        return MapLibreView(proxy: proxy, initialCamera: context.camera, style: mapStyle,
+            bottomInset: geometry.safeAreaInsets.bottom,
+            compassCenter: MapCompassLayout.center(size: geometry.size,
+                topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,
+                showingResults: picker.isPresented, detent: picker.detent, largeText: typeSize.isAccessibilitySize,
+                resultsFrame: resultsFrame(in: geometry)),
+            sync: { style in
+                MapLayerSync.sync(style: style, base: context.baseStyle, overlays: overlays,
+                    routes: routes, places: places, showPlaceLabels: context.showPlaces, pitched: pitched)
+            }, styleLoaded: {
+                refreshPhotos(proxy: proxy, geometry: geometry)
+                refreshPlaces(proxy: proxy, geometry: geometry)
+                scheduleNavigation(proxy: proxy)
+            }, cameraMoved: { camera in
+                picker.invalidateQuery()
+                if proxy.map?.isStyleLoaded == true, store.selectedTab == .map {
+                    context.record(camera)
                 }
-            }
-            if let place = filteredPlace {
-                MapViewAnnotation(coordinate: CLLocationCoordinate2D(latitude: place.place.latitude, longitude: place.place.longitude)) {
-                    PlaceFilterPin(place: place.place)
-                }
-                .variableAnchors([ViewAnnotationAnchorConfig(anchor: .bottom)])
-                .allowOverlap(true)
-                .ignoreCameraPadding(true)
-                .priority(3)
-            }
-            if context.showPhotos {
-                ForEvery(photoGroups) { group in
-                    if let photo = photoModels[group.id], let coordinate = photo.location,
-                       Int(photo.activityID).map(store.visibleActivityIDs.contains) == true {
-                        MapViewAnnotation(coordinate: coordinate) {
-                            MapPhotoMarker(store: store, photo: photo, count: group.photoIDs.count,
-                                thumbnails: photoThumbnails) { openPhotoGroup(group) }
-                                .matchedTransitionSource(id: photo.id, in: photoTransition)
-                        }
-                        .allowOverlap(true)
-                    }
-                }
-            }
-
-            routeInteraction(proxy: proxy)
-            TapInteraction { context in
-                self.context.highlightedPlaceID = nil
-                if let map = proxy.map, !handlePlaceTap(at: context.point, map: map) && !handlePhotoTap(at: context.point, map: map) {
-                    picker.pick(at: context.point, map: map, store: store)
-                }
-                return true
-            }
-        }
-        // Fitted and restored camera padding already includes safe areas.
-        .usesSafeAreaInsetsAsPadding(false)
-        .mapStyle(mapStyle)
-        .ornamentOptions(attributionLayout(in: geometry).ornamentOptions)
-        .gestureHandlers(MapGestureHandlers(onBegin: { gesture in
-            if gesture != .singleTap {
+            }, idle: {
+                if proxy.map?.isStyleLoaded == true { context.saveCamera?() }
+                refreshPhotos(proxy: proxy, geometry: geometry)
+                refreshPlaces(proxy: proxy, geometry: geometry)
+            }, frameDrawn: {
+                refreshPositions(proxy: proxy)
+                applyNavigation(proxy: proxy, geometry: geometry)
+            }, gestureStarted: {
+                cameraTransitionID = nil
                 location.cancel()
                 context.cancelLocationRequest()
                 picker.invalidateQuery()
-            }
-        }))
-        .onCameraChanged { event in
-            picker.invalidateQuery()
-            if acceptsCameraEvents, store.selectedTab == .map {
-                context.record(event.cameraState)
-                compass.record(event.cameraState.bearing)
-            }
-        }
-        .onStyleLoaded { _ in
-            configureTerrain(restart: true)
-            if !acceptsCameraEvents { viewport = context.camera.viewport }
-            acceptsCameraEvents = true
-            refreshPhotos(proxy: proxy, geometry: geometry)
-            refreshPlaces(proxy: proxy, geometry: geometry)
-            scheduleNavigation(proxy: proxy)
-            clearInactiveTerrain(proxy: proxy)
-        }
-        .onRenderFrameFinished { _ in
-            refreshPositions(proxy: proxy)
-            // The shell can replace a native bar when returning from List.
-            // Mapbox's fitter must see its resized viewport, not the previous
-            // tab's bounds. Keep the request until that layout has rendered.
-            applyNavigation(proxy: proxy, geometry: geometry)
-        }
-        .onMapIdle { _ in
-            if acceptsCameraEvents { context.saveCamera?() }
-            refreshPhotos(proxy: proxy, geometry: geometry)
-            refreshPlaces(proxy: proxy, geometry: geometry)
-            // A local/cached style can finish before SwiftUI installs its
-            // onStyleLoaded subscription. Recover readiness at the first idle
-            // frame as well, or camera persistence and queued fits stay blocked.
-            if !acceptsCameraEvents, proxy.map?.isStyleLoaded == true {
-                viewport = context.camera.viewport
-                acceptsCameraEvents = true
-            }
-            if let deferred = deferredTransition {
-                deferredTransition = nil
-                if deferred.id == cameraTransitionID, store.selectedTab == .map {
-                    withViewportAnimation(.easeOut(duration: 0.5)) { viewport = deferred.viewport }
+            }, tap: { point in
+                context.highlightedPlaceID = nil
+                if let map = proxy.map, !handlePlaceTap(at: point, map: map) && !handlePhotoTap(at: point, map: map) {
+                    picker.pick(at: point, map: map, store: store)
                 }
-            }
-            clearInactiveTerrain(proxy: proxy)
-            if terrain.status == .loading, let map = proxy.map,
-               map.sourceExists(withId: terrain.sourceID),
-               map.terrainProperty("source").value as? String == terrain.sourceID {
-                terrain.loaded(sourceID: terrain.sourceID)
-            }
-        }
-        .onSourceDataLoaded { event in
-            if event.type == .tile, event.loaded == true { terrain.loaded(sourceID: event.sourceId) }
-        }
-        .onMapLoadingError { error in
-            if error.sourceId == terrain.sourceID || error.type == .style {
-                terrain.failed(sourceID: terrain.sourceID)
-            }
-        }
+            })
         .onChange(of: store.activityPlaces?.focus) { _, focus in
             refreshPlaces(proxy: proxy, geometry: geometry)
             guard let focus, focus.revealOnMap, let place = store.activityPlaces?.result(focus.activityID)?.places.first(where: { $0.id == focus.placeID }),
@@ -336,9 +223,10 @@ struct MapScreen: View {
             let visible = CGRect(origin: .zero, size: geometry.size).inset(by: context.camera.padding).insetBy(dx: 60, dy: 90)
             if !visible.contains(map.point(for: coordinate)) {
                 var camera = context.camera; camera.center = coordinate
-                withViewportAnimation(.easeOut(duration: 0.35)) { viewport = camera.viewport }
+                map.move(to: camera, duration: 0.35)
             }
         }
+        .overlay { annotationOverlay }
         .overlay { MapPositionOverlay(state: positions) }
         // Scrubbing moves the cursor per touch event. Observing it here, not
         // in this body, repositions the dot without rebuilding map content.
@@ -351,9 +239,6 @@ struct MapScreen: View {
         .onChange(of: context.pendingRequest?.id, initial: true) { _, _ in
             location.cancel()
             scheduleNavigation(proxy: proxy)
-        }
-        .onChange(of: terrain.includesTerrain) { _, enabled in
-            if !enabled { clearInactiveTerrain(proxy: proxy) }
         }
         .onChange(of: picker.detent) { _, _ in scheduleNavigation(proxy: proxy) }
         .onChange(of: resultsGeometry) { _, _ in scheduleNavigation(proxy: proxy) }
@@ -458,7 +343,7 @@ struct MapScreen: View {
         loader.focus = PlaceFocus(activityID: activityID, placeID: entry.id)
     }
 
-    private func openPlaceGroup(_ group: MapPlaceLayout.Group, map: MapboxMap?) {
+    private func openPlaceGroup(_ group: MapPlaceLayout.Group, map: MapController?) {
         guard context.showPlaces, let map, let entry = placeModels[group.id] else { return }
         let key = "cluster:\(group.id)"
         if let last = lastPlaceAction, last.id == key, Date().timeIntervalSince(last.time) < 0.4 { return }
@@ -470,7 +355,7 @@ struct MapScreen: View {
             var camera = context.camera
             camera.center = .init(latitude: entry.place.latitude, longitude: entry.place.longitude)
             camera.zoom = min(MapPlaceLayout.chooserZoom, map.cameraState.zoom + 2)
-            withViewportAnimation(.easeOut(duration: 0.45)) { viewport = camera.viewport }
+            map.move(to: camera, duration: 0.45)
         }
     }
 
@@ -503,7 +388,7 @@ struct MapScreen: View {
         if photoThumbnails != thumbnails { photoThumbnails = thumbnails }
     }
 
-    private func handlePlaceTap(at point: CGPoint, map: MapboxMap) -> Bool {
+    private func handlePlaceTap(at point: CGPoint, map: MapController) -> Bool {
         if context.showPlaces {
             for group in placeGroups where group.pointIDs.count > 1 {
                 guard let entry = placeModels[group.id] else { continue }
@@ -523,7 +408,7 @@ struct MapScreen: View {
         openPlaceGroupID = nil
         return false
     }
-    private func handlePhotoTap(at point: CGPoint, map: MapboxMap) -> Bool {
+    private func handlePhotoTap(at point: CGPoint, map: MapController) -> Bool {
         guard context.showPhotos else { return false }
         // Test the current projection during camera animation, rather than the
         // settled positions used for grouping. Photos take priority over routes.
@@ -542,16 +427,14 @@ struct MapScreen: View {
     private func openPhotoGroup(_ group: MapPhotoLayout.Group) {
         guard context.showPhotos, let photo = photoModels[group.id], let coordinate = photo.location,
               Int(photo.activityID).map(store.visibleActivityIDs.contains) == true else { return }
-        // Mapbox and the annotation button may both receive the same touch.
+        // The map recognizer and overlay button may both receive the same touch.
         if let last = lastPhotoAction, last.id == group.id, Date().timeIntervalSince(last.time) < 0.4 { return }
         lastPhotoAction = (group.id, Date())
         if !photoThumbnails, group.photoIDs.count > 1 {
-            withViewportAnimation(.easeOut(duration: 0.45)) {
-                viewport = .camera(center: coordinate, zoom: max(context.camera.zoom + 2, MapPhotoLayout.thumbnailZoom),
-                                   bearing: context.camera.bearing, pitch: context.camera.pitch)
-                    .padding(EdgeInsets(top: context.camera.padding.top, leading: context.camera.padding.left,
-                                        bottom: context.camera.padding.bottom, trailing: context.camera.padding.right))
-            }
+            var camera = context.camera
+            camera.center = coordinate
+            camera.zoom = max(camera.zoom + 2, MapPhotoLayout.thumbnailZoom)
+            proxy.map?.move(to: camera, duration: 0.45)
             return
         }
         guard let activityID = Int(photo.activityID) else { return }
@@ -591,7 +474,6 @@ struct MapScreen: View {
     private func applyNavigation(proxy: MapProxy, geometry: GeometryProxy) {
         guard store.selectedTab == .map, context.pendingRequest != nil,
               let map = proxy.map, map.isStyleLoaded else { return }
-        acceptsCameraEvents = true
         let layout = MapResultsLayout(size: geometry.size,
             topInset: max(topOcclusion, geometry.safeAreaInsets.top), bottomInset: geometry.safeAreaInsets.bottom,
             detent: picker.detent, largeText: typeSize.isAccessibilitySize)
@@ -616,32 +498,8 @@ struct MapScreen: View {
             trailingOcclusion: showingResults && layout.isSidePanel
                 ? layout.resolvedTrailingOcclusion(presentedFrame: resultsFrame(in: geometry)) + safeArea.trailing : 0
         ) else { return }
-        let padding = camera.padding ?? context.camera.padding
-        let target = Viewport.camera(center: camera.center, zoom: camera.zoom, bearing: camera.bearing, pitch: camera.pitch)
-            .padding(EdgeInsets(top: padding.top, leading: padding.left, bottom: padding.bottom, trailing: padding.right))
-        let transitionID = UUID()
-        cameraTransitionID = transitionID
-        switch action {
-        case .activity, .fitActivity, .fitSelection, .fitFiltered:
-            // Commit navigation/results layout first. Updating the viewport
-            // inside that same SwiftUI update loses its animation transaction.
-            // Ease the fixed camera and final panel padding together afterwards.
-            DispatchQueue.main.async {
-                guard cameraTransitionID == transitionID, store.selectedTab == .map else { return }
-                // The request is already consumed. Returning to Map can still be
-                // adding the newly active route, and a camera move started then
-                // is interrupted, so finish it at the next idle frame instead.
-                guard map.isStyleLoaded else {
-                    deferredTransition = (transitionID, target)
-                    return
-                }
-                withViewportAnimation(.easeOut(duration: 0.5)) { viewport = target }
-            }
-        case .place:
-            withViewportAnimation(.fly) { viewport = target }
-        default:
-            withViewportAnimation(.default(maxDuration: 0.5)) { viewport = target }
-        }
+        cameraTransitionID = UUID()
+        map.move(to: camera, fly: { if case .place = action { return true }; return false }())
     }
 
     private func resultsFrame(in geometry: GeometryProxy) -> CGRect {
@@ -652,90 +510,53 @@ struct MapScreen: View {
             leadingSafeInset: geometry.safeAreaInsets.leading, trailingSafeInset: geometry.safeAreaInsets.trailing)
     }
 
-    private func attributionLayout(in geometry: GeometryProxy) -> MapAttributionLayout {
-        MapAttributionLayout(bottomInset: geometry.safeAreaInsets.bottom)
-    }
-
-    private func clearInactiveTerrain(proxy: MapProxy) {
-        guard !terrain.includesTerrain, let map = proxy.map, map.isStyleLoaded else { return }
-        // Unmounting declarative Terrain restores the style's original value.
-        // Custom catalogue styles can already contain terrain, so explicitly
-        // flatten that too when 2D is chosen or our elevation request fails.
-        let source: StylePropertyValue = map.terrainProperty("source")
-        if let id = source.value as? String, !id.isEmpty { map.removeTerrain() }
-    }
-
-    private func routeInteraction(proxy: MapProxy) -> TapInteraction {
-        // Route hits take priority over external feature overlays. Photo
-        // annotations consume their own taps before this layer interaction.
-        TapInteraction(.layer(RouteSource.ordinaryLayerID), radius: RouteHitTesting.radius) { _, context in
-            self.context.highlightedPlaceID = nil
-            if let map = proxy.map, !handlePlaceTap(at: context.point, map: map) && !handlePhotoTap(at: context.point, map: map) {
-                picker.pick(at: context.point, map: map, store: store)
-            }
-            return true
-        }
-    }
-
-    @MapContentBuilder
-    private var baseContent: some MapContent {
-        if let raster = context.baseStyle.rasterSource {
-            rasterSource(
-                id: "selected-raster-base",
-                url: raster.url,
-                tileSize: raster.tileSize,
-                attribution: context.baseStyle.attribution
-            )
-
-            RasterLayer(id: "selected-raster-base-layer", source: "selected-raster-base")
-        }
-
-        ForEvery(SharedMapCatalog.rasterOverlays.filter(context.activeOverlays.contains)) { overlay in
-            rasterSource(
-                id: overlay.sourceID,
-                url: overlay.url,
-                tileSize: overlay.tileSize,
-                attribution: overlay.attribution
-            )
-
-            RasterLayer(id: overlay.layerID, source: overlay.sourceID)
-                .rasterOpacity(overlay.opacity)
-        }
-
-    }
-
     private var mapControls: some View {
         VStack(spacing: 0) {
             Menu {
-                // Toggles tick in the same column as the base map, and keep the
-                // menu open so several layers can be switched in one go.
-                Section("Activities") {
-                    Toggle(isOn: $context.showPhotos) { Label("Photos", systemImage: "photo") }
-                        .menuActionDismissBehavior(.disabled)
-                    if context.showPhotos, !store.photos.contains(where: {
-                        Int($0.activityID).map(store.visibleActivityIDs.contains) == true && MapPhotoLayout.validLocation($0.location)
-                    }) {
-                        Text("No located photos in the current filter")
-                    }
-                    Toggle(isOn: $context.showPlaces) { Label("Places", systemImage: "mappin.and.ellipse") }
-                        .menuActionDismissBehavior(.disabled)
-                    if context.showPlaces, placeModels.isEmpty, store.activityPlaces?.overviewLoading != true {
-                        Text("No matched places saved in the current filter")
-                    }
+                Toggle(isOn: $context.showPhotos) { Label("Photos", systemImage: "photo") }
+                    .menuActionDismissBehavior(.disabled)
+                if context.showPhotos, !store.photos.contains(where: {
+                    Int($0.activityID).map(store.visibleActivityIDs.contains) == true && MapPhotoLayout.validLocation($0.location)
+                }) {
+                    Text("No located photos in the current filter")
                 }
-                Section("Base Map") {
-                    Picker("Base Map", selection: $context.baseStyle) {
-                        ForEach(BaseStyle.all) { style in
-                            Label(style.title, systemImage: style.systemImage)
-                                .tag(style)
+                Toggle(isOn: $context.showPlaces) { Label("Places", systemImage: "mappin.and.ellipse") }
+                    .menuActionDismissBehavior(.disabled)
+                if context.showPlaces, placeModels.isEmpty, store.activityPlaces?.overviewLoading != true {
+                    Text("No matched places saved in the current filter")
+                }
+                Divider()
+                ForEach(SharedMapCatalog.baseMapGroups) { group in
+                    let maps = BaseStyle.all.filter { group.maps.contains($0.id) }
+                    if maps.count == 1, let style = maps.first {
+                        // A one-item inline Picker creates its own padded menu
+                        // section. A single choice stays in the base-map group.
+                        Toggle(group.label, isOn: Binding(
+                            get: { context.baseStyle == style },
+                            set: { if $0 { context.baseStyle = style } }
+                        ))
+                    } else if !maps.isEmpty {
+                        Menu(group.label) {
+                            Picker(group.label, selection: $context.baseStyle) {
+                                ForEach(maps) { style in
+                                    Label(style.title, systemImage: style.systemImage).tag(style)
+                                }
+                            }.pickerStyle(.inline)
                         }
                     }
                 }
-
                 Section("Overlays") {
-                    ForEach(SharedMapCatalog.rasterOverlays) { overlay in
+                    let groupedIDs = Set(SharedMapCatalog.overlayGroups.flatMap(\.overlays))
+                    ForEach(SharedMapCatalog.rasterOverlays.filter { !groupedIDs.contains($0.id) }) { overlay in
                         Toggle(overlay.label, isOn: overlayBinding(overlay))
                             .menuActionDismissBehavior(.disabled)
+                    }
+                    ForEach(SharedMapCatalog.overlayGroups) { group in
+                        Menu(group.label) {
+                            ForEach(SharedMapCatalog.rasterOverlays.filter { group.overlays.contains($0.id) }) { overlay in
+                                Toggle(overlay.label, isOn: overlayBinding(overlay)).menuActionDismissBehavior(.disabled)
+                            }
+                        }
                     }
                 }
             } label: {
@@ -747,22 +568,13 @@ struct MapScreen: View {
             Divider().frame(width: 24, height: 1)
 
             Button {
-                if context.isPitched {
-                    context.request(.pitch(0))
-                } else if terrainConfiguration != nil {
-                    context.request(.pitch(50))
-                } else {
-                    terrain.configure(enabled: true, supported: false)
-                }
+                context.request(.pitch(context.isPitched ? 0 : 50))
             } label: {
-                ZStack {
-                    BrowseIconLabel(systemImage: "view.3d", isSelected: terrain.status == .ready)
-                        .opacity(terrain.status == .loading ? 0 : 1)
-                    if terrain.status == .loading { ProgressView().controlSize(.small) }
-                }.frame(width: 44, height: 48)
+                BrowseIconLabel(systemImage: "view.3d", isSelected: context.isPitched)
+                    .frame(width: 44, height: 48)
             }
             .accessibilityLabel("3D map")
-            .accessibilityValue(terrain.accessibilityValue)
+            .accessibilityValue(context.isPitched ? "On" : "Off")
 
             Divider().frame(width: 24, height: 1)
 
@@ -789,26 +601,7 @@ struct MapScreen: View {
     }
 
     private var mapStyle: MapStyle {
-        if let mapStyleOverride { return mapStyleOverride }
-        if let styleURL = context.baseStyle.styleURL,
-           let url = URL(string: styleURL),
-           let styleURI = StyleURI(url: url) {
-            return MapStyle(uri: styleURI)
-        }
-
-        return .standard(lightPreset: colorScheme == .dark ? .night : .day)
-    }
-
-    private var terrainConfiguration: MapTerrainConfiguration? {
-        if let mapTerrainOverride { return mapTerrainOverride }
-        if mapStyleOverride != nil { return nil }
-        return context.baseStyle.terrainConfiguration
-    }
-
-    private func configureTerrain(restart: Bool = false) {
-        let usesTerrain = mapStyleOverride == nil || mapTerrainOverride != nil
-        terrain.configure(enabled: usesTerrain && context.isPitched,
-                          supported: terrainConfiguration != nil, restart: restart)
+        mapStyleOverride ?? context.baseStyle.mapLibreStyle(dark: colorScheme == .dark)
     }
 
     private func overlayBinding(_ overlay: SharedRasterOverlayDefinition) -> Binding<Bool> {
@@ -819,20 +612,34 @@ struct MapScreen: View {
         }
     }
 
-    private func rasterSource(id: String, url: String, tileSize: Double, attribution: String?) -> RasterSource {
-        var source = RasterSource(id: id)
-            .tiles([url])
-        source.tileSize = tileSize
-        source.attribution = attribution
-        return source
+    @ViewBuilder private var annotationOverlay: some View {
+        ZStack(alignment: .topLeading) {
+            if let loader = store.activityPlaces {
+                MatchedPlacesLayer(places: renderedPlaces, loader: loader, overview: context.showPlaces,
+                    onSelect: openPlace, positions: positions, proxy: proxy)
+                if context.showPlaces {
+                    MapPlaceClusters(groups: placeGroups, places: placeModels, focusedID: loader.focus?.placeID,
+                        openGroupID: openPlaceGroupID, openGroup: { openPlaceGroup($0, map: proxy.map) },
+                        select: openPlace, close: { openPlaceGroupID = nil }, positions: positions, proxy: proxy)
+                }
+            }
+            if let place = filteredPlace {
+                GeographicOverlay(coordinate: .init(latitude: place.place.latitude, longitude: place.place.longitude),
+                    positions: positions, proxy: proxy, anchor: .bottom) { PlaceFilterPin(place: place.place) }
+            }
+            if context.showPhotos {
+                ForEach(photoGroups) { group in
+                    if let photo = photoModels[group.id], let coordinate = photo.location {
+                        GeographicOverlay(coordinate: coordinate, positions: positions, proxy: proxy) {
+                            MapPhotoMarker(store: store, photo: photo, count: group.photoIDs.count,
+                                thumbnails: photoThumbnails) { openPhotoGroup(group) }
+                                .matchedTransitionSource(id: photo.id, in: photoTransition)
+                        }
+                    }
+                }
+            }
+        }.frame(maxWidth: .infinity, maxHeight: .infinity).clipped()
     }
-
-
-}
-
-private extension SharedRasterOverlayDefinition {
-    var sourceID: String { "\(id)-source" }
-    var layerID: String { "\(id)-layer" }
 }
 
 // Inject a local style for rendered previews/tests through the same declarative

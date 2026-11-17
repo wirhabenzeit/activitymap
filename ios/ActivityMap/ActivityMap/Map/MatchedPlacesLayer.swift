@@ -1,34 +1,17 @@
-import MapboxMaps
+import MapLibre
 import SwiftUI
 
-struct MatchedPlacesLayer: MapContent {
+struct MatchedPlacesLayer: View {
     let places: [DisplayMatchedPlace]
     let loader: ActivityPlacesLoader
     var overview = false
     var onSelect: ((DisplayMatchedPlace) -> Void)?
-    private var attributionSource: GeoJSONSource {
-        var source = GeoJSONSource(id: "matched-places-attribution")
-        source.data = .featureCollection(.init(features: []))
-        // Places come from OSM; Copernicus terrain decides which are listed.
-        source.attribution = "<a href=\"https://www.openstreetmap.org/copyright\">© OpenStreetMap contributors</a>, <a href=\"https://spacedata.copernicus.eu/collections/copernicus-digital-elevation-model\">© DLR e.V. and Airbus, Copernicus programme</a>"
-        return source
-    }
-    var body: some MapContent {
-        attributionSource
-        if overview {
-            GeoJSONSource(id: "matched-places-labels").data(.featureCollection(.init(features: places.map { entry in
-                var feature = Feature(geometry: .point(Point(CLLocationCoordinate2D(latitude: entry.place.latitude, longitude: entry.place.longitude))))
-                feature.properties = ["name": .string(entry.place.name)]
-                return feature
-            })))
-            SymbolLayer(id: "matched-places-labels-layer", source: "matched-places-labels")
-                .minZoom(Double(MapPlaceLayout.labelZoom)).textField(Exp(.get) { "name" })
-                .textSize(12).textAnchor(.top).textOffset(x: 0, y: 1.4)
-                .textColor(UIColor.black).textHaloColor(UIColor.white).textHaloWidth(1.5)
-        }
-        ForEvery(places) { entry in
+    let positions: MapPositionState
+    let proxy: MapProxy
+    var body: some View {
+        ForEach(places) { entry in
             let coordinate = CLLocationCoordinate2D(latitude: entry.place.latitude, longitude: entry.place.longitude)
-            MapViewAnnotation(coordinate: coordinate) {
+            GeographicOverlay(coordinate: coordinate, positions: positions, proxy: proxy) {
                 Button {
                     if let onSelect { onSelect(entry) }
                     else { loader.focus = loader.focus?.placeID == entry.id ? nil
@@ -42,29 +25,14 @@ struct MatchedPlacesLayer: MapContent {
                 .accessibilityAddTraits(loader.focus?.placeID == entry.id ? .isSelected : [])
                 .accessibilityIdentifier("matched-place-\(entry.id)")
             }
-            .variableAnchors([ViewAnnotationAnchorConfig(anchor: .center)])
-            .allowOverlap(true)
-            // Camera padding can cover the whole short landscape viewport.
-            // Keep geographic annotations visible in the actual map bounds.
-            .ignoreCameraPadding(true)
-            .priority(loader.focus?.placeID == entry.id ? 1 : 0)
-
             if loader.focus?.placeID == entry.id {
                 // The card has its own bottom anchor. Its changing size must
                 // never change the marker's fixed 44pt centered annotation.
-                MapViewAnnotation(coordinate: coordinate) {
+                GeographicOverlay(coordinate: coordinate, positions: positions, proxy: proxy, anchor: .bottom) {
                     MatchedPlaceCard(place: entry.place, routeCount: entry.activityIDs.count, overview: overview) { loader.focus = nil }
                         .padding(.bottom, 16)
                 }
-                // Prefer extending left of the marker so Close stays clear
-                // of the map tools on the right. Flip at the map's left edge.
-                .variableAnchors([ViewAnnotationAnchorConfig(anchor: .bottomRight),
-                                  ViewAnnotationAnchorConfig(anchor: .bottomLeft),
-                                  ViewAnnotationAnchorConfig(anchor: .topRight),
-                                  ViewAnnotationAnchorConfig(anchor: .topLeft)])
-                .allowOverlap(true)
-                .ignoreCameraPadding(true)
-                .priority(2)
+
             }
         }
     }

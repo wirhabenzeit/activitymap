@@ -466,7 +466,6 @@ export async function runNativeHarness({
       'COMPILER_INDEX_STORE_ENABLE=NO',
       'CODE_SIGNING_ALLOWED=NO',
       'ACTIVITYMAP_API_BASE_URL=http:$(SLASH)$(SLASH)127.0.0.1:1',
-      'MAPBOX_ACCESS_TOKEN=pk.offline-test',
     ];
     // The first hosted run spent 11m37s compiling before tests could launch.
     // Give cold compilation its own bound so it cannot consume runtime's budget.

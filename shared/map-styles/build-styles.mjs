@@ -248,6 +248,27 @@ export function buildStyle(id, upstream, trailOverrides) {
   if (profile.theme === 'outdoor') {
     for (const override of trailOverrides.layers)
       paint(style, override.id, override.paint);
+    // Keep terrain legible behind trails and contours at hiking zoom levels.
+    paint(style, 'Hillshade', {
+      'hillshade-exaggeration': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        6,
+        0.7,
+        12,
+        0.75,
+        16,
+        0.6,
+        18,
+        0.45,
+      ],
+      'hillshade-shadow-color': '#454d45',
+      'hillshade-highlight-color': '#fafbf5',
+      'hillshade-accent-color': '#76836d',
+      'hillshade-illumination-direction': 315,
+      'hillshade-illumination-anchor': 'map',
+    });
   }
   if (profile.theme === 'topolight') {
     // Inspection of the current Studio style found grayscale mapping + hillshade,

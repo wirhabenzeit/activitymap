@@ -1,5 +1,5 @@
 // The token is public at runtime but must be supplied outside version control.
-MAPBOX_ACCESS_TOKEN =
+MAPTILER_KEY =
 
 // Shared by system controls and the explicit browsing selection treatment.
 ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor

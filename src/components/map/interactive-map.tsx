@@ -50,6 +50,7 @@ import type { Activity } from '~/lib/activity';
 import { MATCHED_PLACES_HIT_LAYER } from '~/lib/activity-places';
 import { sortActivities } from '~/lib/activity-presentation';
 import { LEGACY_SHARING_ENABLED } from '~/lib/legacy-sharing';
+import { syncBuildingExtrusions } from '~/lib/map-buildings';
 import { transformMapRequest } from '~/lib/map-glyphs';
 import { observeMapResize } from '~/lib/map-resize';
 import { parseMapShareParams } from '~/lib/map-share';
@@ -359,6 +360,7 @@ export default function InteractiveMap() {
   const [viewport, setViewport] = useState(initialViewport);
   // The controlled viewport mirrors every move/pitch event of the real map.
   const pitched = (viewport.pitch ?? 0) > MAP_3D_PITCH_THRESHOLD;
+
   const hasAutoCenteredOnLatest = useRef(false);
   const hasExplicitInitialView =
     !!routeFitRequest ||
@@ -686,6 +688,18 @@ export default function InteractiveMap() {
   );
 
   const baseMapStyle = useBaseMapStyle(baseMap);
+
+  useEffect(() => {
+    if (!mapLoaded) return;
+    const map = mapRefLoc.current?.getMap();
+    if (!map) return;
+    const sync = () => syncBuildingExtrusions(map, pitched);
+    sync();
+    map.on('style.load', sync);
+    return () => {
+      map.off('style.load', sync);
+    };
+  }, [mapLoaded, baseMapStyle, pitched]);
 
   const photoDict = useMemo(
     () => groupBy(photos, (photo) => photo.activity_id),

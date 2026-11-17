@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import Observation
 import SwiftUI
 import Testing
@@ -9,45 +9,41 @@ import UIKit
 struct RenderedMapToolsTests {
     @Test(arguments: [false, true])
     func locatedPositionStaysVisibleAtEveryZoomAndPitch(tablet: Bool) async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let oldWindow = scene.keyWindow
         let window = UIWindow(windowScene: scene)
         window.frame = CGRect(origin: .zero, size: tablet ? CGSize(width: 768, height: 1024) : CGSize(width: 390, height: 844))
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
         store.replaceSelection(with: [1])
-        let fixture = try MapToolsStyleFixture()
+        let fixture = MapToolsStyleFixture()
         let host = UIHostingController(rootView: MapToolsFixtureView(store: store, picker: RoutePicker(), style: fixture))
         window.rootViewController = host
         window.makeKeyAndVisible()
         host.view.frame = window.bounds
         defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
-        try await mapToolsWait { mapToolsDescendants(host.view, of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
-        let map = try #require(mapToolsDescendants(host.view, of: MapView.self).first)
+        try await mapToolsWait { mapToolsDescendants(host.view, of: MLNMapView.self).first?.renderer.isStyleLoaded == true }
+        let map = try #require(mapToolsDescendants(host.view, of: MLNMapView.self).first)
         store.mapContext.request(.resetView)
         try await mapToolsWait { store.mapContext.pendingRequest == nil }
         try await Task.sleep(for: .milliseconds(650))
         store.mapContext.request(.locate(latitude: 46.005, longitude: 8.005))
         try await mapToolsWait { store.mapContext.pendingRequest == nil && mapToolsPosition(in: host.view) != nil }
         try await Task.sleep(for: .milliseconds(650))
-        #expect(abs(map.mapboxMap.cameraState.zoom - 15) < 0.1, "Locate me animates from the overview to nearby streets")
+        #expect(abs(map.renderer.cameraState.zoom - 15) < 0.1, "Locate me animates from the overview to nearby streets")
         let coordinate = try #require(store.mapContext.locatedPosition)
         let selection = store.selectedActivityIDs, filters = store.activeSportTypes
         for zoom: CGFloat in [2, 6, 10, 14, 18, 22] {
             for pitch: CGFloat in [0, 50] {
                 // Simulate manual map navigation, which leaves follow/viewport state idle.
-                map.viewport.idle()
-                map.mapboxMap.setCamera(to: CameraOptions(center: coordinate, zoom: zoom, bearing: 25, pitch: pitch))
+                map.renderer.setCamera(to: MapCamera(center: coordinate, zoom: zoom, bearing: 25, pitch: pitch))
                 try await mapToolsWait {
                     guard let view = mapToolsPosition(in: host.view) else { return false }
                     let frame = view.convert(view.bounds, to: map)
-                    let projected = map.mapboxMap.point(for: coordinate)
+                    let projected = map.renderer.point(for: coordinate)
                     return !view.isHidden && view.alpha > 0 && frame.width >= 26 && frame.height >= 26
                         && map.bounds.contains(CGPoint(x: frame.midX, y: frame.midY))
                         && abs(frame.midX - projected.x) < 1 && abs(frame.midY - projected.y) < 1
-                        && abs(map.mapboxMap.cameraState.zoom - zoom) < 0.1
+                        && abs(map.renderer.cameraState.zoom - zoom) < 0.1
                 }
                 let view = try #require(mapToolsPosition(in: host.view))
                 #expect(abs(view.bounds.width - 26) < 0.1 && abs(view.bounds.height - 26) < 0.1,
@@ -62,165 +58,79 @@ struct RenderedMapToolsTests {
         fixture.json = CameraHarness.style.replacingOccurrences(of: "#e5e8df", with: "#cfded8")
         store.mapContext.baseStyle = BaseStyle.all[1]
         try await mapToolsWait {
-            map.mapboxMap.isStyleLoaded && mapToolsPosition(in: host.view) != nil
+            map.renderer.isStyleLoaded && mapToolsPosition(in: host.view) != nil
                 && mapToolsPosition(in: host.view)?.isHidden == false
         }
         #expect(store.mapContext.locatedPosition?.latitude == coordinate.latitude)
-        map.viewport.idle()
-        map.mapboxMap.setCamera(to: CameraOptions(center: .init(latitude: 47, longitude: 9), zoom: 18))
+        map.renderer.setCamera(to: MapCamera(center: .init(latitude: 47, longitude: 9), zoom: 18))
         try await mapToolsWait { mapToolsPosition(in: host.view) == nil }
-        map.mapboxMap.setCamera(to: CameraOptions(center: coordinate, zoom: 18))
+        map.renderer.setCamera(to: MapCamera(center: coordinate, zoom: 18))
         try await mapToolsWait { mapToolsPosition(in: host.view) != nil }
         store.clearScope()
         try await mapToolsWait { mapToolsPosition(in: host.view) == nil }
         #expect(store.mapContext.locatedPosition == nil)
     }
 
-    @Test func terrainSourceFailureExplainsTiltAndAllowsRetry() async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
-        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let oldWindow = scene.keyWindow
-        let window = UIWindow(windowScene: scene)
-        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        let store = ActivityStore()
-        let fixture = try MapToolsStyleFixture()
-        let validDEM = fixture.dem
-        let invalidMetadata = FileManager.default.temporaryDirectory.appendingPathComponent("map-tools-invalid-dem.json")
-        try Data("invalid TileJSON".utf8).write(to: invalidMetadata)
-        fixture.dem = MapTerrainConfiguration(url: invalidMetadata.absoluteString)
-        let host = UIHostingController(rootView: MapToolsFixtureView(store: store, picker: RoutePicker(), style: fixture))
-        window.rootViewController = host
-        window.makeKeyAndVisible()
-        host.view.frame = window.bounds
-        defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
-        try await mapToolsWait { mapToolsDescendants(host.view, of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
-        let map = try #require(mapToolsDescendants(host.view, of: MapView.self).first)
-        store.mapContext.request(.resetView)
-        try await mapToolsWait { store.mapContext.pendingRequest == nil }
-        try await Task.sleep(for: .milliseconds(650))
-        store.mapContext.request(.pitch(50))
-        try await mapToolsWait { store.mapContext.isPitched }
-        try await mapToolsWait { host.presentedViewController is UIAlertController }
-        let alert = try #require(host.presentedViewController as? UIAlertController)
-        #expect(alert.title == "3D terrain" && alert.message?.contains("remains tilted") == true)
-        try await mapToolsWait {
-            let source: StylePropertyValue = map.mapboxMap.terrainProperty("source")
-            return ((source.value as? String) ?? "").isEmpty && abs(map.mapboxMap.cameraState.pitch - 50) < 0.1
-        }
-        alert.dismiss(animated: false)
-        store.mapContext.request(.pitch(0))
-        try await mapToolsWait { !store.mapContext.isPitched }
-        fixture.dem = validDEM
-        store.mapContext.request(.pitch(50))
-        try await mapToolsWait {
-            (map.mapboxMap.elevation(at: MapCamera.initial.center) ?? 0) > 500
-                && abs(map.mapboxMap.cameraState.pitch - 50) < 0.1
-        }
-        #expect(host.presentedViewController == nil)
-    }
-
     @Test(arguments: [false, true])
-    func terrainAndCompassPreserveCameraAcrossStyleReloads(tablet: Bool) async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
-        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let oldWindow = scene.keyWindow
-        let window = UIWindow(windowScene: scene)
-        let size = tablet ? CGSize(width: 768, height: 1024) : CGSize(width: 390, height: 844)
-        window.frame = CGRect(origin: .zero, size: size)
-        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
-        store.replaceSelection(with: [1])
-        let picker = RoutePicker()
-        let style = try MapToolsStyleFixture()
-        let host = UIHostingController(rootView: MapToolsFixtureView(store: store, picker: picker, style: style))
-        window.rootViewController = host
-        window.makeKeyAndVisible()
-        host.view.frame = window.bounds
-        defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
-        try await mapToolsWait { mapToolsDescendants(host.view, of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
-        let map = try #require(mapToolsDescendants(host.view, of: MapView.self).first)
-        store.mapContext.request(.resetView)
-        try await mapToolsWait { store.mapContext.pendingRequest == nil }
-        try await Task.sleep(for: .milliseconds(650))
-        map.mapboxMap.setCamera(to: CameraOptions(center: .init(latitude: 46.5, longitude: 8.5),
-            padding: UIEdgeInsets(top: 110, left: 12, bottom: 80, right: 18), zoom: 10, bearing: 37, pitch: 0))
-        try await mapToolsWait { abs(store.mapContext.camera.bearing - 37) < 0.1 }
-        let original = map.mapboxMap.cameraState
+    func geographicMarkersStayOnTheirCoordinateAfterPaddedRouteFit(bottomAnchored: Bool) async throws {
+        let harness = try await CameraHarness(size: CGSize(width: 390, height: 700))
+        defer { harness.close() }
+        // Match production: camera padding must not move native ornaments or
+        // acquire a delayed UIKit navigation/safe-area inset after first layout.
+        harness.map.automaticallyAdjustsContentInset = false
+        let coordinate = CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005)
+        let proxy = MapProxy()
+        proxy.map = harness.renderer
+        let positions = MapPositionState()
+        let host = UIHostingController(rootView:
+            ZStack(alignment: .topLeading) {
+                GeographicOverlay(coordinate: coordinate, positions: positions, proxy: proxy,
+                                  anchor: bottomAnchored ? .bottom : .center) {
+                    Color.red.frame(width: bottomAnchored ? 160 : 44, height: bottomAnchored ? 64 : 44)
+                }
+            }.frame(maxWidth: .infinity, maxHeight: .infinity).ignoresSafeArea())
+        let parent = try #require(harness.window.rootViewController)
+        parent.addChild(host)
+        host.view.frame = harness.map.frame
+        host.view.backgroundColor = .clear
+        parent.view.addSubview(host.view)
+        host.didMove(toParent: parent)
+        parent.view.layoutIfNeeded()
+        host.view.layoutIfNeeded()
+        for (padding, bearing, pitch): (UIEdgeInsets, Double, CGFloat) in [
+            (.zero, 0, 0),
+            (UIEdgeInsets(top: 80, left: 16, bottom: 280, right: 16), 35, 0),
+            (UIEdgeInsets(top: 80, left: 16, bottom: 70, right: 120), 35, 50)
+        ] {
+            harness.renderer.move(to: MapCamera(center: coordinate, zoom: 13,
+                bearing: bearing, pitch: pitch, padding: padding), duration: 0)
+            positions.update(map: harness.renderer, located: nil, route: nil)
+            try await Task.sleep(for: .milliseconds(120))
+            let point = harness.renderer.point(for: coordinate)
+            let bounds = try redMarkerBounds(in: host.view)
+            #expect(abs(bounds.midX - point.x) <= 1,
+                    "Geographic marker must share the native map's x origin, including padded fits")
+            #expect(abs((bottomAnchored ? bounds.maxY : bounds.midY) - point.y) <= 1,
+                    "Geographic marker must share the native map's y origin, including padded fits")
+        }
+    }
+
+    @Test func pitchRemainsAvailableWithoutTerrain() async throws {
+        let harness = try await CameraHarness(size: CGSize(width: 390, height: 844))
+        defer { harness.close() }
+        let store = ActivityStore(activities: [])
         store.mapContext.request(.pitch(50))
-        try await mapToolsWait {
-            let source: StylePropertyValue = map.mapboxMap.terrainProperty("source")
-            return (source.value as? String)?.hasPrefix("activitymap-dem-") == true
-                && abs(map.mapboxMap.cameraState.pitch - 50) < 0.1
-        }
-        let first: StylePropertyValue = map.mapboxMap.terrainProperty("source")
-        let sourceID = try #require(first.value as? String)
-        let dem = try map.mapboxMap.source(withId: sourceID, type: RasterDemSource.self)
-        #expect(dem.type == .rasterDem && dem.tileSize == 514 && dem.maxzoom == 14)
-        #expect(map.mapboxMap.sourceExists(withId: RouteSource.id))
-        #expect(map.mapboxMap.cameraState.padding == original.padding)
-        #expect(abs(map.mapboxMap.cameraState.center.latitude - original.center.latitude) < 0.001)
-        #expect(abs(map.mapboxMap.cameraState.zoom - original.zoom) < 0.01)
-        #expect(abs(map.mapboxMap.cameraState.bearing - original.bearing) < 0.01)
-        #expect(map.ornaments.options.compass.visibility == .hidden,
-                "The default SDK compass must not compete with the custom control")
-        picker.reviewSelection(store: store)
-        picker.detent = .medium
-        try await Task.sleep(for: .milliseconds(250))
-        try mapToolsSnapshot(window, name: tablet ? "ipad-rotated-terrain" : "iphone-rotated-terrain")
-        // Changing the environment uses the production declarative style path.
-        // The offline DEM tests configuration and restoration, not real relief.
-        style.json = CameraHarness.style.replacingOccurrences(of: "#e5e8df", with: "#cfded8")
-        store.mapContext.baseStyle = BaseStyle.all[1]
-        try await mapToolsWait {
-            let source: StylePropertyValue = map.mapboxMap.terrainProperty("source")
-            return (source.value as? String)?.hasPrefix("activitymap-dem-") == true
-                && source.value as? String != sourceID
-                && abs(map.mapboxMap.cameraState.pitch - 50) < 0.1
-        }
-        #expect(store.mapContext.isPitched && store.selectedActivityIDs == [1])
-        #expect(map.mapboxMap.sourceExists(withId: RouteSource.id))
-        #expect(map.ornaments.logoView.isHidden == false && map.ornaments.attributionButton.isHidden == false)
-        #expect(abs(map.mapboxMap.cameraState.center.latitude - original.center.latitude) < 0.001)
-        #expect(abs(map.mapboxMap.cameraState.zoom - original.zoom) < 0.01)
-        #expect(abs(map.mapboxMap.cameraState.bearing - original.bearing) < 0.01)
-        store.mapContext.request(.resetBearing)
-        try await mapToolsWait { abs(map.mapboxMap.cameraState.bearing) < 0.1 }
-        #expect(abs(map.mapboxMap.cameraState.pitch - 50) < 0.1)
-        #expect(abs(map.mapboxMap.cameraState.zoom - original.zoom) < 0.01)
-        try mapToolsSnapshot(window, name: tablet ? "ipad-north-up" : "iphone-north-up")
-        store.mapContext.request(.pitch(0))
-        try await mapToolsWait {
-            let source: StylePropertyValue = map.mapboxMap.terrainProperty("source")
-            return !store.mapContext.isPitched && ((source.value as? String) ?? "").isEmpty
-        }
-        #expect(store.selectedActivityIDs == [1])
-        #expect(map.mapboxMap.cameraState.padding == original.padding)
+        let target = try #require(MapNavigation.resolve(store: store, map: harness.renderer,
+            size: harness.map.bounds.size, safeArea: .zero, sheetHeight: 0))
+        harness.renderer.move(to: target, duration: 0)
+        #expect(abs(harness.map.camera.pitch - 50) < 0.1)
+        #expect(!MapTerrain.enabled)
     }
 }
 
-@MainActor @Observable
-private final class MapToolsStyleFixture {
+@Observable private final class MapToolsStyleFixture {
     var json = CameraHarness.style
-    var dem: MapTerrainConfiguration
-
-    init() throws {
-        let format = UIGraphicsImageRendererFormat()
-        format.scale = 1
-        let size = CGSize(width: 514, height: 514)
-        let image = UIGraphicsImageRenderer(size: size, format: format).image { context in
-            // Mapbox RGB encoding of a flat 1,000 metre DEM, with padded edges.
-            UIColor(red: 1 / 255, green: 173 / 255, blue: 176 / 255, alpha: 1).setFill()
-            context.fill(CGRect(origin: .zero, size: size))
-        }
-        let file = FileManager.default.temporaryDirectory.appendingPathComponent("map-tools-dem.png")
-        try image.pngData()?.write(to: file)
-        dem = MapTerrainConfiguration(url: nil, tiles: [file.absoluteString])
-    }
 }
-
 private struct MapToolsFixtureView: View {
     let store: ActivityStore
     let picker: RoutePicker
@@ -228,7 +138,6 @@ private struct MapToolsFixtureView: View {
     var body: some View {
         MapScreen(store: store, topOcclusion: 80, picker: picker)
             .environment(\.mapStyleOverride, MapStyle(json: style.json))
-            .environment(\.mapTerrainOverride, style.dem)
     }
 }
 
@@ -259,72 +168,34 @@ private func mapToolsSnapshot(_ view: UIView, name: String) throws {
     try image.pngData()?.write(to: directory.appendingPathComponent("\(name).png"))
 }
 
-nonisolated private enum LiveMapToolsEnvironment {
-    static var enabled: Bool { ProcessInfo.processInfo.environment["ACTIVITYMAP_LIVE_MAP_TOOLS"] == "1" }
-}
-
-/// Opt-in network evidence using the configured public Mapbox token. Physical
-/// device permission, touch and terrain acceptance remain a separate check.
-@MainActor @Suite(.serialized, .enabled(if: LiveMapToolsEnvironment.enabled))
-struct LiveMapTerrainTests {
-    @Test func catalogueLoadsRealElevationWithoutCameraJumps() async throws {
-        let token = Bundle.main.object(forInfoDictionaryKey: "MBXAccessToken") as? String
-        try #require(token?.hasPrefix("pk.") == true, "Configure a public Mapbox token in Local.xcconfig")
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = token!
-        defer { MapboxOptions.accessToken = oldToken }
-        let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
-        let oldWindow = scene.keyWindow
-        let window = UIWindow(windowScene: scene)
-        window.frame = CGRect(x: 0, y: 0, width: 390, height: 844)
-        let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
-        let host = UIHostingController(rootView: MapScreen(store: store, topOcclusion: 80))
-        window.rootViewController = host
-        window.makeKeyAndVisible()
-        host.view.frame = window.bounds
-        defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
-        try await mapToolsWait { mapToolsDescendants(host.view, of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
-        let map = try #require(mapToolsDescendants(host.view, of: MapView.self).first)
-        store.mapContext.request(.resetView)
-        try await mapToolsWait { store.mapContext.pendingRequest == nil }
-        try await Task.sleep(for: .milliseconds(650))
-        let center = CLLocationCoordinate2D(latitude: 46.57, longitude: 8.4)
-        map.mapboxMap.setCamera(to: CameraOptions(center: center, zoom: 15, bearing: 25, pitch: 50))
-        try await mapToolsWait { store.mapContext.isPitched }
-        // Synchronize the declarative viewport after moving the renderer directly.
-        store.mapContext.request(.pitch(50))
-        try await mapToolsWait { store.mapContext.pendingRequest == nil }
-        try await Task.sleep(for: .milliseconds(650))
-        store.mapContext.request(.locate(latitude: center.latitude, longitude: center.longitude))
-        try await mapToolsWait { store.mapContext.pendingRequest == nil && mapToolsPosition(in: host.view) != nil }
-        try await Task.sleep(for: .milliseconds(650))
-        var previousSource = ""
-        for style in BaseStyle.all {
-            store.mapContext.baseStyle = style
-            do {
-                try await mapToolsWait {
-                    let source: StylePropertyValue = map.mapboxMap.terrainProperty("source")
-                    guard let id = source.value as? String, id != previousSource else { return false }
-                    return id.hasPrefix("activitymap-dem-") && (map.mapboxMap.elevation(at: center) ?? 0) > 500
-                        && abs(map.mapboxMap.cameraState.pitch - 50) < 0.1
-                }
-                let source: StylePropertyValue = map.mapboxMap.terrainProperty("source")
-                previousSource = source.value as? String ?? ""
-                // Source delivery precedes drawing. Capture a settled frame.
-                try await Task.sleep(for: .milliseconds(650))
-                let camera = map.mapboxMap.cameraState
-                #expect(abs(camera.center.latitude - center.latitude) < 0.001, "Center retained for \(style.id)")
-                #expect(abs(camera.center.longitude - center.longitude) < 0.001, "Center retained for \(style.id)")
-                #expect(abs(camera.zoom - 15) < 0.01 && abs(camera.bearing - 25) < 0.1, "Camera retained for \(style.id)")
-                #expect(map.mapboxMap.sourceExists(withId: RouteSource.id))
-                let marker = try #require(mapToolsPosition(in: host.view))
-                #expect(!marker.isHidden && marker.bounds.size == CGSize(width: 26, height: 26),
-                        "Position remains visible above real terrain for \(style.id)")
-                try mapToolsSnapshot(window, name: "live-terrain-\(style.id)")
-                print("Terrain loaded: \(style.id)")
-            } catch {
-                Issue.record("Terrain did not load for \(style.id)")
+/// Check rendered pixels: SwiftUI visual effects can leave layout frames in
+/// their original positions, hiding a real on-screen displacement from UIKit.
+@MainActor
+private func redMarkerBounds(in view: UIView) throws -> CGRect {
+    view.layoutIfNeeded()
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    let image = UIGraphicsImageRenderer(bounds: view.bounds, format: format).image { _ in
+        view.drawHierarchy(in: view.bounds, afterScreenUpdates: true)
+    }
+    let cgImage = try #require(image.cgImage)
+    var pixels = [UInt8](repeating: 0, count: cgImage.width * cgImage.height * 4)
+    try pixels.withUnsafeMutableBytes { bytes in
+        let context = try #require(CGContext(data: bytes.baseAddress, width: cgImage.width, height: cgImage.height,
+            bitsPerComponent: 8, bytesPerRow: cgImage.width * 4, space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue))
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: cgImage.width, height: cgImage.height))
+    }
+    var minX = cgImage.width, minY = cgImage.height, maxX = -1, maxY = -1
+    for y in 0..<cgImage.height {
+        for x in 0..<cgImage.width {
+            let offset = (y * cgImage.width + x) * 4
+            if pixels[offset] > 200 && pixels[offset + 1] < 80 && pixels[offset + 2] < 80 && pixels[offset + 3] > 200 {
+                minX = min(minX, x); maxX = max(maxX, x)
+                minY = min(minY, y); maxY = max(maxY, y)
             }
         }
     }
+    try #require(maxX >= minX && maxY >= minY, "Geographic marker must be visible")
+    return CGRect(x: minX, y: minY, width: maxX - minX + 1, height: maxY - minY + 1)
 }

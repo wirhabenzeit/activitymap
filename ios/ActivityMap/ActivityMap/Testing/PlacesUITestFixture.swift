@@ -1,5 +1,5 @@
 #if DEBUG
-import MapboxMaps
+import MapLibre
 import SwiftUI
 
 /// Offline synthetic host using production map, profile, loaders and SwiftData.
@@ -134,7 +134,7 @@ struct PlacesUITestFixture: View {
                 picker.detailID = chooserTest ? nil : 1; picker.isPresented = !chooserTest; picker.detent = .medium
                 // Keep overview anchors in the real viewport in short landscape
                 // layouts too. The legacy profile fixture reserves its tall sheet.
-                store.mapContext.record(CameraState(center: .init(latitude: 47.002, longitude: 8.002), padding: UIEdgeInsets(top: 0, left: 0, bottom: overviewTest ? 200 : 400, right: 0), zoom: markerStyleTest ? 11 : overviewTest ? 12 : 15, bearing: 0, pitch: 0))
+                store.mapContext.record(MapCamera(center: .init(latitude: 47.002, longitude: 8.002), padding: UIEdgeInsets(top: 0, left: 0, bottom: overviewTest ? 200 : 400, right: 0), zoom: markerStyleTest ? 11 : overviewTest ? 12 : 15, bearing: 0, pitch: 0))
                 ready = true
             } catch { self.error = String(describing: error) }
         }

@@ -97,3 +97,30 @@ test('an upstream layer rename fails instead of silently losing a requested trea
     /Missing upstream layer: Red trail/,
   );
 });
+
+test('Outdoor retains trails and contours alongside moderate shared hillshade', () => {
+  const outdoor = build('mapboxOutdoors');
+  const shades = outdoor.layers.filter((layer) => layer.type === 'hillshade');
+  assert.equal(shades.length, 1);
+  assert.equal(shades[0].layout.visibility, 'visible');
+  assert.equal(shades[0].source, 'terrain-rgb');
+  assert.deepEqual(shades[0].paint['hillshade-exaggeration'], [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    6,
+    0.7,
+    12,
+    0.75,
+    16,
+    0.6,
+    18,
+    0.45,
+  ]);
+  assert(outdoor.layers.some((layer) => layer.source === 'contours'));
+  for (const override of trails.layers) {
+    const layer = outdoor.layers.find((layer) => layer.id === override.id);
+    for (const [key, value] of Object.entries(override.paint))
+      assert.deepEqual(layer.paint[key], value);
+  }
+});

@@ -1,5 +1,5 @@
 import CoreLocation
-import MapboxMaps
+import MapLibre
 import Testing
 @testable import ActivityMap
 
@@ -106,29 +106,8 @@ struct MapToolsTests {
         }
     }
 
-    @Test func terrainCatalogueAndLateEvents() throws {
-        #expect(BaseStyle.all.allSatisfy { $0.terrainConfiguration != nil })
-        let source = try #require(BaseStyle.standard.terrainConfiguration).source(id: "dem")
-        #expect(source.url == "mapbox://mapbox.mapbox-terrain-dem-v1" && source.type == .rasterDem)
-        #expect(source.maxzoom == 14 && source.tileSize == 514)
-        let terrain = MapTerrainState()
-        terrain.configure(enabled: true, supported: true)
-        let first = terrain.sourceID
-        #expect(terrain.status == .loading)
-        terrain.configure(enabled: true, supported: true, restart: true)
-        terrain.loaded(sourceID: first)
-        terrain.failed(sourceID: first)
-        #expect(terrain.status == .loading && terrain.errorMessage == nil)
-        terrain.loaded(sourceID: terrain.sourceID)
-        #expect(terrain.status == .ready)
-        terrain.failed(sourceID: terrain.sourceID)
-        #expect(terrain.status == .failed && !terrain.includesTerrain && terrain.errorMessage != nil)
-        terrain.configure(enabled: false, supported: true)
-        terrain.configure(enabled: true, supported: true)
-        #expect(terrain.status == .loading && terrain.sourceID != first && terrain.errorMessage == nil)
-        terrain.configure(enabled: true, supported: false)
-        #expect(terrain.status == .unsupported && !terrain.includesTerrain && terrain.errorMessage != nil)
-    }
+    @Test func terrainRemainsDisabled() { #expect(!MapTerrain.enabled) }
+
 }
 
 @MainActor

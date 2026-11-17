@@ -1,6 +1,6 @@
 import Foundation
 import CoreGraphics
-import MapboxMaps
+import MapLibre
 import Observation
 
 /// Map results presentation and hit-query lifetime, separate from list inspection.
@@ -16,54 +16,27 @@ final class RoutePicker {
     var detailID: Int?
     var errorMessage: String?
     private(set) var candidateIDs: [Int] = []
-    @ObservationIgnored private var pendingQuery: Cancelable?
     @ObservationIgnored private var generation = 0
 
     @discardableResult
     func invalidateQuery() -> Int {
         generation += 1
-        pendingQuery?.cancel()
-        pendingQuery = nil
         return generation
     }
 
-    func pick(at point: CGPoint, map: MapboxMap, store: ActivityStore) {
+    func pick(at point: CGPoint, map: MapController, store: ActivityStore) {
         let request = invalidateQuery()
-        let revision = store.activitiesRevision
-        guard store.routeGeometry.revision == revision else { return }
-        guard map.isStyleLoaded, map.layerExists(withId: RouteSource.ordinaryLayerID) else {
+        guard store.routeGeometry.revision == store.activitiesRevision else { return }
+        guard map.isStyleLoaded, map.view.style?.layer(withIdentifier: RouteSource.ordinaryLayerID) != nil else {
             errorMessage = Self.unavailableMessage
             return
         }
-        let visibleIDs = store.visibleActivityIDs
-        let adding = store.isCombining
-        let restriction = store.onlySelected
-        let selected = store.selectedActivityIDs
         let rect = CGRect(x: point.x - RouteHitTesting.radius, y: point.y - RouteHitTesting.radius,
                           width: RouteHitTesting.radius * 2, height: RouteHitTesting.radius * 2)
-        // Query only the ordinary route layer: no raster/POI/photo feature can
-        // become an activity hit, and casing/highlight copies are excluded.
-        pendingQuery = map.queryRenderedFeatures(
-            with: rect,
-            options: RenderedQueryOptions(layerIds: [RouteSource.ordinaryLayerID], filter: nil)
-        ) { [weak self, weak map, weak store] result in
-            guard let self, let map, let store,
-                  request == self.generation,
-                  revision == store.activitiesRevision,
-                  visibleIDs == store.visibleActivityIDs, adding == store.isCombining, restriction == store.onlySelected, selected == store.selectedActivityIDs else { return }
-            self.pendingQuery = nil
-            switch result {
-            case let .success(features):
-                let ids = RouteHitTesting.orderedIDs(
-                    features: features.map { $0.queriedFeature.feature },
-                    at: point, eligibleIDs: visibleIDs, project: map.points(for:)
-                )
-                self.apply(ids: ids, adding: adding, request: request, store: store)
-            case .failure:
-                // A loading/failed style is not an empty-map selection tap.
-                self.errorMessage = Self.unavailableMessage
-            }
-        }
+        let features = map.view.visibleFeatures(in: rect, styleLayerIdentifiers: [RouteSource.ordinaryLayerID])
+        let ids = RouteHitTesting.orderedIDs(features: features, at: point,
+            eligibleIDs: store.visibleActivityIDs, project: map.points(for:))
+        apply(ids: ids, adding: store.isCombining, request: request, store: store)
     }
 
     /// The query token also fences late callbacks after gestures or tab changes.

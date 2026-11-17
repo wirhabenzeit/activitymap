@@ -5,6 +5,7 @@ import { MapControlIconButton } from '~/components/map/map-control-icon-button';
 import {
   PreferenceMenuCheckboxItem,
   PreferenceMenuContent,
+  PreferenceMenuSubContent,
 } from '~/components/preference-menu';
 import { Button } from '~/components/ui/button';
 import {
@@ -13,14 +14,18 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from '~/components/ui/dropdown-menu';
 import { useSelectedActivityPlaces } from '~/hooks/use-activity-places';
 import type { Activity } from '~/lib/activity';
+import { groupedOverlayIDs, overlayGroups } from '~/lib/map-catalog';
 import { validPhotoLocation } from '~/lib/photo-gallery';
 import type { Photo } from '~/server/records';
 import {
   type BaseMapId,
+  baseMapGroups,
   baseMaps,
   isBaseMapAvailable,
   overlayMaps as overlayMapSettings,
@@ -115,7 +120,6 @@ export function LayerSwitcher({
         </MapControlIconButton>
       </DropdownMenuTrigger>
       <PreferenceMenuContent className="w-56">
-        <DropdownMenuLabel>Activities</DropdownMenuLabel>
         <PreferenceMenuCheckboxItem
           checked={showPhotos}
           onCheckedChange={togglePhotos}
@@ -148,27 +152,43 @@ export function LayerSwitcher({
           </LayerHint>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuLabel>Base Map</DropdownMenuLabel>
+        {baseMapGroups.map((group) => {
+          const maps = group.maps.filter(isBaseMapAvailable);
+          if (!maps.length) return null;
+          if (maps.length === 1) {
+            const id = maps[0]!;
+            return (
+              <DropdownMenuRadioGroup
+                key={group.id}
+                value={renderableBaseMap(baseMap)}
+                onValueChange={(value) => setBaseMap(value as BaseMapId)}
+              >
+                <DropdownMenuRadioItem value={id}>
+                  {group.label}
+                </DropdownMenuRadioItem>
+              </DropdownMenuRadioGroup>
+            );
+          }
+          return (
+            <DropdownMenuSub key={group.id}>
+              <DropdownMenuSubTrigger>{group.label}</DropdownMenuSubTrigger>
+              <PreferenceMenuSubContent>
+                <DropdownMenuRadioGroup
+                  value={renderableBaseMap(baseMap)}
+                  onValueChange={(value) => setBaseMap(value as BaseMapId)}
+                >
+                  {maps.map((id) => (
+                    <DropdownMenuRadioItem value={id} key={id}>
+                      {baseMaps[id].label}
+                    </DropdownMenuRadioItem>
+                  ))}
+                </DropdownMenuRadioGroup>
+              </PreferenceMenuSubContent>
+            </DropdownMenuSub>
+          );
+        })}
         <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup
-          // A stored map this deployment cannot render shows as its fallback.
-          value={renderableBaseMap(baseMap)}
-          onValueChange={(value) => setBaseMap(value as BaseMapId)}
-        >
-          {(
-            Object.entries(baseMaps) as Array<
-              [BaseMapId, (typeof baseMaps)[BaseMapId]]
-            >
-          )
-            .filter(([key]) => isBaseMapAvailable(key))
-            .map(([key, setting]) => (
-              <DropdownMenuRadioItem value={key} key={key}>
-                {setting.label}
-              </DropdownMenuRadioItem>
-            ))}
-        </DropdownMenuRadioGroup>
         <DropdownMenuLabel>Overlays</DropdownMenuLabel>
-        <DropdownMenuSeparator />
         {(
           Object.entries(overlayMapSettings) as Array<
             [
@@ -176,14 +196,35 @@ export function LayerSwitcher({
               (typeof overlayMapSettings)[keyof typeof overlayMapSettings],
             ]
           >
-        ).map(([key, setting]) => (
-          <PreferenceMenuCheckboxItem
-            key={key}
-            checked={activeOverlays.includes(key)}
-            onCheckedChange={() => toggleOverlayMap(key)}
-          >
-            {setting.label}
-          </PreferenceMenuCheckboxItem>
+        )
+          .filter(([key]) => !groupedOverlayIDs.has(key))
+          .map(([key, setting]) => (
+            <PreferenceMenuCheckboxItem
+              key={key}
+              checked={activeOverlays.includes(key)}
+              onCheckedChange={() => toggleOverlayMap(key)}
+            >
+              {setting.label}
+            </PreferenceMenuCheckboxItem>
+          ))}
+        {overlayGroups.map((group) => (
+          <DropdownMenuSub key={group.id}>
+            <DropdownMenuSubTrigger>{group.label}</DropdownMenuSubTrigger>
+            <PreferenceMenuSubContent>
+              {group.overlays.map((id) => {
+                const key = id as keyof typeof overlayMapSettings;
+                return (
+                  <PreferenceMenuCheckboxItem
+                    key={key}
+                    checked={activeOverlays.includes(key)}
+                    onCheckedChange={() => toggleOverlayMap(key)}
+                  >
+                    {overlayMapSettings[key].label}
+                  </PreferenceMenuCheckboxItem>
+                );
+              })}
+            </PreferenceMenuSubContent>
+          </DropdownMenuSub>
         ))}
       </PreferenceMenuContent>
     </DropdownMenu>

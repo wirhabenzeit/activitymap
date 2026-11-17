@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import SwiftUI
 import Testing
 import UIKit
@@ -58,7 +58,7 @@ nonisolated enum GalleryEnvironment {
         URL(fileURLWithPath: values["ACTIVITYMAP_GALLERY_OUTPUT"] ?? "/tmp/activitymap-gallery/latest")
     }
     /// A public token renders the real basemap; otherwise an offline plain style.
-    static var mapboxToken: String? { values["ACTIVITYMAP_GALLERY_MAPBOX_TOKEN"].flatMap { $0.isEmpty ? nil : $0 } }
+    static var liveMaps: Bool { values["ACTIVITYMAP_GALLERY_LIVE_MAPS"] == "1" }
 }
 
 struct GalleryVariant {
@@ -162,7 +162,7 @@ enum GalleryScene: String, CaseIterable, CustomTestStringConvertible {
 
 private extension View {
     @ViewBuilder func galleryMapStyle() -> some View {
-        if GalleryEnvironment.mapboxToken == nil {
+        if !GalleryEnvironment.liveMaps {
             environment(\.mapStyleOverride, MapStyle(json: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##))
         } else {
             self
@@ -175,13 +175,10 @@ private final class GalleryWindow {
     let window: UIWindow
     let oldWindow: UIWindow?
     let host: UIHostingController<AnyView>
-    let previousToken: String
     private var framing: [String: Any] = [:]
     private var readinessDetail = ""
 
     init(root: AnyView, variant: GalleryVariant) throws {
-        previousToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = GalleryEnvironment.mapboxToken ?? "pk.offline-test"
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         oldWindow = scene.keyWindow
         window = UIWindow(windowScene: scene)
@@ -224,7 +221,6 @@ private final class GalleryWindow {
     func close() {
         window.isHidden = true
         oldWindow?.makeKeyAndVisible()
-        MapboxOptions.accessToken = previousToken
     }
 
     /// Review the bottom actions in their real Map sheet, rather than a bare row.
@@ -249,47 +245,47 @@ private final class GalleryWindow {
             try await Task.sleep(for: .milliseconds(900))
             return
         }
-        try await wait(seconds: 15) { self.mapView(in: self.host.view)?.mapboxMap.isStyleLoaded == true }
+        try await wait(seconds: 15) { self.mapView(in: self.host.view)?.renderer.isStyleLoaded == true }
         let map = try #require(mapView(in: host.view))
-        var idleCamera: CameraState?
-        let token = map.mapboxMap.onMapIdle.observe { _ in idleCamera = map.mapboxMap.cameraState }
-        defer { token.cancel() }
+        var idleCamera: MapCamera?
+
         staged.prepare()
-        map.mapboxMap.triggerRepaint()
+        map.renderer.triggerRepaint()
         try await wait(seconds: 15, phase: "navigation request", staged.ready)
         try #require(staged.navigationError() == nil, "Navigation failed: \(staged.navigationError() ?? "")")
         // Request consumption alone does not prove that SwiftUI applied the
         // intended camera. Require the route inside that camera's padded rect.
         try await wait(seconds: 30, phase: "fitted route and map idle") {
-            let camera = map.mapboxMap.cameraState
-            let points = map.mapboxMap.points(for: staged.coordinates)
+            let camera = map.renderer.cameraState
+            let points = map.renderer.points(for: staged.coordinates)
             let projected = points.reduce(CGRect.null) { $0.union(CGRect(origin: $1, size: CGSize(width: 0.01, height: 0.01))) }
             // A centre point outside the padded rect means Mapbox kept a stale size.
-            self.readinessDetail = "idleCamera=\(String(describing: idleCamera)), projected=\(projected), centerPoint=\(map.mapboxMap.point(for: camera.center))"
-            guard case .state = map.viewport.status, idleCamera == camera else { return false }
+            self.readinessDetail = "idleCamera=\(String(describing: idleCamera)), projected=\(projected), centerPoint=\(map.renderer.point(for: camera.center))"
+            defer { idleCamera = camera }
+            guard idleCamera == camera else { return false }
             guard !staged.coordinates.isEmpty else { return true }
             guard camera.padding != .zero else { return false }
             let visible = self.routeViewport(map)
             return points.allSatisfy { visible.contains($0) }
         }
-        let fitted = map.mapboxMap.cameraState
+        let fitted = map.renderer.cameraState
         staged.reveal()
         var lastFrame = "", stableSince = Date()
         try await wait(seconds: 15, phase: "revealed panel stability") {
             self.host.view.layoutIfNeeded()
             let panel = self.host.presentedViewController?.view
             let frame = panel.map { $0.convert($0.bounds, to: map) } ?? .zero
-            let signature = "\(frame)|\(map.bounds)|\(map.mapboxMap.cameraState)"
+            let signature = "\(frame)|\(map.bounds)|\(map.renderer.cameraState)"
             if signature != lastFrame { lastFrame = signature; stableSince = Date() }
             return Date().timeIntervalSince(stableSince) >= 0.35
         }
-        let camera = map.mapboxMap.cameraState
+        let camera = map.renderer.cameraState
         try #require(abs(camera.zoom - fitted.zoom) < 0.001 && camera.padding == fitted.padding
                      && abs(camera.center.latitude - fitted.center.latitude) < 0.00001
                      && abs(camera.center.longitude - fitted.center.longitude) < 0.00001
                      && camera.bearing == fitted.bearing && camera.pitch == fitted.pitch,
                      "Revealing results unexpectedly changed the fitted camera")
-        let points = map.mapboxMap.points(for: staged.coordinates)
+        let points = map.renderer.points(for: staged.coordinates)
         let visible = routeViewport(map)
         try #require(points.allSatisfy { visible.contains($0) }, "Route escaped the fitted viewport after reveal")
         let panel = host.presentedViewController?.view
@@ -314,11 +310,11 @@ private final class GalleryWindow {
                    "cameraSettled": true, "routeContained": true]
     }
 
-    private func routeViewport(_ map: MapView) -> CGRect {
+    private func routeViewport(_ map: MLNMapView) -> CGRect {
         // Standard's rendered coordinates can differ a few points from the
         // fitting API's inset (3.5pt in the wide fixture). Allow 8pt within the
         // reserved breathing room, then independently check the actual panel.
-        map.bounds.inset(by: map.mapboxMap.cameraState.padding).insetBy(dx: -8, dy: -8)
+        map.bounds.inset(by: map.renderer.cameraState.padding).insetBy(dx: -8, dy: -8)
             .intersection(map.bounds.insetBy(dx: 16, dy: 16))
     }
 
@@ -345,22 +341,22 @@ private final class GalleryWindow {
             "variant": variant.name, "width": variant.size.width, "height": variant.size.height,
             "dark": variant.dark, "contentSize": variant.contentSize.rawValue, "library": library,
             "orientationCapture": GalleryEnvironment.values["ACTIVITYMAP_GALLERY_HOSTED_VIEWPORTS"] == "1" ? "hosted viewport" : "scene rotation",
-            "basemap": GalleryEnvironment.mapboxToken == nil ? "offline" : "mapbox",
+            "basemap": !GalleryEnvironment.liveMaps ? "offline" : "maplibre",
             "framing": framing,
         ]
         try JSONSerialization.data(withJSONObject: metadata, options: [.prettyPrinted, .sortedKeys])
             .write(to: directory.appendingPathComponent("\(name).json"))
     }
 
-    private func mapView(in view: UIView) -> MapView? {
-        if let map = view as? MapView { return map }
+    private func mapView(in view: UIView) -> MLNMapView? {
+        if let map = view as? MLNMapView { return map }
         return view.subviews.lazy.compactMap { self.mapView(in: $0) }.first
     }
 
     private func wait(seconds: Double, phase: String = "style loading", _ condition: () -> Bool) async throws {
         let settled = try await poll(seconds: seconds, condition)
         let map = mapView(in: host.view)
-        try #require(settled, "Gallery \(phase) did not settle; viewport=\(String(describing: map?.viewport.status)), camera=\(String(describing: map?.mapboxMap.cameraState)), bounds=\(String(describing: map?.bounds)), \(readinessDetail)")
+        try #require(settled, "Gallery \(phase) did not settle; camera=\(String(describing: map?.renderer.cameraState)), bounds=\(String(describing: map?.bounds)), \(readinessDetail)")
     }
 
     private func poll(seconds: Double, _ condition: () -> Bool) async throws -> Bool {
