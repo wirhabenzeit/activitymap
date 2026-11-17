@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Marker, useMap } from 'react-map-gl/maplibre';
 
+import { navigateToView } from '~/lib/app-views';
 import {
   type MapPhotoGroup,
   groupMapPhotos,
@@ -178,7 +179,7 @@ export function MapPhotos({
         }
         onViewActivity={(photo) => {
           setPresentation(null);
-          router.push(`/list?activity=${photo.activity_id}`);
+          navigateToView(router, `/list?activity=${photo.activity_id}`);
         }}
       />
     </>

@@ -15,6 +15,7 @@ import {
 import { usePlaceLibrary } from '~/hooks/use-place-library';
 import type { Activity } from '~/lib/activity';
 import { placeKindLabel } from '~/lib/activity-places';
+import { navigateToView } from '~/lib/app-views';
 import { formatPreferredDate } from '~/lib/date-preferences';
 import {
   applyTextFilter,
@@ -251,7 +252,7 @@ function PanelSearch() {
 
   const toMap = () => {
     end();
-    if (pathname !== '/map') router.push('/map');
+    if (pathname !== '/map') navigateToView(router, '/map');
   };
   const pickActivity = (activity: Activity) => {
     selectFromSearch(store, [activity.id]);

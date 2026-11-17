@@ -7,6 +7,7 @@ import {
 } from '~/components/auth/strava-connect';
 import { AppHeader } from '~/components/layout/app-header';
 import { AppSidebar } from '~/components/layout/app-sidebar';
+import { AppViews } from '~/components/layout/app-views';
 import { MergeActivitiesProvider } from '~/components/merge/merge-activities-dialog';
 import { AuthProvider } from '~/components/providers/auth';
 import { OfflineSyncProvider } from '~/components/providers/offline-sync';
@@ -82,7 +83,8 @@ export default async function AppShellLayout({
                     <AppSidebar />
                     <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
                       <div className="h-14 w-full" />
-                      <div className="min-h-0 w-full flex-1 overflow-hidden">
+                      <div className="relative min-h-0 w-full flex-1 overflow-hidden">
+                        <AppViews />
                         {children}
                         <SignedOutConnectPanel />
                         <FirstSummaryFetch />
