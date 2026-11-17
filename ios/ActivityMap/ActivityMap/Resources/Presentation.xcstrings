@@ -6397,6 +6397,54 @@
         }
       }
     },
+    "filters.sports": {
+      "comment": "Sport-group scope heading in the Stats sidebar.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sports"
+          }
+        }
+      }
+    },
+    "filters.sportCount": {
+      "comment": "Selected sport groups in the Stats workspace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld of %lld sports"
+          }
+        }
+      }
+    },
+    "filters.resetStatsScope": {
+      "comment": "Accessible label for resetting the independent Stats sport scope.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reset Stats sport scope"
+          }
+        }
+      }
+    },
+    "filters.groupOptions": {
+      "comment": "Menu with sport-group actions such as Only this sport.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ options"
+          }
+        }
+      }
+    },
     "filters.onlyGroup": {
       "comment": "Shared browsing and activity command presentation.",
       "extractionState": "manual",

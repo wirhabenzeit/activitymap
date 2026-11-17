@@ -38,6 +38,12 @@ import UIKit
         #expect(String(localized: AppMessages.connectButton(locale: Locale(identifier: "ar"))) == "Connect with Strava")
     }
 
+    @Test func statsScopeLabelsUseSharedResources() {
+        #expect(String(localized: AppMessages.filtersSports(locale: english)) == "Sports")
+        #expect(String(localized: AppMessages.filtersSportCount(2, 5, locale: english)) == "2 of 5 sports")
+        #expect(String(localized: AppMessages.filtersResetStatsScope(locale: english)) == "Reset Stats sport scope")
+    }
+
     @Test func protocolMembershipAndNativeSemanticGlyphsAreComplete() throws {
         #expect(SportPresentation.categoryIDs.count == SportType.allCases.count)
         for sport in SportType.allCases {

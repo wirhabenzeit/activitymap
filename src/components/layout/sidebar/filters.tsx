@@ -202,44 +202,53 @@ export function CategoryFilter({
                 />
               ) : null}
             </SidebarMenuButton>
-            {!groupsOnly && sportType && setSportType && (
-              <DropdownMenu modal={false}>
-                <DropdownMenuTrigger asChild>
-                  <SidebarMenuAction
-                    aria-label={`Choose ${name} activity types`}
-                  >
-                    <MoreHorizontal />
-                  </SidebarMenuAction>
-                </DropdownMenuTrigger>
-                <PreferenceMenuContent side="right" align="start">
-                  <DropdownMenuItem
-                    onSelect={() =>
-                      setSportGroup((group) =>
-                        isolateSportGroup(group, id as keyof typeof group),
-                      )
-                    }
-                  >
-                    {message('filters.onlyGroup', { group: name })}
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  {(
-                    Object.entries(
-                      Object.fromEntries(alias.map((a) => [a, sportType[a]])),
-                    ) as [SportType, boolean][]
-                  ).map(([key, selected]) => (
-                    <PreferenceMenuCheckboxItem
-                      checked={selected}
-                      key={key}
-                      onCheckedChange={() =>
-                        setSportType((type) => ({ ...type, [key]: !type[key] }))
-                      }
-                    >
-                      {key}
-                    </PreferenceMenuCheckboxItem>
-                  ))}
-                </PreferenceMenuContent>
-              </DropdownMenu>
-            )}
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <SidebarMenuAction
+                  aria-label={
+                    groupsOnly
+                      ? message('filters.groupOptions', { group: name })
+                      : `Choose ${name} activity types`
+                  }
+                >
+                  <MoreHorizontal />
+                </SidebarMenuAction>
+              </DropdownMenuTrigger>
+              <PreferenceMenuContent side="right" align="start">
+                <DropdownMenuItem
+                  onSelect={() =>
+                    setSportGroup((group) =>
+                      isolateSportGroup(group, id as keyof typeof group),
+                    )
+                  }
+                >
+                  {message('filters.onlyGroup', { group: name })}
+                </DropdownMenuItem>
+                {!groupsOnly && sportType && setSportType && (
+                  <>
+                    <DropdownMenuSeparator />
+                    {(
+                      Object.entries(
+                        Object.fromEntries(alias.map((a) => [a, sportType[a]])),
+                      ) as [SportType, boolean][]
+                    ).map(([key, selected]) => (
+                      <PreferenceMenuCheckboxItem
+                        checked={selected}
+                        key={key}
+                        onCheckedChange={() =>
+                          setSportType((type) => ({
+                            ...type,
+                            [key]: !type[key],
+                          }))
+                        }
+                      >
+                        {key}
+                      </PreferenceMenuCheckboxItem>
+                    ))}
+                  </>
+                )}
+              </PreferenceMenuContent>
+            </DropdownMenu>
           </SidebarMenuItem>
         ),
       )}
@@ -783,7 +792,10 @@ function FilterSummaryContent() {
       <div className="min-w-0">
         <p className="text-sm font-semibold">
           {result.unit === 'sports'
-            ? `${result.shown} of ${result.total} sports`
+            ? message('filters.sportCount', {
+                shown: result.shown,
+                total: result.total,
+              })
             : message('filters.resultCount', {
                 shown: result.shown,
                 total: result.total,

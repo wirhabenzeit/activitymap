@@ -324,23 +324,13 @@ final class ActivityStore {
         return result
     }
 
-    private var savedStatsSports: Set<ActivityCategory>?
     private var initialStatsSports: Set<ActivityCategory> {
         let groups = Set(activeSportTypes.map(\.category))
         return groups.isEmpty ? Set(ActivityCategory.allCases) : groups
     }
-    var statsSports: Set<ActivityCategory> {
-        get {
-            if let savedStatsSports { return savedStatsSports }
-            let initial = initialStatsSports
-            savedStatsSports = initial
-            browsingPreferences?.save(statsSports: initial)
-            return initial
-        }
-        set {
-            savedStatsSports = newValue
-            browsingPreferences?.save(statsSports: newValue)
-        }
+    // Initialized from the activity filter once when an account scope is restored.
+    var statsSports = Set(ActivityCategory.allCases) {
+        didSet { browsingPreferences?.save(statsSports: statsSports) }
     }
     var statsActivities: [Activity] {
         let sports = statsSports
@@ -558,7 +548,7 @@ final class ActivityStore {
         browsingPreferences?.save(filters: filters)
         browsingPreferences?.save(camera: mapContext.camera)
         browsingPreferences?.activate(nil)
-        savedStatsSports = nil
+        statsSports = Set(ActivityCategory.allCases)
         mapContext.saveCamera = nil
         applyFilters(ActivityFilterState(), resetSelectedOnly: true)
         selectedPlace = nil

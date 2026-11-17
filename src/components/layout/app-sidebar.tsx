@@ -143,7 +143,7 @@ export function StatsScopePanel() {
   return (
     <>
       <SidebarGroup>
-        <SidebarGroupLabel>Sports</SidebarGroupLabel>
+        <SidebarGroupLabel>{message('filters.sports')}</SidebarGroupLabel>
         <SidebarGroupContent>
           <CategoryFilter value={sports} groupsOnly onChange={onChange} />
         </SidebarGroupContent>

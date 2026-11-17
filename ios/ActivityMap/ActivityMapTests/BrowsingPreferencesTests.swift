@@ -30,6 +30,20 @@ struct BrowsingPreferencesTests {
         #expect(relaunched.statsSports == Set(ActivityCategory.allCases))
     }
 
+    @Test func readingStatsScopeDoesNotWritePreferencesOrFollowActivityFilters() {
+        let defaults = isolated()
+        let store = ActivityStore(browsingDefaults: defaults)
+        store.restoreBrowsingScope(Fixtures.scope)
+        let key = "browsing.v1." + StoreScope.key([Fixtures.scope.key, "statsSports"])
+        defaults.removeObject(forKey: key)
+        let initial = store.statsSports
+        store.activeSportTypes = [.run]
+        #expect(store.statsSports == initial)
+        #expect(defaults.object(forKey: key) == nil)
+        store.statsSports = [.ride]
+        #expect(defaults.array(forKey: key) as? [String] == [ActivityCategory.ride.rawValue])
+    }
+
     @Test func statsScopeSanitizesSavedGroupsAndEmptyMigration() {
         let defaults = isolated(), prefs = BrowsingPreferences(defaults: isolated())
         prefs.activate(Fixtures.scope)

@@ -179,7 +179,7 @@ struct FilterPanel: View {
     }
 
     private var resultCountLabel: String {
-        scope == .stats ? "\(store.statsSports.count) of \(ActivityCategory.allCases.count) sports"
+        scope == .stats ? String(localized: AppMessages.filtersSportCount(store.statsSports.count, ActivityCategory.allCases.count, locale: locale))
             : String(localized: AppMessages.filtersResultCount(count, store.activities.count, locale: locale))
     }
 
@@ -222,7 +222,7 @@ struct FilterPanel: View {
     }
 
     private var statsSection: some View {
-        Section("Sports") {
+        Section {
             ForEach(ActivityCategory.allCases) { category in
                 Toggle(isOn: Binding(get: { store.statsSports.contains(category) }, set: { selected in
                     if selected { store.statsSports.insert(category) }
@@ -235,6 +235,8 @@ struct FilterPanel: View {
                     Button(String(localized: AppMessages.filtersOnlyGroup(category.name, locale: locale))) { store.statsSports = [category] }
                 }
             }
+        } header: {
+            Text(AppMessages.filtersSports(locale: locale))
         }
     }
 
@@ -289,7 +291,7 @@ struct FilterPanel: View {
             }
         } header: {
             // A popover already titles its single part.
-            if part == nil { Text("Sports") }
+            if part == nil { Text(AppMessages.filtersSports(locale: locale)) }
         }
     }
 
@@ -441,7 +443,7 @@ enum FilterPart: CaseIterable, Identifiable {
         switch self {
         case .text: "Text and place"
         case .selection: "Selected activities"
-        case .sports: "Sports"
+        case .sports: String(localized: AppMessages.filtersSports())
         case .dates: "Dates"
         case .distance: "Distance"
         case .duration: "Duration"
@@ -496,6 +498,7 @@ enum FilterScope {
 /// Keep it available in both full-panel and rail presentations; the store's
 /// reset revision invalidates draft editors without unnecessary filter work.
 struct FilterResetButton: View {
+    @Environment(\.locale) private var locale
     let store: ActivityStore
     let scope: FilterScope
     var iconOnly = false
@@ -507,7 +510,7 @@ struct FilterResetButton: View {
                     .contentShape(Rectangle())
             } else { Text("Reset").frame(minHeight: AppTheme.minimumTarget) }
         }
-        .accessibilityLabel(scope == .stats ? "Reset Stats sport scope" : "Reset all filters")
+        .accessibilityLabel(scope == .stats ? String(localized: AppMessages.filtersResetStatsScope(locale: locale)) : "Reset all filters")
         .accessibilityIdentifier("filter-reset")
     }
 }
