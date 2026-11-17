@@ -1,6 +1,6 @@
 import CoreLocation
 import Foundation
-import MapboxMaps
+import MapLibre
 import Testing
 import UIKit
 @testable import ActivityMap
@@ -10,9 +10,6 @@ import UIKit
 @MainActor @Suite(.serialized)
 struct RenderedRoutePickingTests {
     @Test func renderedOverlapsFiltersAndSelectionReuseOneSource() async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
         let scene = try #require(UIApplication.shared.connectedScenes.first as? UIWindowScene)
         let oldWindow = scene.keyWindow
         let window = UIWindow(windowScene: scene)
@@ -22,15 +19,10 @@ struct RenderedRoutePickingTests {
         defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
 
         let center = CLLocationCoordinate2D(latitude: 46.005, longitude: 8.005)
-        let map = MapView(frame: CGRect(x: 0, y: 0, width: 390, height: 700), mapInitOptions: MapInitOptions(
-            cameraOptions: CameraOptions(center: center, zoom: 13), styleURI: nil,
-            styleJSON: ##"{"version":8,"sources":{},"layers":[{"id":"background","type":"background","paint":{"background-color":"#e5e8df"}}]}"##
-        ))
-        controller.view.addSubview(map)
-        var styleLoaded = map.mapboxMap.isStyleLoaded
-        let styleEvent = map.mapboxMap.onStyleLoaded.observe { _ in styleLoaded = true }
-        defer { styleEvent.cancel() }
-        try await waitUntil { styleLoaded }
+        let harness = try await CameraHarness(size: CGSize(width: 390, height: 700))
+        defer { harness.close() }
+        let map = harness.map
+        map.renderer.setCamera(to: MapCamera(center: center, zoom: 13))
 
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(10),
                                                ActivityStoreSelectionTests.activity(9, sport: .ride)])
@@ -38,23 +30,20 @@ struct RenderedRoutePickingTests {
         store.routeGeometry.update(activities: store.activities, revision: store.activitiesRevision)
         // A style without the route layer must not be mistaken for an empty tap.
         store.replaceSelection(with: [9])
-        picker.pick(at: .zero, map: map.mapboxMap, store: store)
+        picker.pick(at: .zero, map: map.renderer, store: store)
         #expect(picker.errorMessage != nil && store.selectedActivityIDs == [9])
         picker.errorMessage = nil
         func render() async throws {
-            var idle = false
-            let event = map.mapboxMap.onMapIdle.observe { _ in idle = true }
-            defer { event.cancel() }
-            map.mapboxMap.setMapStyleContent {
-                RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
-                            selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID)
-            }
-            try await waitUntil { idle }
+            let style = try #require(map.style)
+            RouteLayers(data: store.routeGeometry.data, visibleIDs: store.visibleActivityIDs,
+                        selectedIDs: store.selectedActivityIDs, activeID: store.activeActivityID).sync(style: style)
+            try await Task.sleep(for: .milliseconds(250))
+
         }
         try await render()
-        let point = map.mapboxMap.point(for: center)
+        let point = map.renderer.point(for: center)
         // A near miss on a 3pt stroke still picks both identical routes.
-        picker.pick(at: CGPoint(x: point.x + 10, y: point.y), map: map.mapboxMap, store: store)
+        picker.pick(at: CGPoint(x: point.x + 10, y: point.y), map: map.renderer, store: store)
         try await waitUntil { picker.isPresented || picker.errorMessage != nil }
         #expect(picker.errorMessage == nil)
         #expect(picker.candidateIDs == [10, 9])
@@ -68,13 +57,13 @@ struct RenderedRoutePickingTests {
         picker.reconcile(with: store)
         try await render()
         picker.isPresented = false
-        picker.pick(at: point, map: map.mapboxMap, store: store)
+        picker.pick(at: point, map: map.renderer, store: store)
         try await waitUntil { picker.isPresented || picker.errorMessage != nil }
         #expect(picker.candidateIDs == [10] && picker.detailID == 10)
         #expect(store.selectedActivityIDs == [10])
 
         // A late query from the previous mode cannot replace the group.
-        picker.pick(at: point, map: map.mapboxMap, store: store)
+        picker.pick(at: point, map: map.renderer, store: store)
         store.setCombine(true)
         try await Task.sleep(for: .milliseconds(150))
         #expect(store.selectedActivityIDs == [10] && store.isCombining)
@@ -84,12 +73,12 @@ struct RenderedRoutePickingTests {
         try await render()
         #expect(store.ordinaryVisibleActivityIDs == [9, 10] && store.visibleActivityIDs == [10])
         // A Combine miss preserves the group, active route and result detail.
-        picker.pick(at: CGPoint(x: 5, y: 5), map: map.mapboxMap, store: store)
+        picker.pick(at: CGPoint(x: 5, y: 5), map: map.renderer, store: store)
         try await Task.sleep(for: .milliseconds(150))
         #expect(store.selectedActivityIDs == [10] && picker.detailID == 10)
         store.setCombine(false)
         // Rendered-map miss clears selection instead of selecting raster/POIs.
-        picker.pick(at: CGPoint(x: 5, y: 5), map: map.mapboxMap, store: store)
+        picker.pick(at: CGPoint(x: 5, y: 5), map: map.renderer, store: store)
         try await waitUntil { !picker.isPresented || picker.errorMessage != nil }
         #expect(picker.errorMessage == nil && store.selectedActivityIDs.isEmpty)
         #expect(store.routeGeometry.buildCount == 1)

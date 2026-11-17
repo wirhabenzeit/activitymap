@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import SwiftUI
 import Testing
 import UIKit
@@ -7,9 +7,6 @@ import Vision
 
 extension RenderedRoutePickingTests {
     @Test func firstSyncKeepsMapClearWhileProgressIsAvailableInSettings() async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let source = GatedSyncSource()
         let store = ActivityStore()
@@ -25,7 +22,7 @@ extension RenderedRoutePickingTests {
             .environment(\.mapStyleOverride, MapStyle(json: CameraHarness.style))
         let host = try BrowsingHarness(root: root, size: CGSize(width: 390, height: 844))
         defer { host.close() }
-        try await browsingWait { host.descendants(of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
+        try await browsingWait { host.descendants(of: MLNMapView.self).first?.renderer.isStyleLoaded == true }
         try await Task.sleep(for: .milliseconds(150))
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
@@ -58,9 +55,6 @@ extension RenderedRoutePickingTests {
 
     @Test(arguments: ["phone", "accessibility", "tablet"])
     func browsingCachedStatesKeepMapAndListMounted(layout: String) async throws {
-        let token = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = token }
         let storage = try LocalStore(container: LocalStore.makeContainer(inMemory: true))
         let dto = try Fixtures.activity(["id": "1", "name": "Saved activity near midnight"])
         var checkpoint = Fixtures.checkpoint
@@ -79,8 +73,8 @@ extension RenderedRoutePickingTests {
             .environment(\.dynamicTypeSize, layout == "accessibility" ? .accessibility2 : .large)
         let host = try BrowsingHarness(root: root, size: layout == "tablet" ? CGSize(width: 768, height: 1024) : CGSize(width: 390, height: 844))
         defer { host.close() }
-        try await browsingWait { host.descendants(of: MapView.self).first?.mapboxMap.isStyleLoaded == true }
-        let map = try #require(host.descendants(of: MapView.self).first)
+        try await browsingWait { host.descendants(of: MLNMapView.self).first?.renderer.isStyleLoaded == true }
+        let map = try #require(host.descendants(of: MLNMapView.self).first)
         try await Task.sleep(for: .milliseconds(150))
         try host.save(name: "\(layout)-offline-map")
         store.selectedTab = .list
@@ -106,7 +100,7 @@ extension RenderedRoutePickingTests {
         sync.setSession(SyncFixtures.session(), storage: storage)
         await sync.refresh()
         try await Task.sleep(for: .milliseconds(150))
-        #expect(host.descendants(of: MapView.self).first === map)
+        #expect(host.descendants(of: MLNMapView.self).first === map)
         #expect(store.selectedActivityIDs == [1])
         #expect(!sync.canRefresh && sync.status != .expired)
         try host.save(name: "\(layout)-server-wait-map")

@@ -8,7 +8,7 @@
 #   scripts/install-dev-iphone.sh --build-only     # build and verify, no install
 #   scripts/install-dev-iphone.sh --release        # optimized Dev app for performance review
 #
-# The Mapbox token comes from MAPBOX_ACCESS_TOKEN, else from Config/Local.xcconfig
+# The optional MapTiler key comes from MAPTILER_KEY, else from Config/Local.xcconfig
 # in this checkout or the main checkout (worktrees usually have none).
 set -euo pipefail
 repo="$(cd "$(dirname "$0")/.." && pwd)"
@@ -63,15 +63,14 @@ EOF
 
 local_config() { [[ -f "$1/ios/ActivityMap/Config/Local.xcconfig" ]] && echo "$1/ios/ActivityMap/Config/Local.xcconfig"; }
 main_checkout="$(git -C "$repo" worktree list --porcelain | sed -n '1s/^worktree //p')"
-token="${MAPBOX_ACCESS_TOKEN:-}"
+token="${MAPTILER_KEY:-}"
 settings=()
 if [[ -z "$token" && -z "$(local_config "$repo")" ]]; then
   # A worktree has no ignored Local.xcconfig: take only the token from the main one.
   config="$(local_config "$main_checkout" || true)"
-  [[ -n "$config" ]] && token="$(sed -n 's/^[[:space:]]*MAPBOX_ACCESS_TOKEN[[:space:]]*=[[:space:]]*//p' "$config" | tail -1)"
-  [[ -n "$token" ]] || { echo "No Mapbox token: set MAPBOX_ACCESS_TOKEN or add Config/Local.xcconfig (the map would be blank)." >&2; exit 1; }
+  [[ -n "$config" ]] && token="$(sed -n 's/^[[:space:]]*MAPTILER_KEY[[:space:]]*=[[:space:]]*//p' "$config" | tail -1)"
 fi
-[[ -n "$token" ]] && settings+=("MAPBOX_ACCESS_TOKEN=$token")
+[[ -n "$token" ]] && settings+=("MAPTILER_KEY=$token")
 
 branch="$(git -C "$repo" branch --show-current)"
 echo "Building $(git -C "$repo" rev-parse --short HEAD) (${branch:-detached HEAD}, $configuration); log: $work/build.log" >&2
@@ -90,7 +89,6 @@ app="$work/DerivedData/Build/Products/$configuration-iphoneos/ActivityMap.app"
 plist() { /usr/libexec/PlistBuddy -c "Print :$1" "$app/Info.plist" 2>/dev/null || true; }
 # Never overwrite the TestFlight app (page.dominik.activitymap) by accident.
 [[ "$(plist CFBundleIdentifier)" == "$bundle_id" ]] || { echo "Built bundle ID is $(plist CFBundleIdentifier), not $bundle_id; not installing." >&2; exit 1; }
-[[ -n "$(plist MBXAccessToken)" ]] || { echo "Built app has no Mapbox token; not installing." >&2; exit 1; }
 echo "Server: $(plist ActivityMapAPIBaseURL)" >&2
 [[ -n "$install" ]] || { echo "Built $app" >&2; exit; }
 

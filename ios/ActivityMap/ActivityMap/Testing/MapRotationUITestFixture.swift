@@ -1,5 +1,5 @@
 #if DEBUG
-import MapboxMaps
+import MapLibre
 import SwiftUI
 import UIKit
 
@@ -40,7 +40,6 @@ struct MapRotationUITestFixture: View {
     }
 
     init(expanded: Bool = false) {
-        MapboxOptions.accessToken = "pk.offline-test"
         PerfProbe.install()
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let continuation = ProcessInfo.processInfo.arguments.contains("--activity-continuation-ui-testing")
@@ -342,7 +341,7 @@ private struct MapRotationPresentationProbe: UIViewRepresentable {
             let scroll = panel.flatMap(findResultsScroll)
             if let scroll { resultsScroll = scroll }
             if let panel { presentations.insert(ObjectIdentifier(panel)) }
-            let map = descendants(window).first { $0 is MapView }
+            let map = descendants(window).first { $0 is MLNMapView }
             let visibleDetailID = store.selectedTab == .list ? store.inspectedActivityID : picker.detailID
             let detailScrolls = visibleDetailID == nil ? [] : detailScrollCandidates(in: panel ?? root)
             let detailScroll = findDetailScroll(among: detailScrolls)

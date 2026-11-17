@@ -23,102 +23,126 @@ struct SharedRasterOverlayDefinition: Identifiable, Hashable, Sendable {
     let attribution: String?
 }
 
+struct SharedBaseMapGroup: Identifiable, Sendable {
+    let id: String
+    let label: String
+    let maps: [String]
+}
+
+struct SharedOverlayGroup: Identifiable, Sendable {
+    let id: String
+    let label: String
+    let overlays: [String]
+}
+
 enum SharedMapCatalog {
+    static let overlayGroups: [SharedOverlayGroup] = [
+        .init(id: "swisstopo", label: "Swisstopo", overlays: ["swisstopoSki", "swisstopoSlope", "veloland", "wanderland"])
+    ]
+    static let baseMapGroups: [SharedBaseMapGroup] = [
+        .init(id: "worldwide", label: "Worldwide", maps: ["mapboxOutdoors", "mapboxStreet", "mapboxLight", "mapboxDark", "mapboxTopolight", "mapboxSatellite"]),
+        .init(id: "swisstopo", label: "Swisstopo", maps: ["swisstopoVectorBasemap", "swisstopoVectorLight", "swisstopoVectorWinter", "swisstopoSatellite", "swisstopoPixelkarte", "swisstopoWinter"]),
+        .init(id: "kartverket", label: "NorgesKart", maps: ["norgeskart"])
+    ]
+    static let baseMapAliases: [String: String] = [
+        "mapboxStreet3d": "mapboxStreet"
+    ]
+
     static let baseMaps: [SharedBaseMapDefinition] = [
         .init(
             id: "mapboxStreet",
-            label: "Mapbox Street",
-            source: .style(url: "mapbox://styles/mapbox/streets-v12"),
+            label: "Street",
+            source: .style(url: "/map-styles/mapboxStreet.json"),
             visibleByDefault: true,
             attribution: nil
         ),
         .init(
             id: "mapboxStreet3d",
-            label: "Mapbox Street 3D",
-            source: .style(url: "mapbox://styles/wirhabenzeit/clk6y6c1q00lk01pe8fqs0urn"),
+            label: "Street 3D",
+            source: .style(url: "/map-styles/mapboxStreet3d.json"),
             visibleByDefault: false,
             attribution: nil
         ),
         .init(
             id: "mapboxOutdoors",
-            label: "Mapbox Outdoors",
-            source: .style(url: "mapbox://styles/mapbox/outdoors-v12"),
+            label: "Outdoor",
+            source: .style(url: "/map-styles/mapboxOutdoors.json"),
             visibleByDefault: false,
             attribution: nil
         ),
         .init(
             id: "mapboxLight",
-            label: "Mapbox Light",
-            source: .style(url: "mapbox://styles/mapbox/light-v11"),
+            label: "Light",
+            source: .style(url: "/map-styles/mapboxLight.json"),
             visibleByDefault: false,
             attribution: nil
         ),
         .init(
             id: "mapboxTopolight",
-            label: "Mapbox Topolight",
-            source: .style(url: "mapbox://styles/wirhabenzeit/clk0tpduc00ab01qyguzi09gv"),
+            label: "Topo Light",
+            source: .style(url: "/map-styles/mapboxTopolight.json"),
             visibleByDefault: false,
             attribution: nil
         ),
         .init(
             id: "mapboxDark",
-            label: "Mapbox Dark",
-            source: .style(url: "mapbox://styles/mapbox/dark-v11"),
+            label: "Dark",
+            source: .style(url: "/map-styles/mapboxDark.json"),
             visibleByDefault: false,
             attribution: nil
         ),
         .init(
             id: "mapboxSatellite",
-            label: "Mapbox Satellite",
-            source: .style(url: "mapbox://styles/mapbox/satellite-v9"),
+            label: "Satellite",
+            source: .style(url: "/map-styles/mapboxSatellite.json"),
             visibleByDefault: false,
             attribution: nil
         ),
         .init(
             id: "swisstopoVectorBasemap",
-            label: "Swisstopo Vector Basemap",
+            label: "Vector Base",
             source: .style(url: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap.vt/style.json"),
             visibleByDefault: false,
             attribution: "© swisstopo"
         ),
         .init(
             id: "swisstopoVectorLight",
-            label: "Swisstopo Vector Light",
+            label: "Vector Light",
             source: .style(url: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.lightbasemap.vt/style.json"),
             visibleByDefault: false,
             attribution: "© swisstopo"
         ),
         .init(
             id: "swisstopoVectorWinter",
-            label: "Swisstopo Vector Winter",
+            label: "Vector Winter",
             source: .style(url: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.basemap-winter.vt/style.json"),
             visibleByDefault: false,
             attribution: "© swisstopo"
         ),
         .init(
             id: "swisstopoSatellite",
-            label: "Swisstopo Satellite",
-            source: .style(url: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.leichte-basiskarte-imagery.vt/style.json"),
+            label: "Aerial",
+            source: .style(url: "https://vectortiles.geo.admin.ch/styles/ch.swisstopo.imagerybasemap.vt/style.json"),
             visibleByDefault: false,
             attribution: "© swisstopo"
         ),
         .init(
             id: "swisstopoPixelkarte",
-            label: "Swisstopo Pixelkarte",
+            label: "Topo",
             source: .raster(url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe/default/current/3857/{z}/{x}/{y}.jpeg", tileSize: 256),
             visibleByDefault: false,
             attribution: "© swisstopo"
         ),
         .init(
             id: "swisstopoWinter",
-            label: "Swisstopo Winter",
+            label: "Topo Winter",
             source: .raster(url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.pixelkarte-farbe-winter/default/current/3857/{z}/{x}/{y}.jpeg", tileSize: 256),
             visibleByDefault: false,
             attribution: "© swisstopo"
         ),
         .init(
             id: "norgeskart",
-            label: "NorgesKart",
+            label: "Topo",
             source: .raster(url: "https://cache.kartverket.no/v1/wmts/1.0.0/toporaster/default/webmercator/{z}/{y}/{x}.png", tileSize: 256),
             visibleByDefault: false,
             attribution: "© Kartverket"
@@ -128,7 +152,7 @@ enum SharedMapCatalog {
     static let rasterOverlays: [SharedRasterOverlayDefinition] = [
         .init(
             id: "swisstopoSki",
-            label: "Swisstopo Ski",
+            label: "Ski routes",
             url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo-karto.skitouren/default/current/3857/{z}/{x}/{y}.png",
             tileSize: 256,
             visibleByDefault: false,
@@ -146,7 +170,7 @@ enum SharedMapCatalog {
         ),
         .init(
             id: "swisstopoSlope",
-            label: "Swisstopo Slope",
+            label: "Slope shading",
             url: "https://wmts.geo.admin.ch/1.0.0/ch.swisstopo.hangneigung-ueber_30/default/current/3857/{z}/{x}/{y}.png",
             tileSize: 256,
             visibleByDefault: false,
@@ -155,7 +179,7 @@ enum SharedMapCatalog {
         ),
         .init(
             id: "veloland",
-            label: "Veloland",
+            label: "Cycling routes",
             url: "https://wmts.geo.admin.ch/1.0.0/ch.astra.veloland/default/current/3857/{z}/{x}/{y}.png",
             tileSize: 256,
             visibleByDefault: false,
@@ -164,7 +188,7 @@ enum SharedMapCatalog {
         ),
         .init(
             id: "wanderland",
-            label: "Wanderland",
+            label: "Hiking routes",
             url: "https://wmts.geo.admin.ch/1.0.0/ch.astra.wanderland/default/current/3857/{z}/{x}/{y}.png",
             tileSize: 256,
             visibleByDefault: false,

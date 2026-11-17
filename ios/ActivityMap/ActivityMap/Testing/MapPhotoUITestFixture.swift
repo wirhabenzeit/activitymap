@@ -1,6 +1,6 @@
 #if DEBUG
 import CoreLocation
-import MapboxMaps
+import MapLibre
 import Observation
 import SwiftUI
 import UIKit
@@ -71,7 +71,6 @@ private final class MapPhotoUITestState {
 
     init(resultsPresented: Bool) {
         initiallyPresentedResults = resultsPresented
-        MapboxOptions.accessToken = "pk.offline-test"
         // This fixed subtree belongs exclusively to this DEBUG fixture. XCUI
         // terminates the process, so the next launch must clean prior bytes.
         let root = FileManager.default.temporaryDirectory.appending(path: "ActivityMapMapPhotoUITestFixture", directoryHint: .isDirectory)
@@ -108,7 +107,7 @@ private final class MapPhotoUITestState {
             Photo(id: "unlocated", activityID: "1", caption: nil, urls: [:], location: nil, createdAt: nil),
         ]
         store.photos = initialPhotos
-        store.mapContext.record(CameraState(center: center, padding: .zero, zoom: 10, bearing: 0, pitch: 0))
+        store.mapContext.record(MapCamera(center: center, padding: .zero, zoom: 10, bearing: 0, pitch: 0))
         store.mapContext.showPhotos = true
         if resultsPresented { store.replaceSelection(with: [2]) }
         initialSelection = store.selectedActivityIDs

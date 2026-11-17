@@ -1,5 +1,5 @@
 #if DEBUG
-import MapboxMaps
+import MapLibre
 import SwiftUI
 
 /// Real Stats navigation with a private, offline library. No LocalStore is
@@ -15,7 +15,6 @@ struct StatsUITestFixture: View {
     }
 
     init() {
-        MapboxOptions.accessToken = "pk.offline-test"
         PerfProbe.install()
         let today = StatsDates.localToday()
         let sports: [SportType] = [.ride, .run, .hike, .swim]

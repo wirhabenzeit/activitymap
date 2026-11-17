@@ -1,26 +1,28 @@
 import Foundation
 import CoreGraphics
-import MapboxMaps
+import MapLibre
 
 /// Screen-space tolerance and ordering are independent of the map's tile order.
 enum RouteHitTesting {
     static let radius: CGFloat = 22
 
     static func orderedIDs(
-        features: [Feature], at point: CGPoint, eligibleIDs: Set<Int>,
+        features: [MLNFeature], at point: CGPoint, eligibleIDs: Set<Int>,
         project: ([CLLocationCoordinate2D]) -> [CGPoint]
     ) -> [Int] {
         var distances: [Int: CGFloat] = [:]
         for feature in features {
-            guard case let .string(rawID) = feature.properties?["id"],
-                  let id = Int(rawID), String(id) == rawID, eligibleIDs.contains(id)
-            else { continue }
-            let lines: [[CLLocationCoordinate2D]]
-            switch feature.geometry {
-            case let .lineString(line): lines = [line.coordinates]
-            case let .multiLineString(linesGeometry): lines = linesGeometry.coordinates
-            default: continue
+            guard let rawID = feature.attribute(forKey: "id") as? String,
+                  let id = Int(rawID), String(id) == rawID, eligibleIDs.contains(id) else { continue }
+            func coordinates(_ line: MLNPolyline) -> [CLLocationCoordinate2D] {
+                var values = [CLLocationCoordinate2D](repeating: .init(), count: Int(line.pointCount))
+                line.getCoordinates(&values, range: NSRange(location: 0, length: values.count))
+                return values
             }
+            let lines: [[CLLocationCoordinate2D]]
+            if let line = feature as? MLNPolyline { lines = [coordinates(line)] }
+            else if let multi = feature as? MLNMultiPolyline { lines = multi.polylines.map(coordinates) }
+            else { continue }
             let distance = lines.map { distance(to: project($0), from: point) }.min() ?? .infinity
             guard distance <= radius else { continue }
             distances[id] = min(distances[id] ?? .infinity, distance)

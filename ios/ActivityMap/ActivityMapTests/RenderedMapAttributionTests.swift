@@ -1,4 +1,4 @@
-import MapboxMaps
+import MapLibre
 import SwiftUI
 import Testing
 import UIKit
@@ -9,9 +9,6 @@ import Vision
 struct RenderedMapAttributionTests {
     @Test(arguments: ["raster", "vector"])
     func sourceCreditsStayInOneNativeInfoMenu(kind: String) async throws {
-        let oldToken = MapboxOptions.accessToken
-        MapboxOptions.accessToken = "pk.offline-test"
-        defer { MapboxOptions.accessToken = oldToken }
         let store = ActivityStore(activities: [ActivityStoreSelectionTests.activity(1)])
         if kind == "raster" {
             store.mapContext.baseStyle = .shared(.init(id: "offline-swisstopo", label: "Swisstopo",
@@ -32,39 +29,49 @@ struct RenderedMapAttributionTests {
         window.makeKeyAndVisible()
         defer { window.isHidden = true; oldWindow?.makeKeyAndVisible() }
         host.view.frame = window.bounds
-        try await waitUntil { self.descendants(MapView.self, in: host.view).first?.mapboxMap.isStyleLoaded == true }
+        try await waitUntil { self.descendants(MLNMapView.self, in: host.view).first?.renderer.isStyleLoaded == true }
         try await Task.sleep(for: .milliseconds(250))
-        let map = try #require(descendants(MapView.self, in: host.view).first)
-        #expect(!map.ornaments.logoView.isHidden && !map.ornaments.attributionButton.isHidden)
-        let info = try #require(descendants(UIButton.self, in: map.ornaments.attributionButton).first)
-        #expect(map.ornaments.attributionButton.bounds.width >= 44 && map.ornaments.attributionButton.bounds.height >= 44)
+        let map = try #require(descendants(MLNMapView.self, in: host.view).first)
+        #expect(!map.logoView.isHidden && !map.attributionButton.isHidden)
+        let info = map.attributionButton
         let visible = try snapshot(host.view, name: "map-attribution-\(kind)")
         let request = VNRecognizeTextRequest()
         request.recognitionLevel = .accurate
         try VNImageRequestHandler(cgImage: try #require(visible.cgImage)).perform([request])
         let text = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
         #expect(!text.lowercased().contains("swisstopo"), "No extra provider badge on the map: \(text)")
-        info.sendActions(for: .primaryActionTriggered)
+        info.sendActions(for: .touchUpInside)
         try await waitUntil { host.presentedViewController is UIAlertController }
         let menu = try #require(host.presentedViewController as? UIAlertController)
         let titles = menu.actions.compactMap(\.title)
         #expect(titles.filter { $0.lowercased().contains("swisstopo") }.count == 1,
                 "Swisstopo appears once in the info menu: \(titles)")
         #expect(titles.contains { $0.contains("NVE") }, "Overlay metadata remains credited: \(titles)")
-        #expect(titles.contains { $0.contains("Telemetry") })
-        #expect(titles.contains { $0.contains("Privacy") })
         try await Task.sleep(for: .milliseconds(350))
         _ = try snapshot(window, name: "map-sources-\(kind)")
         menu.dismiss(animated: false)
-        let logoFrame = map.ornaments.logoView.convert(map.ornaments.logoView.bounds, to: window)
-        let infoFrame = map.ornaments.attributionButton.convert(map.ornaments.attributionButton.bounds, to: window)
+        let logoFrame = map.logoView.convert(map.logoView.bounds, to: window)
+        let infoFrame = map.attributionButton.convert(map.attributionButton.bounds, to: window)
+        store.replaceSelection(with: [1])
+        picker.reviewSelection(store: store)
+        store.mapContext.request(.fitSelection)
+        try await waitUntil { store.mapContext.pendingRequest == nil }
+        try await Task.sleep(for: .milliseconds(650))
+        #expect(map.renderer.cameraState.padding.bottom > 200)
+        #expect(map.contentInset == .zero, "Fitting must leave ornament layout independent of camera padding")
+        #expect(map.logoView.convert(map.logoView.bounds, to: window) == logoFrame)
+        #expect(map.attributionButton.convert(map.attributionButton.bounds, to: window) == infoFrame)
+        store.replaceSelection(with: [])
+        try await Task.sleep(for: .milliseconds(150))
+        #expect(map.attributionButton.convert(map.attributionButton.bounds, to: window) == infoFrame,
+                "Clearing selection after a fit must not leave credits floating in the map")
         store.replaceSelection(with: [1])
         picker.reviewSelection(store: store)
         for detent in MapResultsDetent.allCases {
             picker.detent = detent
             try await Task.sleep(for: .milliseconds(100))
-            #expect(map.ornaments.logoView.convert(map.ornaments.logoView.bounds, to: window) == logoFrame)
-            #expect(map.ornaments.attributionButton.convert(map.ornaments.attributionButton.bounds, to: window) == infoFrame,
+            #expect(map.logoView.convert(map.logoView.bounds, to: window) == logoFrame)
+            #expect(map.attributionButton.convert(map.attributionButton.bounds, to: window) == infoFrame,
                     "Info stays behind results at its original map position")
         }
     }

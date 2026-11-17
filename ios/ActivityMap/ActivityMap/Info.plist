@@ -2,6 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+	<key>ActivityMapMapTilerKey</key>
+	<string>$(MAPTILER_KEY)</string>
 	<key>ActivityMapAPIBaseURL</key>
 	<string>$(ACTIVITYMAP_API_BASE_URL)</string>
 	<key>ActivityMapAuthCallbackScheme</key>
@@ -21,8 +23,6 @@
 			</array>
 		</dict>
 	</array>
-	<key>MBXAccessToken</key>
-	<string>$(MAPBOX_ACCESS_TOKEN)</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>ActivityMap uses your current location to center the map when you tap Locate me.</string>
 	<!-- HTTPS, authentication and storage use platform-provided/exempt encryption. -->

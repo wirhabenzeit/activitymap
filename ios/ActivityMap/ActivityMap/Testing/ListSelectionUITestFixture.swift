@@ -1,5 +1,5 @@
 #if DEBUG
-import MapboxMaps
+import MapLibre
 import SwiftUI
 
 /// Offline browsing fixture for real accessibility/rotation tests. No local
@@ -10,7 +10,6 @@ struct ListSelectionUITestFixture: View {
 
     init(standalone: Bool) {
         self.standalone = standalone
-        MapboxOptions.accessToken = "pk.offline-test"
         let date = Date(timeIntervalSince1970: 1_700_000_000)
         let summaryLayout = ProcessInfo.processInfo.arguments.contains("--summary-layout-ui-testing")
         var activities = (1...(summaryLayout ? 4634 : 4)).map { id in
