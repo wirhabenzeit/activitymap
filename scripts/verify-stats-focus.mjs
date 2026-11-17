@@ -28,6 +28,76 @@ let failure;
 try {
   await waitForFixtureRoute(new URL('/stats-focus-test', base));
   browser = await launchBrowser();
+  // Viewport size alone does not enable touch CSS. Exercise a coarse pointer
+  // so compact faces cannot silently grow back to the 44px tap-target height.
+  const touchContext = await browser.newContext({
+    viewport: { width: 402, height: 874 },
+    isMobile: true,
+    hasTouch: true,
+    reducedMotion: 'reduce',
+    serviceWorkers: 'block',
+  });
+  const touchEvidence = await recordBrowserEvidence(touchContext, {
+    base,
+    output: join(output, 'touch-controls'),
+  });
+  let touchFailure;
+  try {
+    const touchPage = await touchContext.newPage();
+    await touchPage.goto(new URL('/stats-focus-test', base).href);
+    const metrics = touchPage
+      .locator('[data-tile-id="thisWeek"]')
+      .getByRole('group', { name: 'This week: Metric' });
+    await metrics.waitFor();
+    await touchPage.evaluate(() => document.fonts.ready);
+    assert(
+      await touchPage.evaluate(() => matchMedia('(pointer: coarse)').matches),
+    );
+    const sizes = await metrics.getByRole('button').evaluateAll((buttons) =>
+      buttons.map((button) => ({
+        target: button.getBoundingClientRect().height,
+        width: button.getBoundingClientRect().width,
+        face: button
+          .querySelector('[data-stats-choice-face]')
+          .getBoundingClientRect().height,
+      })),
+    );
+    assert(
+      sizes.every(
+        ({ target, width, face }) => target >= 44 && width >= 44 && face === 28,
+      ),
+    );
+    assert.equal(
+      await metrics.evaluate(
+        (group) => getComputedStyle(group, '::before').height,
+      ),
+      '32px',
+    );
+    const time = metrics.getByRole('button', {
+      name: 'Moving time',
+      exact: true,
+    });
+    const bounds = await time.boundingBox();
+    // Tap the transparent padding above the visible face, not just its label.
+    await touchPage.touchscreen.tap(bounds.x + bounds.width / 2, bounds.y + 2);
+    assert.equal(await time.getAttribute('aria-pressed'), 'true');
+    await touchPage.addStyleTag({
+      content: 'nextjs-portal { display:none !important; }',
+    });
+    await touchPage.screenshot({
+      path: join(output, 'compact-touch-controls.png'),
+      animations: 'disabled',
+    });
+    console.log(
+      'Touch controls retain 28px faces, a 32px track, and working 44px tap targets',
+    );
+  } catch (error) {
+    touchFailure = error;
+    throw error;
+  } finally {
+    await touchEvidence.finish(touchFailure);
+    await touchContext.close();
+  }
   const context = await browser.newContext({
     viewport: { width: 1440, height: 1000 },
     reducedMotion: 'reduce',
