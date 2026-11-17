@@ -44,24 +44,24 @@ struct ActivityFilterBatchingTests {
         if statsOnly { store.resetStatsActivityFilters() }
         else { store.resetFilters() }
 
-        let expected = Set(1...(statsOnly ? 10_000 : 20_000))
+        let expected = statsOnly ? Set(stride(from: 1, through: 10_000, by: 2)) : Set(1...20_000)
         #expect(Set(store.filteredActivities.map(\.id)) == expected)
         #expect(store.ordinaryVisibleActivityIDs == expected)
-        #expect(Set(store.browsingActivities.map(\.id)) == (statsOnly ? [1, 2] : expected))
+        #expect(Set(store.browsingActivities.map(\.id)) == (statsOnly ? [1] : expected))
         #expect(store.dateDayRange == (statsOnly ? savedDates : nil))
         #expect(store.onlySelected == statsOnly && store.isCombining)
         #expect(store.selectedActivityIDs == selection && store.activeActivityID == 1 && store.inspectedActivityID == 1)
-        #expect(store.activeFilterCount == (statsOnly ? 2 : 0) && store.activeStatsFilterCount == 0)
+        #expect(store.activeFilterCount == (statsOnly ? 10 : 0) && store.activeStatsFilterCount == 0)
         #expect(store.statsActivities.count == 20_000, "Stats ignores saved dates and selected-only scope")
-        #expect(store.filterBuildCount == builds + 1)
-        #expect(store.selectionReconciliationCount == reconciliations + 1)
+        #expect(store.filterBuildCount == builds + (statsOnly ? 0 : 1))
+        #expect(store.selectionReconciliationCount == reconciliations + (statsOnly ? 0 : 1))
         #expect(store.activityLookupBuildCount == identities && store.activitiesRevision == revision)
-        #expect(store.filterResetRevision == reset + 1 && presentation.settings == list)
+        #expect(store.filterResetRevision == reset + (statsOnly ? 0 : 1) && presentation.settings == list)
         #expect(store.mapContext.camera.zoom == camera.zoom && store.mapContext.camera.center.latitude == camera.center.latitude)
         _ = store.listedActivities
-        #expect(store.sortBuildCount == sorts + 1)
+        #expect(store.sortBuildCount == sorts + (statsOnly ? 0 : 1))
         for _ in 0..<30 { _ = store.filteredActivities; _ = store.listedActivities }
-        #expect(store.filterBuildCount == builds + 1 && store.sortBuildCount == sorts + 1)
+        #expect(store.filterBuildCount == builds + (statsOnly ? 0 : 1) && store.sortBuildCount == sorts + (statsOnly ? 0 : 1))
     }
 
     @Test func batchNeverReconcilesAnIntermediateFilterThatWouldCloseInspection() {
@@ -142,7 +142,7 @@ struct ActivityFilterBatchingTests {
         } onChange: { changes.withLock { $0 += 1 } }
         store.resetFilters()
         store.resetStatsActivityFilters()
-        #expect(store.filterResetRevision == reset + 2, "Reset intent still closes/discards unapplied filter drafts")
+        #expect(store.filterResetRevision == reset + 1, "Reset intent still closes/discards unapplied filter drafts")
         #expect(changes.withLock { $0 } == 0)
         #expect(store.filterBuildCount == builds && store.sortBuildCount == sorts && store.selectionReconciliationCount == reconciliations)
         #expect(store.inspectedActivityID == 1 && store.activeActivityID == 1 && store.isCombining)

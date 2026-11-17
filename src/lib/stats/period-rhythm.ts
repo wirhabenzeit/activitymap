@@ -1,14 +1,14 @@
+import { type StatsMetric } from '~/settings/stats-tiles.generated';
+
 import {
+  type Sport,
+  type StatsActivity,
   compareStatsActivities,
   dayOf,
   metricValue,
-  sameDateLastYear,
   sportOrder,
-  type Sport,
-  type StatsActivity,
 } from './tile-data';
 import { dateOfDay, monthStart } from './tile-series';
-import { type StatsMetric } from '~/settings/stats-tiles.generated';
 
 export type PeriodSportValues = Record<Sport, number>;
 const emptyValues = (): PeriodSportValues =>
@@ -75,11 +75,18 @@ export function yearMonthlyRhythm(
   activities: readonly StatsActivity[],
   today: number,
   metric: StatsMetric,
+  comparedYear = dateOfDay(today).getUTCFullYear() - 1,
 ) {
   const date = dateOfDay(today);
   const year = date.getUTCFullYear();
   const month = date.getUTCMonth();
-  const previousThrough = sameDateLastYear(today);
+  const previousThrough =
+    monthStart(comparedYear, month) +
+    Math.min(
+      date.getUTCDate(),
+      monthStart(comparedYear, month + 1) - monthStart(comparedYear, month),
+    ) -
+    1;
   const months = Array.from({ length: month + 1 }, (_, index) => ({
     start: monthStart(year, index),
     current: emptyValues(),
@@ -95,7 +102,7 @@ export function yearMonthlyRhythm(
     const period =
       activityYear === year && day <= today
         ? 'current'
-        : activityYear === year - 1 && day <= previousThrough
+        : activityYear === comparedYear && day <= previousThrough
           ? 'previous'
           : null;
     if (period) {

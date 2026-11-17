@@ -3164,6 +3164,31 @@ export const presentation = {
         "other": "{count} activities fetched. Older history, details and photos continue in the background."
       }
     },
+    "filters.sports": {
+      "source": "Sports",
+      "arguments": {},
+      "context": "Sport-group scope heading in the Stats sidebar."
+    },
+    "filters.sportCount": {
+      "source": "{shown} of {total} sports",
+      "arguments": {
+        "shown": "number",
+        "total": "number"
+      },
+      "context": "Selected sport groups in the Stats workspace."
+    },
+    "filters.resetStatsScope": {
+      "source": "Reset Stats sport scope",
+      "arguments": {},
+      "context": "Accessible label for resetting the independent Stats sport scope."
+    },
+    "filters.groupOptions": {
+      "source": "{group} options",
+      "arguments": {
+        "group": "string"
+      },
+      "context": "Menu with sport-group actions such as Only this sport."
+    },
     "filters.onlyGroup": {
       "source": "Only {group}",
       "arguments": {
@@ -3812,6 +3837,10 @@ export type MessageArguments = {
   "activity.gpx.noGeometry": Record<never, never>;
   "activity.gpx.invalidCoordinate": Record<never, never>;
   "status.firstSummary.count": { count: number };
+  "filters.sports": Record<never, never>;
+  "filters.sportCount": { shown: number; total: number };
+  "filters.resetStatsScope": Record<never, never>;
+  "filters.groupOptions": { group: string };
   "filters.onlyGroup": { group: string };
   "filters.resultCount": { shown: number; total: number };
   "filters.activeCount": { count: number };

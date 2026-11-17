@@ -7,18 +7,14 @@ import { useMemo, useState } from 'react';
 import { AppSidebar } from '~/components/layout/app-sidebar';
 import { StatsTileGrid } from '~/components/stats/tiles';
 import { StatsActivityInspector } from '~/components/stats/tiles/activity-inspector';
-import { FilterScope } from '~/components/stats/tiles/scope';
 import { Separator } from '~/components/ui/separator';
 import { SidebarProvider, SidebarTrigger } from '~/components/ui/sidebar';
 import { activityDTOSchema } from '~/contracts/v1/activity';
-import {
-  filterStatsActivities,
-  statsFilterScope,
-} from '~/lib/stats/filter-scope';
 import { dayFromISODate } from '~/lib/stats/tile-data';
 import { toStatsActivity } from '~/lib/stats/tile-series';
 import { dtoToActivity } from '~/lib/sync/v1-mappers';
 import { useShallowStore } from '~/store';
+import { filterByStatsSports } from '~/store/stats-scope';
 
 import fixture from '../../../ios/ActivityMap/ActivityMapTests/Gallery/gallery-activities.json';
 
@@ -28,40 +24,36 @@ const defaults = Object.fromEntries(
     .map((key) => [key, null]),
 );
 
-function PreviewStats() {
+type PreviewSnapshot = {
+  activities: Record<string, unknown>[];
+  reportingDate: string;
+};
+
+function PreviewStats({ snapshot }: { snapshot?: PreviewSnapshot }) {
   const activities = useMemo(
     () =>
-      fixture.activities.map((item) =>
+      (snapshot?.activities ?? fixture.activities).map((item) =>
         dtoToActivity(activityDTOSchema.parse({ ...defaults, ...item })),
       ),
-    [],
+    [snapshot],
   );
-  const filters = useShallowStore((state) => ({
-    sportType: state.sportType,
-    sportGroup: state.sportGroup,
-    dateRange: state.dateRange,
-    values: state.values,
-    binary: state.binary,
-    search: state.search,
-    place: state.place,
-  }));
-  const reset = useShallowStore((state) => state.resetActivityFilters);
+  const sports = useShallowStore((state) => state.statsSports);
   const stats = useMemo(
-    () => filterStatsActivities(activities, filters).map(toStatsActivity),
-    [activities, filters],
+    () => filterByStatsSports(activities, sports).map(toStatsActivity),
+    [activities, sports],
   );
-  const scope = statsFilterScope(filters);
+  const singleSport = Object.values(sports).filter(Boolean).length === 1;
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <FilterScope labels={scope.labels} onReset={reset} />
       <div className="min-h-0 flex-1">
         <StatsActivityInspector activities={activities} preview>
           {(open, detailsOpen, inspection) => (
             <StatsTileGrid
               activities={stats}
-              filtered={scope.filtered}
-              singleSport={scope.singleSport}
-              reportingDay={dayFromISODate('2026-09-22')}
+              singleSport={singleSport}
+              reportingDay={dayFromISODate(
+                snapshot?.reportingDate ?? '2026-09-22',
+              )}
               onOpenActivity={open}
               detailsOpen={detailsOpen}
               {...inspection}
@@ -73,8 +65,15 @@ function PreviewStats() {
   );
 }
 
-export default function StatsFocusPreview() {
+export default function StatsFocusPreview({
+  snapshot,
+}: {
+  snapshot?: PreviewSnapshot;
+}) {
   const [client] = useState(() => new QueryClient());
+  const previewURL = snapshot
+    ? '/stats-focus-preview?data=dev'
+    : '/stats-focus-preview';
   return (
     <QueryClientProvider client={client}>
       <SidebarProvider className="flex h-dvh flex-col">
@@ -86,7 +85,7 @@ export default function StatsFocusPreview() {
               className="mx-2 h-8 bg-header-foreground"
             />
             <a
-              href="/stats-focus-preview"
+              href={previewURL}
               aria-label="ActivityMap stats preview"
               className="mr-4 ml-2 flex items-center gap-2 lg:mr-6"
             >
@@ -109,10 +108,10 @@ export default function StatsFocusPreview() {
               >
                 List
               </button>
-              <a href="/stats-focus-preview">Stats</a>
+              <a href={previewURL}>Stats</a>
             </nav>
             <span className="ml-auto px-2 text-xs text-header-foreground/80">
-              Sample preview
+              {snapshot ? 'Dev data preview' : 'Sample preview'}
             </span>
           </div>
         </header>
@@ -121,10 +120,12 @@ export default function StatsFocusPreview() {
           <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
             <div className="h-14 w-full shrink-0" />
             <div className="min-h-0 w-full flex-1 overflow-hidden">
-              <PreviewStats />
+              <PreviewStats snapshot={snapshot} />
             </div>
             <p className="shrink-0 border-t px-4 py-1 text-xs text-muted-foreground">
-              Local preview · sample activities · September 22, 2026
+              {snapshot
+                ? `Local Convex dev snapshot · ${snapshot.reportingDate}`
+                : 'Local preview · sample activities · September 22, 2026'}
             </p>
           </main>
         </div>

@@ -1571,6 +1571,18 @@ nonisolated enum AppMessages {
     static func statusFirstSummaryCount(_ count: Int, locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("status.firstSummary.count", defaultValue: "\(count) activities fetched. Older history, details and photos continue in the background.", table: "Presentation", locale: locale, comment: "Complete initial-summary import result. Zero has its own empty-library explanation. History, details and photos continue independently.")
     }
+    static func filtersSports(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.sports", defaultValue: "Sports", table: "Presentation", locale: locale, comment: "Sport-group scope heading in the Stats sidebar.")
+    }
+    static func filtersSportCount(_ shown: Int, _ total: Int, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.sportCount", defaultValue: "\(shown) of \(total) sports", table: "Presentation", locale: locale, comment: "Selected sport groups in the Stats workspace.")
+    }
+    static func filtersResetStatsScope(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.resetStatsScope", defaultValue: "Reset Stats sport scope", table: "Presentation", locale: locale, comment: "Accessible label for resetting the independent Stats sport scope.")
+    }
+    static func filtersGroupOptions(_ group: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("filters.groupOptions", defaultValue: "\(group) options", table: "Presentation", locale: locale, comment: "Menu with sport-group actions such as Only this sport.")
+    }
     static func filtersOnlyGroup(_ group: String, locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("filters.onlyGroup", defaultValue: "Only \(group)", table: "Presentation", locale: locale, comment: "Shared browsing and activity command presentation.")
     }

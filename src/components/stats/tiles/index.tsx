@@ -53,7 +53,8 @@ import { Measure } from './charts';
 import { StatsChoices } from './choices';
 import { statsFormat } from './format';
 import { tilePalette } from './format';
-import { FilterScope, useStatsActivities } from './scope';
+import { HeadlineValue } from './headline-value';
+import { useStatsActivities } from './scope';
 import {
   type TileContext,
   type TileSummary,
@@ -86,12 +87,11 @@ const optionOf = (options: TileOptions, tile: StatsTile) =>
   options[tile.id] ?? toggleOf(tile)?.options[0];
 
 export default function StatsTiles() {
-  const { query, activities, scope, reset } = useStatsActivities();
+  const { query, activities, singleSport } = useStatsActivities();
   const empty = activities.length === 0;
   const loading = isStatsHistoryLoading(query, empty);
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <FilterScope labels={scope.labels} onReset={reset} />
       {query.isError && (
         <div role="alert" className="px-4 py-3 text-sm">
           Could not load activity history.{' '}
@@ -128,8 +128,7 @@ export default function StatsTiles() {
               {(open, detailsOpen, inspection) => (
                 <StatsTileGrid
                   activities={activities}
-                  filtered={scope.filtered}
-                  singleSport={scope.singleSport}
+                  singleSport={singleSport}
                   onOpenActivity={open}
                   detailsOpen={detailsOpen}
                   {...inspection}
@@ -145,7 +144,6 @@ export default function StatsTiles() {
 
 export function StatsTileGrid({
   activities,
-  filtered = false,
   singleSport = false,
   onOpenActivity,
   detailsOpen = false,
@@ -154,7 +152,6 @@ export function StatsTileGrid({
   reportingDay,
 }: {
   activities: StatsActivity[];
-  filtered?: boolean;
   singleSport?: boolean;
   onOpenActivity?: (id: number) => void;
   detailsOpen?: boolean;
@@ -186,7 +183,6 @@ export function StatsTileGrid({
       units,
       dateFormat,
       today: reportingDay ?? today,
-      filtered,
       singleSport,
       onOpenActivity,
       availableWidth,
@@ -202,7 +198,6 @@ export function StatsTileGrid({
       units,
       dateFormat,
       resolvedTheme,
-      filtered,
       singleSport,
       onOpenActivity,
       availableWidth,
@@ -478,19 +473,12 @@ function Headline({
   return (
     <>
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-        <div
-          className={cn(
-            'max-w-full min-w-0 shrink-0 font-mono leading-tight font-medium tracking-tight tabular-nums',
-            size === 'tile' && 'mt-1 text-[20px]',
-            size === 'large' && 'mt-1 text-[32px]',
-          )}
-        >
-          {summary.value}
-          {summary.unit && (
-            <small className="ml-1 font-sans text-[13px] font-normal tracking-normal text-muted-foreground">
-              {summary.unit}
-            </small>
-          )}
+        <div className="mt-1 max-w-full min-w-0 shrink-0">
+          <HeadlineValue
+            value={summary.value}
+            unit={summary.unit}
+            size={size}
+          />
         </div>
         {controls}
       </div>
@@ -621,6 +609,12 @@ export function TileFocusView({
   }, []);
   const toggle = toggleOf(tile);
   const summary = view.summary(context, option);
+  const explorerFocus = [
+    'monthVsLastMonth',
+    'yearToDate',
+    'weeklyVolume',
+    'distanceVsElevation',
+  ].includes(tile.id);
   const sideBySide =
     (context.focusWidth ?? 0) >= 1000 &&
     Boolean(view.insight ?? view.more) &&
@@ -631,37 +625,44 @@ export function TileFocusView({
       aria-label={`${tile.title} focus view`}
       className="@container flex h-full min-h-0 flex-col bg-card text-card-foreground"
     >
-      <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
-        <div className="flex min-w-0 items-center gap-3">
-          <button
-            ref={backRef}
-            type="button"
-            onClick={onBack}
-            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
-            aria-label={
-              context.selectedActivityId
-                ? `Back to ${tile.title}`
-                : 'Back to stats dashboard'
-            }
-          >
-            <ArrowLeft aria-hidden="true" className="size-4" />
-            Back
-          </button>
-          <h1 className="text-base font-medium">{tile.title}</h1>
-        </div>
-        {toggle && (
-          <FaceSwitch
-            label={`${tile.title}: ${toggle.label}`}
-            options={toggle.options}
-            value={option}
-            onChange={onOption}
-          />
-        )}
-      </header>
+      {!explorerFocus && (
+        <header className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b px-4 py-2">
+          <div className="flex min-w-0 items-center gap-3">
+            <button
+              ref={backRef}
+              type="button"
+              onClick={onBack}
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-hidden"
+              aria-label={
+                context.selectedActivityId
+                  ? `Back to ${tile.title}`
+                  : 'Back to stats dashboard'
+              }
+            >
+              <ArrowLeft aria-hidden="true" className="size-4" />
+              Back
+            </button>
+            <h1 className="text-base font-medium">{tile.title}</h1>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {toggle && (
+              <FaceSwitch
+                label={`${tile.title}: ${toggle.label}`}
+                options={toggle.options}
+                value={option}
+                onChange={onOption}
+              />
+            )}
+          </div>
+        </header>
+      )}
       <div
         ref={retainScroll}
         data-stats-focus-scroll
-        className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4"
+        className={cn(
+          'min-h-0 flex-1 overflow-y-auto overscroll-y-contain',
+          explorerFocus ? 'px-4 py-3' : 'p-4',
+        )}
       >
         <div
           className={cn(
@@ -673,13 +674,46 @@ export function TileFocusView({
                 : 'max-w-7xl',
           )}
         >
-          {view.expandedPeriod !== null && (
+          {!explorerFocus && view.expandedPeriod !== null && (
             <p className="mb-2 text-xs text-muted-foreground">
               {view.expandedPeriod ?? view.period(context, option)}
             </p>
           )}
           {view.detail ? (
-            view.detail(context, option)
+            view.detail(
+              explorerFocus
+                ? {
+                    ...context,
+                    focusControls: {
+                      back: (
+                        <button
+                          ref={backRef}
+                          type="button"
+                          onClick={onBack}
+                          aria-label={
+                            context.selectedActivityId
+                              ? `Back to ${tile.title}`
+                              : 'Back to stats dashboard'
+                          }
+                          className="flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted focus-visible:outline-2 focus-visible:outline-ring"
+                        >
+                          <ArrowLeft aria-hidden="true" className="size-4" />
+                        </button>
+                      ),
+                      metric: toggle ? (
+                        <FaceSwitch
+                          descriptive
+                          label={`${tile.title}: ${toggle.label}`}
+                          options={toggle.options}
+                          value={option}
+                          onChange={onOption}
+                        />
+                      ) : null,
+                    },
+                  }
+                : context,
+              option,
+            )
           ) : (
             <div
               className={cn(
@@ -711,11 +745,13 @@ function FaceSwitch({
   options,
   value,
   onChange,
+  descriptive = false,
 }: {
   label: string;
   options: readonly string[];
   value: string | undefined;
   onChange: (value: string) => void;
+  descriptive?: boolean;
 }) {
   const { metricUnit } = statsFormat(useDisplayUnits());
   return (
@@ -726,13 +762,35 @@ function FaceSwitch({
       onChange={onChange}
       compact
       accessibleLabel={(option) => optionLabels[option] ?? option}
-      visibleLabel={(option) =>
-        option === 'distance'
-          ? metricUnit.distance
-          : option === 'elevation'
-            ? metricUnit.elevation
-            : (faceOptionLabels[option] ?? option)
-      }
+      visibleLabel={(option) => {
+        const shortLabel =
+          option === 'distance'
+            ? metricUnit.distance
+            : option === 'elevation'
+              ? metricUnit.elevation
+              : (faceOptionLabels[option] ?? option);
+        const fullLabel =
+          (
+            {
+              distance: 'Distance',
+              time: 'Time',
+              elevation: 'Elevation',
+              count: 'Activities',
+            } as Record<string, string>
+          )[option] ??
+          optionLabels[option] ??
+          option;
+        return descriptive ? (
+          <>
+            <span className="hidden text-xs @min-[320px]:inline">
+              {fullLabel}
+            </span>
+            <span className="@min-[320px]:hidden">{shortLabel}</span>
+          </>
+        ) : (
+          shortLabel
+        );
+      }}
     />
   );
 }

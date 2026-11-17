@@ -132,7 +132,7 @@ struct FilterPanel: View {
         switch part {
         case .text: Section { textFilters }
         case .selection: Section { selectionFilter }
-        case .sports: activitySection
+        case .sports: if scope == .stats { statsSection } else { activitySection }
         case .dates: dateSection
         case .distance, .duration, .elevation: metricsSection([part]).id(store.filterResetRevision)
         case .details: binarySection
@@ -140,6 +140,7 @@ struct FilterPanel: View {
     }
 
     @ViewBuilder private var full: some View {
+        if scope == .stats { statsSection } else {
         Section {
             textFilters
             if scope != .stats { selectionFilter }
@@ -148,12 +149,13 @@ struct FilterPanel: View {
         if scope != .stats { dateSection }
         metricsSection([.distance, .duration, .elevation]).id(store.filterResetRevision)
         binarySection
+        }
     }
 
     private var summaryHeader: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
-                Text(AppMessages.filtersResultCount(count, store.activities.count, locale: locale))
+                Text(resultCountLabel)
                     .font(.subheadline.weight(.semibold))
                     .accessibilityValue(Text(AppMessages.filtersActiveCount(activeCount, locale: locale)))
                     .accessibilityIdentifier("filter-result-count")
@@ -176,8 +178,13 @@ struct FilterPanel: View {
         }
     }
 
+    private var resultCountLabel: String {
+        scope == .stats ? String(localized: AppMessages.filtersSportCount(store.statsSports.count, ActivityCategory.allCases.count, locale: locale))
+            : String(localized: AppMessages.filtersResultCount(count, store.activities.count, locale: locale))
+    }
+
     private var resultSummary: String {
-        let total = String(localized: AppMessages.filtersResultCount(count, store.activities.count, locale: locale))
+        let total = resultCountLabel
         return activeCount > 0 ? "\(total) · \(activeCount) active" : total
     }
 
@@ -211,6 +218,25 @@ struct FilterPanel: View {
                 Spacer(minLength: 0)
             }
             .accessibilityIdentifier("active-text-filters")
+        }
+    }
+
+    private var statsSection: some View {
+        Section {
+            ForEach(ActivityCategory.allCases) { category in
+                Toggle(isOn: Binding(get: { store.statsSports.contains(category) }, set: { selected in
+                    if selected { store.statsSports.insert(category) }
+                    else { store.statsSports.remove(category) }
+                })) {
+                    Label { Text(category.name) } icon: { BrowseSportSymbol(category: category) }
+                }
+                .accessibilityIdentifier("stats-sport-group-\(category.rawValue)")
+                .contextMenu {
+                    Button(String(localized: AppMessages.filtersOnlyGroup(category.name, locale: locale))) { store.statsSports = [category] }
+                }
+            }
+        } header: {
+            Text(AppMessages.filtersSports(locale: locale))
         }
     }
 
@@ -265,7 +291,7 @@ struct FilterPanel: View {
             }
         } header: {
             // A popover already titles its single part.
-            if part == nil { Text("Sports") }
+            if part == nil { Text(AppMessages.filtersSports(locale: locale)) }
         }
     }
 
@@ -417,7 +443,7 @@ enum FilterPart: CaseIterable, Identifiable {
         switch self {
         case .text: "Text and place"
         case .selection: "Selected activities"
-        case .sports: "Sports"
+        case .sports: String(localized: AppMessages.filtersSports())
         case .dates: "Dates"
         case .distance: "Distance"
         case .duration: "Duration"
@@ -441,7 +467,7 @@ enum FilterPart: CaseIterable, Identifiable {
 
     /// Stats measures its own periods, so it has no date filter.
     static func available(in scope: FilterScope) -> [FilterPart] {
-        allCases.filter { scope != .stats || ($0 != .dates && $0 != .selection) }
+        scope == .stats ? [.sports] : allCases
     }
 
     /// Matches the parts `ActivityStore.activeFilterCount` counts.
@@ -463,7 +489,7 @@ enum FilterScope {
     case browsing, stats
 
     @MainActor func reset(_ store: ActivityStore) {
-        if self == .stats { store.resetStatsActivityFilters() }
+        if self == .stats { store.resetStatsScope() }
         else { store.resetFilters() }
     }
 }
@@ -472,6 +498,7 @@ enum FilterScope {
 /// Keep it available in both full-panel and rail presentations; the store's
 /// reset revision invalidates draft editors without unnecessary filter work.
 struct FilterResetButton: View {
+    @Environment(\.locale) private var locale
     let store: ActivityStore
     let scope: FilterScope
     var iconOnly = false
@@ -483,7 +510,7 @@ struct FilterResetButton: View {
                     .contentShape(Rectangle())
             } else { Text("Reset").frame(minHeight: AppTheme.minimumTarget) }
         }
-        .accessibilityLabel(scope == .stats ? "Reset Stats activity filters" : "Reset all filters")
+        .accessibilityLabel(scope == .stats ? String(localized: AppMessages.filtersResetStatsScope(locale: locale)) : "Reset all filters")
         .accessibilityIdentifier("filter-reset")
     }
 }

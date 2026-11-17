@@ -1,37 +1,41 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
-import { useMemo } from 'react';
 
-import { filterStatsActivities } from '~/lib/stats/filter-scope';
-import { isStatsRoute } from '~/lib/stats/route';
+import { workspaceFor } from '~/lib/workspace';
 import { useShallowStore } from '~/store';
 import { activeFilterCount } from '~/store/filter';
 
 import { useBrowsingIDs } from './use-browsing-activities';
-import { useBrowsingLibrary } from './use-browsing-library';
-import { useDeferredActivityFilters } from './use-deferred-activity-filters';
+import { useOptionalBrowsingLibrary } from './use-browsing-library';
 
-/** Restrictions in force for the current page: stats ignore the reporting
- * period and "only selected", so those never inflate its count. */
+const emptyIDs: number[] = [];
+
+/** Each workspace counts only its own restrictions. */
 export function useActiveFilterCount() {
-  const scope = isStatsRoute(usePathname()) ? 'stats' : 'browse';
-  return useShallowStore((state) => activeFilterCount(state, scope));
+  const stats = workspaceFor(usePathname()) === 'stats';
+  return useShallowStore((state) =>
+    stats
+      ? Object.values(state.statsSports).every(Boolean)
+        ? 0
+        : 1
+      : activeFilterCount(state),
+  );
 }
 
-/** "N of M activities": what the current page shows out of the whole library.
- * Undefined until the library has loaded. */
+/** Stats counts sports; activities counts matching rows after loading. */
 export function useFilterResultCount() {
-  const stats = isStatsRoute(usePathname());
-  const { query, filterIDs } = useBrowsingLibrary();
-  const browsing = useBrowsingIDs(filterIDs);
-  const filters = useDeferredActivityFilters();
-  const data = query.data;
-  const statsShown = useMemo(
-    () =>
-      stats && data ? filterStatsActivities(data, filters).length : undefined,
-    [stats, data, filters],
-  );
+  const stats = workspaceFor(usePathname()) === 'stats';
+  const library = useOptionalBrowsingLibrary();
+  const browsing = useBrowsingIDs(library?.filterIDs ?? emptyIDs);
+  const sports = useShallowStore((state) => state.statsSports);
+  const data = library?.query.data;
+  if (stats)
+    return {
+      shown: Object.values(sports).filter(Boolean).length,
+      total: Object.keys(sports).length,
+      unit: 'sports',
+    };
   if (!data) return undefined;
-  return { shown: statsShown ?? browsing.length, total: data.length };
+  return { shown: browsing.length, total: data.length, unit: 'activities' };
 }

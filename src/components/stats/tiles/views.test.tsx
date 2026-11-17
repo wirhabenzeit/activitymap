@@ -45,13 +45,14 @@ void test('the shared capability matrix matches actual visible and expandable we
   );
 });
 
-void test('wide Training volume exposes totals and Records exposes both ranges', () => {
+void test('Training volume keeps totals optional and Records exposes both ranges', () => {
   const wide = { ...context, focusWidth: 1100 };
   const volume = renderToStaticMarkup(
     tileView('weeklyVolume')!.detail!(wide, 'distance') as ReactElement,
   );
   assert.match(volume, /Period totals by sport/);
-  assert.doesNotMatch(volume, /<details/);
+  assert.match(volume, /<details[^>]*data-explorer-data/);
+  assert.doesNotMatch(volume, /<details[^>]* open/);
   const records = renderToStaticMarkup(
     tileView('records')!.detail!(wide, undefined) as ReactElement,
   );
@@ -63,7 +64,8 @@ void test('wide Training volume exposes totals and Records exposes both ranges',
     tileView('weeklyVolume')!.detail!(context, 'distance') as ReactElement,
   );
   assert.match(narrow, /Period totals by sport/);
-  assert.doesNotMatch(narrow, /<details/);
+  assert.match(narrow, /<details[^>]*data-explorer-data/);
+  assert.doesNotMatch(narrow, /<details[^>]* open/);
 });
 
 const today = dayFromISODate('2026-09-01');
@@ -195,17 +197,21 @@ void test('period insights expose daily drill-down and comparable monthly totals
     selectedActivityId: 10,
   };
   const month = renderToStaticMarkup(
-    tileView('monthVsLastMonth')!.insight!(sample, 'distance') as ReactElement,
+    tileView('monthVsLastMonth')!.detail!(sample, 'distance') as ReactElement,
   );
-  assert.match(month, /Your month, day by day/);
-  assert.match(month, /31: 1 activity, 6 mi/);
+  assert.match(month, /Cumulative monthly totals and daily activity/);
+  assert.match(month, /Aug 31: 6 mi/);
   assert.match(month, /data-stats-activity-id="10"[^>]*aria-current="true"/);
   const year = renderToStaticMarkup(
-    tileView('yearToDate')!.insight!(sample, 'distance') as ReactElement,
+    tileView('yearToDate')!.detail!(sample, 'distance') as ReactElement,
   );
-  assert.match(year, /Your year, month by month/);
-  assert.match(year, /aria-label="Aug 2026: 6 mi"/);
-  assert.match(year, /aria-label="Aug 2025: 0 mi"/);
+  assert.match(
+    year,
+    /Cumulative yearly totals and monthly activity comparison/,
+  );
+  assert.match(year, /Aug 2026: 6 mi/);
+  assert.match(year, /Your first recorded year/);
+  assert.doesNotMatch(year, /previous year: 0 mi/);
   assert.doesNotMatch(year, /Sep 2026:/);
 });
 
@@ -362,7 +368,8 @@ void test('expanded training history exposes bounded presets and period totals',
   assert.doesNotMatch(html, /role="combobox"/);
   assert.match(html, /2\.0 h/);
   assert.match(html, /Period totals/);
-  assert.doesNotMatch(html, /<details|<summary/);
+  assert.match(html, /<details[^>]*data-explorer-data/);
+  assert.doesNotMatch(html, /<details[^>]* open/);
   assert.doesNotMatch(html, /Latest week incomplete/);
   assert.match(html, /Period totals by sport/);
   assert.match(html, /scope="col"[^>]*>Ride/);
@@ -408,10 +415,9 @@ void test('calendar history scrolls across years, and mixed days stay identifiab
 void test('month and year expansion retain the current-period comparison without navigation', () => {
   for (const id of ['yearToDate', 'monthVsLastMonth'] as const) {
     const view = tileView(id)!;
-    assert.equal(
+    assert.ok(
       view.detail,
-      undefined,
-      'expansion must reuse the current summary and chart',
+      'expansion connects the comparison to period selection',
     );
     for (const option of ['distance', 'time', 'elevation', 'count']) {
       const summary = view.summary(context, option)!;
@@ -488,7 +494,7 @@ void test('hilliness details retain names and activity links, exclude short/out-
     onOpenActivity: () => undefined,
   };
   const html = renderToStaticMarkup(
-    view.more!(sample, undefined) as ReactElement,
+    view.detail!(sample, undefined) as ReactElement,
   );
   assert.match(html, /<button/);
   assert.match(html, /Steep hike/);
@@ -502,9 +508,9 @@ void test('hilliness details retain names and activity links, exclude short/out-
   );
   assert.doesNotMatch(delta, /text-green|text-orange/);
   const empty = renderToStaticMarkup(
-    view.more!({ ...sample, activities: [] }, undefined) as ReactElement,
+    view.detail!({ ...sample, activities: [] }, undefined) as ReactElement,
   );
-  assert.match(empty, /No qualifying activities/);
+  assert.match(empty, /No activities with recorded distance and ascent/);
 });
 
 void test('sport mix names every represented sport and retains useful phone details', () => {
@@ -647,4 +653,237 @@ void test('short-workout bar axes render a distinct half-hour tick', () => {
     }),
   );
   assert.match(html, />0\.5<\/text>/);
+});
+
+void test('expanded month retains empty leap days and disables future dates', () => {
+  const reportingDay = dayFromISODate('2024-02-10');
+  const html = renderToStaticMarkup(
+    tileView('monthVsLastMonth')!.detail!(
+      { ...context, today: reportingDay, activities: [] },
+      'distance',
+    ) as ReactElement,
+  );
+  assert.equal((html.match(/data-explorer-period=/g) ?? []).length, 29);
+  assert.equal((html.match(/aria-disabled="true"/g) ?? []).length, 19);
+  assert.match(
+    html,
+    new RegExp(
+      `aria-pressed="true"[^>]*data-explorer-period="${reportingDay}"`,
+    ),
+  );
+  assert.match(html, /No matching activities in this period/);
+  assert.doesNotMatch(html, /NaN|Infinity/);
+});
+
+void test('expanded hilliness uses measured values within one sport and links the selected month', () => {
+  const sample: TileContext = {
+    ...context,
+    units: 'imperial',
+    onOpenActivity: () => undefined,
+    activities: [
+      {
+        ...make('2026-08-01', 'ride'),
+        id: 1,
+        name: 'Measured ride',
+        distance: 100000,
+        total_elevation_gain: 1000,
+      },
+      {
+        ...make('2026-08-02', 'ride'),
+        id: 2,
+        name: 'Unknown ascent',
+        distance: 1000000,
+        total_elevation_gain: null,
+      },
+      {
+        ...make('2026-08-03', 'trailHike'),
+        id: 3,
+        name: 'Steep hike',
+        distance: 5000,
+        total_elevation_gain: 1000,
+      },
+      {
+        ...make('2025-08-01', 'ride'),
+        id: 4,
+        name: 'Flat ride',
+        distance: 100000,
+        total_elevation_gain: 0,
+      },
+    ],
+  };
+  const html = renderToStaticMarkup(
+    tileView('distanceVsElevation')!.detail!(sample, undefined) as ReactElement,
+  );
+  const { formatHilliness, hillinessUnit } = statsFormat('imperial');
+  assert.match(html, new RegExp(formatHilliness(10).replace('.', '\\.')));
+  assert.match(html, /ft \/ mi/);
+  assert.match(html, /Measured ride/);
+  assert.doesNotMatch(html, /Unknown ascent|Steep hike|Flat ride/);
+  assert.match(html, /data-stats-activity-id="1"/);
+  assert.match(
+    html,
+    new RegExp(`Previous 12 months: ${formatHilliness(0)} ${hillinessUnit}`),
+  );
+  assert.doesNotMatch(html, /NaN|Infinity/);
+});
+
+void test('month hierarchy tells the comparison story and keeps history secondary', () => {
+  const html = renderToStaticMarkup(
+    tileView('monthVsLastMonth')!.detail!(
+      {
+        ...context,
+        today: dayFromISODate('2026-09-22'),
+        activities: [
+          { ...make('2026-09-22', 'ride'), distance: 155000 },
+          { ...make('2026-08-01', 'ride'), distance: 18000 },
+        ],
+      },
+      'distance',
+    ) as ReactElement,
+  );
+  assert.match(html, /<h1[^>]*>September 2026<\/h1>/);
+  assert.match(html, /155 km/);
+  assert.match(html, /through Sep 22/);
+  assert.match(html, /137 km ahead of August at this point/);
+  assert.match(html, /Distance accumulated/);
+  assert.match(html, /Daily distance/);
+  assert.doesNotMatch(html, /746%|Shaded:/);
+  assert.match(html, /Historical range/);
+  assert.match(html, /checked=""/);
+  assert.equal((html.match(/data-comparison-row=/g) ?? []).length, 12);
+  assert.match(html, /Show data/);
+  assert.doesNotMatch(html, /<details[^>]* open/);
+  assert(
+    html.indexOf('Selected day activities') <
+      html.indexOf('Monthly comparisons'),
+  );
+});
+
+void test('month comparison avoids a rounded zero lead or deficit', () => {
+  for (const delta of [-200, 200]) {
+    const html = renderToStaticMarkup(
+      tileView('monthVsLastMonth')!.detail!(
+        {
+          ...context,
+          today: dayFromISODate('2026-09-22'),
+          activities: [
+            { ...make('2026-09-22', 'ride'), distance: 10000 + delta },
+            { ...make('2026-08-01', 'ride'), distance: 10000 },
+          ],
+        },
+        'distance',
+      ) as ReactElement,
+    );
+    assert.match(html, /About level with August at this point/);
+    assert.doesNotMatch(html, /0 km ahead|0 km behind/);
+  }
+});
+
+void test('month chart labels reporting date, future dates and pinned day separately', () => {
+  const html = renderToStaticMarkup(
+    tileView('monthVsLastMonth')!.detail!(
+      {
+        ...context,
+        today: dayFromISODate('2026-09-22'),
+        activities: [
+          { ...make('2026-09-22', 'ride'), id: 1, distance: 15000 },
+          { ...make('2026-09-22', 'ride'), id: 2, distance: 32000 },
+        ],
+      },
+      'distance',
+    ) as ReactElement,
+  );
+  assert.match(html, /As of Sep 22/);
+  assert.match(html, /Future days/);
+  assert.equal((html.match(/data-future-region=/g) ?? []).length, 1);
+  assert.doesNotMatch(html, /data-future-strip/);
+  assert.match(html, /data-selected-date/);
+  assert.match(html, /data-selected-day-highlight[^>]*stroke="none"/);
+  assert.match(html, /data-current-endpoint/);
+  assert.match(html, /Sep · 47 km/);
+  assert.match(html, /Sep 22 · 47 km · 2 activities/);
+  assert.doesNotMatch(html, /Select a day to see its activities/);
+  assert.equal((html.match(/data-explorer-period=/g) ?? []).length, 30);
+});
+
+void test('year hierarchy aligns its cumulative trend and monthly comparison before history', () => {
+  const html = renderToStaticMarkup(
+    tileView('yearToDate')!.detail!(
+      {
+        ...context,
+        today: dayFromISODate('2026-09-22'),
+        activities: [
+          { ...make('2026-09-22', 'ride'), distance: 155000 },
+          { ...make('2025-09-01', 'ride'), distance: 18000 },
+          make('2024-01-01', 'ride'),
+          make('2023-01-01', 'ride'),
+        ],
+      },
+      'distance',
+    ) as ReactElement,
+  );
+  assert.match(html, /<h1[^>]*>2026 so far<\/h1>/);
+  assert.match(html, /137 km ahead of 2025 at this point/);
+  assert.match(html, /aria-label="Comparison year"/);
+  assert.match(html, /Historical range/);
+  assert.match(html, /data-explorer-band/);
+  assert.match(html, /stroke-width="3.25"/);
+  assert.match(html, /data-current-endpoint/);
+  assert.match(html, /As of Sep 22/);
+  assert.match(html, /Rest of year/);
+  assert.match(html, /Monthly distance/);
+  assert.match(html, /Sep 2026: 155 km; 2025: 18 km/);
+  assert.match(html, /data-selected-date="true"[^>]*>Sep<\/text>/);
+  assert.match(html, /Sep 2026 · 155 km · 1 activity/);
+  assert.equal((html.match(/data-comparison-row=/g) ?? []).length, 4);
+  assert(
+    html.indexOf('Selected month activities') <
+      html.indexOf('Yearly comparisons'),
+  );
+  assert.doesNotMatch(html, /grid-cols-\[|NaN|Infinity|data-future-strip/);
+});
+
+void test('volume and hilliness put a single chart before the selected period details', () => {
+  for (const [id, title, region] of [
+    ['weeklyVolume', 'Training volume', 'Selected period activities'],
+    ['distanceVsElevation', 'Hilliness', 'Selected month hilliness'],
+  ] as const) {
+    const html = renderToStaticMarkup(
+      tileView(id)!.detail!(context, 'distance') as ReactElement,
+    );
+    assert.match(html, new RegExp(`<h1[^>]*>${title}</h1>`));
+    assert.match(html, /data-selected-date="true"/);
+    assert(
+      html.indexOf('data-explorer-chart') <
+        html.indexOf(`aria-label="${region}"`),
+    );
+    assert.doesNotMatch(html, /grid-cols-\[|rounded-lg border|NaN|Infinity/);
+  }
+  const hilliness = renderToStaticMarkup(
+    tileView('distanceVsElevation')!.detail!(
+      context,
+      undefined,
+    ) as ReactElement,
+  );
+  assert.match(hilliness, /Dashed: your distance-weighted average/);
+  assert.match(hilliness, /Measured activities/);
+});
+
+void test('empty hilliness retains its page heading and back control', () => {
+  const html = renderToStaticMarkup(
+    tileView('distanceVsElevation')!.detail!(
+      {
+        ...context,
+        activities: [],
+        focusControls: {
+          back: createElement('button', null, 'Back to stats'),
+          metric: null,
+        },
+      },
+      undefined,
+    ) as ReactElement,
+  );
+  assert.match(html, /Back to stats/);
+  assert.match(html, /<h1[^>]*>Hilliness<\/h1>/);
+  assert.match(html, /No activities with recorded distance and ascent/);
 });

@@ -1,25 +1,10 @@
 import Foundation
 import Observation
 
-/// All non-date predicates participate in the cache key. Date, selection,
-/// sorting/density, chart dimensions and map camera deliberately do not.
+/// Stats cache identity depends only on its independent sport-group scope.
 struct StatsFilterScope: Hashable {
-    let sports: Set<SportType>
-    let search: String
-    let place: PlaceFilter?
-    let distance: NumericFilter?
-    let elevation: NumericFilter?
-    let elapsed: NumericFilter?
-    let commute: Bool?
-    let isPrivate: Bool?
-    let flagged: Bool?
-    init(_ store: ActivityStore) {
-        sports = store.activeSportTypes
-        search = store.searchText.trimmingCharacters(in: .whitespacesAndNewlines).precomposedStringWithCanonicalMapping.lowercased()
-        place = store.selectedPlace
-        distance = store.distanceFilter; elevation = store.elevationFilter; elapsed = store.durationFilter
-        commute = store.commuteOnly; isPrivate = store.privateFilter; flagged = store.flaggedFilter
-    }
+    let sports: Set<ActivityCategory>
+    init(_ store: ActivityStore) { sports = store.statsSports }
 }
 
 /// History completeness is separate from measured totals. Consumers may draw

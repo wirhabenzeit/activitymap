@@ -142,9 +142,17 @@ import Testing
                 let args = row["args"] as! [String: Any]
                 store.stats.refreshToday(now: StatsDates.date(StatsDates.day(args["today"] as? String ?? fixture["today"] as! String)), timeZone: .gmt)
                 store.resetFilters()
-                if let filter = args["filter"] as? [String: Any] { StatsFixtureTests.apply(filter, to: store) }
+                let queryStore: ActivityStore
+                if let filter = args["filter"] as? [String: Any] {
+                    // Historical parity vectors pin activity-filter semantics.
+                    // Supply that subset as the library; Stats has its own scope.
+                    StatsFixtureTests.apply(filter, to: store)
+                    store.dateDayRange = nil
+                    queryStore = ActivityStore(activities: store.filteredActivities)
+                    queryStore.stats.refreshToday(now: StatsDates.date(store.stats.reportingDay), timeZone: .gmt)
+                } else { queryStore = store }
                 let option = StatsToggleOption(rawValue: args["metric"] as? String ?? "distance")
-                guard case .dashboard(let result) = await store.stats.result(.dashboard(tile, option), for: store) else {
+                guard case .dashboard(let result) = await queryStore.stats.result(.dashboard(tile, option), for: queryStore) else {
                     Issue.record("Missing dashboard query"); continue
                 }
                 let comparison: StatsPeriodComparison
@@ -176,10 +184,13 @@ import Testing
         #expect(state.option(.activityCalendar) == .elevation && state.expandedTile == .activityCalendar)
         let selection = store.selectedActivityIDs, dates = store.dateDayRange
         store.searchText = "no matching name"
+        #expect(state.result(.yearToDate, source: StatsDashboardSource(store)) != nil)
+        store.statsSports = []
         #expect(state.result(.yearToDate, source: StatsDashboardSource(store)) == nil)
         #expect(StatsPresentation(store: store, preparing: false).state == .noMatches)
         FilterScope.stats.reset(store)
         #expect(store.dateDayRange == dates && store.selectedActivityIDs == selection)
+        #expect(store.searchText == "no matching name")
         await Self.load(state, store)
         #expect(state.option(.activityCalendar) == .elevation)
         #expect(store.stats.retainedResultCount <= 16)
@@ -318,6 +329,8 @@ import Testing
         #expect(state.result(tile.id, source: source) != nil)
         #expect(store.stats.aggregationCount == 1 && store.stats.calculationCount == StatsDashboard.tiles.count + 1)
         store.searchText = "Ride"
+        #expect(state.face(tile.id, source: StatsDashboardSource(store))?.option == .time)
+        store.statsSports = [.ride]
         #expect(state.face(tile.id, source: StatsDashboardSource(store)) == nil)
         store.searchText = ""
         store.clearScope()
@@ -330,6 +343,8 @@ import Testing
         #expect(StatsPresentation(store: empty, preparing: false).state == .noHistory)
         let (store, _) = try Self.fixture()
         store.activeSportTypes = []
+        #expect(StatsPresentation(store: store, preparing: false).state == .ready)
+        store.statsSports = []
         #expect(StatsPresentation(store: store, preparing: false).state == .noMatches)
         #expect(!StatsPresentation(store: store, preparing: false).hasContent)
     }

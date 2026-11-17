@@ -3151,6 +3151,31 @@
         "other": "{count} activities fetched. Older history, details and photos continue in the background."
       }
     },
+    "filters.sports": {
+      "source": "Sports",
+      "arguments": {},
+      "context": "Sport-group scope heading in the Stats sidebar."
+    },
+    "filters.sportCount": {
+      "source": "{shown} of {total} sports",
+      "arguments": {
+        "shown": "number",
+        "total": "number"
+      },
+      "context": "Selected sport groups in the Stats workspace."
+    },
+    "filters.resetStatsScope": {
+      "source": "Reset Stats sport scope",
+      "arguments": {},
+      "context": "Accessible label for resetting the independent Stats sport scope."
+    },
+    "filters.groupOptions": {
+      "source": "{group} options",
+      "arguments": {
+        "group": "string"
+      },
+      "context": "Menu with sport-group actions such as Only this sport."
+    },
     "filters.onlyGroup": {
       "source": "Only {group}",
       "arguments": {

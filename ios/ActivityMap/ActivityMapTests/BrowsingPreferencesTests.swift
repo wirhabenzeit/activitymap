@@ -6,6 +6,66 @@ import Testing
 struct BrowsingPreferencesTests {
     private func isolated() -> UserDefaults { UserDefaults(suiteName: "browsing-tests-\(UUID())")! }
 
+    @Test func statsScopeMigratesOncePersistsAndResetsIndependently() {
+        let defaults = isolated()
+        var filters = ActivityFilterState()
+        filters.activeSportTypes = [.trailRun]
+        let legacy = BrowsingPreferences(defaults: defaults)
+        legacy.activate(Fixtures.scope)
+        legacy.save(filters: filters)
+        let store = ActivityStore(browsingDefaults: defaults)
+        store.restoreBrowsingScope(Fixtures.scope)
+        #expect(store.statsSports == [.trailHike])
+        store.activeSportTypes = [.ride]
+        #expect(store.statsSports == [.trailHike])
+        store.statsSports = []
+        let relaunched = ActivityStore(browsingDefaults: defaults)
+        relaunched.restoreBrowsingScope(Fixtures.scope)
+        #expect(relaunched.statsSports.isEmpty && relaunched.activeSportTypes == [.ride])
+        relaunched.resetStatsScope()
+        #expect(relaunched.statsSports == Set(ActivityCategory.allCases))
+        #expect(relaunched.activeSportTypes == [.ride])
+        relaunched.statsSports = [.run]
+        relaunched.restoreBrowsingScope(StoreScope(deployment: Fixtures.scope.deployment, userID: "bob"))
+        #expect(relaunched.statsSports == Set(ActivityCategory.allCases))
+    }
+
+    @Test func readingStatsScopeDoesNotWritePreferencesOrFollowActivityFilters() {
+        let defaults = isolated()
+        let store = ActivityStore(browsingDefaults: defaults)
+        store.restoreBrowsingScope(Fixtures.scope)
+        let key = "browsing.v1." + StoreScope.key([Fixtures.scope.key, "statsSports"])
+        defaults.removeObject(forKey: key)
+        let initial = store.statsSports
+        store.activeSportTypes = [.run]
+        #expect(store.statsSports == initial)
+        #expect(defaults.object(forKey: key) == nil)
+        store.statsSports = [.ride]
+        #expect(defaults.array(forKey: key) as? [String] == [ActivityCategory.ride.rawValue])
+    }
+
+    @Test func statsScopeSanitizesSavedGroupsAndEmptyMigration() {
+        let defaults = isolated(), prefs = BrowsingPreferences(defaults: isolated())
+        prefs.activate(Fixtures.scope)
+        #expect(prefs.statsSports(fallback: [.run]) == [.run])
+        let key = "browsing.v1." + StoreScope.key([Fixtures.scope.key, "statsSports"])
+        let saved = BrowsingPreferences(defaults: defaults)
+        saved.activate(Fixtures.scope)
+        defaults.set(["unknown"], forKey: key)
+        #expect(saved.statsSports(fallback: [.run]) == [.run])
+        defaults.set([ActivityCategory.ride.rawValue, "unknown"], forKey: key)
+        #expect(saved.statsSports(fallback: [.run]) == [.ride])
+        saved.save(statsSports: [])
+        #expect(saved.statsSports(fallback: [.run]).isEmpty)
+        saved.remove(scope: Fixtures.scope)
+        var filters = ActivityFilterState()
+        filters.activeSportTypes = []
+        saved.save(filters: filters)
+        let store = ActivityStore(browsingDefaults: defaults)
+        store.restoreBrowsingScope(Fixtures.scope)
+        #expect(store.statsSports == Set(ActivityCategory.allCases))
+    }
+
     @Test func relaunchRestoresFiltersAndCameraWithoutSelectionOrInspection() throws {
         let defaults = isolated()
         let activity = try StoredModelMapper.activity(Fixtures.activity(["id": "1", "name": "Trail hike", "private": false]))

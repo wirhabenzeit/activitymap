@@ -30,6 +30,12 @@ import {
   createNotificationSlice,
 } from './notifications';
 import { type SelectionSlice, createSelectionSlice } from './selection';
+import {
+  type StatsScopeSlice,
+  createStatsScopeSlice,
+  initialStatsSports,
+  sanitizeStatsSports,
+} from './stats-scope';
 
 // Combine all slice types into the root state type
 export type RootState = ListSlice &
@@ -37,6 +43,7 @@ export type RootState = ListSlice &
   MapSlice &
   ActivitySlice &
   FilterSlice &
+  StatsScopeSlice &
   AuthSlice &
   NotificationSlice;
 
@@ -48,6 +55,7 @@ type PersistedUiState = Pick<
   | 'threeDim'
   | 'showPhotos'
   | 'showPlaces'
+  | 'statsSports'
   | 'sportType'
   | 'sportGroup'
   | 'dateRange'
@@ -151,6 +159,7 @@ export const store = create<RootState>()(
         ...createMapSlice(set, get, store),
         ...createActivitySlice(set, get, store),
         ...createFilterSlice(set, get, store),
+        ...createStatsScopeSlice(set, get, store),
         ...createAuthSlice(set, get, store),
         ...createNotificationSlice(set, get, store),
       })),
@@ -167,6 +176,7 @@ export const store = create<RootState>()(
           threeDim: state.threeDim,
           showPhotos: state.showPhotos,
           showPlaces: state.showPlaces,
+          statsSports: state.statsSports,
           sportType: state.sportType,
           sportGroup: state.sportGroup,
           dateRange: state.dateRange,
@@ -221,6 +231,10 @@ export const store = create<RootState>()(
               typeof persisted.showPlaces === 'boolean'
                 ? persisted.showPlaces
                 : currentState.showPlaces,
+            statsSports: sanitizeStatsSports(
+              persisted.statsSports,
+              initialStatsSports(sportType),
+            ),
             sportType,
             sportGroup: deriveSportGroups(sportType),
             dateRange: sanitizePersistedDateRange(persisted.dateRange),

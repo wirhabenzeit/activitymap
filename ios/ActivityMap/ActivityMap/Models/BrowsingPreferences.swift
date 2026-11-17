@@ -55,6 +55,16 @@ final class BrowsingPreferences {
         guard let scope, let data = try? JSONEncoder().encode(filters) else { return }
         defaults.set(data, forKey: key("filters", scope: scope))
     }
+    func statsSports(fallback: Set<ActivityCategory>) -> Set<ActivityCategory> {
+        guard let scope, let saved = defaults.array(forKey: key("statsSports", scope: scope)) as? [String] else { return fallback }
+        let known = saved.compactMap(ActivityCategory.init(rawValue:))
+        // Preserve an intentional empty selection; discard corrupt payloads.
+        return saved.isEmpty || !known.isEmpty ? Set(known) : fallback
+    }
+    func save(statsSports: Set<ActivityCategory>) {
+        guard let scope else { return }
+        defaults.set(statsSports.map(\.rawValue).sorted(), forKey: key("statsSports", scope: scope))
+    }
     func camera() -> MapCamera? {
         guard let scope, let data = defaults.data(forKey: key("camera", scope: scope)),
               let saved = try? JSONDecoder().decode(Camera.self, from: data) else { return nil }
@@ -65,6 +75,7 @@ final class BrowsingPreferences {
         defaults.set(data, forKey: key("camera", scope: scope))
     }
     func remove(scope: StoreScope) {
+        defaults.removeObject(forKey: key("statsSports", scope: scope))
         defaults.removeObject(forKey: key("filters", scope: scope))
         defaults.removeObject(forKey: key("camera", scope: scope))
     }

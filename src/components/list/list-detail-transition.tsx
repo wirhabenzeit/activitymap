@@ -142,9 +142,12 @@ function DetailPage({
 export function ListDetailTransition({
   children,
   detail,
+  overlayPanel = false,
   ...props
 }: DetailPageProps & {
   detail?: ReactNode;
+  // Stats preserves the timeline's width while its inspector is open.
+  overlayPanel?: boolean;
 }) {
   const reducedMotion = useReducedMotion();
   const open = detail != null;
@@ -193,7 +196,7 @@ export function ListDetailTransition({
       <motion.div
         className={cn(
           'flex h-full min-h-0 min-w-0 flex-col',
-          open && panel && 'mr-[clamp(420px,45%,520px)]',
+          open && panel && !overlayPanel && 'mr-[clamp(420px,45%,520px)]',
         )}
         inert={open && !panel}
         aria-hidden={open && !panel}

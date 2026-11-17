@@ -89,3 +89,16 @@ void test('sport and glyph adapters expose stable semantic identity', () => {
     'Average power',
   );
 });
+
+void test('Stats sport scope uses complete shared messages', () => {
+  assert.equal(message('filters.sports'), 'Sports');
+  assert.equal(
+    message('filters.sportCount', { shown: 2, total: 5 }),
+    '2 of 5 sports',
+  );
+  assert.equal(message('filters.resetStatsScope'), 'Reset Stats sport scope');
+  assert.equal(
+    message('filters.groupOptions', { group: 'Run' }),
+    'Run options',
+  );
+});

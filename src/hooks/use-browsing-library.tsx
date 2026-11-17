@@ -38,6 +38,10 @@ export function useHasBrowsingLibrary() {
   return useContext(BrowsingContext) !== null;
 }
 
+export function useOptionalBrowsingLibrary() {
+  return useContext(BrowsingContext);
+}
+
 export function useBrowsingLibrary() {
   const value = useContext(BrowsingContext);
   if (!value) throw new Error('Browsing consumers require BrowsingProvider');

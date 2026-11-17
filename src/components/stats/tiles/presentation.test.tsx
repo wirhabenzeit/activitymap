@@ -21,7 +21,7 @@ void test('imperial axes choose precision after conversion', () => {
     format.formatShort(0.4, 'distance', 0.2),
   );
 });
-void test('compact/standard choices retain labels, one tab stop, and the same target/selected contract', () => {
+void test('choices retain labels, one tab stop, selection, and touch targets with compact desktop metrics', () => {
   for (const compact of [false, true]) {
     const html = renderToStaticMarkup(
       createElement(StatsChoices, {
@@ -37,6 +37,12 @@ void test('compact/standard choices retain labels, one tab stop, and the same ta
     assert.equal((html.match(/tabindex="0"/g) ?? []).length, 1);
     assert.match(html, /aria-pressed="true"/);
     assert.equal((html.match(/min-h-11/g) ?? []).length, 2);
+    if (compact) {
+      assert.equal((html.match(/pointer-coarse:min-h-11/g) ?? []).length, 2);
+      assert.equal((html.match(/pointer-coarse:min-w-11/g) ?? []).length, 2);
+      assert.equal((html.match(/min-h-7/g) ?? []).length, 2);
+      assert.equal((html.match(/min-w-7/g) ?? []).length, 2);
+    }
   }
 });
 void test('summary and face share one projection derivation without retaining another library owner', () => {

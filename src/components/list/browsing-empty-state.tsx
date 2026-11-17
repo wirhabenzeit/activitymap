@@ -8,10 +8,10 @@ import { type FilterScope, activeFilterCount } from '~/store/filter';
 
 import { BrowsingEmptyView, browsingEmptyKind } from './browsing-empty-view';
 
-/** Stats keep the reporting period and "only selected"; list and map do not. */
+/** Recover only the current workspace scope. */
 export function useClearFilters(scope: FilterScope = 'browse') {
   return useShallowStore((state) =>
-    scope === 'stats' ? state.resetActivityFilters : state.resetFilters,
+    scope === 'stats' ? state.resetStatsScope : state.resetFilters,
   );
 }
 
@@ -52,7 +52,13 @@ export function BrowsingEmptyState({
   selectionHidden?: boolean;
   className?: string;
 }) {
-  const active = useShallowStore((state) => activeFilterCount(state, scope));
+  const active = useShallowStore((state) =>
+    scope === 'stats'
+      ? Object.values(state.statsSports).every(Boolean)
+        ? 0
+        : 1
+      : activeFilterCount(state),
+  );
   const onlySelectedHidden = useShallowStore(
     (state) =>
       scope === 'browse' && state.onlySelected && state.selected.length > 0,

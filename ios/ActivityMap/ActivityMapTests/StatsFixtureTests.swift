@@ -151,7 +151,13 @@ import Testing
                 let args = vector["args"] as! [String: Any]
                 Self.apply(args["filter"] as? [String: Any] ?? [:], to: store)
                 let scope = StatsFilterScope(store), dates = store.dateDayRange
-                let engine = try #require(await store.stats.engine(for: store))
+                // The historical corpus pins the activity filter, independent of Stats scope.
+                store.dateDayRange = nil
+                let engine = StatsEngine(activities: store.filteredActivities.map {
+                    StatsActivity(id: $0.id, name: $0.name, sport: $0.category, start: $0.startDateLocal,
+                                  distance: $0.distance, movingTime: $0.movingTime.map(Double.init), elevation: $0.totalElevationGain)
+                })
+                store.dateDayRange = dates
                 let today = StatsDates.day(args["today"] as? String ?? fixture["today"] as! String)
                 let actual = try Self.run(vector["operation"] as! String, engine: engine, today: today, args: args)
                 if vector["operation"] as? String == "filterActivities" {

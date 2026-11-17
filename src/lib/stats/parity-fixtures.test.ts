@@ -6,6 +6,7 @@ import { type z } from 'zod';
 
 import { type Activity } from '~/server/records';
 import { aliasMap } from '~/settings/category';
+import { applyFilters } from '~/store/filter';
 import {
   type FilterState,
   initializeBinary,
@@ -15,7 +16,6 @@ import {
 } from '~/store/filter';
 
 import { statsParitySchema } from '../../../scripts/lib/stats-parity-schema';
-import { filterStatsActivities } from './filter-scope';
 import { calendarDays, periodComparisons, volumeHistory } from './history';
 import { monthActivityRhythm, yearMonthlyRhythm } from './period-rhythm';
 import * as data from './tile-data';
@@ -310,7 +310,11 @@ for (const fixture of corpus.fixtures) {
       }));
       const state = vector.args.filter ? filterState(vector.args.filter) : null;
       const original = state ? structuredClone(state) : null;
-      const scoped = state ? filterStatsActivities(source, state) : source;
+      const scoped = state
+        ? source.filter((activity) =>
+            applyFilters({ ...state, dateRange: undefined }, activity),
+          )
+        : source;
       const activities = scoped.map((a) => ({
         ...a,
         sport: aliasMap[a.sport_type] ?? 'misc',
