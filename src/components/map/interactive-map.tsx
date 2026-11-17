@@ -10,6 +10,7 @@ import { useSearchParams } from 'next/navigation';
 import React, {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -221,11 +222,18 @@ const NO_SUMMARY_ACTIVITIES: never[] = [];
  * While the map is hidden behind another tab it keeps the last value it
  * showed, so library, filter and selection changes made elsewhere do not
  * re-tile routes nobody can see. It catches up once it is shown again.
+ *
+ * The value is remembered in a ref after each visible commit, never in state:
+ * inputs such as `data = []` defaults are a new array on every render, and a
+ * render-time `setState` latch on them re-rendered forever (React #301).
  */
 function useHeldWhileHidden<T>(value: T, active: boolean): T {
-  const [held, setHeld] = useState(value);
-  if (active && held !== value) setHeld(value);
-  return active ? value : held;
+  const held = useRef(value);
+  useLayoutEffect(() => {
+    if (active) held.current = value;
+  });
+  // eslint-disable-next-line react-hooks/refs -- read only while hidden, where the ref holds the last committed visible value
+  return active ? value : held.current;
 }
 
 /**
