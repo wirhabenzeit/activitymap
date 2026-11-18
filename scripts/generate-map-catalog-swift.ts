@@ -61,6 +61,8 @@ const rasterOverlaySchema = z
   })
   .strict();
 
+/** ISO 3166-1 alpha-2; clients draw the flag. */
+const countrySchema = z.string().regex(/^[A-Z]{2}$/);
 const catalogIDSchema = z.string().regex(/^[a-z][A-Za-z0-9]*$/);
 const catalogSchema = z
   .object({
@@ -72,6 +74,7 @@ const catalogSchema = z
         .object({
           id: catalogIDSchema,
           label: z.string().min(1),
+          country: countrySchema.optional(),
           maps: z.array(catalogIDSchema).min(1),
         })
         .strict(),
@@ -82,6 +85,7 @@ const catalogSchema = z
         .object({
           id: catalogIDSchema,
           label: z.string().min(1),
+          country: countrySchema.optional(),
           overlays: z.array(catalogIDSchema).min(1),
         })
         .strict(),
@@ -204,21 +208,23 @@ struct SharedRasterOverlayDefinition: Identifiable, Hashable, Sendable {
 struct SharedBaseMapGroup: Identifiable, Sendable {
     let id: String
     let label: String
+    let country: String?
     let maps: [String]
 }
 
 struct SharedOverlayGroup: Identifiable, Sendable {
     let id: String
     let label: String
+    let country: String?
     let overlays: [String]
 }
 
 enum SharedMapCatalog {
     static let overlayGroups: [SharedOverlayGroup] = [
-${catalog.overlayGroups.map((group) => `        .init(id: ${swiftString(group.id)}, label: ${swiftString(group.label)}, overlays: [${group.overlays.map(swiftString).join(', ')}])`).join(',\n')}
+${catalog.overlayGroups.map((group) => `        .init(id: ${swiftString(group.id)}, label: ${swiftString(group.label)}, country: ${swiftOptionalString(group.country)}, overlays: [${group.overlays.map(swiftString).join(', ')}])`).join(',\n')}
     ]
     static let baseMapGroups: [SharedBaseMapGroup] = [
-${catalog.baseMapGroups.map((group) => `        .init(id: ${swiftString(group.id)}, label: ${swiftString(group.label)}, maps: [${group.maps.map(swiftString).join(', ')}])`).join(',\n')}
+${catalog.baseMapGroups.map((group) => `        .init(id: ${swiftString(group.id)}, label: ${swiftString(group.label)}, country: ${swiftOptionalString(group.country)}, maps: [${group.maps.map(swiftString).join(', ')}])`).join(',\n')}
     ]
     static let baseMapAliases: [String: String] = [
 ${Object.entries(catalog.baseMapAliases)

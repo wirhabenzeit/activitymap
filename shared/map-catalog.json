@@ -152,8 +152,9 @@
       ]
     },
     {
-      "id": "swisstopo",
-      "label": "Swisstopo",
+      "id": "switzerland",
+      "label": "Switzerland",
+      "country": "CH",
       "maps": [
         "swisstopoVectorBasemap",
         "swisstopoVectorLight",
@@ -164,8 +165,9 @@
       ]
     },
     {
-      "id": "kartverket",
-      "label": "NorgesKart",
+      "id": "norway",
+      "label": "Norway",
+      "country": "NO",
       "maps": ["norgeskart"]
     }
   ],
@@ -174,9 +176,16 @@
   },
   "overlayGroups": [
     {
-      "id": "swisstopo",
-      "label": "Swisstopo",
+      "id": "switzerland",
+      "label": "Switzerland",
+      "country": "CH",
       "overlays": ["swisstopoSki", "swisstopoSlope", "veloland", "wanderland"]
+    },
+    {
+      "id": "norway",
+      "label": "Norway",
+      "country": "NO",
+      "overlays": ["nveAvalanche"]
     }
   ]
 }
