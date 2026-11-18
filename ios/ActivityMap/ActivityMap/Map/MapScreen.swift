@@ -526,37 +526,55 @@ struct MapScreen: View {
                     Text("No matched places saved in the current filter")
                 }
                 Divider()
-                ForEach(SharedMapCatalog.baseMapGroups) { group in
-                    let maps = BaseStyle.all.filter { group.maps.contains($0.id) }
-                    if maps.count == 1, let style = maps.first {
-                        // A one-item inline Picker creates its own padded menu
-                        // section. A single choice stays in the base-map group.
-                        Toggle(group.label, isOn: Binding(
-                            get: { context.baseStyle == style },
-                            set: { if $0 { context.baseStyle = style } }
-                        ))
-                    } else if !maps.isEmpty {
-                        Menu(group.label) {
-                            Picker(group.label, selection: $context.baseStyle) {
-                                ForEach(maps) { style in
-                                    Label(style.title, systemImage: style.systemImage).tag(style)
-                                }
-                            }.pickerStyle(.inline)
+                Section("Base map") {
+                    ForEach(SharedMapCatalog.baseMapGroups) { group in
+                        let maps = BaseStyle.all.filter { group.maps.contains($0.id) }
+                        if maps.count == 1, let style = maps.first {
+                            // A one-item inline Picker creates its own padded menu
+                            // section. A single choice stays in the base-map group.
+                            Toggle(isOn: Binding(
+                                get: { context.baseStyle == style },
+                                set: { if $0 { context.baseStyle = style } }
+                            )) {
+                                Text(group.label)
+                                if context.baseStyle == style { Text(style.title) }
+                                RegionIcon.image(country: group.country)
+                            }
+                        } else if !maps.isEmpty {
+                            Menu {
+                                Picker(group.label, selection: $context.baseStyle) {
+                                    ForEach(maps) { style in
+                                        Label(style.title, systemImage: style.systemImage).tag(style)
+                                    }
+                                }.pickerStyle(.inline)
+                            } label: {
+                                // Submenu rows cannot show a checkmark, so the
+                                // subtitle names the active style instead.
+                                Text(group.label)
+                                if maps.contains(context.baseStyle) { Text(context.baseStyle.title) }
+                                RegionIcon.image(country: group.country)
+                            }
                         }
                     }
                 }
                 Section("Overlays") {
                     let groupedIDs = Set(SharedMapCatalog.overlayGroups.flatMap(\.overlays))
+                    ForEach(SharedMapCatalog.overlayGroups) { group in
+                        let overlays = SharedMapCatalog.rasterOverlays.filter { group.overlays.contains($0.id) }
+                        let active = overlays.filter { overlayBinding($0).wrappedValue }.count
+                        Menu {
+                            ForEach(overlays) { overlay in
+                                Toggle(overlay.label, isOn: overlayBinding(overlay)).menuActionDismissBehavior(.disabled)
+                            }
+                        } label: {
+                            Text(group.label)
+                            if active > 0 { Text("\(active) on") }
+                            RegionIcon.image(country: group.country)
+                        }
+                    }
                     ForEach(SharedMapCatalog.rasterOverlays.filter { !groupedIDs.contains($0.id) }) { overlay in
                         Toggle(overlay.label, isOn: overlayBinding(overlay))
                             .menuActionDismissBehavior(.disabled)
-                    }
-                    ForEach(SharedMapCatalog.overlayGroups) { group in
-                        Menu(group.label) {
-                            ForEach(SharedMapCatalog.rasterOverlays.filter { group.overlays.contains($0.id) }) { overlay in
-                                Toggle(overlay.label, isOn: overlayBinding(overlay)).menuActionDismissBehavior(.disabled)
-                            }
-                        }
                     }
                 }
             } label: {

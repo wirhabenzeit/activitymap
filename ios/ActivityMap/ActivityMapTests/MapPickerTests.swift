@@ -7,12 +7,22 @@ import UIKit
 struct MapPickerTests {
     @Test func legacySelectionsRestoreToStreetAndSwissMapsStayAvailable() throws {
         let definitions = SharedMapCatalog.baseMaps
-        let swiss = try #require(SharedMapCatalog.baseMapGroups.first { $0.id == "swisstopo" })
+        let swiss = try #require(SharedMapCatalog.baseMapGroups.first { $0.id == "switzerland" })
         #expect(Set(swiss.maps) == Set(definitions.filter { $0.id.hasPrefix("swisstopo") }.map(\.id)))
         #expect(!BaseStyle.all.contains { $0.id == "mapboxStreet3d" || $0.id == "native.standard" })
         #expect(BaseStyle.restored(id: "mapboxStreet3d") == .street)
         #expect(BaseStyle.restored(id: "native.standard") == .street)
         for id in swiss.maps { #expect(BaseStyle.restored(id: id).id == id) }
+    }
+
+    @Test func pickerGroupsAreCountriesWithFlags() {
+        #expect(SharedMapCatalog.baseMapGroups.map(\.label) == ["Worldwide", "Switzerland", "Norway"])
+        #expect(SharedMapCatalog.overlayGroups.map(\.label) == ["Switzerland", "Norway"])
+        #expect(SharedMapCatalog.overlayGroups.last?.overlays == ["nveAvalanche"])
+        #expect(SharedMapCatalog.baseMapGroups.first?.country == nil)
+        #expect(RegionIcon.flag("CH") == "🇨🇭")
+        #expect(RegionIcon.flag("NO") == "🇳🇴")
+        #expect(RegionIcon.flag("ch1") == nil)
     }
 
     @Test func savedStreet3DPreferenceMigratesWithoutLosingOverlays() throws {

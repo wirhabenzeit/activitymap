@@ -4,6 +4,7 @@ export type BaseMapId = keyof typeof catalog.baseMaps;
 
 export const baseMapGroups = catalog.baseMapGroups.map((group) => ({
   ...group,
+  country: 'country' in group ? group.country : undefined,
   maps: group.maps as BaseMapId[],
 }));
 
@@ -11,7 +12,16 @@ export const baseMapGroups = catalog.baseMapGroups.map((group) => ({
 export const canonicalBaseMap = (id: BaseMapId): BaseMapId =>
   (catalog.baseMapAliases as Partial<Record<BaseMapId, BaseMapId>>)[id] ?? id;
 
-export const overlayGroups = catalog.overlayGroups;
+/** Web-native overlays (not in the shared catalogue) join a shared group here. */
+const webOverlayGroupAdditions: Partial<Record<string, string[]>> = {
+  norway: ['friflytToppturer'],
+};
+
+export const overlayGroups = catalog.overlayGroups.map((group) => ({
+  ...group,
+  country: 'country' in group ? group.country : undefined,
+  overlays: [...group.overlays, ...(webOverlayGroupAdditions[group.id] ?? [])],
+}));
 export const groupedOverlayIDs: ReadonlySet<string> = new Set(
   overlayGroups.flatMap((group) => group.overlays),
 );

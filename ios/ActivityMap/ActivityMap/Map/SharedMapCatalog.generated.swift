@@ -26,23 +26,26 @@ struct SharedRasterOverlayDefinition: Identifiable, Hashable, Sendable {
 struct SharedBaseMapGroup: Identifiable, Sendable {
     let id: String
     let label: String
+    let country: String?
     let maps: [String]
 }
 
 struct SharedOverlayGroup: Identifiable, Sendable {
     let id: String
     let label: String
+    let country: String?
     let overlays: [String]
 }
 
 enum SharedMapCatalog {
     static let overlayGroups: [SharedOverlayGroup] = [
-        .init(id: "swisstopo", label: "Swisstopo", overlays: ["swisstopoSki", "swisstopoSlope", "veloland", "wanderland"])
+        .init(id: "switzerland", label: "Switzerland", country: "CH", overlays: ["swisstopoSki", "swisstopoSlope", "veloland", "wanderland"]),
+        .init(id: "norway", label: "Norway", country: "NO", overlays: ["nveAvalanche"])
     ]
     static let baseMapGroups: [SharedBaseMapGroup] = [
-        .init(id: "worldwide", label: "Worldwide", maps: ["mapboxOutdoors", "mapboxStreet", "mapboxLight", "mapboxDark", "mapboxTopolight", "mapboxSatellite"]),
-        .init(id: "swisstopo", label: "Swisstopo", maps: ["swisstopoVectorBasemap", "swisstopoVectorLight", "swisstopoVectorWinter", "swisstopoSatellite", "swisstopoPixelkarte", "swisstopoWinter"]),
-        .init(id: "kartverket", label: "NorgesKart", maps: ["norgeskart"])
+        .init(id: "worldwide", label: "Worldwide", country: nil, maps: ["mapboxOutdoors", "mapboxStreet", "mapboxLight", "mapboxDark", "mapboxTopolight", "mapboxSatellite"]),
+        .init(id: "switzerland", label: "Switzerland", country: "CH", maps: ["swisstopoVectorBasemap", "swisstopoVectorLight", "swisstopoVectorWinter", "swisstopoSatellite", "swisstopoPixelkarte", "swisstopoWinter"]),
+        .init(id: "norway", label: "Norway", country: "NO", maps: ["norgeskart"])
     ]
     static let baseMapAliases: [String: String] = [
         "mapboxStreet3d": "mapboxStreet"

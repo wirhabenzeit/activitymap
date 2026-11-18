@@ -24,7 +24,7 @@ void test('grouped picker retains every Swiss map and merges the old Street 3D c
   assert(!baseMapGroups.some((group) => group.id === 'imagery'));
   assert.deepEqual(
     baseMapGroups
-      .find((group) => group.id === 'swisstopo')
+      .find((group) => group.id === 'switzerland')
       ?.maps.slice()
       .sort(),
     Object.keys(catalog.baseMaps)
@@ -72,14 +72,32 @@ void test('3D buildings follow tilt and are restored after a style replacement',
   assert(!changed.includes('roads'));
 });
 
-void test('Swiss overlay submenu contains exactly the four Swiss toggles', async () => {
+void test('overlay submenus are grouped by country, with Friflyt under Norway', async () => {
   const { overlayGroups, groupedOverlayIDs } = await import('./map-catalog');
+  assert.deepEqual(
+    overlayGroups.map((group) => [group.id, group.label, group.country]),
+    [
+      ['switzerland', 'Switzerland', 'CH'],
+      ['norway', 'Norway', 'NO'],
+    ],
+  );
   assert.deepEqual(overlayGroups[0]?.overlays, [
     'swisstopoSki',
     'swisstopoSlope',
     'veloland',
     'wanderland',
   ]);
-  assert(!groupedOverlayIDs.has('nveAvalanche'));
-  assert(!groupedOverlayIDs.has('friflytToppturer'));
+  assert.deepEqual(overlayGroups[1]?.overlays, [
+    'nveAvalanche',
+    'friflytToppturer',
+  ]);
+  assert(groupedOverlayIDs.has('friflytToppturer'));
+  assert.deepEqual(
+    baseMapGroups.map((group) => [group.label, group.country]),
+    [
+      ['Worldwide', undefined],
+      ['Switzerland', 'CH'],
+      ['Norway', 'NO'],
+    ],
+  );
 });
