@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { Decoder, Stream } from '@garmin/fitsdk';
 import test from 'node:test';
 
 import type { MergeStreams } from '~/server/activity-merge/streams';
@@ -230,6 +231,56 @@ void test('uploads, waits for processing and applies the settings', async () => 
       gear_id: 'b1',
     },
   ]);
+});
+
+void test('shifts the whole Strava FIT timeline by a stable offset for the same parts', async () => {
+  const { deps, calls } = fixture(parts);
+  const request = { activity_ids: ['1', '2'], ...metadata };
+  const download = await buildMergedFile(actor, request, deps);
+  await mergeActivities(actor, request, { ...deps, processingWaitMs: 0 });
+  await mergeActivities(
+    actor,
+    { ...request, activity_ids: ['2', '1'] },
+    {
+      ...deps,
+      processingWaitMs: 0,
+      now: () => new Date('2026-06-03T00:00:00Z'),
+    },
+  );
+
+  function decode(bytes: Uint8Array) {
+    const decoder = new Decoder(Stream.fromByteArray(bytes));
+    assert.equal(decoder.checkIntegrity(), true);
+    const { messages, errors } = decoder.read({
+      convertDateTimesToDates: false,
+    });
+    assert.deepEqual(errors, []);
+    return messages;
+  }
+
+  const [upload, retry] = calls
+    .filter((call) => call.method === 'createUpload')
+    .map((call) => decode((call.args[0] as { file: Uint8Array }).file));
+  const original = decode(download.bytes);
+  const start = Number(original.sessionMesgs![0]!.startTime);
+  assert.equal(start, Date.parse(parts[1]!.start_date) / 1000 - 631_065_600);
+  const shiftedStart = Number(upload!.sessionMesgs![0]!.startTime);
+  const shift = shiftedStart - start;
+  assert.ok(shift >= 5 && shift <= 30);
+  assert.equal(retry!.sessionMesgs![0]!.startTime, shiftedStart);
+
+  const timestampFields = ['timestamp', 'startTime', 'localTimestamp'] as const;
+  for (const messages of Object.values(upload!) as Partial<
+    Record<(typeof timestampFields)[number], number>
+  >[][]) {
+    for (const message of messages) {
+      for (const field of timestampFields) {
+        if (message[field] !== undefined) message[field] -= shift;
+      }
+    }
+  }
+  // All timings relative to the start, samples and FIT identity are preserved.
+  assert.deepEqual(upload, original);
 });
 
 void test('a slow upload is reported as processing and can be continued', async () => {

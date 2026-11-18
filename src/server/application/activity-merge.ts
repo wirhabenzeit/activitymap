@@ -1,5 +1,7 @@
 import 'server-only';
 
+import { createHash } from 'node:crypto';
+
 import type { SportType } from '~/contracts/sport';
 import type {
   MergeActivitiesRequest,
@@ -114,6 +116,21 @@ function utcOffsetSeconds(activity: StravaActivity): number {
     : 0;
 }
 
+function stravaTimeShift(start: number, sources: StravaActivity[]): number {
+  // Strava can match the recorded start even with a unique external ID.
+  // Keep the shift stable for a selection so resubmitting it uses the same start.
+  const hash = createHash('sha256')
+    .update(sources.map((source) => source.id).join('-'))
+    .digest();
+  const sourceStarts = new Set(
+    sources.map((source) => Math.floor(Date.parse(source.start_date) / 1000)),
+  );
+  const shifts = Array.from({ length: 26 }, (_, index) => index + 5).filter(
+    (seconds) => !sourceStarts.has(start + seconds),
+  );
+  return shifts[hash.readUInt32BE() % shifts.length]!;
+}
+
 export type MergedFile = {
   bytes: Uint8Array;
   fileName: string;
@@ -130,6 +147,7 @@ export async function buildMergedFile(
   actor: Actor,
   request: MergeFileRequest,
   deps: ActivityMergeDeps = {},
+  destination: 'download' | 'strava' = 'download',
 ): Promise<MergedFile> {
   const commands = (deps.commands ?? convexActivityCommands)(actor);
   for (const id of request.activity_ids) {
@@ -225,6 +243,8 @@ export async function buildMergedFile(
     sport,
     trainer,
     utcOffsetSeconds: utcOffsetSeconds(ordered[0]!),
+    timeShiftSeconds:
+      destination === 'strava' ? stravaTimeShift(recording.start, ordered) : 0,
     now: (deps.now ?? (() => new Date()))(),
   });
   const day = ordered[0]!.start_date_local.slice(0, 10);
@@ -321,6 +341,7 @@ export async function mergeActivities(
     actor,
     { activity_ids: request.activity_ids, sport_type: request.sport_type },
     deps,
+    'strava',
   );
   const client = await connectedClient(actor, deps);
   const metadata: MergedActivityMetadata = {
