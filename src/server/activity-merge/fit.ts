@@ -74,7 +74,6 @@ const MESG_NUM = {
 
 const SEMICIRCLES = 2 ** 31 / 180;
 const semicircles = (degrees: number) => Math.round(degrees * SEMICIRCLES);
-const date = (unixSeconds: number) => new Date(unixSeconds * 1000);
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, Math.round(value)));
 const altitude = (value: number) => Math.min(12_000, Math.max(-500, value));
@@ -86,6 +85,8 @@ export function encodeMergedFit(
     trainer?: boolean;
     /** Seconds east of UTC at the start, for the local timestamp. */
     utcOffsetSeconds?: number;
+    /** Uniform shift for the recorded timeline in Strava uploads. */
+    timeShiftSeconds?: number;
     now?: Date;
   },
 ): Uint8Array {
@@ -94,6 +95,8 @@ export function encodeMergedFit(
   const encoder = new Encoder();
   const M = MESG_NUM;
   const created = options.now ?? new Date();
+  const shift = options.timeShiftSeconds ?? 0;
+  const date = (unixSeconds: number) => new Date((unixSeconds + shift) * 1000);
   // Field names and enum strings follow Garmin's profile; the encoder
   // validates them against it at runtime.
   const write = (num: number, mesg: Record<string, unknown>) =>
@@ -249,7 +252,10 @@ export function encodeMergedFit(
     event: 'activity',
     eventType: 'stop',
     localTimestamp:
-      recording.end + (options.utcOffsetSeconds ?? 0) - FIT_EPOCH_SECONDS,
+      recording.end +
+      shift +
+      (options.utcOffsetSeconds ?? 0) -
+      FIT_EPOCH_SECONDS,
   });
 
   return encoder.close();

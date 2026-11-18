@@ -166,8 +166,9 @@ export function MergeActivitiesDialog({
             <AppDialogHeader>
               <DialogTitle>Merge {draft.length} activities</DialogTitle>
               <DialogDescription>
-                Creates one new activity on Strava from their recordings. The
-                originals stay until you delete them on Strava.
+                Creates one new activity on Strava from their recordings. Its
+                start time shifts by up to 30 seconds to reduce duplicate
+                rejections. The originals stay until you delete them on Strava.
               </DialogDescription>
             </AppDialogHeader>
             <AppDialogBody>
