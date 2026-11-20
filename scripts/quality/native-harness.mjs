@@ -467,13 +467,14 @@ export async function runNativeHarness({
       'CODE_SIGNING_ALLOWED=NO',
       'ACTIVITYMAP_API_BASE_URL=http:$(SLASH)$(SLASH)127.0.0.1:1',
     ];
-    // The first hosted run spent 11m37s compiling before tests could launch.
-    // Give cold compilation its own bound so it cannot consume runtime's budget.
+    // Cold compilation took 11-19 minutes on hosted runners, and one run was
+    // killed at 18 minutes while still compiling test files. Give it its own
+    // bound so it cannot consume runtime's budget.
     await phase('build', () =>
       run('xcodebuild', ['build-for-testing', ...commonArguments], {
         cwd: root,
         log: join(output, 'xcodebuild-build.log'),
-        timeoutMs: 18 * 60 * 1000,
+        timeoutMs: 28 * 60 * 1000,
         signal: abort.signal,
         echo: false,
       }),

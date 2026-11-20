@@ -148,9 +148,9 @@ Those additional journeys are not certified by a passing PR smoke run.
 
 | Limit                                       | PR profile | Full profile |
 | ------------------------------------------- | ---------- | ------------ |
-| Cold `build-for-testing`                    | 18 minutes | 18 minutes   |
+| Cold `build-for-testing`                    | 28 minutes | 28 minutes   |
 | `test-without-building`                     | 12 minutes | 45 minutes   |
-| CI job, including setup and artifact upload | 40 minutes | 75 minutes   |
+| CI job, including setup and artifact upload | 50 minutes | 75 minutes   |
 
 The PR profile retains four UI journeys and all 36 selected app-hosted suites.
 It previously ran twelve; on November 16 those took about 11 of the 14 test
