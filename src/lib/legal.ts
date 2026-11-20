@@ -14,6 +14,16 @@ export const LEGAL_PATHS = {
 
 export type LegalPage = keyof typeof LEGAL_PATHS;
 
+/** The public marketing page; its URL is the App Store "Marketing URL". */
+export const MARKETING_PATH = '/about';
+
+/**
+ * Where the iOS app lives on the App Store, once the listing is live. While it
+ * is `null` the marketing page says the app is coming soon instead of linking
+ * to a page that does not exist yet.
+ */
+export const APP_STORE_URL: string | null = null;
+
 /** The person who operates ActivityMap and is responsible for its data. */
 export const LEGAL_OPERATOR = 'Dominik Schröder';
 

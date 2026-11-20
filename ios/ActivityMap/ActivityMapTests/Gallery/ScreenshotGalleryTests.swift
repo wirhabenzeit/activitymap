@@ -190,7 +190,9 @@ private final class GalleryWindow {
         window.traitOverrides.horizontalSizeClass = variant.regular ? .regular : .compact
         window.traitOverrides.verticalSizeClass = variant.landscape && !variant.regular ? .compact : .regular
         host = UIHostingController(rootView: AnyView(root
-            .environment(\.locale, Locale(identifier: "de_CH"))
+            // Swiss German is the owner's review default; marketing captures set
+            // ACTIVITYMAP_GALLERY_LOCALE=en_GB.
+            .environment(\.locale, Locale(identifier: GalleryEnvironment.values["ACTIVITYMAP_GALLERY_LOCALE"] ?? "de_CH"))
             .environment(\.timeZone, TimeZone(identifier: "Europe/Zurich")!)
             .environment(\.colorScheme, variant.dark ? .dark : .light)
             .environment(\.dynamicTypeSize, variant.dynamicTypeSize)
