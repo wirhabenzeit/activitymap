@@ -152,7 +152,7 @@ The app target currently uses development team `DX96FWY9AX` for physical-device 
 
 ## Legal pages, privacy and Strava branding
 
-The Privacy policy, Terms and Support pages are public web pages served by the deployment (`/privacy`, `/terms`, `/support`; sources under `src/app/(legal)/`, paths and contact address in `src/lib/legal.ts`). **About** in the Account sheet links to them through `Support/LegalLinks.swift`, resolved against `ACTIVITYMAP_API_BASE_URL`, so a device build opens `https://activitymap.cc/privacy`. Use the same URLs in App Store Connect.
+The Privacy policy, Terms and Support pages are public web pages served by the deployment (`/privacy`, `/terms`, `/support`; sources under `src/app/(legal)/`, paths and contact address in `src/lib/legal.ts`). **About ActivityMap** (top-right avatar, Settings sheet, About) links to them through `Support/LegalLinks.swift`, resolved against `ACTIVITYMAP_API_BASE_URL`, so a device build opens `https://activitymap.cc/privacy`. Use the same URLs in App Store Connect.
 
 `ActivityMap/PrivacyInfo.xcprivacy` declares the collected data types, no tracking, and the required-reason APIs; the App Store Connect questionnaire answers and how they were derived are in [docs/app-store-privacy.md](../../docs/app-store-privacy.md). Re-run Xcode's privacy report on every archive.
 
