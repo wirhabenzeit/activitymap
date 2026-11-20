@@ -31,7 +31,7 @@ factual statements and with the sanctioned phrase "Compatible with Strava".
 | Copyright          | `© 2026 Dominik Schröder`                                                                     |       |
 | Support URL        | `https://activitymap.cc/support`                                                              |       |
 | Privacy Policy URL | `https://activitymap.cc/privacy`                                                              |       |
-| Marketing URL      | `https://activitymap.cc` (optional)                                                           |       |
+| Marketing URL      | `https://activitymap.cc/about` (public page, no sign-in needed)                               |       |
 | Terms of Use       | `https://activitymap.cc/terms` (optional; add under App Information)                          |       |
 | What's New (1.0)   | `First release. Sign in with Strava to see your activities on a map, in a list and in stats.` |       |
 
@@ -190,12 +190,42 @@ defines the scenes. Do not show the Strava logos in a way that suggests the app
 is made by Strava, and do not add "Strava" to the captions (see Naming and
 Strava above).
 
+## Marketing page
+
+`https://activitymap.cc/about` (`src/app/about/page.tsx`) is the public page
+for the App Store Marketing URL, so anyone can see what ActivityMap looks like
+before connecting Strava. Set `APP_STORE_URL` in `src/lib/legal.ts` when the
+listing goes live: until then the page says the app is coming soon.
+
+Its screenshots in `public/about/` come from the synthetic gallery library,
+never a personal account. To regenerate them in English (the harness defaults to
+Swiss German for the owner's reviews), use a throwaway simulator so no installed
+build is replaced:
+
+```sh
+xcrun simctl create "Gallery" com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro \
+  com.apple.CoreSimulator.SimRuntime.iOS-27-0
+export TEST_RUNNER_ACTIVITYMAP_GALLERY_LOCALE=en_GB ACTIVITYMAP_GALLERY_LIVE_MAPS=1
+scripts/ios-gallery.sh marketing --simulator Gallery \
+  --scene map,map-results,list --variant phone,phone-dark
+TEST_RUNNER_ACTIVITYMAP_GALLERY_STATS_TILE=records \
+  scripts/ios-gallery.sh marketing-stats --simulator Gallery \
+  --scene stats-expanded --variant phone,phone-dark
+```
+
+Convert the chosen JPEGs with `cwebp -q 82` to `public/about/<name>-light.webp`
+and `-dark.webp`. Two quirks: the live map tiles sometimes have not loaded when
+a capture is taken, so look at each image; and the dark variant keeps a light
+map, so map shots ship without a dark version. `src/lib/legal.test.ts` checks
+that every screenshot the page names exists.
+
 ## Before submitting
 
 - [ ] Demo account signs in on a clean install of the exact build being submitted
 - [ ] The build is one that has been through external TestFlight, and the
       `ios/v1.0.0` tag is cut from the same commit
-- [ ] Privacy, support and terms URLs load without sign-in
+- [ ] Privacy, support, terms and marketing (`/about`) URLs load without sign-in
+- [ ] `APP_STORE_URL` set once the listing is live
 - [ ] App Privacy answers match [app-store-privacy.md](app-store-privacy.md)
 - [ ] Screenshots uploaded for iPhone 6.9" and iPad 13"
 - [ ] Description checked against the app; no advertised feature is missing

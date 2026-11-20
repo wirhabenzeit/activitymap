@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 
-import { LEGAL_LAST_UPDATED, LEGAL_PATHS } from '~/lib/legal';
+import { LEGAL_LAST_UPDATED, LEGAL_PATHS, MARKETING_PATH } from '~/lib/legal';
 
 const NAVIGATION = [
+  { href: MARKETING_PATH, label: 'About' },
   { href: LEGAL_PATHS.privacy, label: 'Privacy policy' },
   { href: LEGAL_PATHS.terms, label: 'Terms of use' },
   { href: LEGAL_PATHS.support, label: 'Support' },
