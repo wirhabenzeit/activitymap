@@ -13,6 +13,7 @@ import {
   StravaConnectButton,
   StravaConnectFailure,
 } from '~/components/auth/strava-connect';
+import { PoweredByStrava } from '~/components/powered-by-strava';
 import { Button } from '~/components/ui/button';
 import { Dialog, DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
@@ -32,6 +33,7 @@ import {
   snapshotIsStale,
 } from '~/lib/ingestion/presentation';
 import { stravaImportMessage } from '~/lib/ingestion/strava-import';
+import { LEGAL_PATHS } from '~/lib/legal';
 import { message } from '~/lib/presentation/messages';
 import {
   STRAVA_PERMISSIONS_RECONNECT,
@@ -641,6 +643,36 @@ export function SettingsDialog({
               <p className="text-sm text-muted-foreground">
                 {message('settings.tagline')}
               </p>
+              <PoweredByStrava className="pt-1" />
+              <nav
+                aria-label={message('settings.legal')}
+                className="flex flex-wrap gap-x-4 gap-y-1 pt-2 text-sm"
+              >
+                <a
+                  className="underline underline-offset-2"
+                  href={LEGAL_PATHS.privacy}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {message('settings.privacy')}
+                </a>
+                <a
+                  className="underline underline-offset-2"
+                  href={LEGAL_PATHS.terms}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {message('settings.terms')}
+                </a>
+                <a
+                  className="underline underline-offset-2"
+                  href={LEGAL_PATHS.support}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  {message('settings.support')}
+                </a>
+              </nav>
             </TabsContent>
           </AppDialogBody>
         </Tabs>

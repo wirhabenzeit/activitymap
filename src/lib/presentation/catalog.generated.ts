@@ -889,7 +889,7 @@ export const presentation = {
       "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
     },
     "action.openInStrava": {
-      "source": "Open in Strava",
+      "source": "View on Strava",
       "arguments": {},
       "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
     },
@@ -2306,6 +2306,31 @@ export const presentation = {
       "arguments": {},
       "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
     },
+    "settings.privacy": {
+      "source": "Privacy policy",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.terms": {
+      "source": "Terms of use",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.support": {
+      "source": "Support",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.legal": {
+      "source": "Legal",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "connect.poweredByStrava": {
+      "source": "Powered by Strava",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
     "settings.signInToSync": {
       "source": "Sign in to sync your activities.",
       "arguments": {},
@@ -3680,6 +3705,11 @@ export type MessageArguments = {
   "settings.syncData": Record<never, never>;
   "settings.display": Record<never, never>;
   "settings.about": Record<never, never>;
+  "settings.privacy": Record<never, never>;
+  "settings.terms": Record<never, never>;
+  "settings.support": Record<never, never>;
+  "settings.legal": Record<never, never>;
+  "connect.poweredByStrava": Record<never, never>;
   "settings.signInToSync": Record<never, never>;
   "settings.offlineSync": Record<never, never>;
   "settings.syncing": Record<never, never>;

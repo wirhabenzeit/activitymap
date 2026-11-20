@@ -715,7 +715,7 @@ extension RenderedRoutePickingTests {
         try host.save(bottom, name: "elevation-phone-details-bottom-\(count)")
         try VNImageRequestHandler(cgImage: try #require(bottom.cgImage)).perform([request])
         let bottomText = (request.results ?? []).compactMap { $0.topCandidates(1).first?.string }.joined(separator: " ")
-        #expect(bottomText.contains("Activity") && bottomText.contains("Open in Strava") && bottomText.contains("Export GPX"),
+        #expect(bottomText.contains("Activity") && bottomText.contains("View on Strava") && bottomText.contains("Export GPX"),
                 "Recording metadata and bottom action rows must remain available by scrolling: \(bottomText)")
     }
 }

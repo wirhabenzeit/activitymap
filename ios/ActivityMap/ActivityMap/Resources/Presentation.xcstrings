@@ -1280,7 +1280,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Open in Strava"
+            "value": "View on Strava"
           }
         }
       }
@@ -4461,6 +4461,66 @@
           "stringUnit": {
             "state": "translated",
             "value": "About"
+          }
+        }
+      }
+    },
+    "settings.privacy": {
+      "comment": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Privacy policy"
+          }
+        }
+      }
+    },
+    "settings.terms": {
+      "comment": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Terms of use"
+          }
+        }
+      }
+    },
+    "settings.support": {
+      "comment": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Support"
+          }
+        }
+      }
+    },
+    "settings.legal": {
+      "comment": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Legal"
+          }
+        }
+      }
+    },
+    "connect.poweredByStrava": {
+      "comment": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Powered by Strava"
           }
         }
       }

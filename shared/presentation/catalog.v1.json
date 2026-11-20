@@ -876,7 +876,7 @@
       "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
     },
     "action.openInStrava": {
-      "source": "Open in Strava",
+      "source": "View on Strava",
       "arguments": {},
       "context": "App-owned activity and navigation copy. User content passed as arguments stays verbatim."
     },
@@ -2290,6 +2290,31 @@
     },
     "settings.about": {
       "source": "About",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.privacy": {
+      "source": "Privacy policy",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.terms": {
+      "source": "Terms of use",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.support": {
+      "source": "Support",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "settings.legal": {
+      "source": "Legal",
+      "arguments": {},
+      "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
+    },
+    "connect.poweredByStrava": {
+      "source": "Powered by Strava",
       "arguments": {},
       "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
     },

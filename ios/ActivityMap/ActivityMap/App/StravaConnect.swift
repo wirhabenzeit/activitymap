@@ -112,6 +112,7 @@ struct StravaConnectControls: View {
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
+            PoweredByStrava()
         }
         .multilineTextAlignment(alignment == .center ? .center : .leading)
     }
