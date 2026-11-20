@@ -1,2 +1,5 @@
 # PDFs are binary even when their streams use ASCII encoding.
 *.pdf binary
+
+# Reproducible aggregate benchmark output; source and findings remain reviewable.
+scripts/investigations/convex-geo/*-results.json linguist-generated=true

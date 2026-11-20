@@ -1,0 +1,7316 @@
+{
+  "scope": "Local-only private recordings; new Node process per group; candidate subsets precomputed outside measured interval; no network, hosting or billing comparison",
+  "node": "v22.22.0",
+  "platform": "darwin/arm64",
+  "verified": 261,
+  "results": [
+    {
+      "task": 0,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 0,
+      "activities": 9,
+      "samples": 22424,
+      "rawBytes": 982047,
+      "candidates": 0,
+      "windows": 12,
+      "readMs": 1.9938749999999885,
+      "decodeMs": 21.04303999999999,
+      "prepareMs": 10.065083000000016,
+      "scoreMs": 26.250042000000008,
+      "totalMs": 59.53587499999999,
+      "startMemory": {
+        "rss": 107.828125,
+        "heap": 16.309707641601562
+      },
+      "afterPrepare": {
+        "rss": 135.484375,
+        "heap": 35.02361297607422
+      },
+      "maxRSS": 165.390625,
+      "maxHeap": 62.50743865966797,
+      "processHighWaterMiB": 165.390625
+    },
+    {
+      "task": 37,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 6,
+      "activities": 12,
+      "samples": 18575,
+      "rawBytes": 725720,
+      "candidates": 0,
+      "windows": 36,
+      "readMs": 3.9018330000000105,
+      "decodeMs": 15.499166999999986,
+      "prepareMs": 9.960956999999965,
+      "scoreMs": 25.32412499999998,
+      "totalMs": 54.881625,
+      "startMemory": {
+        "rss": 105.1875,
+        "heap": 16.339279174804688
+      },
+      "afterPrepare": {
+        "rss": 114.765625,
+        "heap": 22.619529724121094
+      },
+      "maxRSS": 153.765625,
+      "maxHeap": 46.105796813964844,
+      "processHighWaterMiB": 153.765625
+    },
+    {
+      "task": 74,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "75k",
+      "part": 1,
+      "activities": 3,
+      "samples": 31006,
+      "rawBytes": 1432802,
+      "candidates": 320,
+      "windows": 19,
+      "readMs": 0.5467909999999847,
+      "decodeMs": 27.78199899999997,
+      "prepareMs": 16.060167000000035,
+      "scoreMs": 69.81216600000002,
+      "totalMs": 114.30562499999999,
+      "startMemory": {
+        "rss": 106.609375,
+        "heap": 16.33130645751953
+      },
+      "afterPrepare": {
+        "rss": 143.84375,
+        "heap": 38.414588928222656
+      },
+      "maxRSS": 179.59375,
+      "maxHeap": 64.82732391357422,
+      "processHighWaterMiB": 182.15625
+    },
+    {
+      "task": 24,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 5,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.1875,
+      "decodeMs": 28.002583,
+      "prepareMs": 15.961749999999995,
+      "scoreMs": 73.99829200000002,
+      "totalMs": 118.224625,
+      "startMemory": {
+        "rss": 107.828125,
+        "heap": 16.327362060546875
+      },
+      "afterPrepare": {
+        "rss": 145.390625,
+        "heap": 29.745941162109375
+      },
+      "maxRSS": 178.28125,
+      "maxHeap": 52.39629364013672,
+      "processHighWaterMiB": 178.75
+    },
+    {
+      "task": 61,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 10152,
+      "rawBytes": 481099,
+      "candidates": 0,
+      "windows": 6,
+      "readMs": 0.21745900000000518,
+      "decodeMs": 20.576959000000016,
+      "prepareMs": 5.484915999999998,
+      "scoreMs": 23.306166999999988,
+      "totalMs": 49.65525000000001,
+      "startMemory": {
+        "rss": 105.203125,
+        "heap": 16.30901336669922
+      },
+      "afterPrepare": {
+        "rss": 123.53125,
+        "heap": 31.505722045898438
+      },
+      "maxRSS": 151.8125,
+      "maxHeap": 41.65850830078125,
+      "processHighWaterMiB": 151.8125
+    },
+    {
+      "task": 11,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "original",
+      "part": 0,
+      "activities": 12,
+      "samples": 118179,
+      "rawBytes": 5300698,
+      "candidates": 390,
+      "windows": 74,
+      "readMs": 8.326541000000034,
+      "decodeMs": 80.81250100000008,
+      "prepareMs": 33.96779099999998,
+      "scoreMs": 168.26275,
+      "totalMs": 291.72175000000004,
+      "startMemory": {
+        "rss": 106.609375,
+        "heap": 16.33184814453125
+      },
+      "afterPrepare": {
+        "rss": 187.109375,
+        "heap": 72.85694885253906
+      },
+      "maxRSS": 289.328125,
+      "maxHeap": 173.3147735595703,
+      "processHighWaterMiB": 289.328125
+    },
+    {
+      "task": 48,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 5,
+      "activities": 2,
+      "samples": 8210,
+      "rawBytes": 352703,
+      "candidates": 8,
+      "windows": 10,
+      "readMs": 0.4654170000000022,
+      "decodeMs": 11.837499000000008,
+      "prepareMs": 6.80975100000002,
+      "scoreMs": 36.14225000000002,
+      "totalMs": 55.350042,
+      "startMemory": {
+        "rss": 105.0625,
+        "heap": 16.327308654785156
+      },
+      "afterPrepare": {
+        "rss": 113.09375,
+        "heap": 18.265541076660156
+      },
+      "maxRSS": 148.09375,
+      "maxHeap": 40.10881805419922,
+      "processHighWaterMiB": 148.09375
+    },
+    {
+      "task": 85,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 1,
+      "activities": 7,
+      "samples": 45878,
+      "rawBytes": 2056261,
+      "candidates": 240,
+      "windows": 37,
+      "readMs": 1.2364999999999924,
+      "decodeMs": 31.936082999999996,
+      "prepareMs": 22.960499999999982,
+      "scoreMs": 96.53979100000001,
+      "totalMs": 152.84116699999998,
+      "startMemory": {
+        "rss": 105.265625,
+        "heap": 16.345558166503906
+      },
+      "afterPrepare": {
+        "rss": 153.53125,
+        "heap": 43.77912139892578
+      },
+      "maxRSS": 191.640625,
+      "maxHeap": 72.53693389892578,
+      "processHighWaterMiB": 193.125
+    },
+    {
+      "task": 35,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 4,
+      "activities": 12,
+      "samples": 13753,
+      "rawBytes": 539129,
+      "candidates": 0,
+      "windows": 32,
+      "readMs": 2.2971260000000058,
+      "decodeMs": 12.052083999999937,
+      "prepareMs": 7.822163999999987,
+      "scoreMs": 23.001832999999976,
+      "totalMs": 45.358041,
+      "startMemory": {
+        "rss": 105.1875,
+        "heap": 16.333045959472656
+      },
+      "afterPrepare": {
+        "rss": 113.234375,
+        "heap": 20.99554443359375
+      },
+      "maxRSS": 148.984375,
+      "maxHeap": 42.9769287109375,
+      "processHighWaterMiB": 148.984375
+    },
+    {
+      "task": 72,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.2217500000000001,
+      "decodeMs": 23.947000000000003,
+      "prepareMs": 13.373208000000005,
+      "scoreMs": 76.35120799999999,
+      "totalMs": 113.959,
+      "startMemory": {
+        "rss": 105.65625,
+        "heap": 16.310203552246094
+      },
+      "afterPrepare": {
+        "rss": 142.28125,
+        "heap": 36.67059326171875
+      },
+      "maxRSS": 172.265625,
+      "maxHeap": 53.4193115234375,
+      "processHighWaterMiB": 173.625
+    },
+    {
+      "task": 22,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 3,
+      "activities": 1,
+      "samples": 26836,
+      "rawBytes": 1238935,
+      "candidates": 190,
+      "windows": 11,
+      "readMs": 0.1908329999999978,
+      "decodeMs": 28.411125,
+      "prepareMs": 13.633166999999986,
+      "scoreMs": 73.70504199999999,
+      "totalMs": 116.01720800000001,
+      "startMemory": {
+        "rss": 104.875,
+        "heap": 16.32587432861328
+      },
+      "afterPrepare": {
+        "rss": 141.484375,
+        "heap": 36.51575469970703
+      },
+      "maxRSS": 176.984375,
+      "maxHeap": 55.388580322265625,
+      "processHighWaterMiB": 177.421875
+    },
+    {
+      "task": 59,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "75k",
+      "part": 1,
+      "activities": 2,
+      "samples": 26507,
+      "rawBytes": 1145754,
+      "candidates": 29,
+      "windows": 54,
+      "readMs": 0.6984580000000022,
+      "decodeMs": 19.98491700000001,
+      "prepareMs": 12.82612499999999,
+      "scoreMs": 75.701042,
+      "totalMs": 109.297958,
+      "startMemory": {
+        "rss": 107.03125,
+        "heap": 16.33837890625
+      },
+      "afterPrepare": {
+        "rss": 136.265625,
+        "heap": 33.92982482910156
+      },
+      "maxRSS": 175.53125,
+      "maxHeap": 48.33782958984375,
+      "processHighWaterMiB": 175.828125
+    },
+    {
+      "task": 9,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 1,
+      "activities": 3,
+      "samples": 30252,
+      "rawBytes": 1297783,
+      "candidates": 36,
+      "windows": 10,
+      "readMs": 3.0335420000000255,
+      "decodeMs": 27.006456999999983,
+      "prepareMs": 13.372500999999971,
+      "scoreMs": 62.654583,
+      "totalMs": 106.19312500000001,
+      "startMemory": {
+        "rss": 104.640625,
+        "heap": 16.334320068359375
+      },
+      "afterPrepare": {
+        "rss": 138.125,
+        "heap": 39.21086883544922
+      },
+      "maxRSS": 180.8125,
+      "maxHeap": 68.12459564208984,
+      "processHighWaterMiB": 180.8125
+    },
+    {
+      "task": 46,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 3,
+      "activities": 1,
+      "samples": 8893,
+      "rawBytes": 384748,
+      "candidates": 8,
+      "windows": 4,
+      "readMs": 0.1368749999999892,
+      "decodeMs": 14.60879100000001,
+      "prepareMs": 6.213875000000002,
+      "scoreMs": 37.316542,
+      "totalMs": 58.32899999999999,
+      "startMemory": {
+        "rss": 107.5625,
+        "heap": 16.33739471435547
+      },
+      "afterPrepare": {
+        "rss": 116.953125,
+        "heap": 17.807586669921875
+      },
+      "maxRSS": 151.234375,
+      "maxHeap": 33.60227966308594,
+      "processHighWaterMiB": 151.234375
+    },
+    {
+      "task": 83,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "original",
+      "part": 0,
+      "activities": 14,
+      "samples": 103593,
+      "rawBytes": 4553900,
+      "candidates": 336,
+      "windows": 54,
+      "readMs": 10.109789999999975,
+      "decodeMs": 64.55762199999992,
+      "prepareMs": 37.696207999999956,
+      "scoreMs": 121.19875000000002,
+      "totalMs": 233.90445800000003,
+      "startMemory": {
+        "rss": 104.890625,
+        "heap": 16.31281280517578
+      },
+      "afterPrepare": {
+        "rss": 174.90625,
+        "heap": 65.7016372680664
+      },
+      "maxRSS": 270.796875,
+      "maxHeap": 153.4643096923828,
+      "processHighWaterMiB": 270.796875
+    },
+    {
+      "task": 33,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 2,
+      "activities": 12,
+      "samples": 8015,
+      "rawBytes": 314716,
+      "candidates": 0,
+      "windows": 28,
+      "readMs": 2.177125999999973,
+      "decodeMs": 8.685502000000085,
+      "prepareMs": 5.332668000000041,
+      "scoreMs": 23.233625000000018,
+      "totalMs": 39.636250000000004,
+      "startMemory": {
+        "rss": 106.5,
+        "heap": 16.338180541992188
+      },
+      "afterPrepare": {
+        "rss": 112.296875,
+        "heap": 15.546707153320312
+      },
+      "maxRSS": 140.5,
+      "maxHeap": 34.76673889160156,
+      "processHighWaterMiB": 140.5
+    },
+    {
+      "task": 70,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 2,
+      "activities": 1,
+      "samples": 26291,
+      "rawBytes": 1260729,
+      "candidates": 159,
+      "windows": 18,
+      "readMs": 0.1842500000000058,
+      "decodeMs": 27.350875000000002,
+      "prepareMs": 14.131332999999984,
+      "scoreMs": 66.364792,
+      "totalMs": 108.101041,
+      "startMemory": {
+        "rss": 105.40625,
+        "heap": 16.333099365234375
+      },
+      "afterPrepare": {
+        "rss": 140.359375,
+        "heap": 38.64689636230469
+      },
+      "maxRSS": 178.046875,
+      "maxHeap": 60.3665771484375,
+      "processHighWaterMiB": 178.046875
+    },
+    {
+      "task": 20,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 1,
+      "activities": 2,
+      "samples": 21124,
+      "rawBytes": 926290,
+      "candidates": 26,
+      "windows": 9,
+      "readMs": 0.40679100000001256,
+      "decodeMs": 19.909124000000006,
+      "prepareMs": 12.296415999999994,
+      "scoreMs": 68.45875000000001,
+      "totalMs": 101.173209,
+      "startMemory": {
+        "rss": 105.625,
+        "heap": 16.344566345214844
+      },
+      "afterPrepare": {
+        "rss": 129,
+        "heap": 26.534103393554688
+      },
+      "maxRSS": 170.140625,
+      "maxHeap": 49.75245666503906,
+      "processHighWaterMiB": 170.140625
+    },
+    {
+      "task": 57,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 2,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.11391600000000324,
+      "decodeMs": 22.52729199999999,
+      "prepareMs": 11.961749999999995,
+      "scoreMs": 70.042666,
+      "totalMs": 104.705459,
+      "startMemory": {
+        "rss": 104.75,
+        "heap": 16.347137451171875
+      },
+      "afterPrepare": {
+        "rss": 132.796875,
+        "heap": 32.18757629394531
+      },
+      "maxRSS": 170.875,
+      "maxHeap": 66.51081085205078,
+      "processHighWaterMiB": 170.875
+    },
+    {
+      "task": 7,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 4600,
+      "rawBytes": 199173,
+      "candidates": 7,
+      "windows": 4,
+      "readMs": 0.11687499999999318,
+      "decodeMs": 10.441167000000007,
+      "prepareMs": 3.9912080000000003,
+      "scoreMs": 32.530167000000006,
+      "totalMs": 47.130250000000004,
+      "startMemory": {
+        "rss": 106.078125,
+        "heap": 16.34546661376953
+      },
+      "afterPrepare": {
+        "rss": 113.15625,
+        "heap": 17.415199279785156
+      },
+      "maxRSS": 142.515625,
+      "maxHeap": 37.3670654296875,
+      "processHighWaterMiB": 142.515625
+    },
+    {
+      "task": 44,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 1,
+      "activities": 5,
+      "samples": 20364,
+      "rawBytes": 880739,
+      "candidates": 12,
+      "windows": 18,
+      "readMs": 2.9080829999999764,
+      "decodeMs": 20.347375999999997,
+      "prepareMs": 11.08866700000003,
+      "scoreMs": 51.46104200000002,
+      "totalMs": 85.990709,
+      "startMemory": {
+        "rss": 104.75,
+        "heap": 16.307891845703125
+      },
+      "afterPrepare": {
+        "rss": 133.25,
+        "heap": 34.821502685546875
+      },
+      "maxRSS": 168.90625,
+      "maxHeap": 54.859344482421875,
+      "processHighWaterMiB": 168.90625
+    },
+    {
+      "task": 81,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 1,
+      "activities": 36,
+      "samples": 38079,
+      "rawBytes": 1488782,
+      "candidates": 0,
+      "windows": 82,
+      "readMs": 7.3014569999999,
+      "decodeMs": 22.213083000000097,
+      "prepareMs": 11.916461999999939,
+      "scoreMs": 36.279166000000004,
+      "totalMs": 78.083375,
+      "startMemory": {
+        "rss": 105.15625,
+        "heap": 16.344009399414062
+      },
+      "afterPrepare": {
+        "rss": 131.265625,
+        "heap": 29.694442749023438
+      },
+      "maxRSS": 173.84375,
+      "maxHeap": 71.3251953125,
+      "processHighWaterMiB": 173.84375
+    },
+    {
+      "task": 31,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 0,
+      "activities": 12,
+      "samples": 8859,
+      "rawBytes": 345271,
+      "candidates": 0,
+      "windows": 19,
+      "readMs": 2.6056259999999867,
+      "decodeMs": 9.939374999999984,
+      "prepareMs": 6.541500000000013,
+      "scoreMs": 21.602249999999998,
+      "totalMs": 40.856667,
+      "startMemory": {
+        "rss": 107.78125,
+        "heap": 16.320144653320312
+      },
+      "afterPrepare": {
+        "rss": 118.296875,
+        "heap": 21.791297912597656
+      },
+      "maxRSS": 148.390625,
+      "maxHeap": 42.04100799560547,
+      "processHighWaterMiB": 148.390625
+    },
+    {
+      "task": 68,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 0,
+      "activities": 2,
+      "samples": 19831,
+      "rawBytes": 856473,
+      "candidates": 16,
+      "windows": 8,
+      "readMs": 0.46016600000000096,
+      "decodeMs": 24.339416,
+      "prepareMs": 11.913873999999993,
+      "scoreMs": 40.87158299999999,
+      "totalMs": 77.68166699999999,
+      "startMemory": {
+        "rss": 105.40625,
+        "heap": 16.299598693847656
+      },
+      "afterPrepare": {
+        "rss": 138.625,
+        "heap": 28.520179748535156
+      },
+      "maxRSS": 166.328125,
+      "maxHeap": 50.10547637939453,
+      "processHighWaterMiB": 166.328125
+    },
+    {
+      "task": 18,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.1404579999999953,
+      "decodeMs": 25.984166000000016,
+      "prepareMs": 10.998625000000004,
+      "scoreMs": 68.77695799999998,
+      "totalMs": 105.965292,
+      "startMemory": {
+        "rss": 105.40625,
+        "heap": 16.337059020996094
+      },
+      "afterPrepare": {
+        "rss": 139.390625,
+        "heap": 37.93955993652344
+      },
+      "maxRSS": 175.421875,
+      "maxHeap": 43.54560852050781,
+      "processHighWaterMiB": 177.21875
+    },
+    {
+      "task": 55,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 0,
+      "activities": 4,
+      "samples": 44306,
+      "rawBytes": 1903630,
+      "candidates": 31,
+      "windows": 21,
+      "readMs": 0.964082999999988,
+      "decodeMs": 35.738625,
+      "prepareMs": 25.085248999999976,
+      "scoreMs": 82.86295799999999,
+      "totalMs": 144.82725,
+      "startMemory": {
+        "rss": 103.875,
+        "heap": 16.31121063232422
+      },
+      "afterPrepare": {
+        "rss": 154.859375,
+        "heap": 49.802947998046875
+      },
+      "maxRSS": 185.4375,
+      "maxHeap": 75.1578140258789,
+      "processHighWaterMiB": 187.46875
+    },
+    {
+      "task": 5,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 5,
+      "activities": 1,
+      "samples": 10152,
+      "rawBytes": 481099,
+      "candidates": 0,
+      "windows": 6,
+      "readMs": 0.21083299999999383,
+      "decodeMs": 20.147875,
+      "prepareMs": 5.588875000000002,
+      "scoreMs": 22.904957999999993,
+      "totalMs": 48.91529100000001,
+      "startMemory": {
+        "rss": 105.265625,
+        "heap": 16.298133850097656
+      },
+      "afterPrepare": {
+        "rss": 124.1875,
+        "heap": 32.090667724609375
+      },
+      "maxRSS": 151.890625,
+      "maxHeap": 42.25685119628906,
+      "processHighWaterMiB": 151.890625
+    },
+    {
+      "task": 42,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 2,
+      "activities": 2,
+      "samples": 18431,
+      "rawBytes": 867690,
+      "candidates": 0,
+      "windows": 10,
+      "readMs": 1.292915999999991,
+      "decodeMs": 22.39937500000002,
+      "prepareMs": 10.905124999999998,
+      "scoreMs": 26.13941700000001,
+      "totalMs": 60.85608300000001,
+      "startMemory": {
+        "rss": 104.84375,
+        "heap": 16.332046508789062
+      },
+      "afterPrepare": {
+        "rss": 124.25,
+        "heap": 32.2967529296875
+      },
+      "maxRSS": 160.140625,
+      "maxHeap": 58.832183837890625,
+      "processHighWaterMiB": 160.140625
+    },
+    {
+      "task": 79,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 4634,
+      "rawBytes": 196502,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.12633399999999995,
+      "decodeMs": 9.802458000000001,
+      "prepareMs": 3.840457999999998,
+      "scoreMs": 20.91116600000001,
+      "totalMs": 34.725583999999984,
+      "startMemory": {
+        "rss": 107.296875,
+        "heap": 16.339691162109375
+      },
+      "afterPrepare": {
+        "rss": 114.484375,
+        "heap": 17.58525848388672
+      },
+      "maxRSS": 139.953125,
+      "maxHeap": 32.14612579345703,
+      "processHighWaterMiB": 139.953125
+    },
+    {
+      "task": 29,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 3,
+      "activities": 24,
+      "samples": 34660,
+      "rawBytes": 1358662,
+      "candidates": 0,
+      "windows": 57,
+      "readMs": 5.075376999999932,
+      "decodeMs": 23.425875000000147,
+      "prepareMs": 13.956498999999994,
+      "scoreMs": 31.242208000000005,
+      "totalMs": 73.97366600000001,
+      "startMemory": {
+        "rss": 105.03125,
+        "heap": 16.312477111816406
+      },
+      "afterPrepare": {
+        "rss": 135.84375,
+        "heap": 30.528602600097656
+      },
+      "maxRSS": 174.015625,
+      "maxHeap": 66.43142700195312,
+      "processHighWaterMiB": 174.015625
+    },
+    {
+      "task": 66,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "50k",
+      "part": 0,
+      "activities": 15,
+      "samples": 48384,
+      "rawBytes": 2065440,
+      "candidates": 0,
+      "windows": 192,
+      "readMs": 4.291333999999992,
+      "decodeMs": 32.566293,
+      "prepareMs": 22.956455000000048,
+      "scoreMs": 39.29383300000001,
+      "totalMs": 99.407042,
+      "startMemory": {
+        "rss": 104.8125,
+        "heap": 16.340133666992188
+      },
+      "afterPrepare": {
+        "rss": 144.890625,
+        "heap": 36.633567810058594
+      },
+      "maxRSS": 189.75,
+      "maxHeap": 80.45550537109375,
+      "processHighWaterMiB": 189.75
+    },
+    {
+      "task": 16,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "75k",
+      "part": 1,
+      "activities": 6,
+      "samples": 60582,
+      "rawBytes": 2814774,
+      "candidates": 337,
+      "windows": 36,
+      "readMs": 1.3160419999999675,
+      "decodeMs": 50.165415000000024,
+      "prepareMs": 27.789335000000023,
+      "scoreMs": 111.045625,
+      "totalMs": 190.52570799999998,
+      "startMemory": {
+        "rss": 105.90625,
+        "heap": 16.31446075439453
+      },
+      "afterPrepare": {
+        "rss": 173.125,
+        "heap": 58.20112609863281
+      },
+      "maxRSS": 217.734375,
+      "maxHeap": 99.40995025634766,
+      "processHighWaterMiB": 217.734375
+    },
+    {
+      "task": 53,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "100k",
+      "part": 0,
+      "activities": 25,
+      "samples": 95434,
+      "rawBytes": 4073862,
+      "candidates": 0,
+      "windows": 230,
+      "readMs": 17.934997999999936,
+      "decodeMs": 50.561293000000035,
+      "prepareMs": 28.940253000000055,
+      "scoreMs": 51.501041999999984,
+      "totalMs": 149.324292,
+      "startMemory": {
+        "rss": 104.390625,
+        "heap": 16.349319458007812
+      },
+      "afterPrepare": {
+        "rss": 154.171875,
+        "heap": 50.64325714111328
+      },
+      "maxRSS": 232.609375,
+      "maxHeap": 122.91399383544922,
+      "processHighWaterMiB": 232.609375
+    },
+    {
+      "task": 3,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 3,
+      "activities": 4,
+      "samples": 20014,
+      "rawBytes": 854300,
+      "candidates": 0,
+      "windows": 14,
+      "readMs": 0.7762920000000406,
+      "decodeMs": 22.90641699999999,
+      "prepareMs": 13.236497999999997,
+      "scoreMs": 28.749167,
+      "totalMs": 65.80945899999999,
+      "startMemory": {
+        "rss": 105.78125,
+        "heap": 16.30278778076172
+      },
+      "afterPrepare": {
+        "rss": 139.03125,
+        "heap": 26.724266052246094
+      },
+      "maxRSS": 164.546875,
+      "maxHeap": 55.798667907714844,
+      "processHighWaterMiB": 164.546875
+    },
+    {
+      "task": 40,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 0,
+      "activities": 16,
+      "samples": 49106,
+      "rawBytes": 2222705,
+      "candidates": 0,
+      "windows": 20,
+      "readMs": 5.754121999999967,
+      "decodeMs": 30.344083999999995,
+      "prepareMs": 16.44825099999997,
+      "scoreMs": 39.858125,
+      "totalMs": 92.62799999999999,
+      "startMemory": {
+        "rss": 105.3125,
+        "heap": 16.337738037109375
+      },
+      "afterPrepare": {
+        "rss": 139.875,
+        "heap": 40.91471862792969
+      },
+      "maxRSS": 189.140625,
+      "maxHeap": 76.74034881591797,
+      "processHighWaterMiB": 189.140625
+    },
+    {
+      "task": 77,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 2,
+      "activities": 5,
+      "samples": 21637,
+      "rawBytes": 923612,
+      "candidates": 0,
+      "windows": 19,
+      "readMs": 2.2274170000000026,
+      "decodeMs": 18.89929199999999,
+      "prepareMs": 11.726500000000016,
+      "scoreMs": 24.652791000000008,
+      "totalMs": 57.656499999999994,
+      "startMemory": {
+        "rss": 106.53125,
+        "heap": 16.31147003173828
+      },
+      "afterPrepare": {
+        "rss": 137.5,
+        "heap": 27.924957275390625
+      },
+      "maxRSS": 165.765625,
+      "maxHeap": 56.22633361816406,
+      "processHighWaterMiB": 165.765625
+    },
+    {
+      "task": 27,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 1,
+      "activities": 24,
+      "samples": 18565,
+      "rawBytes": 726347,
+      "candidates": 0,
+      "windows": 53,
+      "readMs": 6.26958499999995,
+      "decodeMs": 14.26416400000008,
+      "prepareMs": 9.78695899999994,
+      "scoreMs": 28.445791999999983,
+      "totalMs": 59.109875,
+      "startMemory": {
+        "rss": 106.359375,
+        "heap": 16.298171997070312
+      },
+      "afterPrepare": {
+        "rss": 124.265625,
+        "heap": 26.19635772705078
+      },
+      "maxRSS": 158.15625,
+      "maxHeap": 51.354736328125,
+      "processHighWaterMiB": 158.15625
+    },
+    {
+      "task": 64,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 1,
+      "activities": 48,
+      "samples": 62189,
+      "rawBytes": 2435813,
+      "candidates": 0,
+      "windows": 114,
+      "readMs": 10.055082000000056,
+      "decodeMs": 32.087042000000054,
+      "prepareMs": 18.865042000000003,
+      "scoreMs": 49.961375000000004,
+      "totalMs": 111.46045800000002,
+      "startMemory": {
+        "rss": 104.859375,
+        "heap": 16.337799072265625
+      },
+      "afterPrepare": {
+        "rss": 141.203125,
+        "heap": 34.57269287109375
+      },
+      "maxRSS": 198.140625,
+      "maxHeap": 90.9730224609375,
+      "processHighWaterMiB": 198.15625
+    },
+    {
+      "task": 14,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "75k",
+      "part": 1,
+      "activities": 6,
+      "samples": 36263,
+      "rawBytes": 1681214,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 1.4891259999999846,
+      "decodeMs": 26.347790999999972,
+      "prepareMs": 17.316209,
+      "scoreMs": 36.691667000000024,
+      "totalMs": 81.994,
+      "startMemory": {
+        "rss": 105.5,
+        "heap": 16.348526000976562
+      },
+      "afterPrepare": {
+        "rss": 147.890625,
+        "heap": 36.5277099609375
+      },
+      "maxRSS": 188.90625,
+      "maxHeap": 77.64590454101562,
+      "processHighWaterMiB": 188.90625
+    },
+    {
+      "task": 51,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "75k",
+      "part": 0,
+      "activities": 20,
+      "samples": 72911,
+      "rawBytes": 3113663,
+      "candidates": 0,
+      "windows": 213,
+      "readMs": 5.309875999999974,
+      "decodeMs": 39.87145899999999,
+      "prepareMs": 25.79154100000001,
+      "scoreMs": 52.37620800000002,
+      "totalMs": 123.64925000000001,
+      "startMemory": {
+        "rss": 104.875,
+        "heap": 16.299522399902344
+      },
+      "afterPrepare": {
+        "rss": 154.59375,
+        "heap": 45.66218566894531
+      },
+      "maxRSS": 204.734375,
+      "maxHeap": 98.56607818603516,
+      "processHighWaterMiB": 204.734375
+    },
+    {
+      "task": 1,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 1,
+      "activities": 6,
+      "samples": 22146,
+      "rawBytes": 1025093,
+      "candidates": 0,
+      "windows": 7,
+      "readMs": 2.220959999999991,
+      "decodeMs": 17.344873999999948,
+      "prepareMs": 11.897625999999988,
+      "scoreMs": 28.001042000000012,
+      "totalMs": 59.60025,
+      "startMemory": {
+        "rss": 105.4375,
+        "heap": 16.33722686767578
+      },
+      "afterPrepare": {
+        "rss": 124.90625,
+        "heap": 22.117263793945312
+      },
+      "maxRSS": 160.765625,
+      "maxHeap": 55.00603485107422,
+      "processHighWaterMiB": 160.765625
+    },
+    {
+      "task": 38,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 7,
+      "activities": 12,
+      "samples": 16085,
+      "rawBytes": 632942,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 3.2261679999999444,
+      "decodeMs": 14.418001000000018,
+      "prepareMs": 10.698956999999936,
+      "scoreMs": 24.848375000000004,
+      "totalMs": 53.449749999999995,
+      "startMemory": {
+        "rss": 105.71875,
+        "heap": 16.307281494140625
+      },
+      "afterPrepare": {
+        "rss": 124.671875,
+        "heap": 21.59674835205078
+      },
+      "maxRSS": 155.46875,
+      "maxHeap": 50.99678039550781,
+      "processHighWaterMiB": 155.46875
+    },
+    {
+      "task": 75,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 0,
+      "activities": 6,
+      "samples": 22551,
+      "rawBytes": 961902,
+      "candidates": 0,
+      "windows": 87,
+      "readMs": 1.5628340000000662,
+      "decodeMs": 21.262791000000007,
+      "prepareMs": 14.423791000000037,
+      "scoreMs": 29.16187500000001,
+      "totalMs": 66.57937499999998,
+      "startMemory": {
+        "rss": 104.375,
+        "heap": 16.332931518554688
+      },
+      "afterPrepare": {
+        "rss": 126.796875,
+        "heap": 24.97203826904297
+      },
+      "maxRSS": 162.734375,
+      "maxHeap": 59.38501739501953,
+      "processHighWaterMiB": 162.75
+    },
+    {
+      "task": 25,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "original",
+      "part": 0,
+      "activities": 25,
+      "samples": 95434,
+      "rawBytes": 4073862,
+      "candidates": 0,
+      "windows": 230,
+      "readMs": 17.65454099999998,
+      "decodeMs": 49.038374000000005,
+      "prepareMs": 27.463582999999943,
+      "scoreMs": 50.136875,
+      "totalMs": 144.621625,
+      "startMemory": {
+        "rss": 104.984375,
+        "heap": 16.33685302734375
+      },
+      "afterPrepare": {
+        "rss": 154.84375,
+        "heap": 50.64318084716797
+      },
+      "maxRSS": 233.296875,
+      "maxHeap": 122.65503692626953,
+      "processHighWaterMiB": 233.296875
+    },
+    {
+      "task": 62,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "original",
+      "part": 0,
+      "activities": 26,
+      "samples": 109660,
+      "rawBytes": 4983926,
+      "candidates": 0,
+      "windows": 51,
+      "readMs": 14.60528800000003,
+      "decodeMs": 58.21637700000001,
+      "prepareMs": 30.275374999999926,
+      "scoreMs": 53.92108399999998,
+      "totalMs": 157.358541,
+      "startMemory": {
+        "rss": 105.234375,
+        "heap": 16.334060668945312
+      },
+      "afterPrepare": {
+        "rss": 160.25,
+        "heap": 52.24614715576172
+      },
+      "maxRSS": 254.078125,
+      "maxHeap": 142.01834106445312,
+      "processHighWaterMiB": 254.078125
+    },
+    {
+      "task": 12,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "original",
+      "part": 0,
+      "activities": 97,
+      "samples": 100618,
+      "rawBytes": 3939515,
+      "candidates": 0,
+      "windows": 207,
+      "readMs": 15.513537999999684,
+      "decodeMs": 44.46404400000009,
+      "prepareMs": 23.41654000000004,
+      "scoreMs": 63.93029099999998,
+      "totalMs": 148.3245,
+      "startMemory": {
+        "rss": 106.828125,
+        "heap": 16.331558227539062
+      },
+      "afterPrepare": {
+        "rss": 152.484375,
+        "heap": 42.993629455566406
+      },
+      "maxRSS": 230.4375,
+      "maxHeap": 126.3189697265625,
+      "processHighWaterMiB": 230.453125
+    },
+    {
+      "task": 49,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "100k",
+      "part": 0,
+      "activities": 7,
+      "samples": 77214,
+      "rawBytes": 3428635,
+      "candidates": 192,
+      "windows": 60,
+      "readMs": 3.591958999999946,
+      "decodeMs": 51.16379199999997,
+      "prepareMs": 34.80691600000003,
+      "scoreMs": 106.769375,
+      "totalMs": 196.52616700000002,
+      "startMemory": {
+        "rss": 107.09375,
+        "heap": 16.330604553222656
+      },
+      "afterPrepare": {
+        "rss": 173.15625,
+        "heap": 48.730712890625
+      },
+      "maxRSS": 235.546875,
+      "maxHeap": 119.91747283935547,
+      "processHighWaterMiB": 235.546875
+    },
+    {
+      "task": 86,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 2,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.23254199999999514,
+      "decodeMs": 29.59175000000002,
+      "prepareMs": 10.490791999999999,
+      "scoreMs": 73.72158300000001,
+      "totalMs": 114.10791599999999,
+      "startMemory": {
+        "rss": 105.5625,
+        "heap": 16.313934326171875
+      },
+      "afterPrepare": {
+        "rss": 145.78125,
+        "heap": 42.860801696777344
+      },
+      "maxRSS": 178.296875,
+      "maxHeap": 51.03193664550781,
+      "processHighWaterMiB": 180.03125
+    },
+    {
+      "task": 36,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 5,
+      "activities": 12,
+      "samples": 13776,
+      "rawBytes": 538022,
+      "candidates": 0,
+      "windows": 25,
+      "readMs": 2.2943320000000114,
+      "decodeMs": 10.87991599999998,
+      "prepareMs": 7.770503000000019,
+      "scoreMs": 21.781082999999995,
+      "totalMs": 42.93537500000001,
+      "startMemory": {
+        "rss": 107.359375,
+        "heap": 16.333824157714844
+      },
+      "afterPrepare": {
+        "rss": 114.96875,
+        "heap": 19.716209411621094
+      },
+      "maxRSS": 151.15625,
+      "maxHeap": 43.35041046142578,
+      "processHighWaterMiB": 151.15625
+    },
+    {
+      "task": 73,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "75k",
+      "part": 0,
+      "activities": 11,
+      "samples": 72587,
+      "rawBytes": 3121098,
+      "candidates": 40,
+      "windows": 35,
+      "readMs": 4.974001000000015,
+      "decodeMs": 47.60254099999996,
+      "prepareMs": 23.918248999999975,
+      "scoreMs": 104.82604199999997,
+      "totalMs": 181.57295900000003,
+      "startMemory": {
+        "rss": 104.703125,
+        "heap": 16.33751678466797
+      },
+      "afterPrepare": {
+        "rss": 159.578125,
+        "heap": 46.932220458984375
+      },
+      "maxRSS": 219.1875,
+      "maxHeap": 105.83707427978516,
+      "processHighWaterMiB": 219.1875
+    },
+    {
+      "task": 23,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 4,
+      "activities": 4,
+      "samples": 7526,
+      "rawBytes": 313433,
+      "candidates": 21,
+      "windows": 10,
+      "readMs": 1.1644589999999653,
+      "decodeMs": 9.518084000000002,
+      "prepareMs": 5.743666000000005,
+      "scoreMs": 40.47804099999999,
+      "totalMs": 57.0305,
+      "startMemory": {
+        "rss": 105.234375,
+        "heap": 16.333717346191406
+      },
+      "afterPrepare": {
+        "rss": 111.421875,
+        "heap": 19.762733459472656
+      },
+      "maxRSS": 146.171875,
+      "maxHeap": 43.93408203125,
+      "processHighWaterMiB": 146.1875
+    },
+    {
+      "task": 60,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "100k",
+      "part": 0,
+      "activities": 25,
+      "samples": 99508,
+      "rawBytes": 4502827,
+      "candidates": 0,
+      "windows": 45,
+      "readMs": 8.227123000000006,
+      "decodeMs": 55.296248999999946,
+      "prepareMs": 25.543202000000036,
+      "scoreMs": 67.25395899999998,
+      "totalMs": 156.688125,
+      "startMemory": {
+        "rss": 105.421875,
+        "heap": 16.33025360107422
+      },
+      "afterPrepare": {
+        "rss": 159.53125,
+        "heap": 52.987953186035156
+      },
+      "maxRSS": 241.703125,
+      "maxHeap": 133.57891845703125,
+      "processHighWaterMiB": 241.703125
+    },
+    {
+      "task": 10,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 2,
+      "activities": 3,
+      "samples": 31006,
+      "rawBytes": 1432802,
+      "candidates": 320,
+      "windows": 19,
+      "readMs": 0.5910829999999834,
+      "decodeMs": 28.032625000000024,
+      "prepareMs": 16.22633399999998,
+      "scoreMs": 67.429833,
+      "totalMs": 112.37720900000001,
+      "startMemory": {
+        "rss": 105.28125,
+        "heap": 16.342269897460938
+      },
+      "afterPrepare": {
+        "rss": 142.125,
+        "heap": 38.25286102294922
+      },
+      "maxRSS": 179.09375,
+      "maxHeap": 65.04425048828125,
+      "processHighWaterMiB": 181.625
+    },
+    {
+      "task": 47,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 22796,
+      "rawBytes": 1080099,
+      "candidates": 312,
+      "windows": 9,
+      "readMs": 0.14729099999999562,
+      "decodeMs": 25.128167000000005,
+      "prepareMs": 12.970458000000008,
+      "scoreMs": 58.147583999999995,
+      "totalMs": 96.47500000000001,
+      "startMemory": {
+        "rss": 104.921875,
+        "heap": 16.307403564453125
+      },
+      "afterPrepare": {
+        "rss": 142.265625,
+        "heap": 37.65204620361328
+      },
+      "maxRSS": 173.1875,
+      "maxHeap": 65.7425308227539,
+      "processHighWaterMiB": 173.1875
+    },
+    {
+      "task": 84,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 0,
+      "activities": 4,
+      "samples": 46081,
+      "rawBytes": 1982031,
+      "candidates": 38,
+      "windows": 22,
+      "readMs": 2.22891700000001,
+      "decodeMs": 36.86870900000001,
+      "prepareMs": 20.38745899999998,
+      "scoreMs": 106.32704200000003,
+      "totalMs": 166.00245900000002,
+      "startMemory": {
+        "rss": 105.65625,
+        "heap": 16.323196411132812
+      },
+      "afterPrepare": {
+        "rss": 153.25,
+        "heap": 40.467498779296875
+      },
+      "maxRSS": 190.078125,
+      "maxHeap": 69.26409912109375,
+      "processHighWaterMiB": 190.078125
+    },
+    {
+      "task": 34,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 3,
+      "activities": 12,
+      "samples": 10550,
+      "rawBytes": 411631,
+      "candidates": 0,
+      "windows": 25,
+      "readMs": 2.203874000000013,
+      "decodeMs": 11.05891699999998,
+      "prepareMs": 7.325377000000003,
+      "scoreMs": 24.330083000000002,
+      "totalMs": 45.108834,
+      "startMemory": {
+        "rss": 105.640625,
+        "heap": 16.33087921142578
+      },
+      "afterPrepare": {
+        "rss": 112.59375,
+        "heap": 19.017791748046875
+      },
+      "maxRSS": 144.453125,
+      "maxHeap": 42.31645202636719,
+      "processHighWaterMiB": 144.46875
+    },
+    {
+      "task": 71,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 3,
+      "activities": 2,
+      "samples": 6617,
+      "rawBytes": 264276,
+      "candidates": 9,
+      "windows": 21,
+      "readMs": 0.6083739999999977,
+      "decodeMs": 9.738749999999982,
+      "prepareMs": 4.298416999999986,
+      "scoreMs": 32.17354200000001,
+      "totalMs": 46.889167,
+      "startMemory": {
+        "rss": 104.796875,
+        "heap": 16.338722229003906
+      },
+      "afterPrepare": {
+        "rss": 111.203125,
+        "heap": 20.582740783691406
+      },
+      "maxRSS": 143.1875,
+      "maxHeap": 39.697357177734375,
+      "processHighWaterMiB": 143.1875
+    },
+    {
+      "task": 21,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 2,
+      "activities": 2,
+      "samples": 11516,
+      "rawBytes": 503893,
+      "candidates": 29,
+      "windows": 16,
+      "readMs": 0.41883300000000645,
+      "decodeMs": 14.434249000000008,
+      "prepareMs": 7.920749999999998,
+      "scoreMs": 45.683583,
+      "totalMs": 68.528333,
+      "startMemory": {
+        "rss": 105.6875,
+        "heap": 16.33763885498047
+      },
+      "afterPrepare": {
+        "rss": 116.5,
+        "heap": 20.83612823486328
+      },
+      "maxRSS": 151.5625,
+      "maxHeap": 44.87353515625,
+      "processHighWaterMiB": 151.578125
+    },
+    {
+      "task": 58,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "75k",
+      "part": 0,
+      "activities": 6,
+      "samples": 73923,
+      "rawBytes": 3295995,
+      "candidates": 187,
+      "windows": 41,
+      "readMs": 1.5214599999999479,
+      "decodeMs": 51.92524999999996,
+      "prepareMs": 38.60591899999996,
+      "scoreMs": 121.7825,
+      "totalMs": 214.080291,
+      "startMemory": {
+        "rss": 107.28125,
+        "heap": 16.341781616210938
+      },
+      "afterPrepare": {
+        "rss": 178.359375,
+        "heap": 64.98097229003906
+      },
+      "maxRSS": 240.75,
+      "maxHeap": 122.63540649414062,
+      "processHighWaterMiB": 240.765625
+    },
+    {
+      "task": 8,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 0,
+      "activities": 8,
+      "samples": 42335,
+      "rawBytes": 1823315,
+      "candidates": 17,
+      "windows": 25,
+      "readMs": 3.979707999999974,
+      "decodeMs": 31.00954300000008,
+      "prepareMs": 16.87458300000003,
+      "scoreMs": 72.90775000000002,
+      "totalMs": 124.948292,
+      "startMemory": {
+        "rss": 105.359375,
+        "heap": 16.328384399414062
+      },
+      "afterPrepare": {
+        "rss": 143.203125,
+        "heap": 29.962013244628906
+      },
+      "maxRSS": 187.546875,
+      "maxHeap": 73.92979431152344,
+      "processHighWaterMiB": 188.28125
+    },
+    {
+      "task": 45,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 2,
+      "activities": 2,
+      "samples": 21359,
+      "rawBytes": 913035,
+      "candidates": 29,
+      "windows": 6,
+      "readMs": 0.4452500000000015,
+      "decodeMs": 25.856874000000005,
+      "prepareMs": 12.031958000000003,
+      "scoreMs": 44.375583000000006,
+      "totalMs": 82.79954199999999,
+      "startMemory": {
+        "rss": 105.09375,
+        "heap": 16.31505584716797
+      },
+      "afterPrepare": {
+        "rss": 139.53125,
+        "heap": 32.66511535644531
+      },
+      "maxRSS": 169.859375,
+      "maxHeap": 63.58229064941406,
+      "processHighWaterMiB": 169.859375
+    },
+    {
+      "task": 82,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 2,
+      "activities": 25,
+      "samples": 36900,
+      "rawBytes": 1446627,
+      "candidates": 0,
+      "windows": 60,
+      "readMs": 6.1899190000000175,
+      "decodeMs": 26.183873000000034,
+      "prepareMs": 16.330748999999955,
+      "scoreMs": 32.538624999999996,
+      "totalMs": 81.62875000000001,
+      "startMemory": {
+        "rss": 105.625,
+        "heap": 16.31269073486328
+      },
+      "afterPrepare": {
+        "rss": 136.71875,
+        "heap": 33.775054931640625
+      },
+      "maxRSS": 177.53125,
+      "maxHeap": 72.62701416015625,
+      "processHighWaterMiB": 177.53125
+    },
+    {
+      "task": 32,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 1,
+      "activities": 12,
+      "samples": 8765,
+      "rawBytes": 344119,
+      "candidates": 0,
+      "windows": 18,
+      "readMs": 2.784375000000068,
+      "decodeMs": 10.406126999999998,
+      "prepareMs": 5.934956999999969,
+      "scoreMs": 24.33491600000002,
+      "totalMs": 43.646041,
+      "startMemory": {
+        "rss": 105.078125,
+        "heap": 16.308380126953125
+      },
+      "afterPrepare": {
+        "rss": 115.75,
+        "heap": 21.535171508789062
+      },
+      "maxRSS": 145.78125,
+      "maxHeap": 43.94251251220703,
+      "processHighWaterMiB": 145.796875
+    },
+    {
+      "task": 69,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 1,
+      "activities": 2,
+      "samples": 24475,
+      "rawBytes": 1047157,
+      "candidates": 19,
+      "windows": 13,
+      "readMs": 0.39474900000001867,
+      "decodeMs": 24.323500999999993,
+      "prepareMs": 13.46350000000001,
+      "scoreMs": 68.412666,
+      "totalMs": 106.68975,
+      "startMemory": {
+        "rss": 105.1875,
+        "heap": 16.335044860839844
+      },
+      "afterPrepare": {
+        "rss": 135.203125,
+        "heap": 34.54838562011719
+      },
+      "maxRSS": 174.953125,
+      "maxHeap": 69.05146789550781,
+      "processHighWaterMiB": 174.96875
+    },
+    {
+      "task": 19,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 0,
+      "activities": 2,
+      "samples": 24957,
+      "rawBytes": 1055741,
+      "candidates": 17,
+      "windows": 13,
+      "readMs": 0.4148749999999808,
+      "decodeMs": 23.14958300000002,
+      "prepareMs": 13.645624999999995,
+      "scoreMs": 73.268292,
+      "totalMs": 110.571208,
+      "startMemory": {
+        "rss": 105.5625,
+        "heap": 16.334625244140625
+      },
+      "afterPrepare": {
+        "rss": 135.796875,
+        "heap": 34.95722198486328
+      },
+      "maxRSS": 171.015625,
+      "maxHeap": 51.057411193847656,
+      "processHighWaterMiB": 174
+    },
+    {
+      "task": 56,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 1,
+      "activities": 3,
+      "samples": 32908,
+      "rawBytes": 1525005,
+      "candidates": 164,
+      "windows": 39,
+      "readMs": 0.6137920000000321,
+      "decodeMs": 31.024333999999996,
+      "prepareMs": 17.872832999999986,
+      "scoreMs": 74.56325000000001,
+      "totalMs": 124.18966599999999,
+      "startMemory": {
+        "rss": 105.53125,
+        "heap": 16.326370239257812
+      },
+      "afterPrepare": {
+        "rss": 146.0625,
+        "heap": 37.895668029785156
+      },
+      "maxRSS": 178.703125,
+      "maxHeap": 60.13709259033203,
+      "processHighWaterMiB": 180.90625
+    },
+    {
+      "task": 6,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "100k",
+      "part": 0,
+      "activities": 13,
+      "samples": 98993,
+      "rawBytes": 4354727,
+      "candidates": 334,
+      "windows": 50,
+      "readMs": 12.906209000000047,
+      "decodeMs": 62.490162999999995,
+      "prepareMs": 33.71000299999996,
+      "scoreMs": 119.91670800000003,
+      "totalMs": 229.32541700000002,
+      "startMemory": {
+        "rss": 105.84375,
+        "heap": 16.303634643554688
+      },
+      "afterPrepare": {
+        "rss": 170.078125,
+        "heap": 59.867340087890625
+      },
+      "maxRSS": 261.28125,
+      "maxHeap": 146.41510772705078,
+      "processHighWaterMiB": 261.28125
+    },
+    {
+      "task": 43,
+      "repetition": 0,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 0,
+      "activities": 3,
+      "samples": 21971,
+      "rawBytes": 942576,
+      "candidates": 5,
+      "windows": 7,
+      "readMs": 2.0342490000000026,
+      "decodeMs": 25.770040999999978,
+      "prepareMs": 12.984582999999986,
+      "scoreMs": 47.198792,
+      "totalMs": 88.12024999999998,
+      "startMemory": {
+        "rss": 105.3125,
+        "heap": 16.29998779296875
+      },
+      "afterPrepare": {
+        "rss": 136.96875,
+        "heap": 34.76750946044922
+      },
+      "maxRSS": 170.9375,
+      "maxHeap": 64.26547241210938,
+      "processHighWaterMiB": 170.9375
+    },
+    {
+      "task": 80,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 0,
+      "activities": 36,
+      "samples": 25639,
+      "rawBytes": 1004106,
+      "candidates": 0,
+      "windows": 65,
+      "readMs": 5.083665999999951,
+      "decodeMs": 16.931917999999982,
+      "prepareMs": 9.165794999999974,
+      "scoreMs": 29.136750000000006,
+      "totalMs": 60.619375000000005,
+      "startMemory": {
+        "rss": 105.03125,
+        "heap": 16.329071044921875
+      },
+      "afterPrepare": {
+        "rss": 121,
+        "heap": 29.02552032470703
+      },
+      "maxRSS": 161,
+      "maxHeap": 58.242897033691406,
+      "processHighWaterMiB": 161
+    },
+    {
+      "task": 30,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 4,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.09454200000000412,
+      "decodeMs": 7.476708000000002,
+      "prepareMs": 2.9642079999999993,
+      "scoreMs": 19.521124999999998,
+      "totalMs": 30.157540999999995,
+      "startMemory": {
+        "rss": 105.03125,
+        "heap": 16.32994842529297
+      },
+      "afterPrepare": {
+        "rss": 107.8125,
+        "heap": 16.22362518310547
+      },
+      "maxRSS": 127.34375,
+      "maxHeap": 28.113037109375,
+      "processHighWaterMiB": 127.359375
+    },
+    {
+      "task": 67,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "50k",
+      "part": 1,
+      "activities": 10,
+      "samples": 47050,
+      "rawBytes": 2008422,
+      "candidates": 0,
+      "windows": 38,
+      "readMs": 4.1933770000000266,
+      "decodeMs": 34.57712500000005,
+      "prepareMs": 19.206583999999964,
+      "scoreMs": 37.774542,
+      "totalMs": 95.968875,
+      "startMemory": {
+        "rss": 105.109375,
+        "heap": 16.32628631591797
+      },
+      "afterPrepare": {
+        "rss": 143.21875,
+        "heap": 36.63639831542969
+      },
+      "maxRSS": 188.984375,
+      "maxHeap": 78.4429931640625,
+      "processHighWaterMiB": 188.984375
+    },
+    {
+      "task": 17,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "100k",
+      "part": 0,
+      "activities": 11,
+      "samples": 91959,
+      "rawBytes": 4038292,
+      "candidates": 264,
+      "windows": 59,
+      "readMs": 8.941748999999959,
+      "decodeMs": 59.074625,
+      "prepareMs": 33.63954499999994,
+      "scoreMs": 141.260208,
+      "totalMs": 243.17825,
+      "startMemory": {
+        "rss": 105.5,
+        "heap": 16.313705444335938
+      },
+      "afterPrepare": {
+        "rss": 169.421875,
+        "heap": 63.80122375488281
+      },
+      "maxRSS": 252.453125,
+      "maxHeap": 140.02967834472656,
+      "processHighWaterMiB": 252.46875
+    },
+    {
+      "task": 54,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "original",
+      "part": 0,
+      "activities": 8,
+      "samples": 100430,
+      "rawBytes": 4441749,
+      "candidates": 202,
+      "windows": 95,
+      "readMs": 8.624583999999999,
+      "decodeMs": 68.22595799999998,
+      "prepareMs": 44.16483400000001,
+      "scoreMs": 141.836792,
+      "totalMs": 263.09875,
+      "startMemory": {
+        "rss": 105.96875,
+        "heap": 16.310935974121094
+      },
+      "afterPrepare": {
+        "rss": 176.171875,
+        "heap": 66.15081787109375
+      },
+      "maxRSS": 264.515625,
+      "maxHeap": 153.2636947631836,
+      "processHighWaterMiB": 264.515625
+    },
+    {
+      "task": 4,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 4,
+      "activities": 2,
+      "samples": 15257,
+      "rawBytes": 712634,
+      "candidates": 0,
+      "windows": 8,
+      "readMs": 0.5351659999999896,
+      "decodeMs": 23.00679199999999,
+      "prepareMs": 9.68237400000001,
+      "scoreMs": 26.772625000000005,
+      "totalMs": 60.10437499999999,
+      "startMemory": {
+        "rss": 105.515625,
+        "heap": 16.313201904296875
+      },
+      "afterPrepare": {
+        "rss": 131.390625,
+        "heap": 30.877838134765625
+      },
+      "maxRSS": 160.046875,
+      "maxHeap": 54.315635681152344,
+      "processHighWaterMiB": 160.046875
+    },
+    {
+      "task": 41,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 1,
+      "activities": 8,
+      "samples": 42123,
+      "rawBytes": 1893531,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 2.1401240000000143,
+      "decodeMs": 31.010918000000018,
+      "prepareMs": 18.66645900000003,
+      "scoreMs": 39.28899999999999,
+      "totalMs": 91.31166600000002,
+      "startMemory": {
+        "rss": 105.9375,
+        "heap": 16.305709838867188
+      },
+      "afterPrepare": {
+        "rss": 147.15625,
+        "heap": 36.39659118652344
+      },
+      "maxRSS": 189.921875,
+      "maxHeap": 77.42681884765625,
+      "processHighWaterMiB": 189.921875
+    },
+    {
+      "task": 78,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 3,
+      "activities": 5,
+      "samples": 21622,
+      "rawBytes": 921719,
+      "candidates": 0,
+      "windows": 17,
+      "readMs": 1.9595819999999975,
+      "decodeMs": 19.467876000000018,
+      "prepareMs": 11.725458999999987,
+      "scoreMs": 28.226166000000006,
+      "totalMs": 61.52995799999999,
+      "startMemory": {
+        "rss": 105.828125,
+        "heap": 16.346282958984375
+      },
+      "afterPrepare": {
+        "rss": 128.609375,
+        "heap": 27.85161590576172
+      },
+      "maxRSS": 163.09375,
+      "maxHeap": 59.13568878173828,
+      "processHighWaterMiB": 163.09375
+    },
+    {
+      "task": 28,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 2,
+      "activities": 24,
+      "samples": 27529,
+      "rawBytes": 1077151,
+      "candidates": 0,
+      "windows": 57,
+      "readMs": 4.950628000000066,
+      "decodeMs": 18.604291999999987,
+      "prepareMs": 13.43870700000005,
+      "scoreMs": 27.469833000000023,
+      "totalMs": 64.74900000000001,
+      "startMemory": {
+        "rss": 105.15625,
+        "heap": 16.335617065429688
+      },
+      "afterPrepare": {
+        "rss": 125.875,
+        "heap": 28.009124755859375
+      },
+      "maxRSS": 163.28125,
+      "maxHeap": 60.996376037597656,
+      "processHighWaterMiB": 163.28125
+    },
+    {
+      "task": 65,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 2,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.16391699999999787,
+      "decodeMs": 7.810749999999999,
+      "prepareMs": 2.469707999999997,
+      "scoreMs": 20.164833,
+      "totalMs": 30.695458000000002,
+      "startMemory": {
+        "rss": 105.765625,
+        "heap": 16.307579040527344
+      },
+      "afterPrepare": {
+        "rss": 111.921875,
+        "heap": 19.59386444091797
+      },
+      "maxRSS": 138.828125,
+      "maxHeap": 29.627540588378906,
+      "processHighWaterMiB": 138.828125
+    },
+    {
+      "task": 15,
+      "repetition": 0,
+      "scenario": "real-1",
+      "profile": "75k",
+      "part": 0,
+      "activities": 6,
+      "samples": 57597,
+      "rawBytes": 2485924,
+      "candidates": 56,
+      "windows": 38,
+      "readMs": 2.780124999999998,
+      "decodeMs": 41.83758099999996,
+      "prepareMs": 21.871417999999977,
+      "scoreMs": 115.711208,
+      "totalMs": 182.39799999999997,
+      "startMemory": {
+        "rss": 105.296875,
+        "heap": 16.32062530517578
+      },
+      "afterPrepare": {
+        "rss": 159.921875,
+        "heap": 49.20085144042969
+      },
+      "maxRSS": 199.84375,
+      "maxHeap": 89.46643829345703,
+      "processHighWaterMiB": 199.84375
+    },
+    {
+      "task": 52,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "75k",
+      "part": 1,
+      "activities": 5,
+      "samples": 22523,
+      "rawBytes": 960199,
+      "candidates": 0,
+      "windows": 17,
+      "readMs": 1.808083000000039,
+      "decodeMs": 22.811084000000008,
+      "prepareMs": 13.106958000000049,
+      "scoreMs": 26.569542000000013,
+      "totalMs": 64.46325000000002,
+      "startMemory": {
+        "rss": 105.828125,
+        "heap": 16.309890747070312
+      },
+      "afterPrepare": {
+        "rss": 138.5625,
+        "heap": 28.357940673828125
+      },
+      "maxRSS": 168.359375,
+      "maxHeap": 61.637123107910156,
+      "processHighWaterMiB": 168.359375
+    },
+    {
+      "task": 2,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 2,
+      "activities": 4,
+      "samples": 19667,
+      "rawBytes": 928753,
+      "candidates": 0,
+      "windows": 4,
+      "readMs": 1.4198330000000254,
+      "decodeMs": 20.219583999999955,
+      "prepareMs": 9.983458000000013,
+      "scoreMs": 26.852332999999987,
+      "totalMs": 58.615375,
+      "startMemory": {
+        "rss": 105.6875,
+        "heap": 16.30500030517578
+      },
+      "afterPrepare": {
+        "rss": 133.46875,
+        "heap": 33.46136474609375
+      },
+      "maxRSS": 162.53125,
+      "maxHeap": 60.63395690917969,
+      "processHighWaterMiB": 162.53125
+    },
+    {
+      "task": 39,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 8,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.09058399999999267,
+      "decodeMs": 6.684832999999998,
+      "prepareMs": 2.225166999999999,
+      "scoreMs": 19.258250000000004,
+      "totalMs": 28.303667000000004,
+      "startMemory": {
+        "rss": 105.234375,
+        "heap": 16.32623291015625
+      },
+      "afterPrepare": {
+        "rss": 107.953125,
+        "heap": 16.29412841796875
+      },
+      "maxRSS": 127.640625,
+      "maxHeap": 28.197540283203125,
+      "processHighWaterMiB": 127.640625
+    },
+    {
+      "task": 76,
+      "repetition": 0,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 1,
+      "activities": 8,
+      "samples": 24990,
+      "rawBytes": 1070127,
+      "candidates": 0,
+      "windows": 104,
+      "readMs": 2.002918000000051,
+      "decodeMs": 21.288250000000033,
+      "prepareMs": 13.317875000000015,
+      "scoreMs": 30.646333,
+      "totalMs": 67.413084,
+      "startMemory": {
+        "rss": 103.8125,
+        "heap": 16.338890075683594
+      },
+      "afterPrepare": {
+        "rss": 126.421875,
+        "heap": 27.78868865966797
+      },
+      "maxRSS": 162.6875,
+      "maxHeap": 61.43219757080078,
+      "processHighWaterMiB": 162.703125
+    },
+    {
+      "task": 26,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 0,
+      "activities": 24,
+      "samples": 17624,
+      "rawBytes": 689390,
+      "candidates": 0,
+      "windows": 37,
+      "readMs": 4.315959000000021,
+      "decodeMs": 13.064413999999914,
+      "prepareMs": 9.921919000000031,
+      "scoreMs": 24.927334000000002,
+      "totalMs": 52.486000000000004,
+      "startMemory": {
+        "rss": 104.984375,
+        "heap": 16.33692169189453
+      },
+      "afterPrepare": {
+        "rss": 114.453125,
+        "heap": 21.391799926757812
+      },
+      "maxRSS": 152.53125,
+      "maxHeap": 46.25872802734375,
+      "processHighWaterMiB": 152.546875
+    },
+    {
+      "task": 63,
+      "repetition": 0,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 0,
+      "activities": 48,
+      "samples": 36189,
+      "rawBytes": 1415737,
+      "candidates": 0,
+      "windows": 90,
+      "readMs": 6.819342000000034,
+      "decodeMs": 22.14683399999994,
+      "prepareMs": 12.195498999999884,
+      "scoreMs": 33.71029100000001,
+      "totalMs": 75.35120799999999,
+      "startMemory": {
+        "rss": 107.296875,
+        "heap": 16.30535125732422
+      },
+      "afterPrepare": {
+        "rss": 137.9375,
+        "heap": 27.578956604003906
+      },
+      "maxRSS": 178.171875,
+      "maxHeap": 68.01713562011719,
+      "processHighWaterMiB": 178.171875
+    },
+    {
+      "task": 13,
+      "repetition": 0,
+      "scenario": "real-3",
+      "profile": "75k",
+      "part": 0,
+      "activities": 20,
+      "samples": 73397,
+      "rawBytes": 3302712,
+      "candidates": 0,
+      "windows": 30,
+      "readMs": 5.019789999999887,
+      "decodeMs": 43.927541000000005,
+      "prepareMs": 20.27633399999995,
+      "scoreMs": 51.86504200000002,
+      "totalMs": 121.43541699999999,
+      "startMemory": {
+        "rss": 105.28125,
+        "heap": 16.304664611816406
+      },
+      "afterPrepare": {
+        "rss": 153.359375,
+        "heap": 45.005027770996094
+      },
+      "maxRSS": 208.46875,
+      "maxHeap": 95.77813720703125,
+      "processHighWaterMiB": 208.46875
+    },
+    {
+      "task": 50,
+      "repetition": 0,
+      "scenario": "real-2",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.1077499999999958,
+      "decodeMs": 22.419624999999996,
+      "prepareMs": 13.420333999999997,
+      "scoreMs": 69.388125,
+      "totalMs": 105.40245900000001,
+      "startMemory": {
+        "rss": 105.078125,
+        "heap": 16.340438842773438
+      },
+      "afterPrepare": {
+        "rss": 133.25,
+        "heap": 32.38463592529297
+      },
+      "maxRSS": 171.203125,
+      "maxHeap": 66.49555969238281,
+      "processHighWaterMiB": 171.21875
+    },
+    {
+      "task": 13,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "75k",
+      "part": 0,
+      "activities": 20,
+      "samples": 73397,
+      "rawBytes": 3302712,
+      "candidates": 0,
+      "windows": 30,
+      "readMs": 6.236334999999983,
+      "decodeMs": 40.72758200000007,
+      "prepareMs": 20.31216400000001,
+      "scoreMs": 52.745457999999985,
+      "totalMs": 120.30179100000001,
+      "startMemory": {
+        "rss": 105.03125,
+        "heap": 16.33647918701172
+      },
+      "afterPrepare": {
+        "rss": 147.78125,
+        "heap": 42.63261413574219
+      },
+      "maxRSS": 203.671875,
+      "maxHeap": 94.02363586425781,
+      "processHighWaterMiB": 203.671875
+    },
+    {
+      "task": 50,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.09808300000000258,
+      "decodeMs": 22.246750000000006,
+      "prepareMs": 12.151958000000008,
+      "scoreMs": 65.057334,
+      "totalMs": 99.60558300000001,
+      "startMemory": {
+        "rss": 105.359375,
+        "heap": 16.336746215820312
+      },
+      "afterPrepare": {
+        "rss": 133.5,
+        "heap": 32.35192108154297
+      },
+      "maxRSS": 171.296875,
+      "maxHeap": 65.8813247680664,
+      "processHighWaterMiB": 171.3125
+    },
+    {
+      "task": 0,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 0,
+      "activities": 9,
+      "samples": 22424,
+      "rawBytes": 982047,
+      "candidates": 0,
+      "windows": 12,
+      "readMs": 2.4140829999999767,
+      "decodeMs": 18.17995799999997,
+      "prepareMs": 9.941456000000002,
+      "scoreMs": 25.789833000000016,
+      "totalMs": 56.48308299999999,
+      "startMemory": {
+        "rss": 105.3125,
+        "heap": 16.339683532714844
+      },
+      "afterPrepare": {
+        "rss": 127.0625,
+        "heap": 26.946929931640625
+      },
+      "maxRSS": 160.703125,
+      "maxHeap": 59.01886749267578,
+      "processHighWaterMiB": 160.71875
+    },
+    {
+      "task": 37,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 6,
+      "activities": 12,
+      "samples": 18575,
+      "rawBytes": 725720,
+      "candidates": 0,
+      "windows": 36,
+      "readMs": 3.548333000000028,
+      "decodeMs": 17.106748999999994,
+      "prepareMs": 10.810917999999987,
+      "scoreMs": 26.247000000000014,
+      "totalMs": 57.945459000000014,
+      "startMemory": {
+        "rss": 105.4375,
+        "heap": 16.34033966064453
+      },
+      "afterPrepare": {
+        "rss": 114.671875,
+        "heap": 22.570663452148438
+      },
+      "maxRSS": 153.765625,
+      "maxHeap": 47.022132873535156,
+      "processHighWaterMiB": 153.78125
+    },
+    {
+      "task": 74,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "75k",
+      "part": 1,
+      "activities": 3,
+      "samples": 31006,
+      "rawBytes": 1432802,
+      "candidates": 320,
+      "windows": 19,
+      "readMs": 0.623958000000016,
+      "decodeMs": 33.014125000000035,
+      "prepareMs": 16.221998999999983,
+      "scoreMs": 71.36225000000002,
+      "totalMs": 121.37825000000001,
+      "startMemory": {
+        "rss": 107.421875,
+        "heap": 16.306396484375
+      },
+      "afterPrepare": {
+        "rss": 147.453125,
+        "heap": 43.37091827392578
+      },
+      "maxRSS": 179.40625,
+      "maxHeap": 74.27621459960938,
+      "processHighWaterMiB": 182.328125
+    },
+    {
+      "task": 24,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 5,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.2048340000000053,
+      "decodeMs": 28.886583999999985,
+      "prepareMs": 10.884416000000016,
+      "scoreMs": 70.862708,
+      "totalMs": 110.91429199999999,
+      "startMemory": {
+        "rss": 104.671875,
+        "heap": 16.310028076171875
+      },
+      "afterPrepare": {
+        "rss": 145.296875,
+        "heap": 41.948997497558594
+      },
+      "maxRSS": 178.4375,
+      "maxHeap": 55.48741912841797,
+      "processHighWaterMiB": 178.71875
+    },
+    {
+      "task": 61,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 10152,
+      "rawBytes": 481099,
+      "candidates": 0,
+      "windows": 6,
+      "readMs": 0.18141700000001038,
+      "decodeMs": 17.785750000000007,
+      "prepareMs": 5.753624999999985,
+      "scoreMs": 21.954499999999996,
+      "totalMs": 45.73170800000001,
+      "startMemory": {
+        "rss": 105.109375,
+        "heap": 16.33948516845703
+      },
+      "afterPrepare": {
+        "rss": 115.046875,
+        "heap": 21.526153564453125
+      },
+      "maxRSS": 148.53125,
+      "maxHeap": 37.02375793457031,
+      "processHighWaterMiB": 148.53125
+    },
+    {
+      "task": 11,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "original",
+      "part": 0,
+      "activities": 12,
+      "samples": 118179,
+      "rawBytes": 5300698,
+      "candidates": 390,
+      "windows": 74,
+      "readMs": 4.7985840000000195,
+      "decodeMs": 82.30891699999997,
+      "prepareMs": 39.03816900000001,
+      "scoreMs": 166.100084,
+      "totalMs": 292.561667,
+      "startMemory": {
+        "rss": 105.3125,
+        "heap": 16.331504821777344
+      },
+      "afterPrepare": {
+        "rss": 187.140625,
+        "heap": 70.0408935546875
+      },
+      "maxRSS": 288.765625,
+      "maxHeap": 174.93172454833984,
+      "processHighWaterMiB": 288.765625
+    },
+    {
+      "task": 48,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 5,
+      "activities": 2,
+      "samples": 8210,
+      "rawBytes": 352703,
+      "candidates": 8,
+      "windows": 10,
+      "readMs": 0.30162500000000136,
+      "decodeMs": 10.721874999999997,
+      "prepareMs": 6.038375000000002,
+      "scoreMs": 35.923749999999984,
+      "totalMs": 53.04779099999999,
+      "startMemory": {
+        "rss": 105.578125,
+        "heap": 16.337570190429688
+      },
+      "afterPrepare": {
+        "rss": 113.296875,
+        "heap": 18.34455108642578
+      },
+      "maxRSS": 147.734375,
+      "maxHeap": 39.758338928222656,
+      "processHighWaterMiB": 147.734375
+    },
+    {
+      "task": 85,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 1,
+      "activities": 7,
+      "samples": 45878,
+      "rawBytes": 2056261,
+      "candidates": 240,
+      "windows": 37,
+      "readMs": 1.005166000000031,
+      "decodeMs": 31.81033199999999,
+      "prepareMs": 21.041584000000014,
+      "scoreMs": 99.23658300000002,
+      "totalMs": 153.25874999999996,
+      "startMemory": {
+        "rss": 105.71875,
+        "heap": 16.341384887695312
+      },
+      "afterPrepare": {
+        "rss": 153.875,
+        "heap": 43.73851013183594
+      },
+      "maxRSS": 190.84375,
+      "maxHeap": 71.81857299804688,
+      "processHighWaterMiB": 192.921875
+    },
+    {
+      "task": 35,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 4,
+      "activities": 12,
+      "samples": 13753,
+      "rawBytes": 539129,
+      "candidates": 0,
+      "windows": 32,
+      "readMs": 3.250792000000004,
+      "decodeMs": 12.518293,
+      "prepareMs": 8.339291999999986,
+      "scoreMs": 22.31562500000001,
+      "totalMs": 46.618292,
+      "startMemory": {
+        "rss": 106.765625,
+        "heap": 16.313720703125
+      },
+      "afterPrepare": {
+        "rss": 124.3125,
+        "heap": 31.010887145996094
+      },
+      "maxRSS": 153.90625,
+      "maxHeap": 45.920677185058594,
+      "processHighWaterMiB": 153.90625
+    },
+    {
+      "task": 72,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.1565830000000119,
+      "decodeMs": 22.96249999999999,
+      "prepareMs": 13.265999999999991,
+      "scoreMs": 77.222542,
+      "totalMs": 113.68066700000001,
+      "startMemory": {
+        "rss": 104.78125,
+        "heap": 16.30298614501953
+      },
+      "afterPrepare": {
+        "rss": 141.40625,
+        "heap": 36.667564392089844
+      },
+      "maxRSS": 171.75,
+      "maxHeap": 39.145347595214844,
+      "processHighWaterMiB": 173.09375
+    },
+    {
+      "task": 22,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 3,
+      "activities": 1,
+      "samples": 26836,
+      "rawBytes": 1238935,
+      "candidates": 190,
+      "windows": 11,
+      "readMs": 0.10800000000000409,
+      "decodeMs": 28.347624999999994,
+      "prepareMs": 13.192667,
+      "scoreMs": 74.15270799999999,
+      "totalMs": 115.877583,
+      "startMemory": {
+        "rss": 104.6875,
+        "heap": 16.338958740234375
+      },
+      "afterPrepare": {
+        "rss": 140.859375,
+        "heap": 36.657325744628906
+      },
+      "maxRSS": 176.515625,
+      "maxHeap": 56.082298278808594,
+      "processHighWaterMiB": 176.9375
+    },
+    {
+      "task": 59,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "75k",
+      "part": 1,
+      "activities": 2,
+      "samples": 26507,
+      "rawBytes": 1145754,
+      "candidates": 29,
+      "windows": 54,
+      "readMs": 0.7244169999999883,
+      "decodeMs": 19.473417999999995,
+      "prepareMs": 13.828250000000011,
+      "scoreMs": 77.458125,
+      "totalMs": 111.57366699999999,
+      "startMemory": {
+        "rss": 105.28125,
+        "heap": 16.341033935546875
+      },
+      "afterPrepare": {
+        "rss": 134.84375,
+        "heap": 33.875022888183594
+      },
+      "maxRSS": 174.609375,
+      "maxHeap": 46.18157196044922,
+      "processHighWaterMiB": 174.890625
+    },
+    {
+      "task": 9,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 1,
+      "activities": 3,
+      "samples": 30252,
+      "rawBytes": 1297783,
+      "candidates": 36,
+      "windows": 10,
+      "readMs": 2.7740010000000126,
+      "decodeMs": 26.265416999999985,
+      "prepareMs": 13.541249999999991,
+      "scoreMs": 69.14016699999999,
+      "totalMs": 111.83724999999998,
+      "startMemory": {
+        "rss": 105.234375,
+        "heap": 16.334510803222656
+      },
+      "afterPrepare": {
+        "rss": 138.734375,
+        "heap": 39.28771209716797
+      },
+      "maxRSS": 179.84375,
+      "maxHeap": 60.99720764160156,
+      "processHighWaterMiB": 180.890625
+    },
+    {
+      "task": 46,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 3,
+      "activities": 1,
+      "samples": 8893,
+      "rawBytes": 384748,
+      "candidates": 8,
+      "windows": 4,
+      "readMs": 0.0954579999999936,
+      "decodeMs": 14.138125000000002,
+      "prepareMs": 5.604834000000011,
+      "scoreMs": 38.42775,
+      "totalMs": 58.31325000000001,
+      "startMemory": {
+        "rss": 106.640625,
+        "heap": 16.333114624023438
+      },
+      "afterPrepare": {
+        "rss": 114.8125,
+        "heap": 22.012969970703125
+      },
+      "maxRSS": 150.203125,
+      "maxHeap": 32.996681213378906,
+      "processHighWaterMiB": 150.203125
+    },
+    {
+      "task": 83,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "original",
+      "part": 0,
+      "activities": 14,
+      "samples": 103593,
+      "rawBytes": 4553900,
+      "candidates": 336,
+      "windows": 54,
+      "readMs": 6.831331999999961,
+      "decodeMs": 68.67912599999998,
+      "prepareMs": 30.59866900000003,
+      "scoreMs": 125.86687500000002,
+      "totalMs": 232.25833300000002,
+      "startMemory": {
+        "rss": 107.75,
+        "heap": 16.3377685546875
+      },
+      "afterPrepare": {
+        "rss": 177.953125,
+        "heap": 63.13172149658203
+      },
+      "maxRSS": 261.203125,
+      "maxHeap": 141.62317657470703,
+      "processHighWaterMiB": 261.21875
+    },
+    {
+      "task": 33,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 2,
+      "activities": 12,
+      "samples": 8015,
+      "rawBytes": 314716,
+      "candidates": 0,
+      "windows": 28,
+      "readMs": 4.231376000000026,
+      "decodeMs": 9.466496999999976,
+      "prepareMs": 6.124082999999985,
+      "scoreMs": 23.67420899999999,
+      "totalMs": 43.742958,
+      "startMemory": {
+        "rss": 105.34375,
+        "heap": 16.310874938964844
+      },
+      "afterPrepare": {
+        "rss": 115.984375,
+        "heap": 19.769874572753906
+      },
+      "maxRSS": 145.359375,
+      "maxHeap": 41.38141632080078,
+      "processHighWaterMiB": 145.359375
+    },
+    {
+      "task": 70,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 2,
+      "activities": 1,
+      "samples": 26291,
+      "rawBytes": 1260729,
+      "candidates": 159,
+      "windows": 18,
+      "readMs": 0.17120800000000713,
+      "decodeMs": 29.583749999999995,
+      "prepareMs": 15.488500000000016,
+      "scoreMs": 69.99437499999999,
+      "totalMs": 115.31795900000002,
+      "startMemory": {
+        "rss": 104.5625,
+        "heap": 16.30469512939453
+      },
+      "afterPrepare": {
+        "rss": 145.078125,
+        "heap": 33.36567687988281
+      },
+      "maxRSS": 177.265625,
+      "maxHeap": 49.23920440673828,
+      "processHighWaterMiB": 178.953125
+    },
+    {
+      "task": 20,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 1,
+      "activities": 2,
+      "samples": 21124,
+      "rawBytes": 926290,
+      "candidates": 26,
+      "windows": 9,
+      "readMs": 0.37170800000001236,
+      "decodeMs": 19.727165999999983,
+      "prepareMs": 12.504248999999987,
+      "scoreMs": 68.01262500000001,
+      "totalMs": 100.70762500000001,
+      "startMemory": {
+        "rss": 107.078125,
+        "heap": 16.324996948242188
+      },
+      "afterPrepare": {
+        "rss": 131.15625,
+        "heap": 26.561073303222656
+      },
+      "maxRSS": 172.078125,
+      "maxHeap": 50.08539581298828,
+      "processHighWaterMiB": 172.09375
+    },
+    {
+      "task": 57,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 2,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.12437500000000057,
+      "decodeMs": 23.255166000000017,
+      "prepareMs": 12.543000000000006,
+      "scoreMs": 65.67345899999998,
+      "totalMs": 101.668084,
+      "startMemory": {
+        "rss": 106.4375,
+        "heap": 16.321792602539062
+      },
+      "afterPrepare": {
+        "rss": 135.0625,
+        "heap": 32.29845428466797
+      },
+      "maxRSS": 172.34375,
+      "maxHeap": 65.63249206542969,
+      "processHighWaterMiB": 172.359375
+    },
+    {
+      "task": 7,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 4600,
+      "rawBytes": 199173,
+      "candidates": 7,
+      "windows": 4,
+      "readMs": 0.09583299999999895,
+      "decodeMs": 9.880375,
+      "prepareMs": 3.69987500000002,
+      "scoreMs": 32.927374999999984,
+      "totalMs": 46.65279199999999,
+      "startMemory": {
+        "rss": 106.578125,
+        "heap": 16.3353271484375
+      },
+      "afterPrepare": {
+        "rss": 113.546875,
+        "heap": 17.37908172607422
+      },
+      "maxRSS": 142.890625,
+      "maxHeap": 35.677040100097656,
+      "processHighWaterMiB": 142.90625
+    },
+    {
+      "task": 44,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 1,
+      "activities": 5,
+      "samples": 20364,
+      "rawBytes": 880739,
+      "candidates": 12,
+      "windows": 18,
+      "readMs": 2.603250000000017,
+      "decodeMs": 19.885583000000025,
+      "prepareMs": 10.04583299999996,
+      "scoreMs": 49.374750000000006,
+      "totalMs": 82.05725,
+      "startMemory": {
+        "rss": 105.515625,
+        "heap": 16.304855346679688
+      },
+      "afterPrepare": {
+        "rss": 133.0625,
+        "heap": 34.538909912109375
+      },
+      "maxRSS": 169.84375,
+      "maxHeap": 53.708885192871094,
+      "processHighWaterMiB": 169.84375
+    },
+    {
+      "task": 81,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 1,
+      "activities": 36,
+      "samples": 38079,
+      "rawBytes": 1488782,
+      "candidates": 0,
+      "windows": 82,
+      "readMs": 6.276957999999951,
+      "decodeMs": 23.21087700000001,
+      "prepareMs": 11.639455000000055,
+      "scoreMs": 34.587458,
+      "totalMs": 76.08841699999999,
+      "startMemory": {
+        "rss": 104.5,
+        "heap": 16.305076599121094
+      },
+      "afterPrepare": {
+        "rss": 135.5625,
+        "heap": 30.799461364746094
+      },
+      "maxRSS": 176.703125,
+      "maxHeap": 71.01092529296875,
+      "processHighWaterMiB": 176.703125
+    },
+    {
+      "task": 31,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 0,
+      "activities": 12,
+      "samples": 8859,
+      "rawBytes": 345271,
+      "candidates": 0,
+      "windows": 19,
+      "readMs": 2.919166999999959,
+      "decodeMs": 10.161834999999968,
+      "prepareMs": 5.926500000000004,
+      "scoreMs": 24.951875,
+      "totalMs": 44.16070900000001,
+      "startMemory": {
+        "rss": 105.03125,
+        "heap": 16.33453369140625
+      },
+      "afterPrepare": {
+        "rss": 109.484375,
+        "heap": 18.385047912597656
+      },
+      "maxRSS": 139.53125,
+      "maxHeap": 38.44763946533203,
+      "processHighWaterMiB": 139.53125
+    },
+    {
+      "task": 68,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 0,
+      "activities": 2,
+      "samples": 19831,
+      "rawBytes": 856473,
+      "candidates": 16,
+      "windows": 8,
+      "readMs": 0.43429100000000176,
+      "decodeMs": 23.001541000000003,
+      "prepareMs": 12.076083000000011,
+      "scoreMs": 42.244541,
+      "totalMs": 77.845958,
+      "startMemory": {
+        "rss": 105.59375,
+        "heap": 16.30402374267578
+      },
+      "afterPrepare": {
+        "rss": 139.171875,
+        "heap": 28.522796630859375
+      },
+      "maxRSS": 167.046875,
+      "maxHeap": 50.953269958496094,
+      "processHighWaterMiB": 167.046875
+    },
+    {
+      "task": 18,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.10812500000000114,
+      "decodeMs": 28.37045900000001,
+      "prepareMs": 10.613249999999994,
+      "scoreMs": 71.440875,
+      "totalMs": 110.603125,
+      "startMemory": {
+        "rss": 107.5,
+        "heap": 16.336509704589844
+      },
+      "afterPrepare": {
+        "rss": 143.03125,
+        "heap": 38.468894958496094
+      },
+      "maxRSS": 178.609375,
+      "maxHeap": 48.44927215576172,
+      "processHighWaterMiB": 179.09375
+    },
+    {
+      "task": 55,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 0,
+      "activities": 4,
+      "samples": 44306,
+      "rawBytes": 1903630,
+      "candidates": 31,
+      "windows": 21,
+      "readMs": 0.736083000000022,
+      "decodeMs": 33.26295800000004,
+      "prepareMs": 21.52208300000001,
+      "scoreMs": 86.33783299999999,
+      "totalMs": 141.99687500000002,
+      "startMemory": {
+        "rss": 105.328125,
+        "heap": 16.342140197753906
+      },
+      "afterPrepare": {
+        "rss": 153.6875,
+        "heap": 42.02069091796875
+      },
+      "maxRSS": 190.71875,
+      "maxHeap": 76.29217529296875,
+      "processHighWaterMiB": 192.875
+    },
+    {
+      "task": 5,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 5,
+      "activities": 1,
+      "samples": 10152,
+      "rawBytes": 481099,
+      "candidates": 0,
+      "windows": 6,
+      "readMs": 0.1349999999999909,
+      "decodeMs": 16.833624999999998,
+      "prepareMs": 5.586749999999995,
+      "scoreMs": 20.827833999999996,
+      "totalMs": 43.43491700000001,
+      "startMemory": {
+        "rss": 106.6875,
+        "heap": 16.333023071289062
+      },
+      "afterPrepare": {
+        "rss": 116.671875,
+        "heap": 21.51605224609375
+      },
+      "maxRSS": 150.09375,
+      "maxHeap": 35.748809814453125,
+      "processHighWaterMiB": 150.109375
+    },
+    {
+      "task": 42,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 2,
+      "activities": 2,
+      "samples": 18431,
+      "rawBytes": 867690,
+      "candidates": 0,
+      "windows": 10,
+      "readMs": 0.48391700000000526,
+      "decodeMs": 27.26308300000001,
+      "prepareMs": 11.530374999999964,
+      "scoreMs": 26.074749999999995,
+      "totalMs": 65.46162500000001,
+      "startMemory": {
+        "rss": 105.453125,
+        "heap": 16.2999267578125
+      },
+      "afterPrepare": {
+        "rss": 139.5,
+        "heap": 29.520950317382812
+      },
+      "maxRSS": 164.53125,
+      "maxHeap": 56.911643981933594,
+      "processHighWaterMiB": 164.53125
+    },
+    {
+      "task": 79,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 4634,
+      "rawBytes": 196502,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.17483300000000668,
+      "decodeMs": 10.025333000000003,
+      "prepareMs": 4.200165999999996,
+      "scoreMs": 23.325416999999987,
+      "totalMs": 37.776916,
+      "startMemory": {
+        "rss": 105.359375,
+        "heap": 16.340057373046875
+      },
+      "afterPrepare": {
+        "rss": 112.125,
+        "heap": 17.52172088623047
+      },
+      "maxRSS": 137.921875,
+      "maxHeap": 32.06635284423828,
+      "processHighWaterMiB": 137.9375
+    },
+    {
+      "task": 29,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 3,
+      "activities": 24,
+      "samples": 34660,
+      "rawBytes": 1358662,
+      "candidates": 0,
+      "windows": 57,
+      "readMs": 5.254834000000045,
+      "decodeMs": 22.15458300000003,
+      "prepareMs": 15.526790999999946,
+      "scoreMs": 29.65491700000001,
+      "totalMs": 72.88491700000002,
+      "startMemory": {
+        "rss": 105.15625,
+        "heap": 16.34032440185547
+      },
+      "afterPrepare": {
+        "rss": 131.09375,
+        "heap": 27.015106201171875
+      },
+      "maxRSS": 170.125,
+      "maxHeap": 63.351219177246094,
+      "processHighWaterMiB": 170.125
+    },
+    {
+      "task": 66,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "50k",
+      "part": 0,
+      "activities": 15,
+      "samples": 48384,
+      "rawBytes": 2065440,
+      "candidates": 0,
+      "windows": 192,
+      "readMs": 3.719249000000005,
+      "decodeMs": 30.074169000000012,
+      "prepareMs": 21.583748999999983,
+      "scoreMs": 43.137292,
+      "totalMs": 98.74220899999999,
+      "startMemory": {
+        "rss": 104.546875,
+        "heap": 16.328598022460938
+      },
+      "afterPrepare": {
+        "rss": 144.296875,
+        "heap": 36.752525329589844
+      },
+      "maxRSS": 189.3125,
+      "maxHeap": 80.28195190429688,
+      "processHighWaterMiB": 189.328125
+    },
+    {
+      "task": 16,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "75k",
+      "part": 1,
+      "activities": 6,
+      "samples": 60582,
+      "rawBytes": 2814774,
+      "candidates": 337,
+      "windows": 36,
+      "readMs": 3.043624000000051,
+      "decodeMs": 44.933291999999994,
+      "prepareMs": 26.788460000000015,
+      "scoreMs": 118.62591599999999,
+      "totalMs": 193.55154200000004,
+      "startMemory": {
+        "rss": 105.640625,
+        "heap": 16.339576721191406
+      },
+      "afterPrepare": {
+        "rss": 166.78125,
+        "heap": 58.69203186035156
+      },
+      "maxRSS": 213.5625,
+      "maxHeap": 97.0033187866211,
+      "processHighWaterMiB": 213.5625
+    },
+    {
+      "task": 53,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "100k",
+      "part": 0,
+      "activities": 25,
+      "samples": 95434,
+      "rawBytes": 4073862,
+      "candidates": 0,
+      "windows": 230,
+      "readMs": 18.275833999999946,
+      "decodeMs": 52.52962599999999,
+      "prepareMs": 29.21516800000002,
+      "scoreMs": 50.53687499999998,
+      "totalMs": 150.98145799999998,
+      "startMemory": {
+        "rss": 105.46875,
+        "heap": 16.33069610595703
+      },
+      "afterPrepare": {
+        "rss": 155.84375,
+        "heap": 50.64289093017578
+      },
+      "maxRSS": 233.84375,
+      "maxHeap": 121.31831359863281,
+      "processHighWaterMiB": 233.859375
+    },
+    {
+      "task": 3,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 3,
+      "activities": 4,
+      "samples": 20014,
+      "rawBytes": 854300,
+      "candidates": 0,
+      "windows": 14,
+      "readMs": 2.0566260000000085,
+      "decodeMs": 22.78470799999998,
+      "prepareMs": 11.116207999999972,
+      "scoreMs": 30.055333999999988,
+      "totalMs": 66.15533400000001,
+      "startMemory": {
+        "rss": 105.234375,
+        "heap": 16.306304931640625
+      },
+      "afterPrepare": {
+        "rss": 136.0625,
+        "heap": 36.35661315917969
+      },
+      "maxRSS": 164.546875,
+      "maxHeap": 56.339210510253906,
+      "processHighWaterMiB": 164.546875
+    },
+    {
+      "task": 40,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 0,
+      "activities": 16,
+      "samples": 49106,
+      "rawBytes": 2222705,
+      "candidates": 0,
+      "windows": 20,
+      "readMs": 4.086750000000038,
+      "decodeMs": 32.63208599999997,
+      "prepareMs": 21.053206999999986,
+      "scoreMs": 44.23724999999999,
+      "totalMs": 102.305375,
+      "startMemory": {
+        "rss": 107.265625,
+        "heap": 16.338424682617188
+      },
+      "afterPrepare": {
+        "rss": 143.140625,
+        "heap": 29.91803741455078
+      },
+      "maxRSS": 191.140625,
+      "maxHeap": 79.4566421508789,
+      "processHighWaterMiB": 191.140625
+    },
+    {
+      "task": 77,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 2,
+      "activities": 5,
+      "samples": 21637,
+      "rawBytes": 923612,
+      "candidates": 0,
+      "windows": 19,
+      "readMs": 1.2080839999999995,
+      "decodeMs": 19.096834999999984,
+      "prepareMs": 10.210126000000002,
+      "scoreMs": 28.345917000000014,
+      "totalMs": 58.996042,
+      "startMemory": {
+        "rss": 105.390625,
+        "heap": 16.327003479003906
+      },
+      "afterPrepare": {
+        "rss": 126.078125,
+        "heap": 34.07606506347656
+      },
+      "maxRSS": 163.203125,
+      "maxHeap": 54.057090759277344,
+      "processHighWaterMiB": 163.203125
+    },
+    {
+      "task": 27,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 1,
+      "activities": 24,
+      "samples": 18565,
+      "rawBytes": 726347,
+      "candidates": 0,
+      "windows": 53,
+      "readMs": 5.086164000000039,
+      "decodeMs": 12.367251999999965,
+      "prepareMs": 8.336666999999949,
+      "scoreMs": 25.607541999999995,
+      "totalMs": 51.66270799999998,
+      "startMemory": {
+        "rss": 104.515625,
+        "heap": 16.33885955810547
+      },
+      "afterPrepare": {
+        "rss": 113.15625,
+        "heap": 18.72693634033203
+      },
+      "maxRSS": 152.796875,
+      "maxHeap": 48.49750518798828,
+      "processHighWaterMiB": 152.796875
+    },
+    {
+      "task": 64,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 1,
+      "activities": 48,
+      "samples": 62189,
+      "rawBytes": 2435813,
+      "candidates": 0,
+      "windows": 114,
+      "readMs": 9.451122000000069,
+      "decodeMs": 32.96283399999996,
+      "prepareMs": 19.25646000000002,
+      "scoreMs": 42.64616699999999,
+      "totalMs": 104.842458,
+      "startMemory": {
+        "rss": 106.296875,
+        "heap": 16.330345153808594
+      },
+      "afterPrepare": {
+        "rss": 140.8125,
+        "heap": 38.39965057373047
+      },
+      "maxRSS": 198.671875,
+      "maxHeap": 91.16226959228516,
+      "processHighWaterMiB": 198.703125
+    },
+    {
+      "task": 14,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "75k",
+      "part": 1,
+      "activities": 6,
+      "samples": 36263,
+      "rawBytes": 1681214,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 1.2455409999999603,
+      "decodeMs": 29.17041599999996,
+      "prepareMs": 15.541208999999995,
+      "scoreMs": 37.15366700000001,
+      "totalMs": 83.300292,
+      "startMemory": {
+        "rss": 106.421875,
+        "heap": 16.301376342773438
+      },
+      "afterPrepare": {
+        "rss": 149.859375,
+        "heap": 42.2166748046875
+      },
+      "maxRSS": 190.234375,
+      "maxHeap": 84.45882415771484,
+      "processHighWaterMiB": 190.234375
+    },
+    {
+      "task": 51,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "75k",
+      "part": 0,
+      "activities": 20,
+      "samples": 72911,
+      "rawBytes": 3113663,
+      "candidates": 0,
+      "windows": 213,
+      "readMs": 5.047499999999971,
+      "decodeMs": 39.11946100000003,
+      "prepareMs": 25.41945800000002,
+      "scoreMs": 51.653666999999984,
+      "totalMs": 121.51083299999999,
+      "startMemory": {
+        "rss": 104.984375,
+        "heap": 16.316200256347656
+      },
+      "afterPrepare": {
+        "rss": 153.859375,
+        "heap": 45.491539001464844
+      },
+      "maxRSS": 204.203125,
+      "maxHeap": 99.37771606445312,
+      "processHighWaterMiB": 204.21875
+    },
+    {
+      "task": 1,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 1,
+      "activities": 6,
+      "samples": 22146,
+      "rawBytes": 1025093,
+      "candidates": 0,
+      "windows": 7,
+      "readMs": 1.578291999999962,
+      "decodeMs": 19.02666599999999,
+      "prepareMs": 12.674417999999989,
+      "scoreMs": 25.110375000000005,
+      "totalMs": 58.553792,
+      "startMemory": {
+        "rss": 105.640625,
+        "heap": 16.307785034179688
+      },
+      "afterPrepare": {
+        "rss": 134.828125,
+        "heap": 25.199485778808594
+      },
+      "maxRSS": 164.34375,
+      "maxHeap": 57.87773895263672,
+      "processHighWaterMiB": 164.34375
+    },
+    {
+      "task": 38,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 7,
+      "activities": 12,
+      "samples": 16085,
+      "rawBytes": 632942,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 2.070456999999948,
+      "decodeMs": 12.496001000000007,
+      "prepareMs": 9.799416999999963,
+      "scoreMs": 23.50483300000002,
+      "totalMs": 48.070125000000004,
+      "startMemory": {
+        "rss": 105.453125,
+        "heap": 16.303802490234375
+      },
+      "afterPrepare": {
+        "rss": 124.328125,
+        "heap": 21.561683654785156
+      },
+      "maxRSS": 155.109375,
+      "maxHeap": 50.98542022705078,
+      "processHighWaterMiB": 155.109375
+    },
+    {
+      "task": 75,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 0,
+      "activities": 6,
+      "samples": 22551,
+      "rawBytes": 961902,
+      "candidates": 0,
+      "windows": 87,
+      "readMs": 1.1773339999999592,
+      "decodeMs": 19.466499000000027,
+      "prepareMs": 12.863667000000007,
+      "scoreMs": 26.901624999999996,
+      "totalMs": 60.553083000000015,
+      "startMemory": {
+        "rss": 105.25,
+        "heap": 16.337425231933594
+      },
+      "afterPrepare": {
+        "rss": 127.65625,
+        "heap": 25.016754150390625
+      },
+      "maxRSS": 163.421875,
+      "maxHeap": 59.29138946533203,
+      "processHighWaterMiB": 163.421875
+    },
+    {
+      "task": 25,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "original",
+      "part": 0,
+      "activities": 25,
+      "samples": 95434,
+      "rawBytes": 4073862,
+      "candidates": 0,
+      "windows": 230,
+      "readMs": 19.384084000000087,
+      "decodeMs": 52.45662600000003,
+      "prepareMs": 29.672501999999994,
+      "scoreMs": 52.75041600000003,
+      "totalMs": 154.69983299999996,
+      "startMemory": {
+        "rss": 105.390625,
+        "heap": 16.345367431640625
+      },
+      "afterPrepare": {
+        "rss": 155.4375,
+        "heap": 50.64617156982422
+      },
+      "maxRSS": 233.6875,
+      "maxHeap": 123.62504577636719,
+      "processHighWaterMiB": 233.703125
+    },
+    {
+      "task": 62,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "original",
+      "part": 0,
+      "activities": 26,
+      "samples": 109660,
+      "rawBytes": 4983926,
+      "candidates": 0,
+      "windows": 51,
+      "readMs": 20.022959000000043,
+      "decodeMs": 61.37946100000005,
+      "prepareMs": 30.438502000000028,
+      "scoreMs": 57.152457999999996,
+      "totalMs": 169.36037500000003,
+      "startMemory": {
+        "rss": 104.6875,
+        "heap": 16.335159301757812
+      },
+      "afterPrepare": {
+        "rss": 158.203125,
+        "heap": 48.37171173095703
+      },
+      "maxRSS": 252.5,
+      "maxHeap": 136.6260223388672,
+      "processHighWaterMiB": 252.5
+    },
+    {
+      "task": 12,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "original",
+      "part": 0,
+      "activities": 97,
+      "samples": 100618,
+      "rawBytes": 3939515,
+      "candidates": 0,
+      "windows": 207,
+      "readMs": 16.28429300000012,
+      "decodeMs": 44.757287999999974,
+      "prepareMs": 17.127749000000165,
+      "scoreMs": 65.53579099999999,
+      "totalMs": 144.58887499999997,
+      "startMemory": {
+        "rss": 107.109375,
+        "heap": 16.33905792236328
+      },
+      "afterPrepare": {
+        "rss": 153.453125,
+        "heap": 42.84767150878906
+      },
+      "maxRSS": 228.484375,
+      "maxHeap": 121.79725646972656,
+      "processHighWaterMiB": 228.484375
+    },
+    {
+      "task": 49,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "100k",
+      "part": 0,
+      "activities": 7,
+      "samples": 77214,
+      "rawBytes": 3428635,
+      "candidates": 192,
+      "windows": 60,
+      "readMs": 1.94500000000005,
+      "decodeMs": 51.061873000000034,
+      "prepareMs": 38.063457000000014,
+      "scoreMs": 120.678417,
+      "totalMs": 211.99575000000004,
+      "startMemory": {
+        "rss": 106.46875,
+        "heap": 16.335792541503906
+      },
+      "afterPrepare": {
+        "rss": 177.59375,
+        "heap": 69.29194641113281
+      },
+      "maxRSS": 229.78125,
+      "maxHeap": 114.74860382080078,
+      "processHighWaterMiB": 229.78125
+    },
+    {
+      "task": 86,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 2,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.13437499999999147,
+      "decodeMs": 26.874583999999984,
+      "prepareMs": 10.308166999999997,
+      "scoreMs": 68.89233300000001,
+      "totalMs": 106.27449999999999,
+      "startMemory": {
+        "rss": 105.015625,
+        "heap": 16.333999633789062
+      },
+      "afterPrepare": {
+        "rss": 139.265625,
+        "heap": 37.64263916015625
+      },
+      "maxRSS": 175.6875,
+      "maxHeap": 45.61677551269531,
+      "processHighWaterMiB": 177.484375
+    },
+    {
+      "task": 36,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 5,
+      "activities": 12,
+      "samples": 13776,
+      "rawBytes": 538022,
+      "candidates": 0,
+      "windows": 25,
+      "readMs": 3.645916999999983,
+      "decodeMs": 12.254334000000014,
+      "prepareMs": 8.185208999999986,
+      "scoreMs": 25.056375000000003,
+      "totalMs": 49.400915999999995,
+      "startMemory": {
+        "rss": 103.9375,
+        "heap": 15.881813049316406
+      },
+      "afterPrepare": {
+        "rss": 121.890625,
+        "heap": 31.055282592773438
+      },
+      "maxRSS": 152.5,
+      "maxHeap": 47.403297424316406,
+      "processHighWaterMiB": 152.5
+    },
+    {
+      "task": 73,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "75k",
+      "part": 0,
+      "activities": 11,
+      "samples": 72587,
+      "rawBytes": 3121098,
+      "candidates": 40,
+      "windows": 35,
+      "readMs": 4.489292999999961,
+      "decodeMs": 46.159918999999945,
+      "prepareMs": 23.95341500000002,
+      "scoreMs": 110.941541,
+      "totalMs": 185.787917,
+      "startMemory": {
+        "rss": 105.25,
+        "heap": 16.33978271484375
+      },
+      "afterPrepare": {
+        "rss": 160.90625,
+        "heap": 47.15205383300781
+      },
+      "maxRSS": 230.03125,
+      "maxHeap": 106.55108642578125,
+      "processHighWaterMiB": 230.03125
+    },
+    {
+      "task": 23,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 4,
+      "activities": 4,
+      "samples": 7526,
+      "rawBytes": 313433,
+      "candidates": 21,
+      "windows": 10,
+      "readMs": 1.293374,
+      "decodeMs": 10.434124999999995,
+      "prepareMs": 6.089959999999991,
+      "scoreMs": 39.225291,
+      "totalMs": 57.175917,
+      "startMemory": {
+        "rss": 105.21875,
+        "heap": 16.304397583007812
+      },
+      "afterPrepare": {
+        "rss": 117.3125,
+        "heap": 20.769569396972656
+      },
+      "maxRSS": 150.25,
+      "maxHeap": 44.83283233642578,
+      "processHighWaterMiB": 150.265625
+    },
+    {
+      "task": 60,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "100k",
+      "part": 0,
+      "activities": 25,
+      "samples": 99508,
+      "rawBytes": 4502827,
+      "candidates": 0,
+      "windows": 45,
+      "readMs": 5.312378000000052,
+      "decodeMs": 62.05491500000001,
+      "prepareMs": 36.009874999999965,
+      "scoreMs": 66.500417,
+      "totalMs": 170.355167,
+      "startMemory": {
+        "rss": 105.125,
+        "heap": 16.324790954589844
+      },
+      "afterPrepare": {
+        "rss": 161.578125,
+        "heap": 54.53441619873047
+      },
+      "maxRSS": 241.0625,
+      "maxHeap": 131.76100158691406,
+      "processHighWaterMiB": 241.0625
+    },
+    {
+      "task": 10,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 2,
+      "activities": 3,
+      "samples": 31006,
+      "rawBytes": 1432802,
+      "candidates": 320,
+      "windows": 19,
+      "readMs": 0.7293740000000071,
+      "decodeMs": 33.289749000000015,
+      "prepareMs": 16.553290999999973,
+      "scoreMs": 70.90766699999998,
+      "totalMs": 121.61691699999999,
+      "startMemory": {
+        "rss": 105.5,
+        "heap": 16.311111450195312
+      },
+      "afterPrepare": {
+        "rss": 145.46875,
+        "heap": 43.64894104003906
+      },
+      "maxRSS": 177.453125,
+      "maxHeap": 61.911163330078125,
+      "processHighWaterMiB": 180.640625
+    },
+    {
+      "task": 47,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 22796,
+      "rawBytes": 1080099,
+      "candidates": 312,
+      "windows": 9,
+      "readMs": 0.16483399999999904,
+      "decodeMs": 26.639667000000017,
+      "prepareMs": 12.784625000000005,
+      "scoreMs": 53.460916,
+      "totalMs": 93.111708,
+      "startMemory": {
+        "rss": 105.90625,
+        "heap": 16.308624267578125
+      },
+      "afterPrepare": {
+        "rss": 142.5625,
+        "heap": 37.658203125
+      },
+      "maxRSS": 173.46875,
+      "maxHeap": 66.58769989013672,
+      "processHighWaterMiB": 173.484375
+    },
+    {
+      "task": 84,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 0,
+      "activities": 4,
+      "samples": 46081,
+      "rawBytes": 1982031,
+      "candidates": 38,
+      "windows": 22,
+      "readMs": 2.087124999999986,
+      "decodeMs": 33.12587499999999,
+      "prepareMs": 18.278290999999967,
+      "scoreMs": 103.95883300000003,
+      "totalMs": 157.580959,
+      "startMemory": {
+        "rss": 105.765625,
+        "heap": 16.33745574951172
+      },
+      "afterPrepare": {
+        "rss": 153.5,
+        "heap": 40.48335266113281
+      },
+      "maxRSS": 189,
+      "maxHeap": 72.63052368164062,
+      "processHighWaterMiB": 189
+    },
+    {
+      "task": 34,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 3,
+      "activities": 12,
+      "samples": 10550,
+      "rawBytes": 411631,
+      "candidates": 0,
+      "windows": 25,
+      "readMs": 2.5347919999999817,
+      "decodeMs": 10.12074899999999,
+      "prepareMs": 7.097167999999968,
+      "scoreMs": 22.850708999999995,
+      "totalMs": 42.78841700000001,
+      "startMemory": {
+        "rss": 105.0625,
+        "heap": 16.341720581054688
+      },
+      "afterPrepare": {
+        "rss": 111.96875,
+        "heap": 19.015777587890625
+      },
+      "maxRSS": 143.5625,
+      "maxHeap": 42.340423583984375,
+      "processHighWaterMiB": 143.5625
+    },
+    {
+      "task": 71,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 3,
+      "activities": 2,
+      "samples": 6617,
+      "rawBytes": 264276,
+      "candidates": 9,
+      "windows": 21,
+      "readMs": 0.6344589999999926,
+      "decodeMs": 10.11895800000002,
+      "prepareMs": 4.342166000000006,
+      "scoreMs": 31.012042000000008,
+      "totalMs": 46.178042000000005,
+      "startMemory": {
+        "rss": 105.234375,
+        "heap": 16.3447265625
+      },
+      "afterPrepare": {
+        "rss": 111.140625,
+        "heap": 20.509803771972656
+      },
+      "maxRSS": 143.3125,
+      "maxHeap": 39.665870666503906,
+      "processHighWaterMiB": 143.3125
+    },
+    {
+      "task": 21,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 2,
+      "activities": 2,
+      "samples": 11516,
+      "rawBytes": 503893,
+      "candidates": 29,
+      "windows": 16,
+      "readMs": 1.2557079999999985,
+      "decodeMs": 16.193166000000005,
+      "prepareMs": 6.999417000000008,
+      "scoreMs": 38.24704199999999,
+      "totalMs": 62.793625000000006,
+      "startMemory": {
+        "rss": 105.375,
+        "heap": 16.30809783935547
+      },
+      "afterPrepare": {
+        "rss": 122.4375,
+        "heap": 30.27851104736328
+      },
+      "maxRSS": 154.796875,
+      "maxHeap": 49.161590576171875,
+      "processHighWaterMiB": 154.8125
+    },
+    {
+      "task": 58,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "75k",
+      "part": 0,
+      "activities": 6,
+      "samples": 73923,
+      "rawBytes": 3295995,
+      "candidates": 187,
+      "windows": 41,
+      "readMs": 8.217708000000044,
+      "decodeMs": 57.65137499999996,
+      "prepareMs": 41.525458999999955,
+      "scoreMs": 109.53720799999999,
+      "totalMs": 217.158583,
+      "startMemory": {
+        "rss": 105.125,
+        "heap": 16.304054260253906
+      },
+      "afterPrepare": {
+        "rss": 171.375,
+        "heap": 47.13343811035156
+      },
+      "maxRSS": 230.90625,
+      "maxHeap": 113.41608428955078,
+      "processHighWaterMiB": 230.90625
+    },
+    {
+      "task": 8,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 0,
+      "activities": 8,
+      "samples": 42335,
+      "rawBytes": 1823315,
+      "candidates": 17,
+      "windows": 25,
+      "readMs": 2.277082999999948,
+      "decodeMs": 32.73408399999998,
+      "prepareMs": 15.819250000000011,
+      "scoreMs": 72.16591700000001,
+      "totalMs": 123.15804200000001,
+      "startMemory": {
+        "rss": 106.703125,
+        "heap": 16.341773986816406
+      },
+      "afterPrepare": {
+        "rss": 145.875,
+        "heap": 41.534759521484375
+      },
+      "maxRSS": 189.796875,
+      "maxHeap": 66.19937896728516,
+      "processHighWaterMiB": 191
+    },
+    {
+      "task": 45,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 2,
+      "activities": 2,
+      "samples": 21359,
+      "rawBytes": 913035,
+      "candidates": 29,
+      "windows": 6,
+      "readMs": 0.43883299999998826,
+      "decodeMs": 26.640709,
+      "prepareMs": 12.710208999999992,
+      "scoreMs": 47.601665999999994,
+      "totalMs": 87.50145799999999,
+      "startMemory": {
+        "rss": 105.71875,
+        "heap": 16.305702209472656
+      },
+      "afterPrepare": {
+        "rss": 139.9375,
+        "heap": 32.46820068359375
+      },
+      "maxRSS": 170.453125,
+      "maxHeap": 63.96276092529297,
+      "processHighWaterMiB": 170.46875
+    },
+    {
+      "task": 82,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 2,
+      "activities": 25,
+      "samples": 36900,
+      "rawBytes": 1446627,
+      "candidates": 0,
+      "windows": 60,
+      "readMs": 6.089039000000028,
+      "decodeMs": 24.455165000000022,
+      "prepareMs": 15.814457000000004,
+      "scoreMs": 34.554542,
+      "totalMs": 81.28791700000001,
+      "startMemory": {
+        "rss": 106.453125,
+        "heap": 16.334213256835938
+      },
+      "afterPrepare": {
+        "rss": 133.328125,
+        "heap": 30.267555236816406
+      },
+      "maxRSS": 174.890625,
+      "maxHeap": 71.8812255859375,
+      "processHighWaterMiB": 174.890625
+    },
+    {
+      "task": 32,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 1,
+      "activities": 12,
+      "samples": 8765,
+      "rawBytes": 344119,
+      "candidates": 0,
+      "windows": 18,
+      "readMs": 2.6305400000000105,
+      "decodeMs": 9.98091700000002,
+      "prepareMs": 5.526666999999989,
+      "scoreMs": 23.818624999999997,
+      "totalMs": 42.14137500000001,
+      "startMemory": {
+        "rss": 105.53125,
+        "heap": 16.345306396484375
+      },
+      "afterPrepare": {
+        "rss": 111.890625,
+        "heap": 16.898956298828125
+      },
+      "maxRSS": 142.734375,
+      "maxHeap": 40.240638732910156,
+      "processHighWaterMiB": 142.75
+    },
+    {
+      "task": 69,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 1,
+      "activities": 2,
+      "samples": 24475,
+      "rawBytes": 1047157,
+      "candidates": 19,
+      "windows": 13,
+      "readMs": 1.8172079999999937,
+      "decodeMs": 26.930457999999987,
+      "prepareMs": 12.966833000000008,
+      "scoreMs": 67.49875,
+      "totalMs": 109.31020899999999,
+      "startMemory": {
+        "rss": 105.140625,
+        "heap": 16.29662322998047
+      },
+      "afterPrepare": {
+        "rss": 141.0625,
+        "heap": 36.026771545410156
+      },
+      "maxRSS": 176.46875,
+      "maxHeap": 58.50817108154297,
+      "processHighWaterMiB": 179.734375
+    },
+    {
+      "task": 19,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 0,
+      "activities": 2,
+      "samples": 24957,
+      "rawBytes": 1055741,
+      "candidates": 17,
+      "windows": 13,
+      "readMs": 0.4688330000000036,
+      "decodeMs": 24.728666999999987,
+      "prepareMs": 12.918708999999978,
+      "scoreMs": 70.49491599999999,
+      "totalMs": 108.69604199999999,
+      "startMemory": {
+        "rss": 106.171875,
+        "heap": 16.3280029296875
+      },
+      "afterPrepare": {
+        "rss": 137.15625,
+        "heap": 35.05175018310547
+      },
+      "maxRSS": 171.9375,
+      "maxHeap": 50.71045684814453,
+      "processHighWaterMiB": 174.84375
+    },
+    {
+      "task": 56,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 1,
+      "activities": 3,
+      "samples": 32908,
+      "rawBytes": 1525005,
+      "candidates": 164,
+      "windows": 39,
+      "readMs": 1.9801669999999802,
+      "decodeMs": 32.82641799999999,
+      "prepareMs": 16.698916000000025,
+      "scoreMs": 73.309042,
+      "totalMs": 124.925333,
+      "startMemory": {
+        "rss": 105.015625,
+        "heap": 16.311935424804688
+      },
+      "afterPrepare": {
+        "rss": 148.421875,
+        "heap": 40.19544982910156
+      },
+      "maxRSS": 179.03125,
+      "maxHeap": 57.49897766113281,
+      "processHighWaterMiB": 182.734375
+    },
+    {
+      "task": 6,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "100k",
+      "part": 0,
+      "activities": 13,
+      "samples": 98993,
+      "rawBytes": 4354727,
+      "candidates": 334,
+      "windows": 50,
+      "readMs": 9.493999000000017,
+      "decodeMs": 62.03112399999995,
+      "prepareMs": 32.49233000000001,
+      "scoreMs": 123.454375,
+      "totalMs": 227.72587500000003,
+      "startMemory": {
+        "rss": 104.71875,
+        "heap": 16.31861114501953
+      },
+      "afterPrepare": {
+        "rss": 169,
+        "heap": 59.921852111816406
+      },
+      "maxRSS": 261.296875,
+      "maxHeap": 146.2564926147461,
+      "processHighWaterMiB": 261.3125
+    },
+    {
+      "task": 43,
+      "repetition": 1,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 0,
+      "activities": 3,
+      "samples": 21971,
+      "rawBytes": 942576,
+      "candidates": 5,
+      "windows": 7,
+      "readMs": 1.4238749999999811,
+      "decodeMs": 22.27645799999999,
+      "prepareMs": 11.442542000000017,
+      "scoreMs": 45.494958,
+      "totalMs": 80.72720799999999,
+      "startMemory": {
+        "rss": 105.125,
+        "heap": 16.330772399902344
+      },
+      "afterPrepare": {
+        "rss": 131.09375,
+        "heap": 31.564537048339844
+      },
+      "maxRSS": 166.765625,
+      "maxHeap": 58.077247619628906,
+      "processHighWaterMiB": 166.78125
+    },
+    {
+      "task": 80,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 0,
+      "activities": 36,
+      "samples": 25639,
+      "rawBytes": 1004106,
+      "candidates": 0,
+      "windows": 65,
+      "readMs": 5.068746999999945,
+      "decodeMs": 17.34004300000001,
+      "prepareMs": 10.210290000000086,
+      "scoreMs": 27.664749999999998,
+      "totalMs": 60.601624999999984,
+      "startMemory": {
+        "rss": 105.578125,
+        "heap": 16.303726196289062
+      },
+      "afterPrepare": {
+        "rss": 133.25,
+        "heap": 24.308090209960938
+      },
+      "maxRSS": 165.296875,
+      "maxHeap": 60.80821990966797,
+      "processHighWaterMiB": 165.3125
+    },
+    {
+      "task": 30,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 4,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.1357500000000016,
+      "decodeMs": 7.304374999999993,
+      "prepareMs": 2.561374999999998,
+      "scoreMs": 21.368916999999996,
+      "totalMs": 31.429291000000006,
+      "startMemory": {
+        "rss": 106.078125,
+        "heap": 16.312423706054688
+      },
+      "afterPrepare": {
+        "rss": 112.296875,
+        "heap": 19.495704650878906
+      },
+      "maxRSS": 139.734375,
+      "maxHeap": 29.25677490234375,
+      "processHighWaterMiB": 139.734375
+    },
+    {
+      "task": 67,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "50k",
+      "part": 1,
+      "activities": 10,
+      "samples": 47050,
+      "rawBytes": 2008422,
+      "candidates": 0,
+      "windows": 38,
+      "readMs": 4.746709999999993,
+      "decodeMs": 32.48475000000005,
+      "prepareMs": 18.66553999999998,
+      "scoreMs": 39.834666999999996,
+      "totalMs": 95.946042,
+      "startMemory": {
+        "rss": 104.328125,
+        "heap": 16.328590393066406
+      },
+      "afterPrepare": {
+        "rss": 142.0625,
+        "heap": 36.69231414794922
+      },
+      "maxRSS": 188.234375,
+      "maxHeap": 78.3973388671875,
+      "processHighWaterMiB": 188.234375
+    },
+    {
+      "task": 17,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "100k",
+      "part": 0,
+      "activities": 11,
+      "samples": 91959,
+      "rawBytes": 4038292,
+      "candidates": 264,
+      "windows": 59,
+      "readMs": 8.277959999999993,
+      "decodeMs": 66.32054199999996,
+      "prepareMs": 30.016418000000044,
+      "scoreMs": 149.19779199999996,
+      "totalMs": 254.118167,
+      "startMemory": {
+        "rss": 105.484375,
+        "heap": 16.326263427734375
+      },
+      "afterPrepare": {
+        "rss": 178.234375,
+        "heap": 51.14610290527344
+      },
+      "maxRSS": 248.875,
+      "maxHeap": 129.76306915283203,
+      "processHighWaterMiB": 248.875
+    },
+    {
+      "task": 54,
+      "repetition": 1,
+      "scenario": "real-2",
+      "profile": "original",
+      "part": 0,
+      "activities": 8,
+      "samples": 100430,
+      "rawBytes": 4441749,
+      "candidates": 202,
+      "windows": 95,
+      "readMs": 5.434667000000033,
+      "decodeMs": 70.98249900000002,
+      "prepareMs": 44.79283300000003,
+      "scoreMs": 144.747167,
+      "totalMs": 266.23566700000003,
+      "startMemory": {
+        "rss": 104.234375,
+        "heap": 16.3087158203125
+      },
+      "afterPrepare": {
+        "rss": 176.015625,
+        "heap": 63.33759307861328
+      },
+      "maxRSS": 263.71875,
+      "maxHeap": 139.87454986572266,
+      "processHighWaterMiB": 263.71875
+    },
+    {
+      "task": 4,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 4,
+      "activities": 2,
+      "samples": 15257,
+      "rawBytes": 712634,
+      "candidates": 0,
+      "windows": 8,
+      "readMs": 0.4590830000000068,
+      "decodeMs": 19.920749999999998,
+      "prepareMs": 8.283459000000008,
+      "scoreMs": 24.064458000000002,
+      "totalMs": 52.811458,
+      "startMemory": {
+        "rss": 107.125,
+        "heap": 16.332115173339844
+      },
+      "afterPrepare": {
+        "rss": 120.6875,
+        "heap": 26.40117645263672
+      },
+      "maxRSS": 158.25,
+      "maxHeap": 46.596954345703125,
+      "processHighWaterMiB": 158.25
+    },
+    {
+      "task": 41,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 1,
+      "activities": 8,
+      "samples": 42123,
+      "rawBytes": 1893531,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 1.9875010000000515,
+      "decodeMs": 31.170331999999988,
+      "prepareMs": 16.740248999999977,
+      "scoreMs": 38.919374999999974,
+      "totalMs": 88.9815,
+      "startMemory": {
+        "rss": 105.203125,
+        "heap": 16.30876922607422
+      },
+      "afterPrepare": {
+        "rss": 148.046875,
+        "heap": 41.208839416503906
+      },
+      "maxRSS": 191.03125,
+      "maxHeap": 80.03447723388672,
+      "processHighWaterMiB": 191.03125
+    },
+    {
+      "task": 78,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 3,
+      "activities": 5,
+      "samples": 21622,
+      "rawBytes": 921719,
+      "candidates": 0,
+      "windows": 17,
+      "readMs": 0.921543999999983,
+      "decodeMs": 20.796209999999988,
+      "prepareMs": 11.182500000000005,
+      "scoreMs": 26.816708000000006,
+      "totalMs": 59.86458300000001,
+      "startMemory": {
+        "rss": 105.828125,
+        "heap": 16.301406860351562
+      },
+      "afterPrepare": {
+        "rss": 133.546875,
+        "heap": 33.43138122558594
+      },
+      "maxRSS": 164.515625,
+      "maxHeap": 62.35942077636719,
+      "processHighWaterMiB": 164.515625
+    },
+    {
+      "task": 28,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 2,
+      "activities": 24,
+      "samples": 27529,
+      "rawBytes": 1077151,
+      "candidates": 0,
+      "windows": 57,
+      "readMs": 5.089539000000045,
+      "decodeMs": 18.64612499999997,
+      "prepareMs": 14.004669000000078,
+      "scoreMs": 30.143500000000017,
+      "totalMs": 68.20254099999998,
+      "startMemory": {
+        "rss": 105.890625,
+        "heap": 16.332855224609375
+      },
+      "afterPrepare": {
+        "rss": 126.59375,
+        "heap": 27.809249877929688
+      },
+      "maxRSS": 164.21875,
+      "maxHeap": 60.44483184814453,
+      "processHighWaterMiB": 164.21875
+    },
+    {
+      "task": 65,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 2,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.1022920000000056,
+      "decodeMs": 6.715417000000002,
+      "prepareMs": 2.223458000000008,
+      "scoreMs": 19.042374999999993,
+      "totalMs": 28.124500000000012,
+      "startMemory": {
+        "rss": 104.15625,
+        "heap": 16.3248291015625
+      },
+      "afterPrepare": {
+        "rss": 106.78125,
+        "heap": 16.260597229003906
+      },
+      "maxRSS": 126.78125,
+      "maxHeap": 28.088401794433594,
+      "processHighWaterMiB": 126.78125
+    },
+    {
+      "task": 15,
+      "repetition": 1,
+      "scenario": "real-1",
+      "profile": "75k",
+      "part": 0,
+      "activities": 6,
+      "samples": 57597,
+      "rawBytes": 2485924,
+      "candidates": 56,
+      "windows": 38,
+      "readMs": 2.9415000000000333,
+      "decodeMs": 42.99341599999998,
+      "prepareMs": 21.72262600000002,
+      "scoreMs": 116.21516600000004,
+      "totalMs": 184.088208,
+      "startMemory": {
+        "rss": 104.71875,
+        "heap": 16.33092498779297
+      },
+      "afterPrepare": {
+        "rss": 159.59375,
+        "heap": 49.26050567626953
+      },
+      "maxRSS": 202.90625,
+      "maxHeap": 88.49738311767578,
+      "processHighWaterMiB": 202.90625
+    },
+    {
+      "task": 52,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "75k",
+      "part": 1,
+      "activities": 5,
+      "samples": 22523,
+      "rawBytes": 960199,
+      "candidates": 0,
+      "windows": 17,
+      "readMs": 1.5598330000000118,
+      "decodeMs": 22.578333,
+      "prepareMs": 13.249082000000016,
+      "scoreMs": 27.730458,
+      "totalMs": 65.299792,
+      "startMemory": {
+        "rss": 105.765625,
+        "heap": 16.31139373779297
+      },
+      "afterPrepare": {
+        "rss": 137.90625,
+        "heap": 28.371414184570312
+      },
+      "maxRSS": 167.0625,
+      "maxHeap": 61.670013427734375,
+      "processHighWaterMiB": 167.078125
+    },
+    {
+      "task": 2,
+      "repetition": 1,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 2,
+      "activities": 4,
+      "samples": 19667,
+      "rawBytes": 928753,
+      "candidates": 0,
+      "windows": 4,
+      "readMs": 1.616792000000018,
+      "decodeMs": 20.09783299999998,
+      "prepareMs": 11.689584000000025,
+      "scoreMs": 27.84699999999998,
+      "totalMs": 61.406542,
+      "startMemory": {
+        "rss": 105.53125,
+        "heap": 16.33234405517578
+      },
+      "afterPrepare": {
+        "rss": 124.296875,
+        "heap": 32.21270751953125
+      },
+      "maxRSS": 160.28125,
+      "maxHeap": 51.98267364501953,
+      "processHighWaterMiB": 160.296875
+    },
+    {
+      "task": 39,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 8,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.1910000000000025,
+      "decodeMs": 7.999375000000001,
+      "prepareMs": 2.4172909999999916,
+      "scoreMs": 20.429417,
+      "totalMs": 31.092250000000007,
+      "startMemory": {
+        "rss": 104.578125,
+        "heap": 16.338302612304688
+      },
+      "afterPrepare": {
+        "rss": 107.796875,
+        "heap": 16.34154510498047
+      },
+      "maxRSS": 127.1875,
+      "maxHeap": 28.18842315673828,
+      "processHighWaterMiB": 127.1875
+    },
+    {
+      "task": 76,
+      "repetition": 1,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 1,
+      "activities": 8,
+      "samples": 24990,
+      "rawBytes": 1070127,
+      "candidates": 0,
+      "windows": 104,
+      "readMs": 2.146667999999991,
+      "decodeMs": 22.23837499999999,
+      "prepareMs": 14.133083,
+      "scoreMs": 27.714083000000016,
+      "totalMs": 66.39537500000002,
+      "startMemory": {
+        "rss": 106.53125,
+        "heap": 16.344497680664062
+      },
+      "afterPrepare": {
+        "rss": 129.46875,
+        "heap": 27.727500915527344
+      },
+      "maxRSS": 165.53125,
+      "maxHeap": 52.707557678222656,
+      "processHighWaterMiB": 165.53125
+    },
+    {
+      "task": 26,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 0,
+      "activities": 24,
+      "samples": 17624,
+      "rawBytes": 689390,
+      "candidates": 0,
+      "windows": 37,
+      "readMs": 3.5839169999999996,
+      "decodeMs": 12.953830999999951,
+      "prepareMs": 8.070455000000024,
+      "scoreMs": 24.15216700000002,
+      "totalMs": 49.00379199999999,
+      "startMemory": {
+        "rss": 105.359375,
+        "heap": 16.339004516601562
+      },
+      "afterPrepare": {
+        "rss": 113.0625,
+        "heap": 21.56853485107422
+      },
+      "maxRSS": 152.671875,
+      "maxHeap": 47.588294982910156,
+      "processHighWaterMiB": 152.671875
+    },
+    {
+      "task": 63,
+      "repetition": 1,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 0,
+      "activities": 48,
+      "samples": 36189,
+      "rawBytes": 1415737,
+      "candidates": 0,
+      "windows": 90,
+      "readMs": 7.415751999999955,
+      "decodeMs": 20.98679500000013,
+      "prepareMs": 10.336083999999985,
+      "scoreMs": 35.630792000000014,
+      "totalMs": 74.764417,
+      "startMemory": {
+        "rss": 105.4375,
+        "heap": 16.345077514648438
+      },
+      "afterPrepare": {
+        "rss": 130.09375,
+        "heap": 25.448074340820312
+      },
+      "maxRSS": 172.140625,
+      "maxHeap": 65.58720397949219,
+      "processHighWaterMiB": 172.171875
+    },
+    {
+      "task": 26,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 0,
+      "activities": 24,
+      "samples": 17624,
+      "rawBytes": 689390,
+      "candidates": 0,
+      "windows": 37,
+      "readMs": 3.388914000000028,
+      "decodeMs": 13.181208999999939,
+      "prepareMs": 8.196625000000012,
+      "scoreMs": 25.374374999999986,
+      "totalMs": 50.419332999999995,
+      "startMemory": {
+        "rss": 104.96875,
+        "heap": 16.32854461669922
+      },
+      "afterPrepare": {
+        "rss": 113.546875,
+        "heap": 21.57006072998047
+      },
+      "maxRSS": 153.078125,
+      "maxHeap": 47.74491882324219,
+      "processHighWaterMiB": 153.09375
+    },
+    {
+      "task": 63,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 0,
+      "activities": 48,
+      "samples": 36189,
+      "rawBytes": 1415737,
+      "candidates": 0,
+      "windows": 90,
+      "readMs": 6.572959999999952,
+      "decodeMs": 20.514627999999902,
+      "prepareMs": 10.453703999999973,
+      "scoreMs": 31.811084000000022,
+      "totalMs": 69.749625,
+      "startMemory": {
+        "rss": 105.328125,
+        "heap": 16.34735870361328
+      },
+      "afterPrepare": {
+        "rss": 129.875,
+        "heap": 25.371063232421875
+      },
+      "maxRSS": 171.609375,
+      "maxHeap": 66.05374145507812,
+      "processHighWaterMiB": 171.609375
+    },
+    {
+      "task": 13,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "75k",
+      "part": 0,
+      "activities": 20,
+      "samples": 73397,
+      "rawBytes": 3302712,
+      "candidates": 0,
+      "windows": 30,
+      "readMs": 7.292040000000071,
+      "decodeMs": 43.15791599999997,
+      "prepareMs": 21.218249999999983,
+      "scoreMs": 52.66054200000002,
+      "totalMs": 124.70070899999999,
+      "startMemory": {
+        "rss": 106.015625,
+        "heap": 16.33808135986328
+      },
+      "afterPrepare": {
+        "rss": 150.109375,
+        "heap": 42.55332946777344
+      },
+      "maxRSS": 206.484375,
+      "maxHeap": 94.23603820800781,
+      "processHighWaterMiB": 206.5
+    },
+    {
+      "task": 50,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.10754100000001188,
+      "decodeMs": 22.696749999999994,
+      "prepareMs": 12.294083,
+      "scoreMs": 68.982416,
+      "totalMs": 104.15483400000001,
+      "startMemory": {
+        "rss": 105.25,
+        "heap": 16.336105346679688
+      },
+      "afterPrepare": {
+        "rss": 132.796875,
+        "heap": 32.17998504638672
+      },
+      "maxRSS": 171.203125,
+      "maxHeap": 66.81939697265625,
+      "processHighWaterMiB": 171.21875
+    },
+    {
+      "task": 0,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 0,
+      "activities": 9,
+      "samples": 22424,
+      "rawBytes": 982047,
+      "candidates": 0,
+      "windows": 12,
+      "readMs": 2.3375420000000133,
+      "decodeMs": 19.450249999999983,
+      "prepareMs": 9.66795799999997,
+      "scoreMs": 25.594375000000014,
+      "totalMs": 57.241665999999995,
+      "startMemory": {
+        "rss": 106.90625,
+        "heap": 16.303131103515625
+      },
+      "afterPrepare": {
+        "rss": 134.796875,
+        "heap": 35.075416564941406
+      },
+      "maxRSS": 164.9375,
+      "maxHeap": 60.382568359375,
+      "processHighWaterMiB": 164.9375
+    },
+    {
+      "task": 37,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 6,
+      "activities": 12,
+      "samples": 18575,
+      "rawBytes": 725720,
+      "candidates": 0,
+      "windows": 36,
+      "readMs": 3.264792999999983,
+      "decodeMs": 15.83770900000006,
+      "prepareMs": 10.350124999999991,
+      "scoreMs": 26.741750000000025,
+      "totalMs": 56.415041000000016,
+      "startMemory": {
+        "rss": 106.171875,
+        "heap": 16.34186553955078
+      },
+      "afterPrepare": {
+        "rss": 115.71875,
+        "heap": 22.64354705810547
+      },
+      "maxRSS": 154.71875,
+      "maxHeap": 46.368385314941406,
+      "processHighWaterMiB": 154.71875
+    },
+    {
+      "task": 74,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "75k",
+      "part": 1,
+      "activities": 3,
+      "samples": 31006,
+      "rawBytes": 1432802,
+      "candidates": 320,
+      "windows": 19,
+      "readMs": 0.7698329999999629,
+      "decodeMs": 32.75266599999999,
+      "prepareMs": 15.972375,
+      "scoreMs": 69.64254200000002,
+      "totalMs": 119.24612499999999,
+      "startMemory": {
+        "rss": 106.0625,
+        "heap": 16.308074951171875
+      },
+      "afterPrepare": {
+        "rss": 145.6875,
+        "heap": 43.15972137451172
+      },
+      "maxRSS": 177.625,
+      "maxHeap": 72.7694320678711,
+      "processHighWaterMiB": 180.765625
+    },
+    {
+      "task": 24,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 5,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.13433400000000972,
+      "decodeMs": 26.969082999999998,
+      "prepareMs": 10.671458000000001,
+      "scoreMs": 71.52045799999999,
+      "totalMs": 109.35262499999999,
+      "startMemory": {
+        "rss": 104.859375,
+        "heap": 16.321083068847656
+      },
+      "afterPrepare": {
+        "rss": 138.828125,
+        "heap": 37.458160400390625
+      },
+      "maxRSS": 175.359375,
+      "maxHeap": 46.14894104003906,
+      "processHighWaterMiB": 175.8125
+    },
+    {
+      "task": 61,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 10152,
+      "rawBytes": 481099,
+      "candidates": 0,
+      "windows": 6,
+      "readMs": 0.14245900000000233,
+      "decodeMs": 17.432125,
+      "prepareMs": 6.156416000000007,
+      "scoreMs": 21.305583000000013,
+      "totalMs": 45.09824999999999,
+      "startMemory": {
+        "rss": 104.71875,
+        "heap": 16.338973999023438
+      },
+      "afterPrepare": {
+        "rss": 114.546875,
+        "heap": 21.399261474609375
+      },
+      "maxRSS": 148.046875,
+      "maxHeap": 35.87299346923828,
+      "processHighWaterMiB": 148.046875
+    },
+    {
+      "task": 11,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "original",
+      "part": 0,
+      "activities": 12,
+      "samples": 118179,
+      "rawBytes": 5300698,
+      "candidates": 390,
+      "windows": 74,
+      "readMs": 4.786793000000003,
+      "decodeMs": 79.71162400000001,
+      "prepareMs": 44.652582000000024,
+      "scoreMs": 159.954625,
+      "totalMs": 289.40670800000004,
+      "startMemory": {
+        "rss": 105.84375,
+        "heap": 16.339218139648438
+      },
+      "afterPrepare": {
+        "rss": 185.578125,
+        "heap": 74.3576431274414
+      },
+      "maxRSS": 290.484375,
+      "maxHeap": 159.89138793945312,
+      "processHighWaterMiB": 290.484375
+    },
+    {
+      "task": 48,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 5,
+      "activities": 2,
+      "samples": 8210,
+      "rawBytes": 352703,
+      "candidates": 8,
+      "windows": 10,
+      "readMs": 0.30187500000000966,
+      "decodeMs": 10.686582999999999,
+      "prepareMs": 6.002083999999996,
+      "scoreMs": 34.744208,
+      "totalMs": 51.80454200000001,
+      "startMemory": {
+        "rss": 105.640625,
+        "heap": 16.33588409423828
+      },
+      "afterPrepare": {
+        "rss": 113.125,
+        "heap": 18.23365020751953
+      },
+      "maxRSS": 147.625,
+      "maxHeap": 40.129112243652344,
+      "processHighWaterMiB": 147.625
+    },
+    {
+      "task": 85,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 1,
+      "activities": 7,
+      "samples": 45878,
+      "rawBytes": 2056261,
+      "candidates": 240,
+      "windows": 37,
+      "readMs": 5.621666999999988,
+      "decodeMs": 34.937584,
+      "prepareMs": 21.049249999999986,
+      "scoreMs": 91.22437500000001,
+      "totalMs": 153.04433300000002,
+      "startMemory": {
+        "rss": 105.734375,
+        "heap": 16.311241149902344
+      },
+      "afterPrepare": {
+        "rss": 152.515625,
+        "heap": 29.895614624023438
+      },
+      "maxRSS": 192.796875,
+      "maxHeap": 83.82460021972656,
+      "processHighWaterMiB": 192.8125
+    },
+    {
+      "task": 35,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 4,
+      "activities": 12,
+      "samples": 13753,
+      "rawBytes": 539129,
+      "candidates": 0,
+      "windows": 32,
+      "readMs": 2.391705000000016,
+      "decodeMs": 12.47779200000005,
+      "prepareMs": 8.353459000000115,
+      "scoreMs": 23.341624999999993,
+      "totalMs": 46.79258399999999,
+      "startMemory": {
+        "rss": 108.1875,
+        "heap": 16.33538818359375
+      },
+      "afterPrepare": {
+        "rss": 116.015625,
+        "heap": 20.996376037597656
+      },
+      "maxRSS": 151.625,
+      "maxHeap": 43.15612030029297,
+      "processHighWaterMiB": 151.625
+    },
+    {
+      "task": 72,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.21233399999999847,
+      "decodeMs": 24.402249999999995,
+      "prepareMs": 13.625166999999976,
+      "scoreMs": 67.339958,
+      "totalMs": 105.658375,
+      "startMemory": {
+        "rss": 105.640625,
+        "heap": 16.323707580566406
+      },
+      "afterPrepare": {
+        "rss": 134.34375,
+        "heap": 32.419044494628906
+      },
+      "maxRSS": 172.09375,
+      "maxHeap": 66.93340301513672,
+      "processHighWaterMiB": 172.109375
+    },
+    {
+      "task": 22,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 3,
+      "activities": 1,
+      "samples": 26836,
+      "rawBytes": 1238935,
+      "candidates": 190,
+      "windows": 11,
+      "readMs": 0.16370799999999974,
+      "decodeMs": 30.950625000000016,
+      "prepareMs": 13.982167000000004,
+      "scoreMs": 72.24224999999998,
+      "totalMs": 117.41924999999999,
+      "startMemory": {
+        "rss": 105.578125,
+        "heap": 16.337860107421875
+      },
+      "afterPrepare": {
+        "rss": 141.84375,
+        "heap": 36.84864807128906
+      },
+      "maxRSS": 178.4375,
+      "maxHeap": 48.361228942871094,
+      "processHighWaterMiB": 178.859375
+    },
+    {
+      "task": 59,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "75k",
+      "part": 1,
+      "activities": 2,
+      "samples": 26507,
+      "rawBytes": 1145754,
+      "candidates": 29,
+      "windows": 54,
+      "readMs": 0.44737499999999386,
+      "decodeMs": 22.56675100000001,
+      "prepareMs": 15.233708000000007,
+      "scoreMs": 76.38374999999999,
+      "totalMs": 114.74249999999999,
+      "startMemory": {
+        "rss": 105.3125,
+        "heap": 16.309844970703125
+      },
+      "afterPrepare": {
+        "rss": 145.15625,
+        "heap": 33.930816650390625
+      },
+      "maxRSS": 177.28125,
+      "maxHeap": 49.06700897216797,
+      "processHighWaterMiB": 178.765625
+    },
+    {
+      "task": 9,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 1,
+      "activities": 3,
+      "samples": 30252,
+      "rawBytes": 1297783,
+      "candidates": 36,
+      "windows": 10,
+      "readMs": 0.7178739999999806,
+      "decodeMs": 32.73675000000003,
+      "prepareMs": 16.809125000000023,
+      "scoreMs": 68.79595899999998,
+      "totalMs": 119.19125,
+      "startMemory": {
+        "rss": 105.328125,
+        "heap": 16.30217742919922
+      },
+      "afterPrepare": {
+        "rss": 146.09375,
+        "heap": 39.679161071777344
+      },
+      "maxRSS": 182.625,
+      "maxHeap": 67.31006622314453,
+      "processHighWaterMiB": 184.09375
+    },
+    {
+      "task": 46,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 3,
+      "activities": 1,
+      "samples": 8893,
+      "rawBytes": 384748,
+      "candidates": 8,
+      "windows": 4,
+      "readMs": 0.14008300000000418,
+      "decodeMs": 14.536999999999992,
+      "prepareMs": 5.962332999999987,
+      "scoreMs": 41.536958,
+      "totalMs": 62.233749999999986,
+      "startMemory": {
+        "rss": 105.828125,
+        "heap": 16.32048797607422
+      },
+      "afterPrepare": {
+        "rss": 114.0625,
+        "heap": 21.90142059326172
+      },
+      "maxRSS": 149.4375,
+      "maxHeap": 35.59757995605469,
+      "processHighWaterMiB": 149.4375
+    },
+    {
+      "task": 83,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "original",
+      "part": 0,
+      "activities": 14,
+      "samples": 103593,
+      "rawBytes": 4553900,
+      "candidates": 336,
+      "windows": 54,
+      "readMs": 14.811418000000018,
+      "decodeMs": 66.09575099999998,
+      "prepareMs": 36.47420999999994,
+      "scoreMs": 128.93649999999997,
+      "totalMs": 246.661542,
+      "startMemory": {
+        "rss": 105.546875,
+        "heap": 16.330734252929688
+      },
+      "afterPrepare": {
+        "rss": 168.140625,
+        "heap": 56.46031951904297
+      },
+      "maxRSS": 262.0625,
+      "maxHeap": 142.81157684326172,
+      "processHighWaterMiB": 262.078125
+    },
+    {
+      "task": 33,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 2,
+      "activities": 12,
+      "samples": 8015,
+      "rawBytes": 314716,
+      "candidates": 0,
+      "windows": 28,
+      "readMs": 2.1937080000000293,
+      "decodeMs": 9.299626000000032,
+      "prepareMs": 5.745290999999952,
+      "scoreMs": 25.93662500000002,
+      "totalMs": 43.40075,
+      "startMemory": {
+        "rss": 104.859375,
+        "heap": 16.332054138183594
+      },
+      "afterPrepare": {
+        "rss": 110.640625,
+        "heap": 15.53179931640625
+      },
+      "maxRSS": 138.6875,
+      "maxHeap": 34.49554443359375,
+      "processHighWaterMiB": 138.703125
+    },
+    {
+      "task": 70,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 2,
+      "activities": 1,
+      "samples": 26291,
+      "rawBytes": 1260729,
+      "candidates": 159,
+      "windows": 18,
+      "readMs": 0.23766700000000185,
+      "decodeMs": 30.69879200000001,
+      "prepareMs": 13.94387500000002,
+      "scoreMs": 62.69637499999999,
+      "totalMs": 107.65037500000001,
+      "startMemory": {
+        "rss": 106.296875,
+        "heap": 16.298667907714844
+      },
+      "afterPrepare": {
+        "rss": 145.515625,
+        "heap": 35.69126892089844
+      },
+      "maxRSS": 182.3125,
+      "maxHeap": 71.8076171875,
+      "processHighWaterMiB": 182.3125
+    },
+    {
+      "task": 20,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 1,
+      "activities": 2,
+      "samples": 21124,
+      "rawBytes": 926290,
+      "candidates": 26,
+      "windows": 9,
+      "readMs": 0.3779580000000067,
+      "decodeMs": 20.018874999999994,
+      "prepareMs": 11.80224899999996,
+      "scoreMs": 65.11962500000001,
+      "totalMs": 97.4125,
+      "startMemory": {
+        "rss": 106.84375,
+        "heap": 16.312881469726562
+      },
+      "afterPrepare": {
+        "rss": 136.734375,
+        "heap": 35.00602722167969
+      },
+      "maxRSS": 173.6875,
+      "maxHeap": 56.24993133544922,
+      "processHighWaterMiB": 173.6875
+    },
+    {
+      "task": 57,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 2,
+      "activities": 1,
+      "samples": 23216,
+      "rawBytes": 1013114,
+      "candidates": 24,
+      "windows": 35,
+      "readMs": 0.18429199999999923,
+      "decodeMs": 25.579542000000004,
+      "prepareMs": 13.379290999999995,
+      "scoreMs": 73.87870900000001,
+      "totalMs": 113.094583,
+      "startMemory": {
+        "rss": 104.875,
+        "heap": 16.306663513183594
+      },
+      "afterPrepare": {
+        "rss": 141.359375,
+        "heap": 36.912025451660156
+      },
+      "maxRSS": 171.765625,
+      "maxHeap": 47.048370361328125,
+      "processHighWaterMiB": 173.203125
+    },
+    {
+      "task": 7,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 4600,
+      "rawBytes": 199173,
+      "candidates": 7,
+      "windows": 4,
+      "readMs": 0.15408299999999997,
+      "decodeMs": 11.742374999999996,
+      "prepareMs": 3.4079590000000053,
+      "scoreMs": 31.999167,
+      "totalMs": 47.368750000000006,
+      "startMemory": {
+        "rss": 103.875,
+        "heap": 16.307403564453125
+      },
+      "afterPrepare": {
+        "rss": 113.953125,
+        "heap": 22.483314514160156
+      },
+      "maxRSS": 144.75,
+      "maxHeap": 29.453155517578125,
+      "processHighWaterMiB": 144.75
+    },
+    {
+      "task": 44,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 1,
+      "activities": 5,
+      "samples": 20364,
+      "rawBytes": 880739,
+      "candidates": 12,
+      "windows": 18,
+      "readMs": 2.9096660000000156,
+      "decodeMs": 19.274040999999983,
+      "prepareMs": 10.747958000000025,
+      "scoreMs": 52.735457999999994,
+      "totalMs": 85.83624999999999,
+      "startMemory": {
+        "rss": 103.984375,
+        "heap": 16.32628631591797
+      },
+      "afterPrepare": {
+        "rss": 123.375,
+        "heap": 32.545127868652344
+      },
+      "maxRSS": 165.25,
+      "maxHeap": 52.98884582519531,
+      "processHighWaterMiB": 165.25
+    },
+    {
+      "task": 81,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 1,
+      "activities": 36,
+      "samples": 38079,
+      "rawBytes": 1488782,
+      "candidates": 0,
+      "windows": 82,
+      "readMs": 7.09724899999992,
+      "decodeMs": 21.652791999999977,
+      "prepareMs": 15.406168000000036,
+      "scoreMs": 34.24754100000001,
+      "totalMs": 78.77895799999999,
+      "startMemory": {
+        "rss": 104.65625,
+        "heap": 16.339569091796875
+      },
+      "afterPrepare": {
+        "rss": 129.828125,
+        "heap": 32.32157897949219
+      },
+      "maxRSS": 173.421875,
+      "maxHeap": 71.21310424804688,
+      "processHighWaterMiB": 173.421875
+    },
+    {
+      "task": 31,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 0,
+      "activities": 12,
+      "samples": 8859,
+      "rawBytes": 345271,
+      "candidates": 0,
+      "windows": 19,
+      "readMs": 2.6465840000000185,
+      "decodeMs": 10.156791999999967,
+      "prepareMs": 6.546958000000032,
+      "scoreMs": 21.361500000000007,
+      "totalMs": 40.876000000000005,
+      "startMemory": {
+        "rss": 107.75,
+        "heap": 16.30896759033203
+      },
+      "afterPrepare": {
+        "rss": 118.375,
+        "heap": 21.747459411621094
+      },
+      "maxRSS": 148.484375,
+      "maxHeap": 41.710418701171875,
+      "processHighWaterMiB": 148.484375
+    },
+    {
+      "task": 68,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 0,
+      "activities": 2,
+      "samples": 19831,
+      "rawBytes": 856473,
+      "candidates": 16,
+      "windows": 8,
+      "readMs": 0.41670899999999733,
+      "decodeMs": 23.610208000000014,
+      "prepareMs": 12.478375,
+      "scoreMs": 40.390209,
+      "totalMs": 76.98812499999998,
+      "startMemory": {
+        "rss": 106.59375,
+        "heap": 16.3087158203125
+      },
+      "afterPrepare": {
+        "rss": 140.28125,
+        "heap": 28.806869506835938
+      },
+      "maxRSS": 168.078125,
+      "maxHeap": 50.688941955566406,
+      "processHighWaterMiB": 168.078125
+    },
+    {
+      "task": 18,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "100k",
+      "part": 1,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.12895799999999724,
+      "decodeMs": 27.851499999999987,
+      "prepareMs": 12.655875000000009,
+      "scoreMs": 71.918083,
+      "totalMs": 112.612833,
+      "startMemory": {
+        "rss": 104.625,
+        "heap": 16.33868408203125
+      },
+      "afterPrepare": {
+        "rss": 140.546875,
+        "heap": 36.0882568359375
+      },
+      "maxRSS": 175.046875,
+      "maxHeap": 48.742027282714844,
+      "processHighWaterMiB": 175.53125
+    },
+    {
+      "task": 55,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 0,
+      "activities": 4,
+      "samples": 44306,
+      "rawBytes": 1903630,
+      "candidates": 31,
+      "windows": 21,
+      "readMs": 0.7513339999999857,
+      "decodeMs": 33.196499,
+      "prepareMs": 22.125208999999984,
+      "scoreMs": 88.64266699999996,
+      "totalMs": 144.860375,
+      "startMemory": {
+        "rss": 104.1875,
+        "heap": 16.33464813232422
+      },
+      "afterPrepare": {
+        "rss": 152.640625,
+        "heap": 41.97471618652344
+      },
+      "maxRSS": 186.921875,
+      "maxHeap": 75.78506469726562,
+      "processHighWaterMiB": 188.390625
+    },
+    {
+      "task": 5,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 5,
+      "activities": 1,
+      "samples": 10152,
+      "rawBytes": 481099,
+      "candidates": 0,
+      "windows": 6,
+      "readMs": 0.1183329999999927,
+      "decodeMs": 17.404708000000014,
+      "prepareMs": 6.360375000000005,
+      "scoreMs": 23.374083000000013,
+      "totalMs": 47.335167,
+      "startMemory": {
+        "rss": 104.390625,
+        "heap": 16.33539581298828
+      },
+      "afterPrepare": {
+        "rss": 114.1875,
+        "heap": 21.305496215820312
+      },
+      "maxRSS": 147.6875,
+      "maxHeap": 35.422386169433594,
+      "processHighWaterMiB": 147.6875
+    },
+    {
+      "task": 42,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 2,
+      "activities": 2,
+      "samples": 18431,
+      "rawBytes": 867690,
+      "candidates": 0,
+      "windows": 10,
+      "readMs": 0.37912500000000193,
+      "decodeMs": 21.572791999999993,
+      "prepareMs": 10.475708000000026,
+      "scoreMs": 25.214917000000014,
+      "totalMs": 57.738333,
+      "startMemory": {
+        "rss": 105.875,
+        "heap": 16.342445373535156
+      },
+      "afterPrepare": {
+        "rss": 124.75,
+        "heap": 32.20783996582031
+      },
+      "maxRSS": 161.015625,
+      "maxHeap": 58.88258361816406,
+      "processHighWaterMiB": 161.015625
+    },
+    {
+      "task": 79,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 4634,
+      "rawBytes": 196502,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.18370899999999324,
+      "decodeMs": 10.287457999999987,
+      "prepareMs": 4.052667000000014,
+      "scoreMs": 20.96683300000001,
+      "totalMs": 35.566125000000014,
+      "startMemory": {
+        "rss": 105.375,
+        "heap": 16.333114624023438
+      },
+      "afterPrepare": {
+        "rss": 112.1875,
+        "heap": 17.436065673828125
+      },
+      "maxRSS": 138.125,
+      "maxHeap": 32.131446838378906,
+      "processHighWaterMiB": 138.140625
+    },
+    {
+      "task": 29,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 3,
+      "activities": 24,
+      "samples": 34660,
+      "rawBytes": 1358662,
+      "candidates": 0,
+      "windows": 57,
+      "readMs": 5.29820699999992,
+      "decodeMs": 24.63258499999992,
+      "prepareMs": 15.393294000000026,
+      "scoreMs": 34.48875000000001,
+      "totalMs": 80.12145900000002,
+      "startMemory": {
+        "rss": 105.703125,
+        "heap": 16.3011474609375
+      },
+      "afterPrepare": {
+        "rss": 135.75,
+        "heap": 30.592071533203125
+      },
+      "maxRSS": 174.40625,
+      "maxHeap": 66.4023666381836,
+      "processHighWaterMiB": 174.421875
+    },
+    {
+      "task": 66,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "50k",
+      "part": 0,
+      "activities": 15,
+      "samples": 48384,
+      "rawBytes": 2065440,
+      "candidates": 0,
+      "windows": 192,
+      "readMs": 3.5558750000000146,
+      "decodeMs": 31.832166999999956,
+      "prepareMs": 22.09533400000001,
+      "scoreMs": 40.830208,
+      "totalMs": 98.55087499999999,
+      "startMemory": {
+        "rss": 105.765625,
+        "heap": 16.333343505859375
+      },
+      "afterPrepare": {
+        "rss": 145.078125,
+        "heap": 36.649513244628906
+      },
+      "maxRSS": 189.703125,
+      "maxHeap": 80.2331771850586,
+      "processHighWaterMiB": 189.71875
+    },
+    {
+      "task": 16,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "75k",
+      "part": 1,
+      "activities": 6,
+      "samples": 60582,
+      "rawBytes": 2814774,
+      "candidates": 337,
+      "windows": 36,
+      "readMs": 3.4975400000000008,
+      "decodeMs": 48.27741600000002,
+      "prepareMs": 28.45612699999998,
+      "scoreMs": 111.23795899999999,
+      "totalMs": 191.67033300000003,
+      "startMemory": {
+        "rss": 104.90625,
+        "heap": 16.323928833007812
+      },
+      "afterPrepare": {
+        "rss": 166.96875,
+        "heap": 58.62098693847656
+      },
+      "maxRSS": 214.609375,
+      "maxHeap": 104.69001007080078,
+      "processHighWaterMiB": 214.609375
+    },
+    {
+      "task": 53,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "100k",
+      "part": 0,
+      "activities": 25,
+      "samples": 95434,
+      "rawBytes": 4073862,
+      "candidates": 0,
+      "windows": 230,
+      "readMs": 13.408833000000016,
+      "decodeMs": 55.84858299999996,
+      "prepareMs": 31.491833999999983,
+      "scoreMs": 51.95679200000001,
+      "totalMs": 153.15749999999997,
+      "startMemory": {
+        "rss": 105.15625,
+        "heap": 16.30633544921875
+      },
+      "afterPrepare": {
+        "rss": 154.765625,
+        "heap": 47.690452575683594
+      },
+      "maxRSS": 235.078125,
+      "maxHeap": 122.59130096435547,
+      "processHighWaterMiB": 235.078125
+    },
+    {
+      "task": 3,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 3,
+      "activities": 4,
+      "samples": 20014,
+      "rawBytes": 854300,
+      "candidates": 0,
+      "windows": 14,
+      "readMs": 2.724792000000008,
+      "decodeMs": 23.811959,
+      "prepareMs": 11.601083999999986,
+      "scoreMs": 27.79974999999999,
+      "totalMs": 66.10820799999999,
+      "startMemory": {
+        "rss": 105.203125,
+        "heap": 16.30791473388672
+      },
+      "afterPrepare": {
+        "rss": 135.71875,
+        "heap": 36.37578582763672
+      },
+      "maxRSS": 164.375,
+      "maxHeap": 55.98603820800781,
+      "processHighWaterMiB": 164.375
+    },
+    {
+      "task": 40,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 0,
+      "activities": 16,
+      "samples": 49106,
+      "rawBytes": 2222705,
+      "candidates": 0,
+      "windows": 20,
+      "readMs": 4.780375999999919,
+      "decodeMs": 32.385876999999965,
+      "prepareMs": 16.826288999999974,
+      "scoreMs": 43.16329099999999,
+      "totalMs": 97.45608299999999,
+      "startMemory": {
+        "rss": 105.03125,
+        "heap": 16.304351806640625
+      },
+      "afterPrepare": {
+        "rss": 143.921875,
+        "heap": 43.735389709472656
+      },
+      "maxRSS": 192.421875,
+      "maxHeap": 87.68682098388672,
+      "processHighWaterMiB": 192.4375
+    },
+    {
+      "task": 77,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 2,
+      "activities": 5,
+      "samples": 21637,
+      "rawBytes": 923612,
+      "candidates": 0,
+      "windows": 19,
+      "readMs": 1.1511670000000436,
+      "decodeMs": 19.635209000000003,
+      "prepareMs": 11.273876000000001,
+      "scoreMs": 29.878875000000022,
+      "totalMs": 62.092624999999984,
+      "startMemory": {
+        "rss": 105.09375,
+        "heap": 16.327804565429688
+      },
+      "afterPrepare": {
+        "rss": 126.53125,
+        "heap": 34.15330505371094
+      },
+      "maxRSS": 163.34375,
+      "maxHeap": 54.70758056640625,
+      "processHighWaterMiB": 163.34375
+    },
+    {
+      "task": 27,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 1,
+      "activities": 24,
+      "samples": 18565,
+      "rawBytes": 726347,
+      "candidates": 0,
+      "windows": 53,
+      "readMs": 3.8027500000000884,
+      "decodeMs": 13.082627000000002,
+      "prepareMs": 10.17362400000006,
+      "scoreMs": 26.560665999999998,
+      "totalMs": 53.886167,
+      "startMemory": {
+        "rss": 106.265625,
+        "heap": 16.33647918701172
+      },
+      "afterPrepare": {
+        "rss": 115.46875,
+        "heap": 22.495948791503906
+      },
+      "maxRSS": 154.875,
+      "maxHeap": 46.5445556640625,
+      "processHighWaterMiB": 154.875
+    },
+    {
+      "task": 64,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 1,
+      "activities": 48,
+      "samples": 62189,
+      "rawBytes": 2435813,
+      "candidates": 0,
+      "windows": 114,
+      "readMs": 8.409418999999971,
+      "decodeMs": 30.903917000000163,
+      "prepareMs": 17.888208000000006,
+      "scoreMs": 47.020542000000006,
+      "totalMs": 104.665209,
+      "startMemory": {
+        "rss": 105.015625,
+        "heap": 16.339752197265625
+      },
+      "afterPrepare": {
+        "rss": 139.296875,
+        "heap": 36.82432556152344
+      },
+      "maxRSS": 198.5625,
+      "maxHeap": 90.59181213378906,
+      "processHighWaterMiB": 198.5625
+    },
+    {
+      "task": 14,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "75k",
+      "part": 1,
+      "activities": 6,
+      "samples": 36263,
+      "rawBytes": 1681214,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 1.567415000000011,
+      "decodeMs": 27.05008199999996,
+      "prepareMs": 18.261375000000044,
+      "scoreMs": 35.10187500000001,
+      "totalMs": 82.146584,
+      "startMemory": {
+        "rss": 106.46875,
+        "heap": 16.339027404785156
+      },
+      "afterPrepare": {
+        "rss": 148.09375,
+        "heap": 36.60388946533203
+      },
+      "maxRSS": 188.46875,
+      "maxHeap": 77.98859405517578,
+      "processHighWaterMiB": 188.46875
+    },
+    {
+      "task": 51,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "75k",
+      "part": 0,
+      "activities": 20,
+      "samples": 72911,
+      "rawBytes": 3113663,
+      "candidates": 0,
+      "windows": 213,
+      "readMs": 5.6578739999999925,
+      "decodeMs": 41.25458200000004,
+      "prepareMs": 26.12895899999998,
+      "scoreMs": 53.433374999999984,
+      "totalMs": 126.795208,
+      "startMemory": {
+        "rss": 105.703125,
+        "heap": 16.339080810546875
+      },
+      "afterPrepare": {
+        "rss": 151.78125,
+        "heap": 49.987831115722656
+      },
+      "maxRSS": 203.59375,
+      "maxHeap": 98.34871673583984,
+      "processHighWaterMiB": 204.375
+    },
+    {
+      "task": 1,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 1,
+      "activities": 6,
+      "samples": 22146,
+      "rawBytes": 1025093,
+      "candidates": 0,
+      "windows": 7,
+      "readMs": 1.875957999999983,
+      "decodeMs": 19.890666000000024,
+      "prepareMs": 13.27041699999998,
+      "scoreMs": 28.19429199999999,
+      "totalMs": 63.418000000000006,
+      "startMemory": {
+        "rss": 105.828125,
+        "heap": 16.30998992919922
+      },
+      "afterPrepare": {
+        "rss": 135.109375,
+        "heap": 25.117591857910156
+      },
+      "maxRSS": 164.75,
+      "maxHeap": 58.144691467285156,
+      "processHighWaterMiB": 164.75
+    },
+    {
+      "task": 38,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 7,
+      "activities": 12,
+      "samples": 16085,
+      "rawBytes": 632942,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 2.8037920000000156,
+      "decodeMs": 12.535832999999982,
+      "prepareMs": 9.048084000000017,
+      "scoreMs": 24.57095799999999,
+      "totalMs": 49.15991699999999,
+      "startMemory": {
+        "rss": 105.171875,
+        "heap": 16.329391479492188
+      },
+      "afterPrepare": {
+        "rss": 114.625,
+        "heap": 18.234954833984375
+      },
+      "maxRSS": 151.359375,
+      "maxHeap": 48.74473571777344,
+      "processHighWaterMiB": 151.359375
+    },
+    {
+      "task": 75,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 0,
+      "activities": 6,
+      "samples": 22551,
+      "rawBytes": 961902,
+      "candidates": 0,
+      "windows": 87,
+      "readMs": 1.2879589999999865,
+      "decodeMs": 19.926251000000036,
+      "prepareMs": 13.216000000000037,
+      "scoreMs": 27.209209000000016,
+      "totalMs": 61.793542000000016,
+      "startMemory": {
+        "rss": 105.046875,
+        "heap": 16.339492797851562
+      },
+      "afterPrepare": {
+        "rss": 127.484375,
+        "heap": 25.00054931640625
+      },
+      "maxRSS": 163.359375,
+      "maxHeap": 58.46067810058594,
+      "processHighWaterMiB": 163.359375
+    },
+    {
+      "task": 25,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "original",
+      "part": 0,
+      "activities": 25,
+      "samples": 95434,
+      "rawBytes": 4073862,
+      "candidates": 0,
+      "windows": 230,
+      "readMs": 16.516832999999977,
+      "decodeMs": 53.17433299999996,
+      "prepareMs": 30.649585999999985,
+      "scoreMs": 51.27474999999998,
+      "totalMs": 152.03225000000003,
+      "startMemory": {
+        "rss": 105.59375,
+        "heap": 16.304405212402344
+      },
+      "afterPrepare": {
+        "rss": 154.765625,
+        "heap": 47.81018829345703
+      },
+      "maxRSS": 234.734375,
+      "maxHeap": 121.36038970947266,
+      "processHighWaterMiB": 234.734375
+    },
+    {
+      "task": 62,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "original",
+      "part": 0,
+      "activities": 26,
+      "samples": 109660,
+      "rawBytes": 4983926,
+      "candidates": 0,
+      "windows": 51,
+      "readMs": 18.02041799999995,
+      "decodeMs": 66.42466900000007,
+      "prepareMs": 36.046583999999896,
+      "scoreMs": 55.33291599999998,
+      "totalMs": 176.36849999999998,
+      "startMemory": {
+        "rss": 105.296875,
+        "heap": 16.338897705078125
+      },
+      "afterPrepare": {
+        "rss": 161.40625,
+        "heap": 57.05321502685547
+      },
+      "maxRSS": 252.265625,
+      "maxHeap": 143.15771484375,
+      "processHighWaterMiB": 252.265625
+    },
+    {
+      "task": 12,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "original",
+      "part": 0,
+      "activities": 97,
+      "samples": 100618,
+      "rawBytes": 3939515,
+      "candidates": 0,
+      "windows": 207,
+      "readMs": 15.11495399999994,
+      "decodeMs": 48.62724700000017,
+      "prepareMs": 22.31875400000014,
+      "scoreMs": 53.3715,
+      "totalMs": 140.60695800000002,
+      "startMemory": {
+        "rss": 104.4375,
+        "heap": 16.311080932617188
+      },
+      "afterPrepare": {
+        "rss": 152.125,
+        "heap": 47.328346252441406
+      },
+      "maxRSS": 236.734375,
+      "maxHeap": 130.9622573852539,
+      "processHighWaterMiB": 236.734375
+    },
+    {
+      "task": 49,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "100k",
+      "part": 0,
+      "activities": 7,
+      "samples": 77214,
+      "rawBytes": 3428635,
+      "candidates": 192,
+      "windows": 60,
+      "readMs": 1.8596239999999966,
+      "decodeMs": 55.24654399999994,
+      "prepareMs": 37.21729200000004,
+      "scoreMs": 119.624459,
+      "totalMs": 214.21579100000002,
+      "startMemory": {
+        "rss": 106.75,
+        "heap": 16.32654571533203
+      },
+      "afterPrepare": {
+        "rss": 178.40625,
+        "heap": 69.8084716796875
+      },
+      "maxRSS": 243.859375,
+      "maxHeap": 130.4430389404297,
+      "processHighWaterMiB": 243.859375
+    },
+    {
+      "task": 86,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 2,
+      "activities": 1,
+      "samples": 26220,
+      "rawBytes": 1262406,
+      "candidates": 136,
+      "windows": 15,
+      "readMs": 0.17654199999999776,
+      "decodeMs": 30.920958,
+      "prepareMs": 13.778749999999974,
+      "scoreMs": 75.99808300000001,
+      "totalMs": 120.946167,
+      "startMemory": {
+        "rss": 105.78125,
+        "heap": 16.328567504882812
+      },
+      "afterPrepare": {
+        "rss": 141.59375,
+        "heap": 36.138671875
+      },
+      "maxRSS": 176.03125,
+      "maxHeap": 53.193397521972656,
+      "processHighWaterMiB": 176.46875
+    },
+    {
+      "task": 36,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 5,
+      "activities": 12,
+      "samples": 13776,
+      "rawBytes": 538022,
+      "candidates": 0,
+      "windows": 25,
+      "readMs": 2.809040999999965,
+      "decodeMs": 12.026166999999987,
+      "prepareMs": 8.234250999999986,
+      "scoreMs": 23.718959000000012,
+      "totalMs": 47.024834,
+      "startMemory": {
+        "rss": 106.296875,
+        "heap": 16.332298278808594
+      },
+      "afterPrepare": {
+        "rss": 114.125,
+        "heap": 19.747573852539062
+      },
+      "maxRSS": 150.109375,
+      "maxHeap": 43.338043212890625,
+      "processHighWaterMiB": 150.125
+    },
+    {
+      "task": 73,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "75k",
+      "part": 0,
+      "activities": 11,
+      "samples": 72587,
+      "rawBytes": 3121098,
+      "candidates": 40,
+      "windows": 35,
+      "readMs": 4.348500999999942,
+      "decodeMs": 45.506333999999995,
+      "prepareMs": 23.050334999999933,
+      "scoreMs": 117.739542,
+      "totalMs": 190.8605,
+      "startMemory": {
+        "rss": 104.15625,
+        "heap": 16.330360412597656
+      },
+      "afterPrepare": {
+        "rss": 158.875,
+        "heap": 47.08576965332031
+      },
+      "maxRSS": 227.078125,
+      "maxHeap": 106.45907592773438,
+      "processHighWaterMiB": 227.09375
+    },
+    {
+      "task": 23,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 4,
+      "activities": 4,
+      "samples": 7526,
+      "rawBytes": 313433,
+      "candidates": 21,
+      "windows": 10,
+      "readMs": 1.0833330000000103,
+      "decodeMs": 9.51254200000001,
+      "prepareMs": 5.336707000000004,
+      "scoreMs": 41.30087499999999,
+      "totalMs": 57.35249999999999,
+      "startMemory": {
+        "rss": 105.765625,
+        "heap": 16.34349822998047
+      },
+      "afterPrepare": {
+        "rss": 111.8125,
+        "heap": 19.74835205078125
+      },
+      "maxRSS": 146.515625,
+      "maxHeap": 43.94065856933594,
+      "processHighWaterMiB": 146.515625
+    },
+    {
+      "task": 60,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "100k",
+      "part": 0,
+      "activities": 25,
+      "samples": 99508,
+      "rawBytes": 4502827,
+      "candidates": 0,
+      "windows": 45,
+      "readMs": 9.235165999999936,
+      "decodeMs": 57.05929099999999,
+      "prepareMs": 26.352416999999917,
+      "scoreMs": 67.82087500000003,
+      "totalMs": 160.855958,
+      "startMemory": {
+        "rss": 105.859375,
+        "heap": 16.34107208251953
+      },
+      "afterPrepare": {
+        "rss": 159.359375,
+        "heap": 53.14289093017578
+      },
+      "maxRSS": 238.796875,
+      "maxHeap": 129.06600189208984,
+      "processHighWaterMiB": 238.796875
+    },
+    {
+      "task": 10,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 2,
+      "activities": 3,
+      "samples": 31006,
+      "rawBytes": 1432802,
+      "candidates": 320,
+      "windows": 19,
+      "readMs": 0.7564179999999965,
+      "decodeMs": 35.129125999999985,
+      "prepareMs": 15.831249999999983,
+      "scoreMs": 72.04499999999999,
+      "totalMs": 123.902333,
+      "startMemory": {
+        "rss": 106.1875,
+        "heap": 16.31169891357422
+      },
+      "afterPrepare": {
+        "rss": 146.015625,
+        "heap": 43.41978454589844
+      },
+      "maxRSS": 178.0625,
+      "maxHeap": 72.90837860107422,
+      "processHighWaterMiB": 180.96875
+    },
+    {
+      "task": 47,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 4,
+      "activities": 1,
+      "samples": 22796,
+      "rawBytes": 1080099,
+      "candidates": 312,
+      "windows": 9,
+      "readMs": 0.1304579999999902,
+      "decodeMs": 26.460374999999985,
+      "prepareMs": 12.688124999999985,
+      "scoreMs": 49.756833,
+      "totalMs": 89.127542,
+      "startMemory": {
+        "rss": 106.65625,
+        "heap": 16.3408203125
+      },
+      "afterPrepare": {
+        "rss": 135.734375,
+        "heap": 33.561859130859375
+      },
+      "maxRSS": 170.421875,
+      "maxHeap": 60.93927764892578,
+      "processHighWaterMiB": 170.4375
+    },
+    {
+      "task": 84,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "50k",
+      "part": 0,
+      "activities": 4,
+      "samples": 46081,
+      "rawBytes": 1982031,
+      "candidates": 38,
+      "windows": 22,
+      "readMs": 1.9162910000000153,
+      "decodeMs": 34.791124999999994,
+      "prepareMs": 21.36662599999994,
+      "scoreMs": 112.63891599999997,
+      "totalMs": 170.869375,
+      "startMemory": {
+        "rss": 105.0625,
+        "heap": 16.340736389160156
+      },
+      "afterPrepare": {
+        "rss": 152.5,
+        "heap": 42.88130187988281
+      },
+      "maxRSS": 188.984375,
+      "maxHeap": 78.42626953125,
+      "processHighWaterMiB": 188.984375
+    },
+    {
+      "task": 34,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 3,
+      "activities": 12,
+      "samples": 10550,
+      "rawBytes": 411631,
+      "candidates": 0,
+      "windows": 25,
+      "readMs": 2.142043999999956,
+      "decodeMs": 10.30104200000001,
+      "prepareMs": 7.524914000000024,
+      "scoreMs": 24.719291,
+      "totalMs": 44.849458,
+      "startMemory": {
+        "rss": 105.390625,
+        "heap": 16.342811584472656
+      },
+      "afterPrepare": {
+        "rss": 112.34375,
+        "heap": 19.019454956054688
+      },
+      "maxRSS": 144.109375,
+      "maxHeap": 42.19798278808594,
+      "processHighWaterMiB": 144.125
+    },
+    {
+      "task": 71,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 3,
+      "activities": 2,
+      "samples": 6617,
+      "rawBytes": 264276,
+      "candidates": 9,
+      "windows": 21,
+      "readMs": 0.7744580000000099,
+      "decodeMs": 9.839207999999985,
+      "prepareMs": 4.422916999999998,
+      "scoreMs": 33.341834000000006,
+      "totalMs": 48.456790999999996,
+      "startMemory": {
+        "rss": 105.46875,
+        "heap": 16.33539581298828
+      },
+      "afterPrepare": {
+        "rss": 111.859375,
+        "heap": 20.570030212402344
+      },
+      "maxRSS": 143.921875,
+      "maxHeap": 39.46226501464844,
+      "processHighWaterMiB": 143.9375
+    },
+    {
+      "task": 21,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 2,
+      "activities": 2,
+      "samples": 11516,
+      "rawBytes": 503893,
+      "candidates": 29,
+      "windows": 16,
+      "readMs": 1.1422920000000119,
+      "decodeMs": 15.932500000000005,
+      "prepareMs": 7.466915999999998,
+      "scoreMs": 40.658833000000016,
+      "totalMs": 65.299708,
+      "startMemory": {
+        "rss": 106.59375,
+        "heap": 16.308860778808594
+      },
+      "afterPrepare": {
+        "rss": 123.453125,
+        "heap": 30.275436401367188
+      },
+      "maxRSS": 155.671875,
+      "maxHeap": 53.682403564453125,
+      "processHighWaterMiB": 155.671875
+    },
+    {
+      "task": 58,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "75k",
+      "part": 0,
+      "activities": 6,
+      "samples": 73923,
+      "rawBytes": 3295995,
+      "candidates": 187,
+      "windows": 41,
+      "readMs": 1.8198750000000246,
+      "decodeMs": 52.10296000000001,
+      "prepareMs": 38.27883299999999,
+      "scoreMs": 124.02179199999998,
+      "totalMs": 216.49679200000003,
+      "startMemory": {
+        "rss": 105.3125,
+        "heap": 16.326583862304688
+      },
+      "afterPrepare": {
+        "rss": 176.015625,
+        "heap": 64.87142181396484
+      },
+      "maxRSS": 238.890625,
+      "maxHeap": 118.95919799804688,
+      "processHighWaterMiB": 238.890625
+    },
+    {
+      "task": 8,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "50k",
+      "part": 0,
+      "activities": 8,
+      "samples": 42335,
+      "rawBytes": 1823315,
+      "candidates": 17,
+      "windows": 25,
+      "readMs": 2.4520020000000073,
+      "decodeMs": 33.93949999999997,
+      "prepareMs": 21.348874999999992,
+      "scoreMs": 76.126916,
+      "totalMs": 134.05404099999998,
+      "startMemory": {
+        "rss": 106.46875,
+        "heap": 16.32196807861328
+      },
+      "afterPrepare": {
+        "rss": 150.640625,
+        "heap": 46.089439392089844
+      },
+      "maxRSS": 185.953125,
+      "maxHeap": 73.3597183227539,
+      "processHighWaterMiB": 185.953125
+    },
+    {
+      "task": 45,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 2,
+      "activities": 2,
+      "samples": 21359,
+      "rawBytes": 913035,
+      "candidates": 29,
+      "windows": 6,
+      "readMs": 1.1834580000000159,
+      "decodeMs": 22.807665999999998,
+      "prepareMs": 11.563957999999985,
+      "scoreMs": 47.05054100000001,
+      "totalMs": 82.68591699999999,
+      "startMemory": {
+        "rss": 108.046875,
+        "heap": 16.32489776611328
+      },
+      "afterPrepare": {
+        "rss": 134.796875,
+        "heap": 32.16424560546875
+      },
+      "maxRSS": 169.78125,
+      "maxHeap": 64.09761047363281,
+      "processHighWaterMiB": 169.78125
+    },
+    {
+      "task": 82,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 2,
+      "activities": 25,
+      "samples": 36900,
+      "rawBytes": 1446627,
+      "candidates": 0,
+      "windows": 60,
+      "readMs": 5.622792000000061,
+      "decodeMs": 23.016751999999798,
+      "prepareMs": 15.455288999999993,
+      "scoreMs": 32.49641700000001,
+      "totalMs": 76.890667,
+      "startMemory": {
+        "rss": 104.84375,
+        "heap": 16.340652465820312
+      },
+      "afterPrepare": {
+        "rss": 130.984375,
+        "heap": 30.204360961914062
+      },
+      "maxRSS": 172.71875,
+      "maxHeap": 71.47931671142578,
+      "processHighWaterMiB": 172.734375
+    },
+    {
+      "task": 32,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 1,
+      "activities": 12,
+      "samples": 8765,
+      "rawBytes": 344119,
+      "candidates": 0,
+      "windows": 18,
+      "readMs": 2.262415000000047,
+      "decodeMs": 9.867456999999959,
+      "prepareMs": 5.322039999999987,
+      "scoreMs": 24.649374999999992,
+      "totalMs": 42.26716599999999,
+      "startMemory": {
+        "rss": 105.6875,
+        "heap": 16.33660888671875
+      },
+      "afterPrepare": {
+        "rss": 112.09375,
+        "heap": 16.94060516357422
+      },
+      "maxRSS": 142.8125,
+      "maxHeap": 40.420799255371094,
+      "processHighWaterMiB": 142.828125
+    },
+    {
+      "task": 69,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "25k",
+      "part": 1,
+      "activities": 2,
+      "samples": 24475,
+      "rawBytes": 1047157,
+      "candidates": 19,
+      "windows": 13,
+      "readMs": 0.4174589999999796,
+      "decodeMs": 27.63125000000001,
+      "prepareMs": 15.100833000000023,
+      "scoreMs": 70.09595900000002,
+      "totalMs": 113.34500000000001,
+      "startMemory": {
+        "rss": 105.75,
+        "heap": 16.30121612548828
+      },
+      "afterPrepare": {
+        "rss": 143.359375,
+        "heap": 31.349700927734375
+      },
+      "maxRSS": 175.671875,
+      "maxHeap": 67.80813598632812,
+      "processHighWaterMiB": 178.171875
+    },
+    {
+      "task": 19,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "25k",
+      "part": 0,
+      "activities": 2,
+      "samples": 24957,
+      "rawBytes": 1055741,
+      "candidates": 17,
+      "windows": 13,
+      "readMs": 0.45624999999998295,
+      "decodeMs": 26.83670800000003,
+      "prepareMs": 14.992874999999998,
+      "scoreMs": 76.136042,
+      "totalMs": 118.54304200000001,
+      "startMemory": {
+        "rss": 106.78125,
+        "heap": 16.304885864257812
+      },
+      "afterPrepare": {
+        "rss": 145.421875,
+        "heap": 32.63134765625
+      },
+      "maxRSS": 172.28125,
+      "maxHeap": 39.30945587158203,
+      "processHighWaterMiB": 175.1875
+    },
+    {
+      "task": 56,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "50k",
+      "part": 1,
+      "activities": 3,
+      "samples": 32908,
+      "rawBytes": 1525005,
+      "candidates": 164,
+      "windows": 39,
+      "readMs": 0.6846670000000046,
+      "decodeMs": 31.35587500000001,
+      "prepareMs": 16.610708000000017,
+      "scoreMs": 69.22270900000001,
+      "totalMs": 117.98116699999999,
+      "startMemory": {
+        "rss": 105.25,
+        "heap": 16.331512451171875
+      },
+      "afterPrepare": {
+        "rss": 144.21875,
+        "heap": 37.71612548828125
+      },
+      "maxRSS": 176.4375,
+      "maxHeap": 50.896202087402344,
+      "processHighWaterMiB": 178.96875
+    },
+    {
+      "task": 6,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "100k",
+      "part": 0,
+      "activities": 13,
+      "samples": 98993,
+      "rawBytes": 4354727,
+      "candidates": 334,
+      "windows": 50,
+      "readMs": 6.79970900000005,
+      "decodeMs": 64.10541500000001,
+      "prepareMs": 33.36187799999996,
+      "scoreMs": 126.81825,
+      "totalMs": 231.342042,
+      "startMemory": {
+        "rss": 104.265625,
+        "heap": 16.304046630859375
+      },
+      "afterPrepare": {
+        "rss": 175.125,
+        "heap": 61.48065948486328
+      },
+      "maxRSS": 261.234375,
+      "maxHeap": 145.5201873779297,
+      "processHighWaterMiB": 261.234375
+    },
+    {
+      "task": 43,
+      "repetition": 2,
+      "scenario": "real-4",
+      "profile": "25k",
+      "part": 0,
+      "activities": 3,
+      "samples": 21971,
+      "rawBytes": 942576,
+      "candidates": 5,
+      "windows": 7,
+      "readMs": 2.5122499999999945,
+      "decodeMs": 23.674041000000003,
+      "prepareMs": 12.517208999999951,
+      "scoreMs": 47.89904200000001,
+      "totalMs": 86.71795900000001,
+      "startMemory": {
+        "rss": 105.53125,
+        "heap": 16.329917907714844
+      },
+      "afterPrepare": {
+        "rss": 131.0625,
+        "heap": 31.392898559570312
+      },
+      "maxRSS": 166.671875,
+      "maxHeap": 58.125648498535156,
+      "processHighWaterMiB": 166.6875
+    },
+    {
+      "task": 80,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "75k",
+      "part": 0,
+      "activities": 36,
+      "samples": 25639,
+      "rawBytes": 1004106,
+      "candidates": 0,
+      "windows": 65,
+      "readMs": 5.1935419999999795,
+      "decodeMs": 16.41237500000007,
+      "prepareMs": 9.116166999999962,
+      "scoreMs": 28.84174999999999,
+      "totalMs": 59.863249999999994,
+      "startMemory": {
+        "rss": 105.28125,
+        "heap": 16.33936309814453
+      },
+      "afterPrepare": {
+        "rss": 121.078125,
+        "heap": 28.99376678466797
+      },
+      "maxRSS": 161.1875,
+      "maxHeap": 59.201873779296875,
+      "processHighWaterMiB": 161.203125
+    },
+    {
+      "task": 30,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 4,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.12099999999999511,
+      "decodeMs": 6.836042000000006,
+      "prepareMs": 2.253249999999994,
+      "scoreMs": 18.509124999999997,
+      "totalMs": 27.76120800000001,
+      "startMemory": {
+        "rss": 105.25,
+        "heap": 16.33502960205078
+      },
+      "afterPrepare": {
+        "rss": 107.9375,
+        "heap": 16.293106079101562
+      },
+      "maxRSS": 127.8125,
+      "maxHeap": 28.163307189941406,
+      "processHighWaterMiB": 127.8125
+    },
+    {
+      "task": 67,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "50k",
+      "part": 1,
+      "activities": 10,
+      "samples": 47050,
+      "rawBytes": 2008422,
+      "candidates": 0,
+      "windows": 38,
+      "readMs": 4.093502000000072,
+      "decodeMs": 36.08695799999997,
+      "prepareMs": 20.196999000000076,
+      "scoreMs": 42.14195799999999,
+      "totalMs": 102.79175,
+      "startMemory": {
+        "rss": 105.734375,
+        "heap": 16.304595947265625
+      },
+      "afterPrepare": {
+        "rss": 150.9375,
+        "heap": 48.37611389160156
+      },
+      "maxRSS": 197.171875,
+      "maxHeap": 89.32681274414062,
+      "processHighWaterMiB": 197.171875
+    },
+    {
+      "task": 17,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "100k",
+      "part": 0,
+      "activities": 11,
+      "samples": 91959,
+      "rawBytes": 4038292,
+      "candidates": 264,
+      "windows": 59,
+      "readMs": 10.891002,
+      "decodeMs": 65.66999899999996,
+      "prepareMs": 31.93446,
+      "scoreMs": 144.166458,
+      "totalMs": 252.92725000000002,
+      "startMemory": {
+        "rss": 107.09375,
+        "heap": 16.338722229003906
+      },
+      "afterPrepare": {
+        "rss": 176.828125,
+        "heap": 55.6180419921875
+      },
+      "maxRSS": 245.75,
+      "maxHeap": 131.21248626708984,
+      "processHighWaterMiB": 245.75
+    },
+    {
+      "task": 54,
+      "repetition": 2,
+      "scenario": "real-2",
+      "profile": "original",
+      "part": 0,
+      "activities": 8,
+      "samples": 100430,
+      "rawBytes": 4441749,
+      "candidates": 202,
+      "windows": 95,
+      "readMs": 7.0717489999999685,
+      "decodeMs": 70.91991699999996,
+      "prepareMs": 45.158376000000004,
+      "scoreMs": 147.034375,
+      "totalMs": 270.468583,
+      "startMemory": {
+        "rss": 107.453125,
+        "heap": 16.29993438720703
+      },
+      "afterPrepare": {
+        "rss": 177.734375,
+        "heap": 65.19889068603516
+      },
+      "maxRSS": 266.0625,
+      "maxHeap": 147.10169219970703,
+      "processHighWaterMiB": 266.0625
+    },
+    {
+      "task": 4,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 4,
+      "activities": 2,
+      "samples": 15257,
+      "rawBytes": 712634,
+      "candidates": 0,
+      "windows": 8,
+      "readMs": 0.357001000000011,
+      "decodeMs": 19.708875000000006,
+      "prepareMs": 8.035500999999982,
+      "scoreMs": 26.296166999999997,
+      "totalMs": 54.48825000000001,
+      "startMemory": {
+        "rss": 107.171875,
+        "heap": 16.3446044921875
+      },
+      "afterPrepare": {
+        "rss": 120.953125,
+        "heap": 26.407608032226562
+      },
+      "maxRSS": 158.53125,
+      "maxHeap": 46.424049377441406,
+      "processHighWaterMiB": 158.53125
+    },
+    {
+      "task": 41,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "50k",
+      "part": 1,
+      "activities": 8,
+      "samples": 42123,
+      "rawBytes": 1893531,
+      "candidates": 0,
+      "windows": 21,
+      "readMs": 2.023292999999967,
+      "decodeMs": 30.99250100000002,
+      "prepareMs": 17.071500000000015,
+      "scoreMs": 39.34212500000001,
+      "totalMs": 89.60183300000001,
+      "startMemory": {
+        "rss": 107.09375,
+        "heap": 16.302841186523438
+      },
+      "afterPrepare": {
+        "rss": 149.75,
+        "heap": 41.26762390136719
+      },
+      "maxRSS": 192.578125,
+      "maxHeap": 80.32644653320312,
+      "processHighWaterMiB": 192.59375
+    },
+    {
+      "task": 78,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 3,
+      "activities": 5,
+      "samples": 21622,
+      "rawBytes": 921719,
+      "candidates": 0,
+      "windows": 17,
+      "readMs": 0.7509579999999971,
+      "decodeMs": 20.13458199999998,
+      "prepareMs": 11.113832999999985,
+      "scoreMs": 27.88708300000002,
+      "totalMs": 60.03829200000001,
+      "startMemory": {
+        "rss": 105.625,
+        "heap": 16.31269073486328
+      },
+      "afterPrepare": {
+        "rss": 133.46875,
+        "heap": 33.42524719238281
+      },
+      "maxRSS": 164.4375,
+      "maxHeap": 62.619232177734375,
+      "processHighWaterMiB": 164.453125
+    },
+    {
+      "task": 28,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "50k",
+      "part": 2,
+      "activities": 24,
+      "samples": 27529,
+      "rawBytes": 1077151,
+      "candidates": 0,
+      "windows": 57,
+      "readMs": 4.868956000000011,
+      "decodeMs": 18.84999700000003,
+      "prepareMs": 14.097789999999975,
+      "scoreMs": 29.52966699999999,
+      "totalMs": 67.66695899999999,
+      "startMemory": {
+        "rss": 105.4375,
+        "heap": 16.347183227539062
+      },
+      "afterPrepare": {
+        "rss": 125.90625,
+        "heap": 27.812026977539062
+      },
+      "maxRSS": 163.671875,
+      "maxHeap": 60.71995544433594,
+      "processHighWaterMiB": 163.671875
+    },
+    {
+      "task": 65,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "100k",
+      "part": 2,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.1354170000000039,
+      "decodeMs": 7.033957999999998,
+      "prepareMs": 2.4022500000000093,
+      "scoreMs": 19.172208999999995,
+      "totalMs": 28.79095799999999,
+      "startMemory": {
+        "rss": 105.625,
+        "heap": 16.336380004882812
+      },
+      "afterPrepare": {
+        "rss": 108.15625,
+        "heap": 16.270248413085938
+      },
+      "maxRSS": 127.59375,
+      "maxHeap": 28.105674743652344,
+      "processHighWaterMiB": 127.59375
+    },
+    {
+      "task": 15,
+      "repetition": 2,
+      "scenario": "real-1",
+      "profile": "75k",
+      "part": 0,
+      "activities": 6,
+      "samples": 57597,
+      "rawBytes": 2485924,
+      "candidates": 56,
+      "windows": 38,
+      "readMs": 4.300998999999976,
+      "decodeMs": 43.144998999999984,
+      "prepareMs": 22.94262600000002,
+      "scoreMs": 113.75449999999998,
+      "totalMs": 184.329792,
+      "startMemory": {
+        "rss": 104.359375,
+        "heap": 16.30194854736328
+      },
+      "afterPrepare": {
+        "rss": 152.8125,
+        "heap": 37.55524444580078
+      },
+      "maxRSS": 200.921875,
+      "maxHeap": 91.27799987792969,
+      "processHighWaterMiB": 200.921875
+    },
+    {
+      "task": 52,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "75k",
+      "part": 1,
+      "activities": 5,
+      "samples": 22523,
+      "rawBytes": 960199,
+      "candidates": 0,
+      "windows": 17,
+      "readMs": 1.656958000000074,
+      "decodeMs": 20.633830999999972,
+      "prepareMs": 12.84070699999998,
+      "scoreMs": 27.29445799999999,
+      "totalMs": 62.567417000000006,
+      "startMemory": {
+        "rss": 106.734375,
+        "heap": 16.340232849121094
+      },
+      "afterPrepare": {
+        "rss": 127.40625,
+        "heap": 23.293601989746094
+      },
+      "maxRSS": 163.609375,
+      "maxHeap": 57.316978454589844,
+      "processHighWaterMiB": 163.609375
+    },
+    {
+      "task": 2,
+      "repetition": 2,
+      "scenario": "real-3",
+      "profile": "25k",
+      "part": 2,
+      "activities": 4,
+      "samples": 19667,
+      "rawBytes": 928753,
+      "candidates": 0,
+      "windows": 4,
+      "readMs": 1.9962500000000176,
+      "decodeMs": 21.181209000000024,
+      "prepareMs": 10.994081999999963,
+      "scoreMs": 25.436583000000013,
+      "totalMs": 59.75716600000001,
+      "startMemory": {
+        "rss": 106.15625,
+        "heap": 16.307701110839844
+      },
+      "afterPrepare": {
+        "rss": 134.59375,
+        "heap": 33.39405059814453
+      },
+      "maxRSS": 163.609375,
+      "maxHeap": 60.766761779785156,
+      "processHighWaterMiB": 163.609375
+    },
+    {
+      "task": 39,
+      "repetition": 2,
+      "scenario": "real-5",
+      "profile": "25k",
+      "part": 8,
+      "activities": 1,
+      "samples": 2240,
+      "rawBytes": 87965,
+      "candidates": 0,
+      "windows": 3,
+      "readMs": 0.1617079999999902,
+      "decodeMs": 7.404291999999998,
+      "prepareMs": 2.542500000000004,
+      "scoreMs": 20.097625000000008,
+      "totalMs": 30.280457999999996,
+      "startMemory": {
+        "rss": 106.1875,
+        "heap": 16.307861328125
+      },
+      "afterPrepare": {
+        "rss": 112.390625,
+        "heap": 19.61846160888672
+      },
+      "maxRSS": 139.640625,
+      "maxHeap": 28.929298400878906,
+      "processHighWaterMiB": 139.640625
+    },
+    {
+      "task": 76,
+      "repetition": 2,
+      "scenario": "real-6",
+      "profile": "25k",
+      "part": 1,
+      "activities": 8,
+      "samples": 24990,
+      "rawBytes": 1070127,
+      "candidates": 0,
+      "windows": 104,
+      "readMs": 1.9752909999999417,
+      "decodeMs": 21.605790999999968,
+      "prepareMs": 13.442623999999995,
+      "scoreMs": 29.014916,
+      "totalMs": 66.221208,
+      "startMemory": {
+        "rss": 105.203125,
+        "heap": 16.332061767578125
+      },
+      "afterPrepare": {
+        "rss": 127.46875,
+        "heap": 27.682098388671875
+      },
+      "maxRSS": 163.5625,
+      "maxHeap": 60.48424530029297,
+      "processHighWaterMiB": 163.5625
+    }
+  ]
+}
