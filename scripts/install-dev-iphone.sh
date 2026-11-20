@@ -79,6 +79,7 @@ xcodebuild build -project "$repo/ios/ActivityMap/ActivityMap.xcodeproj" -scheme 
   -allowProvisioningUpdates \
   ACTIVITYMAP_BUNDLE_ID_SUFFIX=.dev ACTIVITYMAP_DISPLAY_NAME="ActivityMap Dev" \
   ACTIVITYMAP_APP_ICON=AppIconDev ACTIVITYMAP_AUTH_CALLBACK_SCHEME=activitymap-dev \
+  ACTIVITYMAP_AUTH_REDIRECT_URI=activitymap-dev://auth/callback \
   ${settings[@]+"${settings[@]}"} >"$work/build.log" 2>&1 || {
     grep -E "error:" "$work/build.log" | head -10 >&2
     echo "Build failed; see $work/build.log" >&2

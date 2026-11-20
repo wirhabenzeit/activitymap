@@ -414,10 +414,7 @@ final class AuthController: NSObject {
 
     private func presentAuthSession(startingAt url: URL) async throws -> URL {
         try await withCheckedThrowingContinuation { continuation in
-            let session = ASWebAuthenticationSession(
-                url: url,
-                callbackURLScheme: APIConfiguration.authCallbackScheme
-            ) { callbackURL, error in
+            let finish: (URL?, Error?) -> Void = { callbackURL, error in
                 if let error {
                     continuation.resume(throwing: error)
                 } else if let callbackURL {
@@ -425,6 +422,18 @@ final class AuthController: NSObject {
                 } else {
                     continuation.resume(throwing: AuthError.missingCodeOrState)
                 }
+            }
+            // A device returns through an https universal link that only this
+            // app can receive; a custom scheme (simulator, Dev) could be
+            // claimed by any installed app (issue #482).
+            let session: ASWebAuthenticationSession
+            switch APIConfiguration.authCallback {
+            case .customScheme(let scheme):
+                session = ASWebAuthenticationSession(
+                    url: url, callbackURLScheme: scheme, completionHandler: finish)
+            case .https(let host, let path):
+                session = ASWebAuthenticationSession(
+                    url: url, callback: .https(host: host, path: path), completionHandler: finish)
             }
             session.presentationContextProvider = self
             // Each explicit sign-in allows choosing an account instead of

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- webcredentials makes ASWebAuthenticationSession deliver the https
+	     sign-in callback to this app only (issue #482). The domain must also
+	     serve public/.well-known/apple-app-site-association. -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:$(ACTIVITYMAP_ASSOCIATED_DOMAIN)</string>
+	</array>
+</dict>
+</plist>

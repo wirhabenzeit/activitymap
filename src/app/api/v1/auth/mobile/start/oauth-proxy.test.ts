@@ -7,6 +7,7 @@ import { oAuthProxy } from 'better-auth/plugins';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
 import test from 'node:test';
 
+import { createMobileAttemptBinding } from '~/server/auth/mobile-attempt.ts';
 import { parseMobileRedirectAllowlist } from '~/server/auth/mobile-redirect-allowlist.ts';
 
 import { createMobileAuthStartHandler } from './handler.ts';
@@ -64,6 +65,9 @@ void test('mobile OAuth preserves its request origin instead of using VERCEL_URL
             ],
           });
           const GET = createMobileAuthStartHandler({
+            attempts: createMobileAttemptBinding({
+              secret: () => PROXY_SECRET,
+            }),
             loadRedirectAllowlist: () =>
               parseMobileRedirectAllowlist('activitymap-dev://auth/callback'),
             startSocialSignIn: async ({

@@ -289,6 +289,19 @@ Recommended flow:
 7. The server returns an ActivityMap session token. SwiftUI stores it in the
    Keychain and sends it in the `Authorization` header.
 
+Hardening, 2026-11-20 (issue #482): step 5's redirect is now an `https`
+universal link (`https://activitymap.cc/auth/callback`) on physical devices,
+delivered to the app through `ASWebAuthenticationSession`'s `.https` callback and
+the `webcredentials` Associated Domains entitlement, because any installed app
+can claim a custom scheme and read the code from it. The simulator and the Dev
+build keep their custom schemes. Step 2's start request also sets a signed,
+short-lived, HttpOnly attempt cookie bound to `state`, `code_challenge` and
+`redirect_uri`; step 5 issues a code only when the callback carries that cookie
+and the browser session was created after the attempt began, so a browser
+session that was already signed in is never handed to a crafted callback URL
+(`src/server/auth/mobile-attempt.ts`). Setup and release steps are in
+`ios/ActivityMap/README.md`, "Universal-link sign-in".
+
 Account-switching follow-up, 2026-10-11: a physical iPhone silently returned
 to a test account even after Strava sign-out in a regular Safari tab with one
 profile. An ephemeral authentication session showed the login screen and an

@@ -1,11 +1,13 @@
 import { auth } from '~/lib/auth';
 import { STRAVA_FORCE_CONSENT } from '~/lib/strava-permissions';
-import { logger } from '~/server/logging/logger';
 import { withApiV1Observability } from '~/server/api/observability';
 import {
   STRICT_IP_RATE_LIMIT,
   withApiV1RateLimit,
 } from '~/server/api/rate-limit-boundary';
+import { mobileAttemptBinding } from '~/server/auth/mobile-attempt';
+import { logger } from '~/server/logging/logger';
+
 import { createMobileAuthStartHandler } from './handler';
 
 const ROUTE = 'GET /api/v1/auth/mobile/start';
@@ -13,6 +15,7 @@ const ROUTE = 'GET /api/v1/auth/mobile/start';
 export const GET = withApiV1Observability(
   withApiV1RateLimit(
     createMobileAuthStartHandler({
+      attempts: mobileAttemptBinding,
       startSocialSignIn: async ({
         callbackURL,
         errorCallbackURL,

@@ -16,6 +16,14 @@ MAPTILER_KEY = your-public-maptiler-key
 //
 // ACTIVITYMAP_API_BASE_URL = https:$(SLASH)$(SLASH)your-host.example
 //
+// Device builds return from sign-in through the https universal link
+// https://activitymap.cc/auth/callback; simulator builds use the custom scheme
+// activitymap://auth/callback. Production must allow both while older builds
+// are installed. To test a different deployment on a phone, point the base URL
+// at it and use a custom-scheme redirect, which needs no associated domain:
+//
+// ACTIVITYMAP_AUTH_REDIRECT_URI[sdk=iphoneos*] = activitymap:$(SLASH)$(SLASH)auth/callback
+//
 // Changing the callback scheme also requires updating the server's
 // MOBILE_AUTH_REDIRECT_ALLOWLIST to match, or sign-in is rejected. The
 // ActivityMap Dev build uses activitymap-dev, so production must allow both

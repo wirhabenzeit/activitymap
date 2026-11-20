@@ -41,6 +41,16 @@ team = os.environ['APPLE_TEAM_ID']
 assert profile['TeamIdentifier'] == [team], 'Wrong signing team'
 assert profile['Entitlements']['application-identifier'] == team + '.page.dominik.activitymap', 'Wrong app profile'
 assert not profile['Entitlements'].get('get-task-allow'), 'Development profile is not valid for TestFlight'
+# The app's entitlements ask for webcredentials on the sign-in domain
+# (issue #482). A profile without the capability fails signing late and
+# opaquely, or worse ships a build whose sign-in never returns to the app.
+config = Path('ios/ActivityMap/Config/Base.xcconfig').read_text()
+domain = re.search(r'^ACTIVITYMAP_ASSOCIATED_DOMAIN\s*=\s*(\S+)', config, re.M).group(1)
+associated = profile['Entitlements'].get('com.apple.developer.associated-domains', [])
+assert associated == '*' or 'webcredentials:' + domain in associated or '*' in associated, (
+    'The App Store provisioning profile lacks the Associated Domains capability for '
+    + domain + '. Enable Associated Domains on the App ID in the Apple Developer portal, '
+    'regenerate the App Store profile, and replace the IOS_PROVISION_PROFILE_BASE64 secret.')
 assert not profile.get('ProvisionedDevices') and not profile.get('ProvisionsAllDevices'), 'Not an App Store profile'
 assert profile['ExpirationDate'].replace(tzinfo=timezone.utc) > datetime.now(timezone.utc), 'Profile expired'
 identities = subprocess.check_output(['security','find-identity','-v','-p','codesigning',str(root / 'testflight-signing.keychain-db')], text=True)

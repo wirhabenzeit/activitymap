@@ -3,6 +3,7 @@ import { getSessionCookie } from 'better-auth/cookies';
 import { withAuthenticatedApiV1 } from '~/server/api/authenticated-boundary';
 import { STRICT_IP_RATE_LIMIT } from '~/server/api/rate-limit-boundary';
 import { issueMobileLoginCode } from '~/server/auth/mobile';
+import { mobileAttemptBinding } from '~/server/auth/mobile-attempt';
 import { logger } from '~/server/logging/logger';
 
 import { createMobileAuthCallbackHandler } from './handler';
@@ -12,10 +13,16 @@ const ROUTE = 'GET /api/v1/auth/mobile/callback';
 export const GET = withAuthenticatedApiV1(
   (request, context) =>
     createMobileAuthCallbackHandler({
-      resolveSessionUserId: async () => {
+      resolveSession: async () => {
         const session = await context.session();
-        return session?.user?.id ?? null;
+        return session?.user?.id
+          ? {
+              userId: session.user.id,
+              createdAt: new Date(session.session.createdAt),
+            }
+          : null;
       },
+      attempts: mobileAttemptBinding,
       // The signed session cookie value Better Auth just set for the browser
       // session that completed the Strava OAuth round trip *is* a valid
       // bearer token: the `bearer` plugin (`~/lib/auth.ts`) accepts any

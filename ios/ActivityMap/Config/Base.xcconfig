@@ -27,11 +27,18 @@ SLASH = /
 ACTIVITYMAP_API_BASE_URL = http:$(SLASH)$(SLASH)localhost:3000
 ACTIVITYMAP_API_BASE_URL[sdk=iphoneos*] = https:$(SLASH)$(SLASH)activitymap.cc
 
-// Mobile sign-in callback. The scheme is registered under CFBundleURLTypes in
-// Info.plist and is what ASWebAuthenticationSession watches for. The full URI
-// must also be listed in the server's MOBILE_AUTH_REDIRECT_ALLOWLIST, which
-// matches protocol, host, and path prefix exactly.
+// Mobile sign-in callback (issue #482). A physical device returns through an
+// https universal link that only this app can receive: the domain below lists
+// the app in its apple-app-site-association file (webcredentials) and the
+// app's entitlements name the same domain, so no other installed app can
+// intercept the one-time sign-in code. The simulator has no such domain for
+// localhost, so it keeps the custom scheme, which is registered under
+// CFBundleURLTypes in Info.plist. Whatever is configured here must also be
+// listed in the server's MOBILE_AUTH_REDIRECT_ALLOWLIST, which matches
+// protocol, host, and path prefix exactly.
+ACTIVITYMAP_ASSOCIATED_DOMAIN = activitymap.cc
 ACTIVITYMAP_AUTH_CALLBACK_SCHEME = activitymap
 ACTIVITYMAP_AUTH_REDIRECT_URI = $(ACTIVITYMAP_AUTH_CALLBACK_SCHEME):$(SLASH)$(SLASH)auth/callback
+ACTIVITYMAP_AUTH_REDIRECT_URI[sdk=iphoneos*] = https:$(SLASH)$(SLASH)$(ACTIVITYMAP_ASSOCIATED_DOMAIN)/auth/callback
 
 #include? "Local.xcconfig"
