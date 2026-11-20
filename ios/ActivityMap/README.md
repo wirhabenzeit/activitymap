@@ -88,7 +88,7 @@ releases and prereleases trigger [the TestFlight workflow](../../.github/workflo
 Draft releases and tags without a published release do not trigger an upload.
 Web releases without the `ios/v` prefix are ignored.
 
-The workflow builds the exact tagged commit on the `xcode-27` runner. The numeric
+The workflow builds the exact tagged commit on the `xcode-27` runner, a GitHub-hosted image: the repository has no self-hosted runners, so each job gets a fresh VM and nothing persists between pull-request checks and the signing job (#487). It signs the archive itself with the distribution identity and profile (an unsigned archive would drop the app's entitlements) and checks the signed app's Associated Domains entitlement before exporting. The numeric
 tag version becomes the app version; `100 + github.run_number` and
 `github.run_attempt` form the build number (for example `101.1`). A rerun gets a
 new build number. Do not move published tags; publish another prerelease tag to
@@ -96,6 +96,10 @@ ship fixes. Apple processes the upload before the workflow copies the GitHub
 release body into TestFlight's **What to Test**, prefixed with its tag and commit.
 The existing **Internal Testing** group has automatic distribution enabled.
 External beta review and public App Store submission are separate operations.
+
+### First App Store release
+
+Tag the release `ios/v1.0.0`. The numeric part becomes `CFBundleShortVersionString`, so betas (`ios/v1.0.0-beta.N`) and the final tag share version 1.0.0, and each upload gets its own build number (`100 + run_number`, then `.run_attempt`), which only grows. Submit a build that has already passed external TestFlight, and cut the final tag from that same commit rather than from a later `main`. Version 1.0.0 may be submitted to App Review more than once; only the build changes.
 
 The Actions summary links to the accepted build, and the `testflight-*` artifact
 contains `source.json`, toolchain information, and archive/upload logs for 14 days.
@@ -105,15 +109,15 @@ check TestFlight before rerunning: the upload may have succeeded already.
 One-time setup uses a GitHub environment named `testflight`, restricted to
 release tags matching `ios/v*`, with these environment secrets:
 
-| Secret                          | Value                                                                                            |
-| ------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `IOS_DISTRIBUTION_P12_BASE64`   | Base64-encoded Apple Distribution identity, including its private key                            |
-| `IOS_DISTRIBUTION_P12_PASSWORD` | Password protecting that P12                                                                     |
-| `IOS_PROVISION_PROFILE_BASE64`  | Base64-encoded App Store profile for `page.dominik.activitymap`, containing the same certificate |
-| `APP_STORE_CONNECT_KEY_ID`      | Dedicated App Store Connect team API key ID                                                      |
-| `APP_STORE_CONNECT_ISSUER_ID`   | Team API issuer ID                                                                               |
-| `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines                                     |
-| `MAPTILER_KEY`                  | Optional public MapTiler key for Outdoors and Satellite                                          |
+| Secret                          | Value                                                                                                                                  |
+| ------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `IOS_DISTRIBUTION_P12_BASE64`   | Base64-encoded Apple Distribution identity, including its private key                                                                  |
+| `IOS_DISTRIBUTION_P12_PASSWORD` | Password protecting that P12                                                                                                           |
+| `IOS_PROVISION_PROFILE_BASE64`  | Base64-encoded App Store profile for `page.dominik.activitymap`, containing the same certificate and the Associated Domains capability |
+| `APP_STORE_CONNECT_KEY_ID`      | Dedicated App Store Connect team API key ID                                                                                            |
+| `APP_STORE_CONNECT_ISSUER_ID`   | Team API issuer ID                                                                                                                     |
+| `APP_STORE_CONNECT_PRIVATE_KEY` | The downloaded `.p8` key, including PEM headers and newlines                                                                           |
+| `MAPTILER_KEY`                  | Optional public MapTiler key for Outdoors and Satellite                                                                                |
 
 The API key needs the **Developer** role for uploads and beta-build metadata.
 Team API keys apply across the team's apps; they cannot be restricted to one app.
@@ -152,15 +156,16 @@ The app talks to an ActivityMap deployment over `/api/v1`. It never holds a data
 
 `Config/Base.xcconfig` declares the values, `Config/Local.xcconfig` overrides them locally, and `Info.plist` surfaces them to `Networking/APIConfiguration.swift`:
 
-| xcconfig value                     | Default                                                              | Purpose                                                                         |
-| ---------------------------------- | -------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `ACTIVITYMAP_API_BASE_URL`         | Simulator: `http://localhost:3000`; device: `https://activitymap.cc` | The deployment to call                                                          |
-| `ACTIVITYMAP_AUTH_CALLBACK_SCHEME` | `activitymap`                                                        | Registered in `CFBundleURLTypes`; what `ASWebAuthenticationSession` watches for |
-| `ACTIVITYMAP_AUTH_REDIRECT_URI`    | `activitymap://auth/callback`                                        | Where mobile sign-in returns its one-time code                                  |
+| xcconfig value                     | Default                                                                                  | Purpose                                                                                                         |
+| ---------------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `ACTIVITYMAP_API_BASE_URL`         | Simulator: `http://localhost:3000`; device: `https://activitymap.cc`                     | The deployment to call                                                                                          |
+| `ACTIVITYMAP_AUTH_CALLBACK_SCHEME` | `activitymap`                                                                            | Registered in `CFBundleURLTypes`; what `ASWebAuthenticationSession` watches for on the simulator and Dev builds |
+| `ACTIVITYMAP_AUTH_REDIRECT_URI`    | Simulator: `activitymap://auth/callback`; device: `https://activitymap.cc/auth/callback` | Where mobile sign-in returns its one-time code (see Universal-link sign-in)                                     |
+| `ACTIVITYMAP_ASSOCIATED_DOMAIN`    | `activitymap.cc`                                                                         | Domain in the app's Associated Domains entitlement and in the device redirect URI                               |
 
 Note that `//` starts a comment in xcconfig, so URL separators are composed from `$(SLASH)` rather than written literally.
 
-`Info.plist` carries one narrow App Transport Security exception, permitting insecure HTTP loads to `localhost` only, so Debug builds can reach a local `pnpm dev` server. Running against a device on the LAN needs its own exception or an HTTPS tunnel.
+`Info.plist` is preprocessed (`INFOPLIST_PREPROCESS`), and only the **Debug** configuration defines `ACTIVITYMAP_ALLOW_LOCALHOST_HTTP`, which adds one narrow App Transport Security exception permitting insecure HTTP loads to `localhost`, so Debug builds can reach a local `pnpm dev` server. Release builds carry no App Transport Security exception. Running against a device on the LAN needs its own exception or an HTTPS tunnel.
 
 ### Install ActivityMap Dev on your iPhone
 
@@ -203,7 +208,7 @@ Run the `ActivityMap` scheme on the connected iPhone in Xcode. The app target ha
 
 Production moved to `https://activitymap.cc`. Builds using this default treat it as a new cache scope, so the first launch needs a network connection to verify the existing session and download activities again. The Keychain token is retained and can be restored against the same production database; an expired session still requires sign-in. An explicit `Local.xcconfig` override takes precedence over the new default. Keep the old host's API available for installed builds until those clients have migrated.
 
-The production Vercel project's **Production** environment must set `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback`, have Strava sign-in enabled, and serve `/api/v1` on that HTTPS host. This Vercel setting is not stored in Git; after adding or changing it, redeploy Production for the server to read it. If sign-in fails with `redirect_not_allowed`, check this setting first. Vercel Preview also supports Strava after the [Preview Strava setup](../../docs/preview-strava-login.md).
+The production Vercel project's **Production** environment must set `MOBILE_AUTH_REDIRECT_ALLOWLIST=https://activitymap.cc/auth/callback,activitymap://auth/callback,activitymap-dev://auth/callback` (the https link is what current device builds use; the custom schemes serve builds already installed and the Dev build), have Strava sign-in enabled, and serve `/api/v1` on that HTTPS host. This Vercel setting is not stored in Git; after adding or changing it, redeploy Production for the server to read it. If sign-in fails with `redirect_not_allowed`, check this setting first. Vercel Preview also supports Strava after the [Preview Strava setup](../../docs/preview-strava-login.md).
 
 To test the Mac's local backend from an iPhone instead, use an HTTPS tunnel with a stable hostname and override the device setting in the ignored `Config/Local.xcconfig`. Add the tunnel host to Better Auth's `allowedHosts` in `src/lib/auth.ts`, set `BETTER_AUTH_URL` consistently, and register the tunnel callback host in the Strava OAuth application. The local server also needs the variables under **Local sign-in setup** below. Direct `http://<Mac LAN IP>:3000` does not work with this client: `APIConfiguration` rejects non-local HTTP and the app's transport policy only excepts `localhost`.
 
@@ -228,18 +233,36 @@ Native sign-in works against an explicitly configured local server. Preview sign
 
 Set these in the repository's `.env` or `.env.local`. `.env.example` is documentation only, so uncommenting a line there configures nothing:
 
-| Variable                                                     | Why                                                                                                    |
-| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ |
-| `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback` | Must match the app's `ACTIVITYMAP_AUTH_REDIRECT_URI`; matched on exact protocol, host, and path prefix |
-| `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`                       | Without this the Strava OAuth provider is never registered and sign-in cannot start                    |
-| `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET`                       | The Strava OAuth application credentials                                                               |
-| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`                      | Session signing, and the trusted-origin fallback                                                       |
+| Variable                                                     | Why                                                                                                                                            |
+| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `MOBILE_AUTH_REDIRECT_ALLOWLIST=activitymap://auth/callback` | Must match the app's `ACTIVITYMAP_AUTH_REDIRECT_URI` (the simulator's custom scheme locally); matched on exact protocol, host, and path prefix |
+| `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled`                       | Without this the Strava OAuth provider is never registered and sign-in cannot start                                                            |
+| `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET`                       | The Strava OAuth application credentials                                                                                                       |
+| `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`                      | Session signing, and the trusted-origin fallback                                                                                               |
 
 Be aware of what the second one turns on: with external effects enabled, the local server makes real Strava API calls and real Strava writes, and any webhook or cron route you invoke acts against live data. That is why the default everywhere except production is `disabled`. Enable it deliberately, for a sign-in session you are actually testing.
 
 The bundle identifier is `page.dominik.activitymap` and is deliberately stable, because a registered URL scheme and any future universal link both depend on it.
 
-Production universal links can replace the custom scheme once there is a final bundle identifier, an Apple team, an Associated Domains entitlement, and a hosted AASA file. Until then the custom scheme is the supported path.
+## Universal-link sign-in
+
+Device builds return from Strava sign-in through `https://activitymap.cc/auth/callback` instead of the `activitymap://` custom scheme (issue #482). Any installed app can register a custom scheme and read the one-time code from it; an https link goes only to the app that the domain's `apple-app-site-association` file names. Four things must agree, and `src/lib/ios-sign-in-config.test.ts` checks them side by side:
+
+- `public/.well-known/apple-app-site-association` lists `DX96FWY9AX.page.dominik.activitymap` under `webcredentials` and is served as `application/json` without a redirect (headers in `next.config.js`).
+- `ActivityMap/ActivityMap.entitlements` carries `webcredentials:$(ACTIVITYMAP_ASSOCIATED_DOMAIN)`.
+- `Config/Base.xcconfig` sets the device redirect to `https://$(ACTIVITYMAP_ASSOCIATED_DOMAIN)/auth/callback`; `AuthController` then uses `ASWebAuthenticationSession`'s `.https(host:path:)` callback.
+- The server allows that URL in `MOBILE_AUTH_REDIRECT_ALLOWLIST`, and `/auth/callback` exists as a real page for anyone who opens the link outside the app.
+
+The simulator and the Dev build keep the custom scheme: a local server has no associated domain, and the Dev build installs beside the TestFlight app under another bundle identifier.
+
+The server additionally binds each callback to the `/api/v1/auth/mobile/start` request that began it. `start` sets a signed, HttpOnly attempt cookie; `callback` issues a code only when that cookie matches the `state`, `code_challenge` and `redirect_uri` on the callback URL and the browser session was created after the attempt started. A session that was already signed in on the web is therefore never handed to a crafted callback URL (`src/server/auth/mobile-attempt.ts`).
+
+### Before the first release that uses it
+
+1. **Allow the link on the server first.** Add `https://activitymap.cc/auth/callback` to Production's `MOBILE_AUTH_REDIRECT_ALLOWLIST`, keeping the custom schemes, and redeploy. A build that asks for an unlisted redirect fails with `redirect_not_allowed`.
+2. **Enable Associated Domains on the App ID.** In the Apple Developer portal, App ID `page.dominik.activitymap` > Capabilities > Associated Domains. Then **regenerate the App Store provisioning profile** and replace the `IOS_PROVISION_PROFILE_BASE64` secret. The release workflow now fails early, with that explanation, when the profile lacks the entitlement.
+3. **Check the AASA file is live**: `curl -i https://activitymap.cc/.well-known/apple-app-site-association` returns 200, `content-type: application/json` and the JSON above. Apple caches it through its CDN, so allow time after the first deploy.
+4. **Prove it on a TestFlight build on a real device** before submitting to the App Store: sign in, sign out, sign in again, and cancel the sheet. A simulator cannot exercise associated domains. If sign-in never returns to the app, one of the four items above is wrong.
 
 Use Profile to sign in. `AuthController` stores the ActivityMap session in the Keychain, confirms it through `/api/v1/me`, and supports restoration and revocation.
 

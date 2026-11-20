@@ -1,26 +1,40 @@
 import assert from 'node:assert/strict';
+
 import test from 'node:test';
 
 import { errorEnvelopeSchema } from '~/contracts/v1/error.ts';
+import { createMobileAttemptBinding } from '~/server/auth/mobile-attempt.ts';
 import { parseMobileRedirectAllowlist } from '~/server/auth/mobile-redirect-allowlist.ts';
-import { buildMobileCallbackUrl, createMobileAuthStartHandler } from './handler.ts';
 
-const ALLOWLIST = parseMobileRedirectAllowlist(
-  'activitymap://auth/callback',
-);
+import {
+  buildMobileCallbackUrl,
+  createMobileAuthStartHandler,
+} from './handler.ts';
+
+const ALLOWLIST = parseMobileRedirectAllowlist('activitymap://auth/callback');
+const attempts = createMobileAttemptBinding({
+  secret: () => 'test-secret',
+  now: () => new Date('2026-11-20T12:00:00Z'),
+});
 
 void test('buildMobileCallbackUrl round-trips state/PKCE challenge/redirect URI', () => {
-  const url = buildMobileCallbackUrl('https://app.example.test/api/v1/auth/mobile/start', {
-    state: 'the-state',
-    codeChallenge: 'the-challenge',
-    redirectUri: 'activitymap://auth/callback',
-  });
+  const url = buildMobileCallbackUrl(
+    'https://app.example.test/api/v1/auth/mobile/start',
+    {
+      state: 'the-state',
+      codeChallenge: 'the-challenge',
+      redirectUri: 'activitymap://auth/callback',
+    },
+  );
 
   const parsed = new URL(url);
   assert.equal(parsed.pathname, '/api/v1/auth/mobile/callback');
   assert.equal(parsed.searchParams.get('state'), 'the-state');
   assert.equal(parsed.searchParams.get('code_challenge'), 'the-challenge');
-  assert.equal(parsed.searchParams.get('redirect_uri'), 'activitymap://auth/callback');
+  assert.equal(
+    parsed.searchParams.get('redirect_uri'),
+    'activitymap://auth/callback',
+  );
 });
 
 void test('GET /api/v1/auth/mobile/start redirects to the Strava authorization URL', async () => {
@@ -28,6 +42,7 @@ void test('GET /api/v1/auth/mobile/start redirects to the Strava authorization U
   let capturedErrorCallbackURL: string | undefined;
   let capturedForceConsent: boolean | undefined;
   const GET = createMobileAuthStartHandler({
+    attempts,
     loadRedirectAllowlist: () => ALLOWLIST,
     startSocialSignIn: async ({
       callbackURL,
@@ -64,6 +79,7 @@ void test('GET /api/v1/auth/mobile/start redirects to the Strava authorization U
 void test('GET /api/v1/auth/mobile/start forces Strava consent for a reconnect', async () => {
   let capturedForceConsent: boolean | undefined;
   const GET = createMobileAuthStartHandler({
+    attempts,
     loadRedirectAllowlist: () => ALLOWLIST,
     startSocialSignIn: async ({ forceConsent }) => {
       capturedForceConsent = forceConsent;
@@ -93,6 +109,7 @@ void test('GET /api/v1/auth/mobile/start forwards every Set-Cookie header onto t
   // is exactly why this must assert Set-Cookie forwarding specifically,
   // not just the redirect Location.
   const GET = createMobileAuthStartHandler({
+    attempts,
     loadRedirectAllowlist: () => ALLOWLIST,
     startSocialSignIn: async () => ({
       url: 'https://www.strava.com/oauth/authorize?client_id=1',
@@ -111,14 +128,18 @@ void test('GET /api/v1/auth/mobile/start forwards every Set-Cookie header onto t
   );
 
   assert.equal(response.status, 302);
-  assert.deepEqual(response.headers.getSetCookie(), [
+  const cookies = response.headers.getSetCookie();
+  assert.deepEqual(cookies.slice(0, 2), [
     'better-auth.state=abc123; Path=/; HttpOnly',
     'better-auth.oauth_state=def456; Path=/; HttpOnly',
   ]);
+  // The attempt cookie rides along after Better Auth's own (issue #482).
+  assert.equal(cookies.length, 3);
 });
 
 void test('GET /api/v1/auth/mobile/start still redirects when startSocialSignIn returns no headers', async () => {
   const GET = createMobileAuthStartHandler({
+    attempts,
     loadRedirectAllowlist: () => ALLOWLIST,
     startSocialSignIn: async () => ({
       url: 'https://www.strava.com/oauth/authorize?client_id=1',
@@ -133,11 +154,15 @@ void test('GET /api/v1/auth/mobile/start still redirects when startSocialSignIn 
   );
 
   assert.equal(response.status, 302);
-  assert.deepEqual(response.headers.getSetCookie(), []);
+  // Only the attempt cookie: Better Auth supplied none of its own.
+  const cookies = response.headers.getSetCookie();
+  assert.equal(cookies.length, 1);
+  assert.match(cookies[0] ?? '', /^activitymap_mobile_attempt=/);
 });
 
 void test('GET /api/v1/auth/mobile/start rejects a missing parameter', async () => {
   const GET = createMobileAuthStartHandler({
+    attempts,
     loadRedirectAllowlist: () => ALLOWLIST,
     startSocialSignIn: async () => {
       throw new Error('must not be called');
@@ -156,6 +181,7 @@ void test('GET /api/v1/auth/mobile/start rejects a missing parameter', async () 
 void test('GET /api/v1/auth/mobile/start rejects a redirect_uri outside the allow-list without starting sign-in', async () => {
   let signInCalled = false;
   const GET = createMobileAuthStartHandler({
+    attempts,
     loadRedirectAllowlist: () => ALLOWLIST,
     startSocialSignIn: async () => {
       signInCalled = true;
@@ -182,6 +208,7 @@ void test('GET /api/v1/auth/mobile/start rejects a redirect_uri outside the allo
 void test('GET /api/v1/auth/mobile/start returns to the app when sign-in throws', async () => {
   let capturedError: unknown;
   const GET = createMobileAuthStartHandler({
+    attempts,
     loadRedirectAllowlist: () => ALLOWLIST,
     onError: (error) => {
       capturedError = error;
@@ -203,4 +230,54 @@ void test('GET /api/v1/auth/mobile/start returns to the app when sign-in throws'
   assert.equal(location.searchParams.get('error'), 'server_error');
   assert.equal(location.searchParams.get('state'), 's1');
   assert.ok(capturedError instanceof Error);
+});
+
+void test('GET /api/v1/auth/mobile/start sets a signed, HttpOnly attempt cookie scoped to the mobile auth routes (#482)', async () => {
+  const GET = createMobileAuthStartHandler({
+    attempts,
+    loadRedirectAllowlist: () => ALLOWLIST,
+    startSocialSignIn: async () => ({
+      url: 'https://www.strava.com/oauth/authorize?client_id=1',
+    }),
+  });
+
+  const response = await GET(
+    new Request(
+      'https://app.example.test/api/v1/auth/mobile/start?state=s1&code_challenge=c1&redirect_uri=activitymap%3A%2F%2Fauth%2Fcallback',
+      { redirect: 'manual' },
+    ),
+  );
+
+  const cookie = response.headers
+    .getSetCookie()
+    .find((value) => value.startsWith('activitymap_mobile_attempt='));
+  assert.ok(cookie, 'the attempt cookie must be set');
+  for (const attribute of [
+    'HttpOnly',
+    'Secure',
+    'SameSite=Lax',
+    'Path=/api/v1/auth/mobile',
+    'Max-Age=600',
+  ]) {
+    assert.ok(cookie.includes(attribute), `${attribute} in ${cookie}`);
+  }
+});
+
+void test('GET /api/v1/auth/mobile/start sets no attempt cookie for a rejected redirect target', async () => {
+  const GET = createMobileAuthStartHandler({
+    attempts,
+    loadRedirectAllowlist: () => ALLOWLIST,
+    startSocialSignIn: async () => {
+      throw new Error('must not be called');
+    },
+  });
+
+  const response = await GET(
+    new Request(
+      'https://app.example.test/api/v1/auth/mobile/start?state=s1&code_challenge=c1&redirect_uri=https%3A%2F%2Fevil.example%2Fcb',
+    ),
+  );
+
+  assert.equal(response.status, 400);
+  assert.deepEqual(response.headers.getSetCookie(), []);
 });

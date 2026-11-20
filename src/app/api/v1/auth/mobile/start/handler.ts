@@ -1,20 +1,25 @@
 import { randomUUID } from 'node:crypto';
 
-import { requestIdFor } from '~/server/http/request-id';
-
 import { errorEnvelope } from '~/contracts/v1/error';
+import type { MobileAttemptBinding } from '~/server/auth/mobile-attempt';
 import { mobileAuthErrorRedirect } from '~/server/auth/mobile-error-redirect';
 import {
+  type AllowlistedRedirectPrefix,
   isAllowedMobileRedirectUri,
   loadMobileRedirectAllowlist,
-  type AllowlistedRedirectPrefix,
 } from '~/server/auth/mobile-redirect-allowlist';
+import { requestIdFor } from '~/server/http/request-id';
 
 export interface MobileAuthStartHandlerDependencies {
   createRequestId?: () => string;
   onError?: (error: unknown, requestId: string) => void;
   /** Defaults to the `MOBILE_AUTH_REDIRECT_ALLOWLIST` env var. */
   loadRedirectAllowlist?: () => AllowlistedRedirectPrefix[];
+  /**
+   * Records which attempt this browser started, so the callback only issues
+   * a login code for a session created by that attempt (issue #482).
+   */
+  attempts: MobileAttemptBinding;
   /**
    * Starts the existing server-side Strava OAuth flow (the same one the
    * web sign-in uses - see `~/lib/auth.ts`'s `genericOAuth` config) with a
@@ -77,6 +82,7 @@ export function createMobileAuthStartHandler({
   createRequestId = randomUUID,
   onError = () => undefined,
   loadRedirectAllowlist = loadMobileRedirectAllowlist,
+  attempts,
   startSocialSignIn,
 }: MobileAuthStartHandlerDependencies) {
   return async function GET(request: Request): Promise<Response> {
@@ -140,6 +146,10 @@ export function createMobileAuthStartHandler({
       for (const cookie of result.headers?.getSetCookie() ?? []) {
         responseHeaders.append('set-cookie', cookie);
       }
+      responseHeaders.append(
+        'set-cookie',
+        attempts.issueCookie({ state, codeChallenge, redirectUri }, request),
+      );
       return new Response(null, { status: 302, headers: responseHeaders });
     } catch (error) {
       onError(error, requestId);

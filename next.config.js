@@ -2,13 +2,14 @@
  * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially useful
  * for Docker builds.
  */
-await import("./src/env.js");
+await import('./src/env.js');
 
 // A private development tunnel needs its exact origin for assets and actions.
 // Production never inherits this development-only allowance.
-const devURL = process.env.NODE_ENV === 'development' && process.env.PUBLIC_URL
-  ? new URL(process.env.PUBLIC_URL)
-  : null;
+const devURL =
+  process.env.NODE_ENV === 'development' && process.env.PUBLIC_URL
+    ? new URL(process.env.PUBLIC_URL)
+    : null;
 
 /** @type {import("next").NextConfig} */
 const config = {
@@ -26,6 +27,25 @@ const config = {
   async headers() {
     return [
       {
+        // Apple fetches this without a file extension and requires JSON served
+        // directly, with no redirect (webcredentials for the iOS sign-in
+        // callback, issue #482).
+        source: '/.well-known/apple-app-site-association',
+        headers: [
+          { key: 'Content-Type', value: 'application/json' },
+          { key: 'Cache-Control', value: 'public, max-age=3600' },
+        ],
+      },
+      {
+        // The query string carries a one-time sign-in code (issue #482).
+        source: '/auth/callback',
+        headers: [
+          { key: 'Referrer-Policy', value: 'no-referrer' },
+          { key: 'Cache-Control', value: 'no-store' },
+          { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
+        ],
+      },
+      {
         source: '/share/:path*',
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
@@ -37,13 +57,13 @@ const config = {
   async redirects() {
     return [
       {
-        source: "/",
-        destination: "/map",
+        source: '/',
+        destination: '/map',
         permanent: true,
       },
       {
-        source: "/stats",
-        destination: "/stats/tiles",
+        source: '/stats',
+        destination: '/stats/tiles',
         permanent: true,
       },
     ];

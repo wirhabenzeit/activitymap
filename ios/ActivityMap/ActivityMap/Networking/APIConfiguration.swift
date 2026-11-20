@@ -22,6 +22,7 @@ nonisolated enum APIConfiguration {
         case schemeMismatch(key: String, value: String, expected: String)
         case missingHost(key: String, value: String)
         case insecureRemoteHost(key: String, value: String, host: String)
+        case missingPath(key: String, value: String)
 
         var description: String {
             switch self {
@@ -50,6 +51,12 @@ nonisolated enum APIConfiguration {
                 xcconfig produces when a literal "//" is swallowed as a comment; \
                 compose separators from $(SLASH).
                 """
+            case .missingPath(let key, let value):
+                """
+                \(key) is an https universal link without a path: \(value). \
+                ASWebAuthenticationSession needs the exact path the server \
+                redirects to.
+                """
             case .insecureRemoteHost(let key, let value, let host):
                 """
                 \(key) uses plain HTTP for \(host): \(value). Only localhost may \
@@ -76,10 +83,29 @@ nonisolated enum APIConfiguration {
         )
     }
 
-    /// The scheme `ASWebAuthenticationSession` watches for, registered under
-    /// `CFBundleURLTypes` so the redirect can reach the app at all.
+    /// The scheme registered under `CFBundleURLTypes`. It is what
+    /// `ASWebAuthenticationSession` watches for when `authCallback` is a custom
+    /// scheme (simulator and Dev builds); an https redirect does not use it.
     static let authCallbackScheme: String = resolve {
         try requiredValue(for: InfoKey.callbackScheme)
+    }
+
+    /// How the sign-in session recognises its return. A universal link is
+    /// delivered only to the app associated with its domain, while any
+    /// installed app can register a custom scheme and intercept it (issue #482).
+    enum AuthCallback: Equatable, Sendable {
+        case customScheme(String)
+        case https(host: String, path: String)
+    }
+
+    /// The callback the configured redirect URI calls for.
+    static let authCallback: AuthCallback = authCallback(for: authRedirectURI)
+
+    static func authCallback(for redirectURI: URL) -> AuthCallback {
+        if redirectURI.scheme?.lowercased() == "https", let host = redirectURI.host() {
+            return .https(host: host, path: redirectURI.path)
+        }
+        return .customScheme(redirectURI.scheme ?? authCallbackScheme)
     }
 
     /// Builds an absolute URL for a v1 path such as `/api/v1/me`.
@@ -128,6 +154,17 @@ nonisolated enum APIConfiguration {
         key: String
     ) throws -> URL {
         let url = try parse(raw, key: key)
+
+        // An https universal link names its own host and exact path.
+        if url.scheme?.lowercased() == "https" {
+            guard let host = url.host(), !host.isEmpty else {
+                throw ConfigurationError.missingHost(key: key, value: raw)
+            }
+            guard url.path.count > 1 else {
+                throw ConfigurationError.missingPath(key: key, value: raw)
+            }
+            return url
+        }
 
         guard url.scheme?.lowercased() == expectedScheme.lowercased() else {
             throw ConfigurationError.schemeMismatch(

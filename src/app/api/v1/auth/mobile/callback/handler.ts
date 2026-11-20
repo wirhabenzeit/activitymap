@@ -1,14 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
-import { requestIdFor } from '~/server/http/request-id';
-
 import { errorEnvelope } from '~/contracts/v1/error';
+import type { MobileAttemptBinding } from '~/server/auth/mobile-attempt';
 import { mobileAuthErrorRedirect } from '~/server/auth/mobile-error-redirect';
 import {
+  type AllowlistedRedirectPrefix,
   isAllowedMobileRedirectUri,
   loadMobileRedirectAllowlist,
-  type AllowlistedRedirectPrefix,
 } from '~/server/auth/mobile-redirect-allowlist';
+import { requestIdFor } from '~/server/http/request-id';
 
 export interface MobileAuthCallbackHandlerDependencies {
   createRequestId?: () => string;
@@ -16,10 +16,18 @@ export interface MobileAuthCallbackHandlerDependencies {
   /** Defaults to the `MOBILE_AUTH_REDIRECT_ALLOWLIST` env var. */
   loadRedirectAllowlist?: () => AllowlistedRedirectPrefix[];
   /**
-   * Resolves the just-completed browser session's user id from the
-   * request's cookie (wired in `route.ts` to `auth.api.getSession`).
+   * Resolves the browser session behind the request's cookie (wired in
+   * `route.ts` to `auth.api.getSession`): its user and when it was created.
    */
-  resolveSessionUserId: (headers: Headers) => Promise<string | null>;
+  resolveSession: (
+    headers: Headers,
+  ) => Promise<{ userId: string; createdAt: Date } | null>;
+  /**
+   * Ties this callback to the `/mobile/start` attempt that began it. Without
+   * it any browser session, however old, would be handed to whoever crafted
+   * the callback URL (issue #482).
+   */
+  attempts: MobileAttemptBinding;
   /**
    * Extracts the already-signed Better Auth bearer session token from the
    * request (wired in `route.ts` to `getSessionCookie` from
@@ -51,7 +59,8 @@ export function createMobileAuthCallbackHandler({
   createRequestId = randomUUID,
   onError = () => undefined,
   loadRedirectAllowlist = loadMobileRedirectAllowlist,
-  resolveSessionUserId,
+  resolveSession,
+  attempts,
   extractSessionBearerToken,
   issueLoginCode,
 }: MobileAuthCallbackHandlerDependencies) {
@@ -100,14 +109,40 @@ export function createMobileAuthCallbackHandler({
       });
     }
 
-    try {
-      const userId = await resolveSessionUserId(request.headers);
-      if (!userId) {
-        return mobileAuthErrorRedirect(redirectUri, {
+    // Every redirect from here on ends the attempt: the cookie that bound it
+    // is single-purpose and must not outlive the callback.
+    const clearAttempt = attempts.clearCookie(request);
+    const redirect = (location: string): Response =>
+      new Response(null, {
+        status: 302,
+        headers: { location, 'set-cookie': clearAttempt },
+      });
+    const failWith = (error: string): Response =>
+      redirect(
+        mobileAuthErrorRedirect(redirectUri, {
           state,
-          error: 'not_authenticated',
+          error,
           requestId,
-        });
+        }).headers.get('location') ?? redirectUri,
+      );
+
+    try {
+      const session = await resolveSession(request.headers);
+      if (!session) return failWith('not_authenticated');
+
+      const verdict = attempts.verify(
+        request,
+        { state, codeChallenge, redirectUri },
+        session.createdAt,
+      );
+      if (!verdict.ok) {
+        // The reason is for operators; the app only needs to know this
+        // sign-in did not start from the app.
+        onError(
+          new Error(`Mobile sign-in attempt rejected: ${verdict.reason}`),
+          requestId,
+        );
+        return failWith('invalid_attempt');
       }
 
       const sessionBearerToken = extractSessionBearerToken(request);
@@ -118,7 +153,7 @@ export function createMobileAuthCallbackHandler({
       }
 
       const { code } = await issueLoginCode({
-        userId,
+        userId: session.userId,
         state,
         pkceChallenge: codeChallenge,
         redirectUri,
@@ -128,14 +163,10 @@ export function createMobileAuthCallbackHandler({
       const target = new URL(redirectUri);
       target.searchParams.set('code', code);
       target.searchParams.set('state', state);
-      return Response.redirect(target.toString(), 302);
+      return redirect(target.toString());
     } catch (error) {
       onError(error, requestId);
-      return mobileAuthErrorRedirect(redirectUri, {
-        state,
-        error: 'server_error',
-        requestId,
-      });
+      return failWith('server_error');
     }
   };
 }

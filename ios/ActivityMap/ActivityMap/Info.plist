@@ -28,6 +28,9 @@
 	<!-- HTTPS, authentication and storage use platform-provided/exempt encryption. -->
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
+#ifdef ACTIVITYMAP_ALLOW_LOCALHOST_HTTP
+	<!-- Debug only: lets the simulator reach `pnpm dev` on http://localhost.
+	     Release builds carry no App Transport Security exception at all. -->
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSExceptionDomains</key>
@@ -39,5 +42,6 @@
 			</dict>
 		</dict>
 	</dict>
+#endif
 </dict>
 </plist>

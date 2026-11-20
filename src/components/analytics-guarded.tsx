@@ -3,6 +3,8 @@
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 
+import { isPrivateUrl } from '~/lib/private-url';
+
 /**
  * Wraps Vercel's Analytics/Speed Insights scripts with a `beforeSend` guard
  * that drops any event for a `/share/...` URL (issue #132: "never let the
@@ -22,10 +24,10 @@ export function AnalyticsGuarded() {
   return (
     <>
       <Analytics
-        beforeSend={(event) => (event.url.startsWith('/share/') ? null : event)}
+        beforeSend={(event) => (isPrivateUrl(event.url) ? null : event)}
       />
       <SpeedInsights
-        beforeSend={(data) => (data.url.startsWith('/share/') ? null : data)}
+        beforeSend={(data) => (isPrivateUrl(data.url) ? null : data)}
       />
     </>
   );
