@@ -18,13 +18,13 @@ enum StatsDashboard {
 
 nonisolated enum StatsDashboardResult: Sendable {
     case week(StatsThisWeek)
-    case volume(StatsPeriodComparison, starts: [Int], values: [Double], averages: [StatsHistoryRange: [StatsPoint]], buckets: [StatsHistoryRange: [StatsHistoryBucket]])
-    case comparison(StatsPeriodComparison, current: [StatsPoint], previous: [StatsPoint], band: StatsComparisonBand?, rhythm: StatsComparisonRhythm, history: [StatsPeriodHistoryComparison])
+    case volume(StatsPeriodComparison, starts: [Int], values: [Double], averages: [StatsHistoryRange: [StatsPoint]], buckets: [StatsHistoryRange: [StatsHistoryBucket]], activities: [StatsActivity])
+    case comparison(StatsPeriodComparison, current: [StatsPoint], previous: [StatsPoint], band: StatsComparisonBand?, explorer: StatsComparisonExplorer)
     case pace(StatsPace)
     case records(StatsRecords, allTime: StatsRecords, best30: [StatsMetric: StatsBestDays])
     case calendar(rolling: StatsCalendarSnapshot, years: [Int: StatsCalendarSnapshot])
     case mix([StatsShare], hours: Double, breakdown: [ActivityCategory: StatsTotals])
-    case hilliness(StatsClimbing, activities: [StatsHillPoint])
+    case hilliness(StatsClimbing, activities: [StatsHillPoint], explorer: StatsHillinessExplorer)
     case typical(StatsTypicalWeek)
     case unsupported
 }
@@ -113,7 +113,7 @@ nonisolated extension StatsEngine {
                            values: series.values, averages: averages,
                            buckets: Dictionary(uniqueKeysWithValues: StatsHistoryRange.allCases.map {
                                ($0, volumeHistory(today: today, metric: metric, range: $0))
-                           }))
+                           }), activities: activities)
         case .monthVsLastMonth:
             let first = StatsDates.start(year: year, month: month)
             let previous = StatsDates.start(year: year, month: month - 1)
@@ -121,16 +121,16 @@ nonisolated extension StatsEngine {
                 [.init(x: 0, y: 0)] + cumulativeByDay(metric: metric, first: first, last: last)
                     .enumerated().map { .init(x: $0.offset + 1, y: $0.element) }
             }
+            let band = comparisonBand(today: today, metric: metric, monthly: true)
             return .comparison(monthComparison(today: today, metric: metric),
-                               current: points(first, today), previous: points(previous, first - 1), band: comparisonBand(today: today, metric: metric, monthly: true),
-                               rhythm: .month(monthActivityRhythm(today: today, metric: metric)),
-                               history: periodComparisons(today: today, metric: metric, range: .months))
+                               current: points(first, today), previous: points(previous, first - 1), band: band,
+                               explorer: .month(monthExplorer(today: today, metric: metric, band: band)))
         case .yearToDate:
+            let band = comparisonBand(today: today, metric: metric, monthly: false)
             return .comparison(yearToDate(today: today, metric: metric),
                 current: cumulativeYearPoints(metric: metric, year: year, last: today),
-                previous: cumulativeYearPoints(metric: metric, year: year - 1, last: StatsDates.start(year: year) - 1), band: comparisonBand(today: today, metric: metric, monthly: false),
-                rhythm: .year(yearMonthlyRhythm(today: today, metric: metric)),
-                history: periodComparisons(today: today, metric: metric, range: .years))
+                previous: cumulativeYearPoints(metric: metric, year: year - 1, last: StatsDates.start(year: year) - 1), band: band,
+                explorer: .year(yearExplorer(today: today, metric: metric, band: band)))
         case .yearPace: return .pace(yearPace(today: today, metric: metric))
         case .records: return .records(records(today: today), allTime: records(today: today, range: .allTime),
             best30: Dictionary(uniqueKeysWithValues: [StatsMetric.distance, .time, .elevation].map { ($0, best30Days(today: today, metric: $0)) }))
@@ -145,7 +145,7 @@ nonisolated extension StatsEngine {
             let range: StatsWindow = option == .allTime ? .allTime : .currentYear
             let first = range == .allTime ? activities.map(\.day).min() ?? today : StatsDates.start(year: year)
             return .mix(sportMix(today: today, range: range), hours: sum(.time, first: first, last: today), breakdown: sportBreakdown(first: first, last: today))
-        case .distanceVsElevation: return .hilliness(climbing(today: today), activities: hilliestActivities(today: today))
+        case .distanceVsElevation: return .hilliness(climbing(today: today), activities: hilliestActivities(today: today), explorer: hillinessExplorer(today: today))
         case .typicalWeek: return .typical(typicalWeek(today: today))
         case .totals, .best30Days, .restDays, .consistency, .speedTrend: return .unsupported
         }
@@ -179,6 +179,13 @@ struct StatsDashboardFace {
 /// Inspection choices outlive a detail destination and are shared with its source tile.
 @MainActor @Observable final class StatsTileInspection {
     var volumeRange = StatsHistoryRange.weeks
+    /// The selected bucket's start day for the current grouping; nil follows the latest.
+    var volumePeriod: Int?
+    /// Comparison month or year, as its start day; nil compares with the previous one.
+    var monthComparison: Int?
+    var yearComparison: Int?
+    var hillinessSport: ActivityCategory?
+    var hillinessMonth: Int?
     var calendarWeek: Int?
     var calendarDay: Int?
     var monthDay: Int?

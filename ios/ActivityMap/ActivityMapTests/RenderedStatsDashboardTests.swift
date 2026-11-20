@@ -324,12 +324,14 @@ import Testing
     @Test(arguments: [false, true])
     func volumeSportTableFitsPhoneAndLargeText(largeText: Bool) async throws {
         let (store, _) = try StatsDashboardTests.fixture()
-        guard case .dashboard(.volume(_, _, _, let averages, let history)) = await store.stats.result(.dashboard(.weeklyVolume, .distance), for: store) else {
+        guard case .dashboard(.volume(_, _, _, let averages, let history, let activities)) = await store.stats.result(.dashboard(.weeklyVolume, .distance), for: store) else {
             Issue.record("Missing volume"); return
         }
         let host = try StatsDashboardHarness(root: ScrollView {
-            StatsVolumeDetail(history: history, averages: averages, metric: .distance, range: .constant(.weeks)) { EmptyView() }.padding(12)
-        }.environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large), size: CGSize(width: 402, height: 874))
+            StatsVolumeExplorer(history: history, averages: averages, activities: activities, metric: .distance,
+                                range: .constant(.weeks), openActivity: { _ in }).padding(12)
+        }.environment(\.statsExplorerDataShown, true)
+            .environment(\.dynamicTypeSize, largeText ? .accessibility3 : .large), size: CGSize(width: 402, height: 874))
         defer { host.close() }
         try await Task.sleep(for: .milliseconds(150))
         let scrolls = host.descendants(UIScrollView.self)
@@ -911,7 +913,7 @@ import Testing
         scroll.setContentOffset(CGPoint(x: 0, y: 300), animated: false)
         let cachedOffset = scroll.contentOffset
         #expect(StatsPresentation(store: store, sync: sync).state == .cached)
-        guard case .comparison(let before, _, _, _, _, _) = state.result(.yearToDate, source: StatsDashboardSource(store)) else {
+        guard case .comparison(let before, _, _, _, _) = state.result(.yearToDate, source: StatsDashboardSource(store)) else {
             Issue.record("Missing cached comparison"); return
         }
         sync.setSession(SyncFixtures.session(), storage: storage)
@@ -920,7 +922,7 @@ import Testing
         try host.capture("error-with-content")
         #expect(StatsPresentation(store: store, sync: sync).hasContent)
         try await statsWait { state.result(.yearToDate, source: StatsDashboardSource(store)) != nil }
-        if case .comparison(let after, _, _, _, _, _) = state.result(.yearToDate, source: StatsDashboardSource(store)) {
+        if case .comparison(let after, _, _, _, _) = state.result(.yearToDate, source: StatsDashboardSource(store)) {
             #expect(scroll.contentOffset == cachedOffset,
                     "A sync failure preserves the user's dashboard scroll position")
             #expect(after == before, "A failed sync retains the authorized cached values")
@@ -1157,7 +1159,8 @@ extension RenderedStatsDashboardTests {
         let outer = try #require(host.descendants(UIScrollView.self).first)
         #expect(outer.contentSize.width <= outer.bounds.width + 1, "Only the comparison table may scroll horizontally")
         if tileID == .monthVsLastMonth && variant != "empty" {
-            #expect(inspection.monthDay == StatsDates.day("2026-10-09"), "Latest active day is selected initially")
+            // The explorer defaults to the latest active day without persisting it.
+            #expect(inspection.monthDay == nil, "Nothing is stored until the viewer chooses a day")
         }
         let image = try host.capture("parity-\(tileID.rawValue)-\(variant)")
         if tileID == .yearToDate && variant != "large-text" && variant != "empty" {
@@ -1205,7 +1208,7 @@ extension RenderedStatsDashboardTests {
             }, size: CGSize(width: 402, height: 1000))
             try await Task.sleep(for: .milliseconds(150))
             if metric == .distance {
-                #expect(inspection.monthDay == StatsDates.day("2026-10-09"))
+                #expect(inspection.monthDay == nil)
                 // A selected rest day is valid too, and must survive a detail
                 // destination being removed and recreated after inspection.
                 inspection.monthDay = StatsDates.day("2026-10-08")

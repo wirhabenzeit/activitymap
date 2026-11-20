@@ -17,8 +17,8 @@ struct StatsAccessibilityUITestFixture: View {
                     .padding().frame(width: 320)
             } else if scenario.hasPrefix("month-rhythm") {
                 ScrollView {
-                    StatsPeriodDetail(rhythm: .month(monthEngine.monthActivityRhythm(today: today, metric: .elevation)),
-                                      history: [], metric: .elevation, today: today, openActivity: { _ in }) { EmptyView() }
+                    StatsMonthExplorerView(explorer: monthEngine.monthExplorer(today: today, metric: .elevation, band: nil),
+                                           metric: .elevation, today: today, openActivity: { _ in })
                         .padding(16)
                 }
                 .environment(\.dynamicTypeSize, scenario.hasSuffix("large-text") ? .accessibility3 : .large)
@@ -26,8 +26,8 @@ struct StatsAccessibilityUITestFixture: View {
                 VStack {
                     StatsMetricPicker(metrics: [.distance, .time], selection: $metric)
                     ScrollView {
-                        StatsPeriodDetail(rhythm: .year(yearEngine.yearMonthlyRhythm(today: today, metric: metric)),
-                                          history: [], metric: metric, today: today, openActivity: { _ in }) { EmptyView() }
+                        StatsYearExplorerView(explorer: yearEngine.yearExplorer(today: today, metric: metric, band: nil),
+                                              metric: metric, today: today, openActivity: { _ in })
                             .padding(16)
                     }
                 }

@@ -11,36 +11,29 @@ final class StatsUITests: XCTestCase {
         defer { app.terminate(); XCUIDevice.shared.orientation = .portrait }
         let dashboard = app.scrollViews["stats-dashboard"]
         XCTAssertTrue(dashboard.waitForExistence(timeout: 15), app.debugDescription)
-        for (id, title, rhythmTitle, historyTitle) in [
-            ("monthVsLastMonth", "This month", "Daily rhythm", "Month comparisons"),
-            ("yearToDate", "Year to date", "Monthly rhythm", "Year comparisons"),
+        for (id, title, comparisonControl) in [
+            ("monthVsLastMonth", "This month", "stats-month-comparison"),
+            ("yearToDate", "Year to date", "stats-year-comparison"),
         ] {
             let expand = app.buttons["Expand \(title)"]
             reveal(expand, in: dashboard, app: app)
             let compact = dashboard.otherElements.matching(identifier: "stats-tile-\(id)").firstMatch
             XCTAssertTrue(compact.waitForExistence(timeout: 10), app.debugDescription)
             capture("Compact comparison \(title)")
-            print("Compact comparison accessibility subtree (\(title)): \(compact.debugDescription)")
-            XCTAssertFalse(compact.staticTexts[rhythmTitle].exists, "Compact \(title) must conceal its detail rhythm")
-            XCTAssertFalse(compact.staticTexts[historyTitle].exists, "Compact \(title) must conceal its detail history")
-            XCTAssertFalse(compact.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "stats-month-day-")).firstMatch.exists,
-                           "Compact comparison must not expose detail-only day controls")
-            XCTAssertFalse(compact.descendants(matching: .any)["stats-year-rhythm-month"].exists,
-                           "Compact comparison must not expose the detail month picker")
+            XCTAssertFalse(compact.staticTexts["Show data"].exists, "Compact \(title) must conceal its data tables")
+            XCTAssertFalse(compact.descendants(matching: .any)[comparisonControl].exists,
+                           "Compact comparison must not expose the detail comparison picker")
             expand.tap()
             let detail = app.scrollViews["stats-detail-\(id)"]
             XCTAssertTrue(detail.waitForExistence(timeout: 10), app.debugDescription)
-            let rhythm = detail.staticTexts[rhythmTitle]
-            reveal(rhythm, in: detail, app: app)
-            XCTAssertTrue(rhythm.isHittable)
-            let control = id == "monthVsLastMonth"
-                ? detail.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "stats-month-day-")).firstMatch
-                : detail.descendants(matching: .any).matching(identifier: "stats-year-rhythm-month").firstMatch
+            let control = detail.descendants(matching: .any).matching(identifier: comparisonControl).firstMatch
             reveal(control, in: detail, app: app)
-            XCTAssertTrue(control.isHittable, "Explicit expansion must expose the rhythm control")
-            let history = detail.staticTexts[historyTitle]
-            reveal(history, in: detail, app: app)
-            XCTAssertTrue(history.isHittable, "Explicit expansion must expose period history")
+            XCTAssertTrue(control.isHittable, "Explicit expansion must expose the comparison picker")
+            let data = detail.buttons["stats-explorer-data-toggle"]
+            reveal(data, in: detail, app: app)
+            XCTAssertTrue(data.isHittable, "Explicit expansion must expose the optional data tables")
+            data.tap()
+            XCTAssertTrue(detail.staticTexts[id == "monthVsLastMonth" ? "Recent months" : "Recorded years"].waitForExistence(timeout: 5), app.debugDescription)
             capture("Expanded comparison \(title)")
             let back = app.buttons["stats-detail-back"]
             reveal(back, in: detail, app: app, fixedControl: true)

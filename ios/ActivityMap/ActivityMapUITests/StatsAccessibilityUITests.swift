@@ -23,39 +23,36 @@ extension StatsUITests {
         XCTAssertFalse(distance.isSelected)
     }
 
-    func testMonthRhythmKeepsZeroAndMissingActivityDaysVisible() {
+    func testMonthExplorerListsZeroAndMissingValueActivities() {
         let app = axLaunch("month-rhythm")
         defer { app.terminate() }
-        let note = app.staticTexts["Dots mark activities with zero or no recorded value."]
-        XCTAssertTrue(note.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertTrue(app.staticTexts["Run"].exists, "Zero/missing values must retain the sport legend")
+        // Zero and unmeasured elevation draw no bar; the selected day still names the activity.
+        let row = app.buttons["stats-month-activity-2"]
+        axReveal(row, app: app)
+        XCTAssertTrue(row.exists, app.debugDescription)
+        XCTAssertTrue(app.buttons["stats-month-comparison"].exists || app.descendants(matching: .any)["stats-month-comparison"].exists)
     }
 
-    func testLargeTextMonthRhythmListsDaysInsteadOfDotExplanation() {
+    func testLargeTextMonthExplorerKeepsActivitiesAndControlsReachable() {
         let app = axLaunch("month-rhythm-large-text")
         defer { app.terminate() }
-        XCTAssertTrue(app.staticTexts["Daily rhythm"].waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertFalse(app.staticTexts["Dots mark activities with zero or no recorded value."].exists)
-        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS %@", "Oct 8")).firstMatch.exists,
-                      "Accessibility text must expose the real day rows")
+        let row = app.buttons["stats-month-activity-2"]
+        axReveal(row, app: app)
+        XCTAssertTrue(row.exists, app.debugDescription)
+        let next = app.buttons["Previous period"]
+        axReveal(next, app: app)
+        XCTAssertGreaterThanOrEqual(next.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(next.frame.height, 44)
     }
 
-    func testYearRhythmReadsExactMonthTotalsAndRetainsSelection() {
+    func testYearExplorerReadsSelectedMonthAndFollowsMetric() {
         let app = axLaunch("year-rhythm")
         defer { app.terminate() }
-        let totals = app.descendants(matching: .any)["stats-year-rhythm-totals"].firstMatch
-        XCTAssertTrue(totals.waitForExistence(timeout: 10), app.debugDescription)
-        XCTAssertEqual(totals.label, "Oct 2026: 2025, 10 km; 2026, 20 km")
-        let picker = app.buttons["stats-year-rhythm-month"]
-        axReveal(picker, app: app)
-        picker.tap()
-        app.buttons["Aug 2026"].tap()
-        XCTAssertEqual(totals.label, "Aug 2026: 2025, 30 km; 2026, 45 km")
+        let heading = app.staticTexts["Oct 2026 · 20 km · 1 activity"]
+        XCTAssertTrue(heading.waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.descendants(matching: .any)["stats-year-comparison"].exists)
         app.buttons["Moving time"].tap()
-        XCTAssertEqual(totals.label, "Aug 2026: 2025, 2.0 h; 2026, 3.0 h")
-        picker.tap()
-        app.buttons["Oct 2026"].tap()
-        XCTAssertEqual(totals.label, "Oct 2026: 2025, 2.0 h; 2026, 3.0 h")
+        XCTAssertTrue(app.staticTexts["Oct 2026 · 3.0 h · 1 activity"].waitForExistence(timeout: 10), app.debugDescription)
     }
 
     func testPhoneHeadersKeepFiltersAndRestoreSettings() throws { try axHeaders("standard") }
