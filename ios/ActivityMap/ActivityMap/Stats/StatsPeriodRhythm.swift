@@ -18,10 +18,6 @@ nonisolated struct StatsYearMonthRhythm: Sendable {
     let previous: [ActivityCategory: Double]
     let inProgress: Bool
 }
-nonisolated enum StatsComparisonRhythm: Sendable {
-    case month(StatsMonthRhythm)
-    case year([StatsYearMonthRhythm])
-}
 nonisolated struct StatsPeriodHistoryComparison: Sendable {
     let start: Int
     let end: Int
@@ -62,19 +58,23 @@ nonisolated extension StatsEngine {
                      average: denominator > 0 ? rows.reduce(0) { $0 + $1.value(metric) } / Double(denominator) : nil)
     }
 
-    func yearMonthlyRhythm(today: Int, metric: StatsMetric) -> [StatsYearMonthRhythm] {
+    /// `comparedYear` defaults to the previous year, the dashboard comparison.
+    /// A chosen earlier year compares through the same calendar date.
+    func yearMonthlyRhythm(today: Int, metric: StatsMetric, comparedYear: Int? = nil) -> [StatsYearMonthRhythm] {
         let date = StatsDates.parts(today), year = date.year!, month = date.month!
-        let previousThrough = StatsDates.previousYear(today)
+        let comparedYear = comparedYear ?? year - 1
+        let monthLength = StatsDates.start(year: comparedYear, month: month + 1) - StatsDates.start(year: comparedYear, month: month)
+        let previousThrough = StatsDates.start(year: comparedYear, month: month) + min(date.day!, monthLength) - 1
         func values(first: Int, last: Int) -> [ActivityCategory: Double] {
             let split = sportBreakdown(first: first, last: last)
             return Dictionary(uniqueKeysWithValues: ActivityCategory.allCases.map { ($0, split[$0]?[metric] ?? 0) })
         }
         return (1...month).map { index in
             let start = StatsDates.start(year: year, month: index)
-            let previous = StatsDates.start(year: year - 1, month: index)
+            let previous = StatsDates.start(year: comparedYear, month: index)
             return .init(start: start,
                          current: values(first: start, last: min(today, StatsDates.start(year: year, month: index + 1) - 1)),
-                         previous: values(first: previous, last: min(previousThrough, StatsDates.start(year: year - 1, month: index + 1) - 1)),
+                         previous: values(first: previous, last: min(previousThrough, StatsDates.start(year: comparedYear, month: index + 1) - 1)),
                          inProgress: index == month)
         }
     }

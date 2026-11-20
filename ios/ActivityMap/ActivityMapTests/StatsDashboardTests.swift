@@ -102,7 +102,7 @@ import Testing
             .init(id: id, name: "Hill \(id)", sport: .trailHike, start: StatsDates.date(StatsDates.day(day)), distance: km * 1000, movingTime: 3600, elevation: elevation)
         }
         let engine = StatsEngine(activities: [row(11, "2026-08-01", 5, 1000), row(12, "2026-08-02", 4.999, 5000), row(13, "2025-08-01", 5, 5000), row(14, "2026-09-02", 5, 5000)])
-        guard case .hilliness(_, let activities) = engine.dashboard(.distanceVsElevation, option: nil, today: StatsDates.day("2026-09-01")) else { Issue.record("Missing hilliness"); return }
+        guard case .hilliness(_, let activities, _) = engine.dashboard(.distanceVsElevation, option: nil, today: StatsDates.day("2026-09-01")) else { Issue.record("Missing hilliness"); return }
         #expect(activities.map(\.activity.id) == [11])
         #expect(activities.first?.metersPerKm == 200)
     }
@@ -157,7 +157,7 @@ import Testing
                 }
                 let comparison: StatsPeriodComparison
                 switch result {
-                case .comparison(let value, _, _, _, _, _), .volume(let value, _, _, _, _): comparison = value
+                case .comparison(let value, _, _, _, _), .volume(let value, _, _, _, _, _): comparison = value
                 default: Issue.record("Wrong tile payload"); continue
                 }
                 StatsFixtureTests.equal(StatsFixtureTests.comparison(comparison), row["expected"]!, label: row["id"] as! String)
@@ -208,7 +208,7 @@ import Testing
                 let result = try #require(state.result(tile.id, source: StatsDashboardSource(store)))
                 switch result {
                 case .unsupported: Issue.record("Unsupported visible tile \(tile.id)")
-                case .volume(_, let starts, let values, let averages, let buckets):
+                case .volume(_, let starts, let values, let averages, let buckets, _):
                     #expect(starts.count == 12 && values.count == 12 && averages.count == 3)
                     #expect(buckets[.weeks]?.map(\.total) == values)
                     #expect(buckets.values.flatMap { $0 }.allSatisfy { abs($0.bySport.values.reduce(0, +) - $0.total) < 0.000001 })
@@ -263,7 +263,7 @@ import Testing
         let store = ActivityStore(activities: activities)
         let today = StatsDates.day("2026-03-03")
         store.stats.refreshToday(now: StatsDates.date(today), timeZone: .gmt)
-        guard case .dashboard(.volume(_, _, _, _, let history)) = await store.stats.result(.dashboard(.weeklyVolume, .distance), for: store) else {
+        guard case .dashboard(.volume(_, _, _, _, let history, _)) = await store.stats.result(.dashboard(.weeklyVolume, .distance), for: store) else {
             Issue.record("Missing grouped volume"); return
         }
         let weeks = try #require(history[.weeks]), months = try #require(history[.months]), years = try #require(history[.years])
@@ -288,7 +288,7 @@ import Testing
             })
             let store = ActivityStore(activities: rows)
             store.stats.refreshToday(now: StatsDates.date(StatsDates.day("2026-09-27")), timeZone: .gmt)
-            guard case .dashboard(.volume(_, _, _, let averages, _)) = await store.stats.result(.dashboard(.weeklyVolume, .time), for: store) else {
+            guard case .dashboard(.volume(_, _, _, let averages, _, _)) = await store.stats.result(.dashboard(.weeklyVolume, .time), for: store) else {
                 Issue.record("Missing averages"); continue
             }
             let trend = try #require(averages[range])

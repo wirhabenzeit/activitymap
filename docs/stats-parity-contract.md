@@ -92,6 +92,17 @@ The current change implements native ranked Records, Month/Year rhythm and compa
 
 Validation: 149 web Stats calculation/UI/URL tests, TypeScript, targeted ESLint and the generated capability/schema check pass. The browser regression passes at desktop, phone landscape and phone portrait, including activity Back/Forward, Escape, resize, focus restoration and all seven dark focus surfaces. All 75 shared fixture vectors also pass through native production calculations. Simulator rendering covers phone, wide, dark, accessibility text and empty Month/Year details; A further 25 native rendered/navigation cases pass, including Records, supporting layouts at 834/1194 points, the production shell, nested Back, resize and retained metric/day/period state. Physical iPad transition recording (normal and Reduce Motion), full personal-library review and phone/iPad interaction acceptance remain outstanding; fixture screenshots do not certify those. The verification counts and images in the preceding follow-up notes describe earlier web revisions.
 
+## Connected explorers (#577 web, mirrored natively 2026-11-20)
+
+The expanded Training volume, This month, Year to date and Hilliness pages are *explorers* on both platforms: one headline, one chart of selectable periods, the activities inside the selected period, and the raw tables behind a collapsed **Show data** control. This replaces the earlier native layouts (day-cell grid, month picker with totals, always-open period/comparison tables); the compact dashboard tiles are unchanged. Navigation titles, the metric switch and the native activity inspector replace the web's in-page header.
+
+- **Training volume**: sport-stacked bars for 12 weeks/months or every recorded year, a dashed four-period average, faded incomplete periods. The latest period is selected initially; selecting a bar lists its activities, and the selection survives opening an activity.
+- **This month / Year to date**: cumulative current-versus-comparison lines above sport-stacked daily (month) or paired monthly (year) bars on one x axis, a reporting-date boundary with a shaded future, and an optional **Historical range** band (preference kept per period kind; the definition is one tap away). Any of the last twelve months or any earlier recorded year can be the comparison; the headline sentence, lines and paired bars follow it. The latest active day (month) or current month (year) is selected initially.
+- **Hilliness**: one sport at a time (the sport with the most distance in the last twelve months first), monthly climbing per distance with a dashed twelve-month average, and the selected month's distance, ascent and ranked activities of at least 5 km. Only activities with both distance and ascent recorded count.
+- Native adds previous/next period steps beside the selected-period heading, a precise alternative to tapping a thin bar and the VoiceOver path to selection. The web's hover readouts have no touch equivalent.
+
+Native inputs are precomputed per tile on the stats executor (`StatsExplorerData.swift`), so choosing a period, comparison or sport never recalculates.
+
 ## Design reference cases
 
 These are prototype/capture inputs for #252 and later #265/#228 review, not accepted native layouts or device evidence. Match dataset/date across platforms; include small phone, landscape, iPad, light/dark and accessibility text. Screenshots/device acceptance remain pending.

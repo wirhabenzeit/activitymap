@@ -480,6 +480,8 @@ extension EnvironmentValues {
     /// so a tile's header, controls and chart fit on one screen. Never below
     /// compact. Its presence also selects the dense one-row tile headers.
     @Entry var statsDetailHeightLimit: Double? = nil
+    /// Actual width after the app's sidebar has taken space.
+    @Entry var statsAvailableWidth: CGFloat = 0
     /// Set only on a wide, tall focus page (iPad): expanded charts grow to this
     /// height instead of keeping their phone size beside empty space.
     @Entry var statsFocusChartHeight: Double? = nil
