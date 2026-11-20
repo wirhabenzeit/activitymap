@@ -171,12 +171,13 @@ export default function PrivacyPage() {
       <h2>Your choices and rights</h2>
       <ul>
         <li>
-          <strong>Delete everything now:</strong> in the app open Account and
-          choose <strong>Delete account and data</strong> (on the website:
-          Settings, Account). This immediately removes your account, sessions,
-          imported activities, photos, streams, share links and sync state. It
-          does not delete your activities on Strava, and signing in again
-          creates a new, empty account.
+          <strong>Delete everything now:</strong> in the app tap your profile
+          picture at the top right and choose{' '}
+          <strong>Delete account and data</strong> in the Account section (on
+          the website: Settings, Account). This immediately removes your
+          account, sessions, imported activities, photos, streams, share links
+          and sync state. It does not delete your activities on Strava, and
+          signing in again creates a new, empty account.
         </li>
         <li>
           <strong>Sign out</strong> removes the locally cached activities from

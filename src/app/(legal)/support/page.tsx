@@ -22,8 +22,8 @@ export default function SupportPage() {
         Email{' '}
         <a href={legalMailto('ActivityMap support')}>{LEGAL_CONTACT_EMAIL}</a>.
         Please say whether you use the iPhone app or the website and, for the
-        app, the version shown in Account &rsaquo; About. Never send your Strava
-        password.
+        app, the version shown under Settings &rsaquo; About ActivityMap. Never
+        send your Strava password.
       </p>
 
       <h2>Common questions</h2>
@@ -33,7 +33,7 @@ export default function SupportPage() {
         activities normally arrive within minutes; a first import of a large
         history can take a while because Strava limits how fast we may request
         data. If sync says Strava is disconnected, sign out and connect again
-        from Account.
+        from the Account section of Settings.
       </p>
       <h3>I cannot sign in</h3>
       <p>
@@ -44,10 +44,12 @@ export default function SupportPage() {
       </p>
       <h3>How do I delete my data?</h3>
       <p>
-        Open Account and choose <strong>Delete account and data</strong>. This
-        is permanent and immediate, and does not touch your activities on
-        Strava. The <a href={LEGAL_PATHS.privacy}>privacy policy</a> explains
-        what is removed.
+        In the app, tap your profile picture at the top right and choose{' '}
+        <strong>Delete account and data</strong> in the Account section; on the
+        website open Settings, then Account. This is permanent and immediate,
+        and does not touch your activities on Strava. The{' '}
+        <a href={LEGAL_PATHS.privacy}>privacy policy</a> explains what is
+        removed.
       </p>
       <h3>Where is my shared link?</h3>
       <p>

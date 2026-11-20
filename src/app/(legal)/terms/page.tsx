@@ -49,8 +49,8 @@ export default function TermsPage() {
           anyone who has it until it expires or you revoke it.
         </li>
         <li>
-          You can delete your ActivityMap account and data at any time from the
-          Account screen.
+          You can delete your ActivityMap account and data at any time from
+          Settings, in the Account section.
         </li>
       </ul>
 
