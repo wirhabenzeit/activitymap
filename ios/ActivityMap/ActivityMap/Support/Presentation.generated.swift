@@ -318,7 +318,7 @@ nonisolated enum AppMessages {
         LocalizedStringResource("action.shareActivity", defaultValue: "Share activity", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
     }
     static func actionOpenInStrava(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("action.openInStrava", defaultValue: "Open in Strava", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
+        LocalizedStringResource("action.openInStrava", defaultValue: "View on Strava", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
     }
     static func actionOpeningStrava(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("action.openingStrava", defaultValue: "Opening Strava…", table: "Presentation", locale: locale, comment: "App-owned activity and navigation copy. User content passed as arguments stays verbatim.")
@@ -1099,6 +1099,21 @@ nonisolated enum AppMessages {
     }
     static func settingsAbout(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("settings.about", defaultValue: "About", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsPrivacy(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.privacy", defaultValue: "Privacy policy", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsTerms(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.terms", defaultValue: "Terms of use", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsSupport(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.support", defaultValue: "Support", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func settingsLegal(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.legal", defaultValue: "Legal", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
+    }
+    static func connectPoweredByStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("connect.poweredByStrava", defaultValue: "Powered by Strava", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
     }
     static func settingsSignInToSync(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("settings.signInToSync", defaultValue: "Sign in to sync your activities.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")

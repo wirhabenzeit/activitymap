@@ -6,6 +6,7 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import * as React from 'react';
 
 import { AppDialogContent } from '~/components/app-dialog';
+import { PoweredByStrava } from '~/components/powered-by-strava';
 import { DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import { signIn } from '~/lib/auth-client';
 import {
@@ -209,6 +210,7 @@ export function SignedOutConnectPanel() {
         <p className="text-xs text-muted-foreground">
           {STRAVA_CONNECT_PERMISSIONS}
         </p>
+        <PoweredByStrava />
       </AppDialogContent>
     </DialogPrimitive.Root>
   );

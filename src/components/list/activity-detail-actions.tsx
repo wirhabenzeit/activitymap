@@ -27,7 +27,17 @@ function ActionContent({
         aria-hidden="true"
       />
       <span className="grid gap-1">
-        <span className="text-sm font-medium">{label}</span>
+        {/* Strava's brand guidelines require "View on Strava" links to be
+            bold, underlined or orange so they read as links (issue #587). */}
+        <span
+          className={
+            action === 'openInStrava'
+              ? 'text-sm font-bold'
+              : 'text-sm font-medium'
+          }
+        >
+          {label}
+        </span>
         <span className="text-xs font-normal text-muted-foreground">
           {hint}
         </span>

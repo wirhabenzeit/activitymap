@@ -68,7 +68,7 @@ struct ActivityDetailActions: View {
                 Button(action: openStrava) {
                     row(title: Text(openingStrava ? AppMessages.actionOpeningStrava(locale: locale) : AppMessages.actionOpenInStrava(locale: locale)),
                         subtitle: Text(AppMessages.activityActionStravaHint(locale: locale)), icon: ActionPresentation.glyph(.openInStrava),
-                        trailing: "arrow.up.right", busy: openingStrava)
+                        trailing: "arrow.up.right", busy: openingStrava, emphasizedTitle: true)
                 }
                 .disabled(openingStrava)
                 .accessibilityIdentifier("activity-open-in-strava")
@@ -105,12 +105,14 @@ struct ActivityDetailActions: View {
         }
     }
 
-    private func row(title: Text, subtitle: Text, icon: String, trailing: String, busy: Bool) -> some View {
+    /// `emphasizedTitle` is Strava's required treatment for "View on Strava":
+    /// a link label must be bold, underlined or orange to read as a link (issue #587).
+    private func row(title: Text, subtitle: Text, icon: String, trailing: String, busy: Bool, emphasizedTitle: Bool = false) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon).font(AppTheme.Typography.icon).foregroundStyle(AppTheme.accent).frame(width: 22)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 4) {
-                title.font(.subheadline.weight(.medium)).foregroundStyle(.primary)
+                title.font(.subheadline.weight(emphasizedTitle ? .bold : .medium)).foregroundStyle(.primary)
                 subtitle.font(.caption).foregroundStyle(AppTheme.secondaryText)
             }
             .fixedSize(horizontal: false, vertical: true)

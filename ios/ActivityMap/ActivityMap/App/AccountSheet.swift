@@ -379,6 +379,16 @@ struct AccountSheet: View {
             Section {
                 Text(String(localized: AppMessages.accountNativeExploreYourActivitiesOnAMapInA(locale: locale)))
                     .foregroundStyle(.secondary)
+                PoweredByStrava()
+            }
+
+            Section(String(localized: AppMessages.settingsLegal(locale: locale))) {
+                Link(String(localized: AppMessages.settingsPrivacy(locale: locale)), destination: LegalLinks.privacy)
+                    .accessibilityIdentifier("legal-privacy")
+                Link(String(localized: AppMessages.settingsTerms(locale: locale)), destination: LegalLinks.terms)
+                    .accessibilityIdentifier("legal-terms")
+                Link(String(localized: AppMessages.settingsSupport(locale: locale)), destination: LegalLinks.support)
+                    .accessibilityIdentifier("legal-support")
             }
         }
     }

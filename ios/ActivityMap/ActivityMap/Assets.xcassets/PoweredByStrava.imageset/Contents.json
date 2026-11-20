@@ -1,0 +1,25 @@
+{
+  "images": [
+    {
+      "filename": "api_logo_pwrdBy_strava_horiz_orange.svg",
+      "idiom": "universal"
+    },
+    {
+      "appearances": [
+        {
+          "appearance": "luminosity",
+          "value": "dark"
+        }
+      ],
+      "filename": "api_logo_pwrdBy_strava_horiz_white.svg",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  },
+  "properties": {
+    "preserves-vector-representation": true
+  }
+}

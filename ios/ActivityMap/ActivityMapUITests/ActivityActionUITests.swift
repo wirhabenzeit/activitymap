@@ -29,7 +29,7 @@ final class ActivityActionUITests: XCTestCase {
         reveal(export, in: scroll, app: app)
         let strava = app.buttons["activity-open-in-strava"]
         XCTAssertTrue(strava.exists && export.exists, app.debugDescription)
-        XCTAssertTrue(strava.label.hasPrefix("Open in Strava"), strava.label)
+        XCTAssertTrue(strava.label.hasPrefix("View on Strava"), strava.label)
         XCTAssertTrue(export.label.hasPrefix("Export GPX"), export.label)
         XCTAssertGreaterThanOrEqual(strava.frame.height, 44)
         XCTAssertGreaterThanOrEqual(export.frame.height, 44)
