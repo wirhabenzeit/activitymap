@@ -1,0 +1,3 @@
+-- Export catalogue peaks with the research prominence (national DEMs, PR #472) and Wikidata prominence.
+-- psql -At -f export-peaks.sql > peaks.csv
+\copy (select k.cc, k.id, k.display_name, st_x(p.location::geometry) lon, st_y(p.location::geometry) lat, p.elevation_m, (p.tags ? 'wikidata') has_wikidata, (p.tags ? 'wikipedia') has_wikipedia, k.dem_prom, w.prom wd_prom from (select 'CH' cc, id, display_name, qid, dem_prom from scratch_sn.pk_a union all select 'AT', id, display_name, qid, dem_prom from scratch_sn.pk_at union all select 'IT', id, display_name, qid, dem_prom from scratch_sn.pk_it) k join places p using (id) left join (select qid, max(prom) prom from scratch_sn.wd group by 1) w on w.qid = k.qid order by 1, 5, 4) to stdout csv header
