@@ -78,7 +78,9 @@ void test('the marketing page keeps Strava to plain facts', () => {
     'utf8',
   );
   // Strava's brand rules: never in the app name, and no claim of endorsement.
-  assert.doesNotMatch(page, /Strava ?Map/i);
-  assert.match(page, /not made, endorsed or sponsored by Strava/);
+  // JSX text is wrapped across lines, so compare with whitespace collapsed.
+  const text = page.replace(/\s+/g, ' ');
+  assert.doesNotMatch(text, /Strava ?Map/i);
+  assert.match(text, /not made, endorsed or sponsored by Strava/);
   assert.match(page, /PoweredByStrava/);
 });
