@@ -18,6 +18,25 @@ import UIKit
 /// `APIConfiguration` for the deployment/scheme/redirect instead of the test
 /// client's hardcoded placeholders, and through `APIClient` and the generated
 /// `ActivityMapAPI` DTOs instead of hand-rolled envelope structs.
+/// How a sign-in reaches the installed Strava app (issue #305). The system
+/// implementation asks UIKit; tests supply their own.
+struct StravaAppLauncher {
+    /// Whether the Strava app is installed (a `canOpenURL` probe on its scheme).
+    var isInstalled: @MainActor () -> Bool
+    /// Opens the app at a `strava://` URL; `false` when it could not be opened.
+    var open: @MainActor (URL) async -> Bool
+
+    static let unavailable = StravaAppLauncher(isInstalled: { false }, open: { _ in false })
+
+    #if canImport(UIKit)
+    static let system = StravaAppLauncher(
+        isInstalled: { UIApplication.shared.canOpenURL(AuthController.stravaAppProbeURL) },
+        open: { await UIApplication.shared.open($0, options: [:]) })
+    #else
+    static let system = unavailable
+    #endif
+}
+
 @MainActor
 @Observable
 final class AuthController: NSObject {
@@ -88,7 +107,35 @@ final class AuthController: NSObject {
     private var signingOut = false
     private(set) var deletingAccount = false
 
-    override init() {
+    /// Strava's documented installed-app authorization route. Only its scheme
+    /// matters to the probe; `strava` must be in `LSApplicationQueriesSchemes`.
+    nonisolated static let stravaAppProbeURL = URL(string: "strava://oauth/mobile/authorize")!
+
+    private let stravaApp: StravaAppLauncher
+    private let apiSession: URLSession
+    /// How long to wait for Strava's return after the app comes back to the
+    /// foreground. A return is delivered around that moment; none within the
+    /// grace means the person came back without approving.
+    private let stravaReturnGrace: Duration
+    /// The longest a sign-in may wait in the Strava app (the server's attempt
+    /// lifetime).
+    private let stravaReturnTimeout: Duration
+    /// Set when an installed-app sign-in failed after Strava was opened, so the
+    /// next attempt uses the web sign-in rather than repeating the failure.
+    private var stravaAppHandoffFailed = false
+    private var pendingStravaReturn: PendingStravaReturn?
+    private var stravaReturnTimeoutTask: Task<Void, Never>?
+
+    init(
+        stravaApp: StravaAppLauncher = .system,
+        session: URLSession = .shared,
+        stravaReturnGrace: Duration = .seconds(2),
+        stravaReturnTimeout: Duration = .seconds(600)
+    ) {
+        self.stravaApp = stravaApp
+        self.apiSession = session
+        self.stravaReturnGrace = stravaReturnGrace
+        self.stravaReturnTimeout = stravaReturnTimeout
         super.init()
         #if DEBUG
         // The real-shell rotation fixture must not restore a device session or avatar.
@@ -112,6 +159,7 @@ final class AuthController: NSObject {
     func invalidateSession(token: String) {
         guard SessionStore.load() == token else { return }
         revision += 1
+        abandonPendingStravaReturn()
         SessionStore.clear()
         SessionIdentityStore.clear()
         currentUser = nil
@@ -164,10 +212,14 @@ final class AuthController: NSObject {
         }
     }
 
-    /// Runs the full flow end to end: generate `state` and a PKCE
-    /// verifier/challenge, open the hosted sign-in sheet, exchange the
-    /// resulting one-time code, store the bearer token, then hand off to
-    /// `restoreSession()` to confirm it and report `status`.
+    /// Runs the full flow end to end, then stores the bearer token and hands
+    /// off to `restoreSession()` to confirm it and report `status`.
+    ///
+    /// The sign-in goes through the installed Strava app when there is one and
+    /// the server offers it (`signInThroughStravaApp`), and otherwise through
+    /// the hosted `ASWebAuthenticationSession` sheet
+    /// (`signInThroughWebSession`). Each generates its own `state` and PKCE
+    /// verifier/challenge, and only one attempt is ever in flight.
     ///
     /// That handoff matters once the token is actually saved: at that point
     /// authentication has already succeeded and persisted, so a timeout or
@@ -181,6 +233,9 @@ final class AuthController: NSObject {
         // Repeated taps while the hosted sheet is opening start nothing new.
         guard status != .signingIn else { return }
         revision += 1
+        // A return still awaited from an earlier attempt belongs to it, not to
+        // this one.
+        abandonPendingStravaReturn()
         // Every later step is fenced to this attempt: signing out, or an
         // expired session being invalidated, supersedes it, and a late
         // callback or exchange must not restore an unwanted session.
@@ -191,51 +246,32 @@ final class AuthController: NSObject {
         let reviewPermissions = currentUser != nil
         currentUser = nil
         status = .signingIn
+        // A handoff that failed last time is not repeated: use the web sign-in.
+        let tryStravaApp = !stravaAppHandoffFailed
+        stravaAppHandoffFailed = false
         do {
-            let state = try Self.randomURLSafeString()
-            let verifier = try Self.randomURLSafeString()
-            let challenge = Self.s256Challenge(forVerifier: verifier)
+            let handoff: StravaAppOutcome = tryStravaApp
+                ? try await signInThroughStravaApp(forceConsent: reviewPermissions, attempt: attempt)
+                : .unavailable
 
-            guard
-                var startURL = URLComponents(
-                    url: APIConfiguration.endpoint("/api/v1/auth/mobile/start"),
-                    resolvingAgainstBaseURL: false)
-            else {
-                throw AuthError.missingCodeOrState
-            }
-            startURL.queryItems = [
-                URLQueryItem(name: "state", value: state),
-                URLQueryItem(name: "code_challenge", value: challenge),
-                URLQueryItem(
-                    name: "redirect_uri",
-                    value: APIConfiguration.authRedirectURI.absoluteString),
-            ]
-            if reviewPermissions {
-                startURL.queryItems?.append(URLQueryItem(name: "prompt", value: "consent"))
-            }
-            guard let url = startURL.url else { throw AuthError.missingCodeOrState }
-
-            let callbackURL = try await presentAuthSession(startingAt: url)
-            guard attempt == revision else { return }
-
-            let code: String
-            switch Self.parseCallback(callbackURL, expectedState: state) {
-            case .code(let value):
-                code = value
-            case .declined:
-                // Declining on Strava's consent screen is the person's
-                // choice, like closing the sheet: return quietly.
+            let exchange: ActivityMapAPI.MobileExchangeResponse
+            switch handoff {
+            case .session(let response):
+                exchange = response
+            case .declined, .abandoned:
+                // Declining in Strava, or coming back without approving, is the
+                // person's choice, like closing the sheet: return quietly.
+                guard attempt == revision else { return }
                 status = .signedOut
                 return
-            case .failure(let error):
-                throw error
+            case .unavailable:
+                // No Strava app, or it could not be used: the system web
+                // sign-in, with its own fresh state and PKCE pair.
+                guard let response = try await signInThroughWebSession(
+                    reviewPermissions: reviewPermissions, attempt: attempt)
+                else { return }
+                exchange = response
             }
-
-            let exchange = try await APIClient.post(
-                "/api/v1/auth/mobile/exchange",
-                body: ActivityMapAPI.MobileExchangeRequest(
-                    code: code, pkceVerifier: verifier, state: state),
-                as: ActivityMapAPI.MobileExchangeResponse.self)
             guard attempt == revision else {
                 // Superseded while exchanging: don't keep the new session,
                 // and don't leave it valid on the server either.
@@ -261,6 +297,236 @@ final class AuthController: NSObject {
         } catch {
             guard attempt == revision else { return }
             status = .failed(String(describing: error))
+        }
+    }
+
+    // MARK: - System web sign-in
+
+    /// The hosted `ASWebAuthenticationSession` flow: generate `state` and a PKCE
+    /// verifier/challenge, open the sign-in sheet, and exchange the one-time
+    /// code it returns. `nil` when the person declined or the attempt was
+    /// superseded (status is already settled).
+    private func signInThroughWebSession(
+        reviewPermissions: Bool, attempt: Int
+    ) async throws -> ActivityMapAPI.MobileExchangeResponse? {
+        let state = try Self.randomURLSafeString()
+        let verifier = try Self.randomURLSafeString()
+        let challenge = Self.s256Challenge(forVerifier: verifier)
+
+        guard
+            var startURL = URLComponents(
+                url: APIConfiguration.endpoint("/api/v1/auth/mobile/start"),
+                resolvingAgainstBaseURL: false)
+        else {
+            throw AuthError.missingCodeOrState
+        }
+        startURL.queryItems = [
+            URLQueryItem(name: "state", value: state),
+            URLQueryItem(name: "code_challenge", value: challenge),
+            URLQueryItem(
+                name: "redirect_uri",
+                value: APIConfiguration.authRedirectURI.absoluteString),
+        ]
+        if reviewPermissions {
+            startURL.queryItems?.append(URLQueryItem(name: "prompt", value: "consent"))
+        }
+        guard let url = startURL.url else { throw AuthError.missingCodeOrState }
+
+        let callbackURL = try await presentAuthSession(startingAt: url)
+        guard attempt == revision else { return nil }
+
+        let code: String
+        switch Self.parseCallback(callbackURL, expectedState: state) {
+        case .code(let value):
+            code = value
+        case .declined:
+            // Declining on Strava's consent screen is the person's
+            // choice, like closing the sheet: return quietly.
+            status = .signedOut
+            return nil
+        case .failure(let error):
+            throw error
+        }
+
+        return try await APIClient.post(
+            "/api/v1/auth/mobile/exchange",
+            body: ActivityMapAPI.MobileExchangeRequest(
+                code: code, pkceVerifier: verifier, state: state),
+            session: apiSession,
+            as: ActivityMapAPI.MobileExchangeResponse.self)
+    }
+
+    // MARK: - Installed Strava app (issue #305)
+
+    enum StravaAppOutcome {
+        case session(ActivityMapAPI.MobileExchangeResponse)
+        /// Strava's consent was declined in the Strava app.
+        case declined
+        /// The person came back without approving, or the attempt was superseded.
+        case abandoned
+        /// Strava is not installed or could not be used: fall back to the web.
+        case unavailable
+    }
+
+    /// What Strava's app returns: `code` and the `scope` actually approved, or
+    /// an error. Every outcome must carry the `state` this attempt sent.
+    enum StravaAppReturn: Equatable {
+        case code(String, scope: String?)
+        case declined
+        case failure(AuthError)
+    }
+
+    private enum StravaReturnResult {
+        case url(URL)
+        /// iOS could not open the Strava app.
+        case openFailed
+        case abandoned
+    }
+
+    private struct PendingStravaReturn {
+        let state: String
+        let continuation: CheckedContinuation<StravaReturnResult, Never>
+    }
+
+    /// Hands the sign-in to the installed Strava app and completes it with what
+    /// the app returns. Strava returns to the *app*, not to a browser, so none
+    /// of the web flow's cookies exist: the server registers this attempt
+    /// (`state` and PKCE challenge) first and redeems it, with the verifier,
+    /// only once, when the code comes back. The client secret never leaves the
+    /// server, and a code taken from a hijacked redirect is useless without
+    /// the verifier that stays here.
+    ///
+    /// Anything that goes wrong *before* Strava is opened (not installed, the
+    /// handoff is unavailable on the server, offline, iOS refusing to open it)
+    /// returns `.unavailable`, and the caller uses the web sign-in. A failure
+    /// *after* that surfaces as an error, and the next attempt uses the web.
+    func signInThroughStravaApp(
+        forceConsent: Bool, attempt: Int
+    ) async throws -> StravaAppOutcome {
+        guard stravaApp.isInstalled() else { return .unavailable }
+
+        let state = try Self.randomURLSafeString()
+        let verifier = try Self.randomURLSafeString()
+        let challenge = Self.s256Challenge(forVerifier: verifier)
+
+        let registration: ActivityMapAPI.StravaAppAttemptResponse
+        do {
+            registration = try await APIClient.post(
+                "/api/v1/auth/mobile/strava/attempt",
+                body: ActivityMapAPI.StravaAppAttemptRequest(
+                    state: state, codeChallenge: challenge, forceConsent: forceConsent ? true : nil),
+                session: apiSession,
+                as: ActivityMapAPI.StravaAppAttemptResponse.self)
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            // Not configured here (503), offline or failing: the web sign-in
+            // works without any of it.
+            return .unavailable
+        }
+        guard attempt == revision else { return .abandoned }
+        guard let url = URL(string: registration.authorizationUrl), url.scheme == "strava" else {
+            return .unavailable
+        }
+
+        switch await awaitStravaReturn(state: state, opening: url) {
+        case .openFailed:
+            return .unavailable
+        case .abandoned:
+            return .abandoned
+        case .url(let returned):
+            guard attempt == revision else { return .abandoned }
+            do {
+                switch Self.parseStravaAppReturn(returned, expectedState: state) {
+                case .declined:
+                    return .declined
+                case .failure(let error):
+                    throw error
+                case .code(let code, let scope):
+                    return .session(try await APIClient.post(
+                        "/api/v1/auth/mobile/strava/complete",
+                        body: ActivityMapAPI.StravaAppCompleteRequest(
+                            code: code, scope: scope, state: state, pkceVerifier: verifier),
+                        session: apiSession,
+                        as: ActivityMapAPI.MobileExchangeResponse.self))
+                }
+            } catch is CancellationError {
+                throw CancellationError()
+            } catch {
+                stravaAppHandoffFailed = true
+                throw error
+            }
+        }
+    }
+
+    /// Interprets the URL the Strava app opened: `code` and `scope`, or an
+    /// `error`. A missing or different `state` is never accepted, so a stale or
+    /// forged return can't end or complete another attempt.
+    static func parseStravaAppReturn(_ url: URL, expectedState: String) -> StravaAppReturn {
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        func value(_ name: String) -> String? { items.first { $0.name == name }?.value }
+        guard let returnedState = value("state") else { return .failure(.missingCodeOrState) }
+        guard returnedState == expectedState else { return .failure(.stateMismatch) }
+        if let error = value("error") {
+            return error == "access_denied" ? .declined : .failure(.provider(code: error, requestID: nil))
+        }
+        guard let code = value("code"), !code.isEmpty else { return .failure(.missingCodeOrState) }
+        return .code(code, scope: value("scope"))
+    }
+
+    private func awaitStravaReturn(state: String, opening url: URL) async -> StravaReturnResult {
+        await withCheckedContinuation { continuation in
+            pendingStravaReturn = PendingStravaReturn(state: state, continuation: continuation)
+            stravaReturnTimeoutTask = Task { [weak self, stravaReturnTimeout] in
+                try? await Task.sleep(for: stravaReturnTimeout)
+                guard !Task.isCancelled else { return }
+                self?.resolveStravaReturn(.abandoned, state: state)
+            }
+            Task { [weak self, stravaApp] in
+                if await stravaApp.open(url) == false {
+                    self?.resolveStravaReturn(.openFailed, state: state)
+                }
+            }
+        }
+    }
+
+    private func resolveStravaReturn(_ result: StravaReturnResult, state: String) {
+        guard let pending = pendingStravaReturn, pending.state == state else { return }
+        pendingStravaReturn = nil
+        stravaReturnTimeoutTask?.cancel()
+        stravaReturnTimeoutTask = nil
+        pending.continuation.resume(returning: result)
+    }
+
+    private func abandonPendingStravaReturn() {
+        if let pending = pendingStravaReturn { resolveStravaReturn(.abandoned, state: pending.state) }
+    }
+
+    /// Receives a URL the app was opened with, such as the return from the
+    /// Strava app (a universal link on a device, a custom scheme elsewhere).
+    /// Returns whether it was that return. One that matches no attempt
+    /// awaiting it (a cold start after the app was killed in Strava, a
+    /// duplicate or stale delivery, or a forged link) is ignored and leaves a
+    /// waiting attempt untouched.
+    @discardableResult
+    func handleOpenURL(_ url: URL) -> Bool {
+        guard APIConfiguration.isStravaAppReturn(url) else { return false }
+        let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+        guard let pending = pendingStravaReturn,
+              items.first(where: { $0.name == "state" })?.value == pending.state
+        else { return true }
+        resolveStravaReturn(.url(url), state: pending.state)
+        return true
+    }
+
+    /// The app came back to the foreground. If a sign-in is waiting in the
+    /// Strava app and no return arrives within the grace period, the person
+    /// came back without approving (the back button, or closing Strava).
+    func applicationDidBecomeActive() {
+        guard let state = pendingStravaReturn?.state else { return }
+        Task { [weak self, stravaReturnGrace] in
+            try? await Task.sleep(for: stravaReturnGrace)
+            self?.resolveStravaReturn(.abandoned, state: state)
         }
     }
 
@@ -345,6 +611,7 @@ final class AuthController: NSObject {
         signingOut = true
         defer { signingOut = false }
         revision += 1
+        abandonPendingStravaReturn()
         currentUser = nil // Hide data and stop sync as soon as sign-out starts.
         guard let token = SessionStore.load() else {
             SessionIdentityStore.clear()
@@ -377,6 +644,7 @@ final class AuthController: NSObject {
         }
         deletingAccount = true
         revision += 1
+        abandonPendingStravaReturn()
         let attempt = revision
         defer { deletingAccount = false }
         let result = try await APIClient.post(

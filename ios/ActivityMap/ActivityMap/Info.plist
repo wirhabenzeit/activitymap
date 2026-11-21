@@ -10,6 +10,14 @@
 	<string>$(ACTIVITYMAP_AUTH_CALLBACK_SCHEME)</string>
 	<key>ActivityMapAuthRedirectURI</key>
 	<string>$(ACTIVITYMAP_AUTH_REDIRECT_URI)</string>
+	<key>ActivityMapStravaAppRedirectURI</key>
+	<string>$(ACTIVITYMAP_STRAVA_APP_REDIRECT_URI)</string>
+	<!-- Lets the app ask whether the Strava app is installed before handing it
+	     the sign-in (issue #305). Strava's documented iOS route. -->
+	<key>LSApplicationQueriesSchemes</key>
+	<array>
+		<string>strava</string>
+	</array>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>

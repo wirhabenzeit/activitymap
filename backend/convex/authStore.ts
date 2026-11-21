@@ -30,6 +30,9 @@ const MODELS = [
   'jwks',
   // The app's own one-time codes for signing in from the iOS app.
   'mobileLoginCode',
+  // A sign-in started in the Strava app (issue #305): the app's PKCE
+  // challenge, redeemed once with its verifier.
+  'stravaAppAttempt',
 ] as const;
 type Model = (typeof MODELS)[number];
 const LOOKUPS = [

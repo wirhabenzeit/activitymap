@@ -29,22 +29,23 @@ const config = {
       {
         // Apple fetches this without a file extension and requires JSON served
         // directly, with no redirect (webcredentials for the iOS sign-in
-        // callback, issue #482).
+        // callback, issue #482; applinks for the Strava app return, #305).
         source: '/.well-known/apple-app-site-association',
         headers: [
           { key: 'Content-Type', value: 'application/json' },
           { key: 'Cache-Control', value: 'public, max-age=3600' },
         ],
       },
-      {
-        // The query string carries a one-time sign-in code (issue #482).
-        source: '/auth/callback',
+      // The query string carries a one-time sign-in code (issue #482) or a
+      // Strava authorization code (the Strava app return, issue #305).
+      ...['/auth/callback', '/auth/strava'].map((source) => ({
+        source,
         headers: [
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'Cache-Control', value: 'no-store' },
           { key: 'X-Robots-Tag', value: 'noindex, nofollow, noarchive' },
         ],
-      },
+      })),
       {
         source: '/share/:path*',
         headers: [

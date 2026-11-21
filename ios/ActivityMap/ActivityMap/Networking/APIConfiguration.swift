@@ -83,6 +83,27 @@ nonisolated enum APIConfiguration {
         )
     }
 
+    /// Where the installed Strava app returns after the person approves there
+    /// (issue #305). Strava opens it with `code`, `scope` and `state`.
+    static let stravaAppRedirectURI: URL = resolve {
+        try validateRedirectURI(
+            requiredValue(for: InfoKey.stravaAppRedirectURI),
+            expectedScheme: authCallbackScheme,
+            key: InfoKey.stravaAppRedirectURI
+        )
+    }
+
+    /// Whether `url` is the return from the Strava app: the configured redirect
+    /// URI's scheme, host and path, whatever its query.
+    static func isStravaAppReturn(_ url: URL, redirectURI: URL = stravaAppRedirectURI) -> Bool {
+        guard let candidate = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let expected = URLComponents(url: redirectURI, resolvingAgainstBaseURL: false)
+        else { return false }
+        return candidate.scheme?.lowercased() == expected.scheme?.lowercased()
+            && candidate.host?.lowercased() == expected.host?.lowercased()
+            && candidate.path == expected.path
+    }
+
     /// The scheme registered under `CFBundleURLTypes`. It is what
     /// `ASWebAuthenticationSession` watches for when `authCallback` is a custom
     /// scheme (simulator and Dev builds); an https redirect does not use it.
@@ -184,6 +205,7 @@ nonisolated enum APIConfiguration {
         static let baseURL = "ActivityMapAPIBaseURL"
         static let redirectURI = "ActivityMapAuthRedirectURI"
         static let callbackScheme = "ActivityMapAuthCallbackScheme"
+        static let stravaAppRedirectURI = "ActivityMapStravaAppRedirectURI"
     }
 
     private static func parse(_ raw: String, key: String) throws -> URL {

@@ -788,6 +788,24 @@ nonisolated extension ActivityMapAPI {
         let sessionExpiresAt: Date
     }
 
+    struct StravaAppAttemptRequest: Codable, Hashable, Sendable {
+        let state: String
+        let codeChallenge: String
+        let forceConsent: Bool?
+    }
+
+    struct StravaAppAttemptResponse: Codable, Hashable, Sendable {
+        let authorizationUrl: String
+        let expiresAt: Date
+    }
+
+    struct StravaAppCompleteRequest: Codable, Hashable, Sendable {
+        let code: String
+        let scope: String?
+        let state: String
+        let pkceVerifier: String
+    }
+
     struct MobileSession: Codable, Hashable, Sendable {
         let token: String
         let createdAt: Date

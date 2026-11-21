@@ -272,6 +272,36 @@ The server additionally binds each callback to the `/api/v1/auth/mobile/start` r
 3. **Check the AASA file is live**: `curl -i https://activitymap.cc/.well-known/apple-app-site-association` returns 200, `content-type: application/json` and the JSON above. Apple caches it through its CDN, so allow time after the first deploy.
 4. **Prove it on a TestFlight build on a real device** before submitting to the App Store: sign in, sign out, sign in again, and cancel the sheet. A simulator cannot exercise associated domains. If sign-in never returns to the app, one of the four items above is wrong.
 
+## Sign-in through the installed Strava app
+
+When the Strava app is installed, `AuthController` hands the sign-in to it (issue #305), following [Strava's documented iOS route](https://developers.strava.com/docs/authentication/): `canOpenURL` on `strava://oauth/mobile/authorize` (`strava` is in `LSApplicationQueriesSchemes`), then opening that URL. Strava 75.0 or later is needed; otherwise, or when anything about the handoff is unavailable, the system web sign-in above runs unchanged.
+
+Strava returns to the _app_, so none of the web flow's cookies exist. The transaction is anchored on the server instead:
+
+1. `POST /api/v1/auth/mobile/strava/attempt` registers the attempt's `state` (stored only as a hash) and PKCE challenge, and returns the `strava://` URL to open. Any failure, including `503` where `STRAVA_APP_REDIRECT_URI` is not set, means "use the web sign-in".
+2. Strava returns `code`, `scope` and `state` to `ACTIVITYMAP_STRAVA_APP_REDIRECT_URI`: on a device the universal link `https://activitymap.cc/auth/strava` (an `applinks` entry in the AASA file and the entitlements); in the simulator the custom scheme, which never meets the Strava app.
+3. `POST /api/v1/auth/mobile/strava/complete` presents them with the PKCE verifier. The server consumes the attempt exactly once, checks the verifier, exchanges the code with the client secret and signs the athlete in through the same Better Auth account linking as the web callback (`src/server/auth/strava-app-sign-in.ts`), then returns the same bearer session as `/exchange`. No browser session is involved, so nothing ambient can be handed out (#482).
+
+A code taken from a hijacked redirect is useless without the verifier, which never leaves the app.
+
+| Situation                                                             | Behaviour                                                                                                         |
+| --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Strava not installed, handoff not configured, offline, launch refused | Web sign-in, with a fresh `state` and PKCE pair; no attempt is left waiting                                       |
+| Approved in Strava                                                    | Return handled warm (`onOpenURL`); scopes actually approved are recorded as on the web                            |
+| Declined in Strava (`access_denied`)                                  | Returns quietly to signed out                                                                                     |
+| Back to ActivityMap without approving                                 | `applicationDidBecomeActive` waits a 2 s grace for a return, then ends the attempt quietly                        |
+| App killed while in Strava (cold return)                              | The verifier lived only in memory, so the return matches no attempt and is ignored; the person taps Connect again |
+| Wrong-`state`, duplicate or forged return                             | Ignored; a waiting attempt is untouched                                                                           |
+| Sign out, delete account or a new sign-in while waiting               | The waiting attempt ends; a late return is ignored                                                                |
+| Server rejects the code or Strava is unavailable                      | Error shown; the next attempt uses the web sign-in, then returns to trying the Strava app                         |
+
+### Before the first release that uses it
+
+1. **Server:** set `STRAVA_APP_REDIRECT_URI=https://activitymap.cc/auth/strava` in Production, which also enables the handoff (Preview and local leave it unset). The Strava application's Authorization Callback Domain must cover `activitymap.cc`; it already does for the web sign-in.
+2. Deploy the Convex backend first: it adds the `stravaAppAttempt` sign-in store model. Until then the attempt call fails and every sign-in falls back to the web.
+3. Regenerate the App Store provisioning profile if its Associated Domains capability does not already cover `applinks` (it is one capability); `scripts/testflight/` verifies the signed entitlements.
+4. **Physical iPhone with the Strava app installed** (a simulator cannot certify any of this). Two questions only a device answers: does the Strava app open the https redirect as a universal link into ActivityMap, and does Strava's callback-domain check accept it? If it opens Safari instead, `/auth/strava` shows the "Return to ActivityMap" page; the fallback is a custom-scheme redirect (`activitymap://activitymap.cc/auth/strava`) in `ACTIVITYMAP_STRAVA_APP_REDIRECT_URI` and `STRAVA_APP_REDIRECT_URI`, which is safe because the verifier stays in the app. Run the matrix in issue #305: installed and signed in, installed but signed out, absent, launch failure, denial, cancellation, warm and cold return, repeat login, wrong-state and replayed return; then check `/me`, a scoped sync, sign-out and revocation.
+
 Use Profile to sign in. `AuthController` stores the ActivityMap session in the Keychain, confirms it through `/api/v1/me`, and supports restoration and revocation.
 
 ## Map controls and terrain
