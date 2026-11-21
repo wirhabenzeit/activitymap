@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 
 import { betterAuth } from 'better-auth';
 import { memoryAdapter } from 'better-auth/adapters/memory';
 import { bearer } from 'better-auth/plugins';
+import test from 'node:test';
 
 import {
   StravaCodeRejectedError,
