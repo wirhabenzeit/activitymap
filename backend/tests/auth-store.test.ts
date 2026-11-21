@@ -14,6 +14,7 @@ import {
 } from '../../src/server/auth/convex-app-state';
 import { convexMobileLoginCodesRepository } from '../../src/server/auth/convex-mobile-login-codes';
 import { convexAuthRecords } from '../../src/server/auth/convex-records';
+import { convexStravaAppAttemptsRepository } from '../../src/server/auth/convex-strava-app-attempts';
 import {
   eraseDueAccountsOnConvex,
   handleWebhookOnConvex,
@@ -649,6 +650,44 @@ void test('a mobile login code is consumed once and gives up its session token o
     [null, now.toISOString()],
   );
   assert.equal(await codes.consumeByCodeHash('unknown', now), null);
+});
+
+void test('a Strava app sign-in attempt is consumed exactly once, even under a race', async (t) => {
+  const { call } = setup(t);
+  const attempts = convexStravaAppAttemptsRepository(call);
+  const created = await attempts.create({
+    stateHash: 'state-hash-1',
+    pkceChallenge: 'challenge',
+    expiresAt: new Date('2026-11-21T10:10:00Z'),
+  });
+  assert.equal(created.consumedAt, null);
+  assert.equal(
+    (await attempts.findByStateHash('state-hash-1'))?.pkceChallenge,
+    'challenge',
+  );
+
+  const now = new Date('2026-11-21T10:01:00Z');
+  const results = await Promise.all([
+    attempts.consumeByStateHash('state-hash-1', now),
+    attempts.consumeByStateHash('state-hash-1', now),
+    attempts.consumeByStateHash('state-hash-1', now),
+  ]);
+  const winners = results.filter((result) => result !== null);
+  assert.equal(winners.length, 1);
+  assert.deepEqual(
+    [
+      winners[0]?.pkceChallenge,
+      winners[0]?.expiresAt.toISOString(),
+      winners[0]?.consumedAt?.toISOString(),
+    ],
+    ['challenge', '2026-11-21T10:10:00.000Z', now.toISOString()],
+  );
+  assert.equal(
+    (await attempts.findByStateHash('state-hash-1'))?.consumedAt?.toISOString(),
+    now.toISOString(),
+  );
+  assert.equal(await attempts.consumeByStateHash('unknown', now), null);
+  assert.equal(await attempts.findByStateHash('unknown'), null);
 });
 
 void test('rate limit windows count exactly and the provider budget holds requests back', async (t) => {

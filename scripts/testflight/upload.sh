@@ -45,6 +45,9 @@ signed = subprocess.run(['codesign', '-d', '--entitlements', ':-', str(app)], ch
 entitlements = plistlib.loads(signed)
 assert f'webcredentials:{domain}' in entitlements.get('com.apple.developer.associated-domains', []), \
     'The signed app lacks the Associated Domains entitlement; sign-in would never return to the app'
+assert f'applinks:{domain}' in entitlements.get('com.apple.developer.associated-domains', []), \
+    'The signed app lacks the applinks entitlement; the Strava app could not return to the app'
+assert d['ActivityMapStravaAppRedirectURI'] == f'https://{domain}/auth/strava', d['ActivityMapStravaAppRedirectURI']
 assert entitlements.get('get-task-allow') is False
 print('Verified compiled bundle, version, privacy, encryption, production configuration and signed entitlements')
 PY

@@ -302,6 +302,23 @@ session that was already signed in is never handed to a crafted callback URL
 (`src/server/auth/mobile-attempt.ts`). Setup and release steps are in
 `ios/ActivityMap/README.md`, "Universal-link sign-in".
 
+Installed Strava app, 2026-11-21 (issue #305): when the Strava app is
+installed, the app opens Strava's documented `strava://oauth/mobile/authorize`
+route instead of steps 2 to 5. Strava returns `code`, `scope` and `state` to the
+_app_ (the `https://activitymap.cc/auth/strava` universal link, an `applinks`
+Associated Domains entry), so there is no browser to carry Better Auth's state
+and session cookies. A server-side attempt replaces them:
+`POST /api/v1/auth/mobile/strava/attempt` records the hashed `state` and PKCE
+challenge before Strava is opened, and
+`POST /api/v1/auth/mobile/strava/complete` consumes it exactly once with the
+verifier, exchanges the code (the client secret stays on the server) and mints
+the session in the same request through a server-only Better Auth endpoint
+(`handleOAuthUserInfo`, so account linking, token storage and the athlete link
+match the web callback). No browser session exists, so none can be handed out,
+and a code taken from a hijacked redirect is useless without the verifier. The
+web flow is the fallback whenever the handoff is unavailable or fails, and the
+shared provider configuration is unchanged.
+
 Account-switching follow-up, 2026-10-11: a physical iPhone silently returned
 to a test account even after Strava sign-out in a regular Safari tab with one
 profile. An ephemeral authentication session showed the login screen and an

@@ -20,7 +20,12 @@ const entitlements = read(
 );
 const aasa = JSON.parse(
   read('public/.well-known/apple-app-site-association'),
-) as { webcredentials: { apps: string[] } };
+) as {
+  webcredentials: { apps: string[] };
+  applinks: {
+    details: Array<{ appIDs: string[]; components: Array<{ '/': string }> }>;
+  };
+};
 
 const setting = (name: string) =>
   new RegExp(`^${name.replace(/[[\]*]/g, '\\$&')}\\s*=\\s*(.+)$`, 'm').exec(
@@ -34,6 +39,11 @@ void test('the app is associated with the domain that serves its callback', () =
     entitlements,
     /webcredentials:\$\(ACTIVITYMAP_ASSOCIATED_DOMAIN\)/,
     'the entitlement uses the xcconfig domain',
+  );
+  assert.match(
+    entitlements,
+    /applinks:\$\(ACTIVITYMAP_ASSOCIATED_DOMAIN\)/,
+    'the Strava app return is an applink on the same domain',
   );
   assert.equal(
     setting('ACTIVITYMAP_AUTH_REDIRECT_URI[sdk=iphoneos*]'),
@@ -55,6 +65,30 @@ void test('the AASA file names this app: team ID plus bundle identifier', () => 
     )?.[1];
   assert.ok(team && bundle);
   assert.deepEqual(aasa.webcredentials.apps, [`${team}.${bundle}`]);
+  assert.deepEqual(
+    aasa.applinks.details.map((detail) => detail.appIDs),
+    [[`${team}.${bundle}`]],
+  );
+});
+
+void test('the Strava app return is the one path the AASA file sends to the app', () => {
+  // The device redirect Strava is given (issue #305) must be an applink of
+  // this app, and the landing page must exist for the not-installed case.
+  const redirect = setting(
+    'ACTIVITYMAP_STRAVA_APP_REDIRECT_URI[sdk=iphoneos*]',
+  );
+  assert.equal(
+    redirect,
+    `https:$(SLASH)$(SLASH)$(ACTIVITYMAP_ASSOCIATED_DOMAIN)/auth/strava`,
+  );
+  const [detail] = aasa.applinks.details;
+  assert.deepEqual(
+    detail?.components.map((component) => component['/']),
+    ['/auth/strava'],
+  );
+  assert.ok(
+    read('src/app/auth/strava/page.tsx').includes('Return to ActivityMap'),
+  );
 });
 
 void test('the app target carries the entitlements file in every configuration', () => {

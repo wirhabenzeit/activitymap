@@ -2,30 +2,21 @@ import { betterAuth } from 'better-auth';
 import { createAuthMiddleware } from 'better-auth/api';
 import { bearer, jwt, oAuthProxy } from 'better-auth/plugins';
 import { genericOAuth } from 'better-auth/plugins/generic-oauth';
-import { z } from 'zod';
 
 import { convexJwtOptions } from '~/lib/auth-jwt';
+import { STRAVA_SIGN_IN_SCOPES } from '~/lib/strava-oauth';
 import {
   callbackScopeParam,
   grantedStravaScope,
   isStravaSignInCallback,
 } from '~/lib/strava-permissions';
 import { convexAuthAdapter } from '~/server/auth/convex-adapter';
-import {
-  findStravaAccountInternal,
-  setAccountScopeInternal,
-  updateUserInternal,
-} from '~/server/auth/users';
+import { stravaAppSignIn } from '~/server/auth/strava-app-sign-in';
+import { fetchStravaUserInfo } from '~/server/auth/strava-profile';
+import { finishStravaSignIn } from '~/server/auth/strava-sign-in';
 import { stravaAccessEnabled } from '~/server/config/external-effects';
 import { logger } from '~/server/logging/logger';
-
-const stravaProfileSchema = z.object({
-  id: z.union([z.string(), z.number()]),
-  email: z.string().email().nullish(),
-  firstname: z.string().nullish(),
-  lastname: z.string().nullish(),
-  profile: z.string().nullish(),
-});
+import { exchangeStravaAuthorizationCode } from '~/server/strava/authorization-code';
 
 function getSessionUserId(value: unknown): string | null {
   if (typeof value !== 'object' || value === null) {
@@ -66,48 +57,26 @@ export const auth = betterAuth({
                 userInfoUrl: 'https://www.strava.com/api/v3/athlete',
                 clientId: process.env.AUTH_STRAVA_ID!,
                 clientSecret: process.env.AUTH_STRAVA_SECRET!,
-                // `activity:read` alongside `activity:read_all` gives Strava's
-                // consent screen separate public and private boxes, so leaving
-                // private unticked still shares public activities (#303).
-                scopes: ['read,activity:read,activity:read_all,activity:write'],
+                scopes: [STRAVA_SIGN_IN_SCOPES],
                 pkce: false,
                 // Custom function to fetch and map user info from Strava
-                getUserInfo: async (tokens) => {
-                  const response = await fetch(
-                    'https://www.strava.com/api/v3/athlete',
-                    {
-                      headers: {
-                        Authorization: `Bearer ${tokens.accessToken}`,
-                      },
-                    },
-                  );
-
-                  if (!response.ok) {
-                    return null;
-                  }
-
-                  const rawProfile: unknown = await response.json();
-                  const parsedProfile =
-                    stravaProfileSchema.safeParse(rawProfile);
-                  if (!parsedProfile.success) {
-                    return null;
-                  }
-
-                  const profile = parsedProfile.data;
-                  const athleteId = profile.id.toString();
-                  const fullName =
-                    `${profile.firstname ?? ''} ${profile.lastname ?? ''}`.trim();
-
-                  return {
-                    id: athleteId,
-                    email: profile.email ?? `${athleteId}@strava.local`,
-                    name: fullName || `Strava ${athleteId}`,
-                    image: profile.profile ?? undefined,
-                    emailVerified: false,
-                  };
-                },
+                getUserInfo: async (tokens) =>
+                  tokens.accessToken
+                    ? fetchStravaUserInfo(tokens.accessToken)
+                    : null,
               },
             ],
+          }),
+        ]
+      : []),
+    // Completes a sign-in that began in the installed Strava app. Registered
+    // wherever the Strava provider is; it is not reachable over HTTP.
+    ...(stravaAccessEnabled()
+      ? [
+          stravaAppSignIn({
+            exchangeCode: exchangeStravaAuthorizationCode,
+            fetchUserInfo: fetchStravaUserInfo,
+            finishSignIn: finishStravaSignIn,
           }),
         ]
       : []),
@@ -145,17 +114,8 @@ export const auth = betterAuth({
         const userId = getSessionUserId(ctx.context.newSession);
         if (userId) {
           try {
-            const account = await findStravaAccountInternal({ userId });
-            if (!account) return;
-            const athleteId = Number(account.accountId);
-            if (!Number.isFinite(athleteId)) {
-              return;
-            }
-
-            await updateUserInternal(userId, { athlete_id: athleteId });
-
             // Strava reports the scopes the person actually approved only on
-            // this redirect; Better Auth never records them (issue #303).
+            // this redirect (issue #303).
             const query: unknown = ctx.query;
             const scope = grantedStravaScope(
               callbackScopeParam(ctx.request?.url) ??
@@ -163,9 +123,7 @@ export const auth = betterAuth({
                   ? query.scope
                   : null),
             );
-            if (scope !== null) {
-              await setAccountScopeInternal(account.id, scope);
-            }
+            await finishStravaSignIn(userId, scope);
           } catch (error) {
             logger.error('[Better Auth] Error updating athlete_id:', error);
           }

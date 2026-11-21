@@ -1,4 +1,12 @@
 {
+  "applinks": {
+    "details": [
+      {
+        "appIDs": ["DX96FWY9AX.page.dominik.activitymap"],
+        "components": [{ "/": "/auth/strava" }]
+      }
+    ]
+  },
   "webcredentials": {
     "apps": ["DX96FWY9AX.page.dominik.activitymap"]
   }

@@ -10,6 +10,9 @@ void test('share links and the sign-in callback are private, as a path or a full
     '/auth/callback',
     '/auth/callback?code=secret&state=s',
     '/auth/callback#x',
+    '/auth/strava',
+    '/auth/strava?code=secret&state=s',
+    'https://activitymap.cc/auth/strava?code=secret',
     'https://activitymap.cc/share/abc',
     'https://activitymap.cc/auth/callback?code=secret',
   ]) {
@@ -23,6 +26,7 @@ void test('ordinary pages and lookalike paths are not private', () => {
     '/privacy',
     '/auth/callbacks',
     '/auth/callback-help',
+    '/auth/stravas',
     '/sharing',
     '/api/auth/callback/strava',
     'https://activitymap.cc/map?next=/auth/callback',

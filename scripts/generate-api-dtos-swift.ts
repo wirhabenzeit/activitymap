@@ -88,6 +88,9 @@ import {
   mobileSessionDTOSchema,
   mobileSessionListDTOSchema,
   revokeSessionRequestSchema,
+  stravaAppAttemptRequestSchema,
+  stravaAppAttemptResponseDTOSchema,
+  stravaAppCompleteRequestSchema,
 } from '../src/contracts/v1/mobile-auth';
 import { photoDTOSchema } from '../src/contracts/v1/photo';
 import { SCHEMA_VERSION } from '../src/contracts/v1/primitives';
@@ -192,6 +195,9 @@ const registeredSchemas: [string, z.ZodType][] = [
   ['ErrorEnvelope', errorEnvelopeSchema],
   ['MobileExchangeRequest', mobileExchangeRequestSchema],
   ['MobileExchangeResponse', mobileExchangeResponseDTOSchema],
+  ['StravaAppAttemptRequest', stravaAppAttemptRequestSchema],
+  ['StravaAppAttemptResponse', stravaAppAttemptResponseDTOSchema],
+  ['StravaAppCompleteRequest', stravaAppCompleteRequestSchema],
   ['MobileSession', mobileSessionDTOSchema],
   ['MobileSessionList', mobileSessionListDTOSchema],
   ['RevokeSessionRequest', revokeSessionRequestSchema],

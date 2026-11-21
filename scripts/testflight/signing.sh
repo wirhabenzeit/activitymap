@@ -42,7 +42,7 @@ assert profile['TeamIdentifier'] == [team], 'Wrong signing team'
 assert profile['Entitlements']['application-identifier'] == team + '.page.dominik.activitymap', 'Wrong app profile'
 assert not profile['Entitlements'].get('get-task-allow'), 'Development profile is not valid for TestFlight'
 # The app's entitlements ask for webcredentials on the sign-in domain
-# (issue #482). A profile without the capability fails signing late and
+# (issue #482) and applinks for the Strava app return (issue #305). A profile without the capability fails signing late and
 # opaquely, or worse ships a build whose sign-in never returns to the app.
 config = Path('ios/ActivityMap/Config/Base.xcconfig').read_text()
 domain = re.search(r'^ACTIVITYMAP_ASSOCIATED_DOMAIN\s*=\s*(\S+)', config, re.M).group(1)

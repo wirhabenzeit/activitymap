@@ -134,6 +134,11 @@ struct AppShell: View {
                      : AppMessages.statusFirstSummaryCount(sync?.firstSummaryCount ?? 0, locale: locale))
             }
         }
+        // The return from the installed Strava app (issue #305).
+        .onOpenURL { auth.handleOpenURL($0) }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { auth.applicationDidBecomeActive() }
+        }
         .task(id: scenePhase) {
             guard scenePhase == .active else { await sync?.pauseAndWait(); return }
             store.stats.refreshToday()

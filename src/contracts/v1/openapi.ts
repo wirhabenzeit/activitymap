@@ -32,6 +32,9 @@ import {
   mobileExchangeResponseDTOSchema,
   mobileSessionListDTOSchema,
   revokeSessionRequestSchema,
+  stravaAppAttemptRequestSchema,
+  stravaAppAttemptResponseDTOSchema,
+  stravaAppCompleteRequestSchema,
 } from './mobile-auth';
 import { MAX_PAGE_SIZE, paginatedSchema } from './pagination';
 import { photoDTOSchema } from './photo';
@@ -133,6 +136,15 @@ export function buildOpenApiDocument() {
   registry.add(mobileExchangeRequestSchema, { id: 'MobileExchangeRequest' });
   registry.add(responseEnvelope(mobileExchangeResponseDTOSchema), {
     id: 'MobileExchangeResponse',
+  });
+  registry.add(stravaAppAttemptRequestSchema, {
+    id: 'StravaAppAttemptRequest',
+  });
+  registry.add(responseEnvelope(stravaAppAttemptResponseDTOSchema), {
+    id: 'StravaAppAttemptResponse',
+  });
+  registry.add(stravaAppCompleteRequestSchema, {
+    id: 'StravaAppCompleteRequest',
   });
   registry.add(responseEnvelope(mobileSessionListDTOSchema), {
     id: 'MobileSessionListResponse',
@@ -1173,6 +1185,63 @@ export function buildOpenApiDocument() {
               'The code is invalid, expired, already used, or its state/PKCE verifier does not match',
             ),
             '429': errorResponse('Too many requests; see `Retry-After`'),
+          },
+        },
+      },
+      '/api/v1/auth/mobile/strava/attempt': {
+        post: {
+          operationId: 'startStravaAppSignIn',
+          summary: 'Register a sign-in handed to the installed Strava app',
+          description:
+            'Called before opening the Strava app. Records the `state` and PKCE challenge server-side, because the installed-app route returns to the app without any browser cookie, and returns the `strava://oauth/mobile/authorize` URL to open. A failure (including 503 where the handoff is not configured) means the client should use the web sign-in instead. See issue #305.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('StravaAppAttemptRequest') },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'The Strava app authorization URL to open',
+              content: {
+                'application/json': { schema: ref('StravaAppAttemptResponse') },
+              },
+            },
+            '400': errorResponse('The request body is invalid'),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
+            '500': errorResponse('The attempt could not be recorded'),
+            '503': errorResponse(
+              'Signing in through the Strava app is not available here',
+            ),
+          },
+        },
+      },
+      '/api/v1/auth/mobile/strava/complete': {
+        post: {
+          operationId: 'completeStravaAppSignIn',
+          summary:
+            'Complete a Strava app sign-in and receive a bearer session token',
+          description:
+            'Presents what the Strava app returned (`code`, `scope`, `state`) with the PKCE verifier of the attempt. The attempt is consumed exactly once before Strava is contacted; the server then exchanges the code (the client secret never leaves the server) and returns the same session as the one-time-code exchange. See issue #305.',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': { schema: ref('StravaAppCompleteRequest') },
+            },
+          },
+          responses: {
+            '200': {
+              description: 'The ActivityMap bearer session token',
+              content: {
+                'application/json': { schema: ref('MobileExchangeResponse') },
+              },
+            },
+            '400': errorResponse('The request body is invalid'),
+            '401': errorResponse(
+              'The attempt is unknown, expired or already used, the PKCE verifier does not match, or Strava rejected the code',
+            ),
+            '429': errorResponse('Too many requests; see `Retry-After`'),
+            '502': errorResponse('Strava could not be reached; retry'),
           },
         },
       },

@@ -41,4 +41,15 @@ ACTIVITYMAP_AUTH_CALLBACK_SCHEME = activitymap
 ACTIVITYMAP_AUTH_REDIRECT_URI = $(ACTIVITYMAP_AUTH_CALLBACK_SCHEME):$(SLASH)$(SLASH)auth/callback
 ACTIVITYMAP_AUTH_REDIRECT_URI[sdk=iphoneos*] = https:$(SLASH)$(SLASH)$(ACTIVITYMAP_ASSOCIATED_DOMAIN)/auth/callback
 
+// Return from the installed Strava app (issue #305). Strava opens this URL
+// after the person approves in its app. On a device it is an https universal
+// link (`applinks` in the apple-app-site-association file and the entitlements)
+// on the same domain as the callback above; the simulator never has the Strava
+// app, so it keeps the custom scheme. It must match the server's
+// STRAVA_APP_REDIRECT_URI and sit within the callback domain registered with
+// Strava. The server answers the app's sign-in attempt with the URL to open,
+// so this value only tells the app which incoming URL is the Strava return.
+ACTIVITYMAP_STRAVA_APP_REDIRECT_URI = $(ACTIVITYMAP_AUTH_CALLBACK_SCHEME):$(SLASH)$(SLASH)auth/strava
+ACTIVITYMAP_STRAVA_APP_REDIRECT_URI[sdk=iphoneos*] = https:$(SLASH)$(SLASH)$(ACTIVITYMAP_ASSOCIATED_DOMAIN)/auth/strava
+
 #include? "Local.xcconfig"

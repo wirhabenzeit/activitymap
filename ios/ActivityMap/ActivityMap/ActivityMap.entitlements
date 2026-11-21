@@ -3,11 +3,13 @@
 <plist version="1.0">
 <dict>
 	<!-- webcredentials makes ASWebAuthenticationSession deliver the https
-	     sign-in callback to this app only (issue #482). The domain must also
-	     serve public/.well-known/apple-app-site-association. -->
+	     sign-in callback to this app only (issue #482). applinks lets the
+	     Strava app hand its https return to this app (issue #305). The domain
+	     must also serve public/.well-known/apple-app-site-association. -->
 	<key>com.apple.developer.associated-domains</key>
 	<array>
 		<string>webcredentials:$(ACTIVITYMAP_ASSOCIATED_DOMAIN)</string>
+		<string>applinks:$(ACTIVITYMAP_ASSOCIATED_DOMAIN)</string>
 	</array>
 </dict>
 </plist>

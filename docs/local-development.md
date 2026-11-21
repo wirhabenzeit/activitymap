@@ -27,7 +27,7 @@ A working `.env.development.local` contains:
 | Sign-in (Strava)       | `AUTH_STRAVA_ID`, `AUTH_STRAVA_SECRET`, `BETTER_AUTH_SECRET`, and `BETTER_AUTH_URL`, `PUBLIC_URL`, `NEXT_PUBLIC_APP_URL` all set to `http://localhost:3000` (or whichever port you use)                                                            |
 | Convex bridge          | `ACTIVITYMAP_CONVEX_SITE` (`https://<deployment>.convex.site`), `ACTIVITYMAP_CONVEX_URL` (`.convex.cloud`), `ACTIVITYMAP_CONVEX_KEY_ID`, `ACTIVITYMAP_CONVEX_SIGNING_KEY`, and the `…_WRITER_KEY_ID` / `…_WRITER_SIGNING_KEY` pair                 |
 | Webhooks and cron      | `STRAVA_WEBHOOK_VERIFY_TOKEN`, `STRAVA_WEBHOOK_CALLBACK_SECRET`, `CRON_SECRET`, and `AUTH_STRAVA_*` / `PUBLIC_URL`; all required once external effects are enabled. `ACTIVITYMAP_PROVIDER_GATEWAY_KEYS` additionally turns on the provider gateway |
-| Admin / mobile sign-in | `ACTIVITYMAP_ADMIN_ATHLETE_IDS`, `MOBILE_AUTH_REDIRECT_ALLOWLIST` (optional)                                                                                                                                                                       |
+| Admin / mobile sign-in | `ACTIVITYMAP_ADMIN_ATHLETE_IDS`, `MOBILE_AUTH_REDIRECT_ALLOWLIST`, `STRAVA_APP_REDIRECT_URI` (both optional)                                                                                                                                       |
 
 `ACTIVITYMAP_EXTERNAL_EFFECTS=enabled` switches on webhooks, cron and the
 provider gateway, and then makes the webhook/cron secrets mandatory. Leave it
