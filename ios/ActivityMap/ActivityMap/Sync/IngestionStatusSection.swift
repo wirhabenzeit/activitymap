@@ -28,11 +28,8 @@ struct IngestionStatusSection: View {
                         }
                     }
                 }.disabled(!stravaImport.canStart(session))
-                Text(AppMessages.statusBrowsingFetchRecentActivitiesMissingDetailsAndPhotosAndMore(locale: locale))
-                    .font(.footnote).foregroundStyle(.secondary)
-                if let message = stravaImport.message(locale: locale) ?? stravaImport.progressMessage(locale: locale) {
+                if let message = stravaImport.message(locale: locale) ?? stravaImport.noticeMessage(locale: locale) {
                     Text(verbatim: message).font(.footnote).foregroundStyle(.secondary)
-                        .accessibilityAddTraits(.updatesFrequently)
                 }
                 if stravaImport.retryAt > Date() {
                     Text(AppMessages.mutationRetryAfter(stravaImport.retryAt.formatted(date: .abbreviated, time: .shortened), locale: locale))
@@ -68,9 +65,6 @@ struct IngestionStatusSection: View {
             Text(AppMessages.statusBrowsingStravaImportStatus(locale: locale))
         } footer: {
             VStack(alignment: .leading, spacing: 3) {
-                if snapshot != nil {
-                    Text(AppMessages.statusBrowsingFetchedForImportedActivitiesPhotosCountOnlyActivitiesWith(locale: locale))
-                }
                 if stale, let snapshot {
                     Text(session.verified ? AppMessages.statusBrowsingLastKnown(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened), locale: locale) : AppMessages.statusBrowsingOfflineLastKnown(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened), locale: locale))
                 }

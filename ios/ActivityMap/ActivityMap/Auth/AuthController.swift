@@ -85,7 +85,7 @@ final class AuthController: NSObject {
     private var revision = 0
     private var restoringToken: String?
     var isRestoringSession: Bool { restoringToken != nil }
-    private var signingOut = false
+    private(set) var signingOut = false
     private(set) var deletingAccount = false
 
     override init() {

@@ -104,6 +104,18 @@ final class StravaImportController {
     private func key(_ scope: StoreScope) -> String { "strava-import.retry.v1." + scope.key }
 
     var progressMessage: String? { progressMessage(locale: .current) }
+    /// Only states that need attention get a line in Settings. A running or
+    /// finished fetch is shown by the button spinner and the coverage rows, so
+    /// routine progress never adds or removes a row while the sheet is open.
+    func noticeMessage(locale: Locale) -> String? {
+        guard let run = snapshot else { return nil }
+        switch run.status {
+        case .idle, .running, .succeeded: return nil
+        case .deferred where run.reason != .rateLimit && run.reason != .busy: return nil
+        default: return progressMessage(locale: locale)
+        }
+    }
+
     func progressMessage(locale: Locale) -> String? {
         guard let run = snapshot else { return nil }
         if run.status == .idle { return nil }
