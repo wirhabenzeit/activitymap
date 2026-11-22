@@ -23,6 +23,12 @@ struct AccountSheet: View {
     @State private var deletionError: PresentationText?
     @State private var accountDeleted = false
     @State private var clearingDeletedData = false
+    /// Sign-out clears the user immediately to stop sync, but the request to
+    /// revoke the session takes a moment. Settings keeps rendering the sections
+    /// from this snapshot until the result arrives, so the whole sheet changes
+    /// once instead of collapsing in stages.
+    @State private var lastSession: SyncSession?
+    @State private var lastSyncAt: Date?
 
     var body: some View {
         NavigationStack {
@@ -72,6 +78,12 @@ struct AccountSheet: View {
                 await stravaImport.observe(session)
             }
         }
+        .onChange(of: syncSession, initial: true) { _, session in
+            if let session { lastSession = session }
+        }
+        .onChange(of: sync?.lastSyncAt, initial: true) { _, date in
+            if let date { lastSyncAt = date }
+        }
         .onChange(of: stravaImport.snapshot) { _, snapshot in
             guard snapshot?.runID != nil, let session = syncSession,
                   stravaImport.scope == session.scope else { return }
@@ -80,6 +92,10 @@ struct AccountSheet: View {
     }
 
     private var syncSession: SyncSession? { sync?.session ?? auth.syncSession }
+    /// Rendering only: never used to start requests.
+    private var displayedSession: SyncSession? {
+        syncSession ?? (auth.signingOut ? lastSession : nil)
+    }
     private struct StatusObservation: Equatable { let session: SyncSession?; let active: Bool }
     private var importNeedsReconnect: Bool {
         guard let session = syncSession else { return false }
@@ -203,23 +219,28 @@ struct AccountSheet: View {
             }
 
             Section {
-                Button(String(localized: AppMessages.accountSignOut(locale: locale)), role: .destructive) {
+                Button(role: .destructive) {
                     Task { await auth.signOut() }
+                } label: {
+                    HStack {
+                        Text(auth.signingOut ? String(localized: AppMessages.accountSigningOut(locale: locale))
+                             : String(localized: AppMessages.accountSignOut(locale: locale)))
+                        if auth.signingOut {
+                            Spacer()
+                            ProgressView()
+                        }
+                    }
                 }
                 .accessibilityIdentifier("account-sign-out")
-                .disabled(auth.deletingAccount)
-            } footer: {
-                Text(String(localized: AppMessages.accountStravaStaysConnected(locale: locale)))
+                .disabled(auth.deletingAccount || auth.signingOut)
             }
 
             Section {
                 Button(auth.deletingAccount ? String(localized: AppMessages.accountDeleting(locale: locale)) : String(localized: AppMessages.accountDelete(locale: locale)), role: .destructive) {
                     confirmDeletion = true
                 }
-                .disabled(auth.deletingAccount)
+                .disabled(auth.deletingAccount || auth.signingOut)
                 .accessibilityIdentifier("account-delete")
-            } footer: {
-                Text(String(localized: AppMessages.accountNativePermanentlyDeleteYourActivityMapAccountImportedActivitiesPhotos(locale: locale)))
             }
 
         }
@@ -299,8 +320,9 @@ struct AccountSheet: View {
         @Bindable var preferences = preferences
         return Group {
             syncContent
-            if let session = syncSession {
+            if let session = displayedSession {
                 IngestionStatusSection(session: session, controller: ingestionStatus, stravaImport: stravaImport)
+                    .disabled(auth.signingOut)
             }
 
             accountContent
@@ -321,9 +343,7 @@ struct AccountSheet: View {
                         Text(verbatim: appearance.title(locale: locale)).tag(appearance)
                     }
                 }
-            } header: { Text(String(localized: AppMessages.settingsDisplay(locale: locale))) } footer: {
-                Text(preferences.units == .metric ? AppMessages.displayMetricExplanation(locale: locale) : AppMessages.displayImperialExplanation(locale: locale))
-            }
+            } header: { Text(String(localized: AppMessages.settingsDisplay(locale: locale))) }
             Section(String(localized: AppMessages.settingsAbout(locale: locale))) {
                 NavigationLink(String(localized: AppMessages.accountNativeAboutActivityMap(locale: locale))) { aboutPage }
                     .accessibilityIdentifier("settings-about")
@@ -335,14 +355,21 @@ struct AccountSheet: View {
     private var syncContent: some View {
         if let sync {
             Section(String(localized: AppMessages.settingsSyncData(locale: locale))) {
-                LabeledContent(String(localized: AppMessages.accountNativeLastDeviceSync(locale: locale)), value: sync.lastSyncAt?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: AppMessages.settingsNotSynced(locale: locale)))
-                if let refresh, sync.session != nil {
+                // Syncing swaps the date for a spinner in place; it never adds a row.
+                LabeledContent(String(localized: AppMessages.accountNativeLastDeviceSync(locale: locale))) {
+                    if sync.status == .syncing {
+                        ProgressView()
+                    } else {
+                        Text(verbatim: (sync.lastSyncAt ?? (auth.signingOut ? lastSyncAt : nil))?.formatted(date: .abbreviated, time: .shortened) ?? String(localized: AppMessages.settingsNotSynced(locale: locale)))
+                    }
+                }
+                if let refresh, sync.session != nil || auth.signingOut {
                     Button {
                         Task { await refresh() }
                     } label: {
                         Label(String(localized: AppMessages.settingsSyncNow(locale: locale)), systemImage: "arrow.clockwise")
                     }
-                        .disabled(!sync.canRefresh)
+                        .disabled(!sync.canRefresh || auth.signingOut)
                 }
                 if let syncMessage {
                     Text(syncMessage).font(.footnote).foregroundStyle(.secondary)
@@ -356,9 +383,10 @@ struct AccountSheet: View {
     }
 
     private var syncMessage: String? {
-        switch sync?.status {
+        if auth.signingOut { return nil }
+        return switch sync?.status {
         case .signedOut: String(localized: AppMessages.settingsSignInToSync(locale: locale))
-        case .syncing: "Syncing…"
+        case .syncing: nil
         case .offline: String(localized: AppMessages.settingsOfflineSync(locale: locale))
         case .failed: String(localized: AppMessages.settingsSyncError(locale: locale))
         case .paused: String(localized: AppMessages.accountNativeSyncPausedTapSyncNowToResume(locale: locale))
