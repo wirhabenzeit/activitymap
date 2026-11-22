@@ -866,9 +866,6 @@ nonisolated enum AppMessages {
     static func statusBrowsingSignInAgainFromAccountToCheckStatus(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("status.browsing.signInAgainFromAccountToCheckStatus", defaultValue: "Sign in again from Account to check status.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
     }
-    static func statusBrowsingFetchFromStrava(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.browsing.fetchFromStrava", defaultValue: "Fetch from Strava", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
-    }
     static func statusBrowsingStravaImportStatus(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("status.browsing.stravaImportStatus", defaultValue: "Strava import status", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
     }
@@ -878,14 +875,8 @@ nonisolated enum AppMessages {
     static func statusBrowsingCheckingYourImport(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("status.browsing.checkingYourImport", defaultValue: "Checking your import…", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
     }
-    static func statusBrowsingFetchingFromStrava(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.browsing.fetchingFromStrava", defaultValue: "Fetching from Strava", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
-    }
     static func statusBrowsingFetchedForImportedActivitiesPhotosCountOnlyActivitiesWith(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("status.browsing.fetchedForImportedActivitiesPhotosCountOnlyActivitiesWith", defaultValue: "Fetched for imported activities. Photos count only activities with photos.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
-    }
-    static func statusBrowsingFetchRecentActivitiesMissingDetailsAndPhotosAndMore(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.browsing.fetchRecentActivitiesMissingDetailsAndPhotosAndMore", defaultValue: "Fetch recent activities, missing details and photos, and more history in the background.", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
     }
     static func statusBrowsingAllActivitiesImported(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("status.browsing.allActivitiesImported", defaultValue: "All activities imported", table: "Presentation", locale: locale, comment: "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.")
@@ -1154,6 +1145,33 @@ nonisolated enum AppMessages {
     static func settingsRetryAfter(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("settings.retryAfter", defaultValue: "Try again after \(time).", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
     }
+    static func settingsCheckStrava(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStrava", defaultValue: "Check Strava for missing activities", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
+    static func settingsCheckStravaExplanation(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStravaExplanation", defaultValue: "Looks through your Strava activity list in the background and adds anything missing or changed. A large history can take a while; you can close Settings meanwhile.", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
+    static func settingsCheckStravaRequested(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStrava.requested", defaultValue: "Check requested. Missing activities appear as they are found.", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
+    static func settingsCheckStravaScanning(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStrava.scanning", defaultValue: "Checking your Strava activity list… Started \(time).", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
+    static func settingsCheckStravaConfirming(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStrava.confirming", defaultValue: "Activity list checked \(time). Remaining details are fetched in the background.", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
+    static func settingsCheckStravaWaiting(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStrava.waiting", defaultValue: "Strava’s request limit was reached. The check continues after \(time).", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
+    static func settingsCheckStravaLastChecked(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStrava.lastChecked", defaultValue: "Last checked \(time).", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
+    static func settingsCheckStravaRecent(_ time: String, locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStrava.recent", defaultValue: "Strava was checked recently. You can check again after \(time).", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
+    static func settingsCheckStravaFailed(locale: Locale = .current) -> LocalizedStringResource {
+        LocalizedStringResource("settings.checkStrava.failed", defaultValue: "Could not request a Strava check. Please try again later.", table: "Presentation", locale: locale, comment: "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.")
+    }
     static func settingsTagline(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("settings.tagline", defaultValue: "Your activities, on a map and beyond.", table: "Presentation", locale: locale, comment: "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.")
     }
@@ -1325,50 +1343,11 @@ nonisolated enum AppMessages {
     static func errorImportStatusSignInAgainToCheckServerImportStatus(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("error.importStatus.signInAgainToCheckServerImportStatus", defaultValue: "Sign in again to check server import status.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
     }
-    static func errorStravaImportFetchingPausedWhileTheServiceIsBusyPlease(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("error.stravaImport.fetchingPausedWhileTheServiceIsBusyPlease", defaultValue: "Fetching paused while the service is busy. Please try again when available.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
-    }
-    static func errorStravaImportReconnectStravaFromAccountToContinueFetching(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("error.stravaImport.reconnectStravaFromAccountToContinueFetching", defaultValue: "Reconnect Strava from Account to continue fetching.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
-    }
-    static func errorStravaImportCouldNotCheckTheStravaFetchPleaseTry(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("error.stravaImport.couldNotCheckTheStravaFetchPleaseTry", defaultValue: "Could not check the Strava fetch. Please try again later.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
-    }
-    static func errorStravaImportSignInAgainToFetchFromStrava(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("error.stravaImport.signInAgainToFetchFromStrava", defaultValue: "Sign in again to fetch from Strava.", table: "Presentation", locale: locale, comment: "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.")
-    }
     static func errorEditServerReconciliation(_ reason: String, locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("error.edit.serverReconciliation", defaultValue: "\(reason) Close this editor and sync before editing again.", table: "Presentation", locale: locale, comment: "Server error plus a complete local recovery instruction. Server reason is verbatim; do not retry an uncertain write.")
     }
-    static func statusStravaImportRunning(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.stravaImport.running", defaultValue: "Fetching from Strava in the background… Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
-    }
-    static func statusStravaImportInterrupted(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.stravaImport.interrupted", defaultValue: "The fetch was interrupted. Saved progress is kept; try again when available. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
-    }
-    static func statusStravaImportRateLimited(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.stravaImport.rateLimited", defaultValue: "Strava’s request limit was reached. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
-    }
-    static func statusStravaImportFailed(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.stravaImport.failed", defaultValue: "Could not finish fetching. Saved progress is kept. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
-    }
-    static func statusStravaImportDeferred(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.stravaImport.deferred", defaultValue: "This fetch has paused. You can continue with another fetch when available. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
-    }
-    static func statusStravaImportFinished(_ summaries: Int, _ details: Int, _ photos: Int, locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("status.stravaImport.finished", defaultValue: "Fetch finished. Summaries fetched: \(summaries) · Activities updated: \(details) · Photos fetched: \(photos).", table: "Presentation", locale: locale, comment: "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.")
-    }
     static func activityEditSaveNative(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("activity.edit.saveNative", defaultValue: "Save", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
-    }
-    static func errorStravaImportCheckFailed(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("error.stravaImport.checkFailed", defaultValue: "Could not check the Strava fetch. Please try again later.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
-    }
-    static func errorStravaImportWaitCheck(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("error.stravaImport.waitCheck", defaultValue: "Please wait before checking again.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
-    }
-    static func errorStravaImportWaitStart(locale: Locale = .current) -> LocalizedStringResource {
-        LocalizedStringResource("error.stravaImport.waitStart", defaultValue: "Please wait before trying again.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")
     }
     static func errorFirstSummaryConnection(locale: Locale = .current) -> LocalizedStringResource {
         LocalizedStringResource("error.firstSummary.connection", defaultValue: "Could not connect to ActivityMap. Check your connection and try again.", table: "Presentation", locale: locale, comment: "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.")

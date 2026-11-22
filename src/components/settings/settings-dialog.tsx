@@ -1,7 +1,8 @@
 'use client';
 
-import { CircleArrowDown, LoaderCircle, RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { CircleArrowDown, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   AppDialogBody,
@@ -19,7 +20,6 @@ import { Dialog, DialogDescription, DialogTitle } from '~/components/ui/dialog';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '~/components/ui/tabs';
 import { useFormattingLocale } from '~/hooks/use-display-preferences';
 import { useIngestionStatus } from '~/hooks/use-ingestion-status';
-import { useStravaImport } from '~/hooks/use-strava-import';
 import {
   clearDeletedAccountData,
   clearLocalAccountData,
@@ -32,7 +32,11 @@ import {
   coverageProgress,
   snapshotIsStale,
 } from '~/lib/ingestion/presentation';
-import { stravaImportMessage } from '~/lib/ingestion/strava-import';
+import {
+  type StravaCheckRequest,
+  requestStravaCheck,
+  stravaCheckView,
+} from '~/lib/ingestion/strava-check';
 import { LEGAL_PATHS } from '~/lib/legal';
 import { message } from '~/lib/presentation/messages';
 import {
@@ -75,7 +79,12 @@ export function SettingsDialog({
     userId,
     open && (tab === 'sync' || tab === 'account'),
   );
-  const manualImport = useStravaImport(userId, open && tab === 'sync');
+  const client = useQueryClient();
+  const [check, setCheck] = useState<{
+    owner: string;
+    request: StravaCheckRequest;
+  } | null>(null);
+  const [checking, setChecking] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutFailed, setSignOutFailed] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
@@ -148,12 +157,42 @@ export function SettingsDialog({
     userId && user?.stravaConnected
       ? stravaPermissionNotes(user.stravaPermissions)
       : [];
-  const manualNeedsReconnect = manualImport.data?.status === 'blocked';
-  const showConnect =
-    !userId ||
-    !!needsReconnect ||
-    manualNeedsReconnect ||
-    permissionNotes.length > 0;
+  const showConnect = !userId || !!needsReconnect || permissionNotes.length > 0;
+  const stravaCheck = stravaCheckView(
+    status,
+    check && check.owner === userId ? check.request : null,
+    clock,
+    date,
+    locale,
+  );
+  const handleCheckStrava = async () => {
+    if (!userId) return;
+    const owner = userId;
+    setChecking(true);
+    try {
+      const request = await requestStravaCheck();
+      if (useShallowStore.getState().user?.id !== owner) return;
+      setCheck({ owner, request });
+      void client.invalidateQueries({ queryKey: ['ingestion-status', owner] });
+    } finally {
+      setChecking(false);
+    }
+  };
+  // Activities a check finds reach this browser with its next sync; ask for
+  // one when the account's count grows while Settings shows it.
+  const knownCount = status?.history.knownActivityCount;
+  const seenCount = useRef<{ owner?: string; count?: number }>({});
+  useEffect(() => {
+    if (!userId || knownCount === undefined) return;
+    const seen = seenCount.current;
+    seenCount.current = { owner: userId, count: knownCount };
+    if (
+      seen.owner === userId &&
+      seen.count !== undefined &&
+      knownCount > seen.count
+    )
+      requestBrowserSync();
+  }, [userId, knownCount]);
   const email = userId ? displayEmail(user?.email) : null;
 
   const handleSignOut = async () => {
@@ -339,58 +378,23 @@ export function SettingsDialog({
                     <Button
                       variant="outline"
                       className="min-h-11"
-                      onClick={manualImport.start}
+                      onClick={handleCheckStrava}
                       disabled={
-                        !userId ||
-                        offline ||
-                        !!needsReconnect ||
-                        manualImport.starting ||
-                        !manualImport.data?.available ||
-                        manualImport.data.status === 'running' ||
-                        clock < manualImport.retryAt
+                        !userId || offline || checking || stravaCheck.disabled
                       }
                     >
-                      {manualImport.starting ||
-                      manualImport.data?.status === 'running' ? (
-                        <LoaderCircle
-                          aria-hidden="true"
-                          className="animate-spin"
-                        />
-                      ) : (
-                        <CircleArrowDown aria-hidden="true" />
-                      )}
-                      {message('status.browsing.fetchFromStrava')}
+                      <CircleArrowDown aria-hidden="true" />
+                      {message('settings.checkStrava')}
                     </Button>
                     <p className="text-xs text-muted-foreground">
-                      {message(
-                        'status.browsing.fetchRecentActivitiesMissingDetailsAndPhotosAndMore',
-                      )}
+                      {message('settings.checkStravaExplanation')}
                     </p>
-                    {(!!manualImport.startError || manualImport.isError) && (
+                    {userId && stravaCheck.message && (
                       <p
                         role="status"
                         className="text-xs text-muted-foreground"
                       >
-                        {manualImport.startError?.message ??
-                          message('error.stravaImport.checkFailed')}
-                      </p>
-                    )}
-                    {manualImport.data &&
-                      stravaImportMessage(manualImport.data, locale) && (
-                        <p
-                          role="status"
-                          className="text-xs text-muted-foreground"
-                        >
-                          {stravaImportMessage(manualImport.data, locale)}
-                        </p>
-                      )}
-                    {clock < manualImport.retryAt && (
-                      <p className="text-xs text-muted-foreground">
-                        {message('settings.retryAfter', {
-                          time: date(
-                            new Date(manualImport.retryAt).toISOString(),
-                          ),
-                        })}
+                        {stravaCheck.message}
                       </p>
                     )}
                   </div>
@@ -543,7 +547,7 @@ export function SettingsDialog({
                         {permissionNotes.join(' ')}{' '}
                         {STRAVA_PERMISSIONS_RECONNECT}
                       </p>
-                    ) : needsReconnect || manualNeedsReconnect ? (
+                    ) : needsReconnect ? (
                       <p className="text-xs text-muted-foreground">
                         {message('account.reconnect')}
                       </p>

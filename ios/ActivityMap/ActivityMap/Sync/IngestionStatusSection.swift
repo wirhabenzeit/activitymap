@@ -4,7 +4,9 @@ struct IngestionStatusSection: View {
     @Environment(\.locale) private var locale
     let session: SyncSession
     let controller: IngestionStatusController
-    var stravaImport: StravaImportController? = nil
+    /// The answer to a Strava check asked for while Settings is open.
+    @State private var check: (scope: StoreScope, request: StravaCheck.Request)?
+    @State private var checking = false
 
     private var snapshot: ActivityMapAPI.IngestionStatus? {
         controller.scope == session.scope ? controller.snapshot : nil
@@ -14,27 +16,21 @@ struct IngestionStatusSection: View {
             || snapshot.map { IngestionPresentation.stale($0, now: Date()) } == true
     }
 
+    private var checkView: StravaCheck.View {
+        StravaCheck.view(snapshot, request: check.flatMap { $0.scope == session.scope ? $0.request : nil },
+                         now: Date(), locale: locale)
+    }
+
     var body: some View {
         Section {
-            if let stravaImport, stravaImport.scope == session.scope {
-                Button {
-                    Task { await stravaImport.start(session) }
-                } label: {
-                    HStack {
-                        Label { Text(AppMessages.statusBrowsingFetchFromStrava(locale: locale)) } icon: { Image(systemName: "arrow.down.circle") }
-                        if stravaImport.isStarting || stravaImport.snapshot?.status == .running {
-                            Spacer()
-                            ProgressView().accessibilityLabel(Text(AppMessages.statusBrowsingFetchingFromStrava(locale: locale)))
-                        }
-                    }
-                }.disabled(!stravaImport.canStart(session))
-                if let message = stravaImport.message(locale: locale) ?? stravaImport.noticeMessage(locale: locale) {
-                    Text(verbatim: message).font(.footnote).foregroundStyle(.secondary)
-                }
-                if stravaImport.retryAt > Date() {
-                    Text(AppMessages.mutationRetryAfter(stravaImport.retryAt.formatted(date: .abbreviated, time: .shortened), locale: locale))
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
+            Button {
+                Task { await requestCheck() }
+            } label: {
+                Label { Text(AppMessages.settingsCheckStrava(locale: locale)) } icon: { Image(systemName: "arrow.down.circle") }
+            }
+            .disabled(!session.verified || checking || checkView.disabled)
+            if let message = checkView.message {
+                Text(verbatim: message).font(.footnote).foregroundStyle(.secondary)
             }
             if let snapshot {
                 LabeledContent(String(localized: AppMessages.statusBrowsingAllActivitiesImported(locale: locale)), value: snapshot.history.progress == .complete ? String(localized: AppMessages.valueYes(locale: locale))
@@ -65,6 +61,7 @@ struct IngestionStatusSection: View {
             Text(AppMessages.statusBrowsingStravaImportStatus(locale: locale))
         } footer: {
             VStack(alignment: .leading, spacing: 3) {
+                Text(AppMessages.settingsCheckStravaExplanation(locale: locale))
                 if stale, let snapshot {
                     Text(session.verified ? AppMessages.statusBrowsingLastKnown(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened), locale: locale) : AppMessages.statusBrowsingOfflineLastKnown(snapshot.observedAt.formatted(date: .abbreviated, time: .shortened), locale: locale))
                 }
@@ -73,6 +70,18 @@ struct IngestionStatusSection: View {
                 }
             }
         }
+    }
+}
+
+extension IngestionStatusSection {
+    private func requestCheck() async {
+        let scope = session.scope
+        checking = true
+        defer { checking = false }
+        let request = await StravaCheck.request(session)
+        guard controller.scope == scope else { return }
+        check = (scope, request)
+        await controller.refreshNow(session)
     }
 }
 

@@ -84,7 +84,6 @@ export function OfflineSyncProvider() {
               'first-summary-fetch',
               'first-summary-import',
               'ingestion-status',
-              'strava-import',
             ].includes(String(query.queryKey[0])) &&
             query.queryKey[1] === departingUserId,
         };

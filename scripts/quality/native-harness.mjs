@@ -57,7 +57,6 @@ export const nativeSuites = [
   'ActivityMapTests/SyncControllerTests',
   'ActivityMapTests/NativeSyncTests',
   'ActivityMapTests/IngestionStatusTests',
-  'ActivityMapTests/StravaImportTests',
   'ActivityMapTests/StreamsAPITests',
   'ActivityMapTests/ActivityPlacesTests',
   'ActivityMapTests/PlaceLibraryTests',

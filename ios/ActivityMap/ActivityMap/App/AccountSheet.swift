@@ -11,7 +11,6 @@ struct AccountSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var ingestionStatus = IngestionStatusController()
-    @State private var stravaImport = StravaImportController()
     @Environment(DisplayPreferences.self) private var injectedPreferences: DisplayPreferences?
     @State private var previewPreferences = DisplayPreferences(defaults: nil)
     private var preferences: DisplayPreferences { injectedPreferences ?? previewPreferences }
@@ -73,21 +72,18 @@ struct AccountSheet: View {
                 await ingestionStatus.observe(session)
             }
         }
-        .task(id: StatusObservation(session: syncSession, active: scenePhase == .active)) {
-            if destination == .settings, scenePhase == .active, let session = syncSession {
-                await stravaImport.observe(session)
-            }
+        // Activities a Strava check finds reach the device with its next sync;
+        // ask for one when the account's count grows while Settings shows it.
+        .onChange(of: ingestionStatus.snapshot?.history.knownActivityCount) { old, new in
+            guard let old, let new, new > old, let session = syncSession,
+                  ingestionStatus.scope == session.scope else { return }
+            Task { await refresh?() }
         }
         .onChange(of: syncSession, initial: true) { _, session in
             if let session { lastSession = session }
         }
         .onChange(of: sync?.lastSyncAt, initial: true) { _, date in
             if let date { lastSyncAt = date }
-        }
-        .onChange(of: stravaImport.snapshot) { _, snapshot in
-            guard snapshot?.runID != nil, let session = syncSession,
-                  stravaImport.scope == session.scope else { return }
-            Task { await refresh?() }
         }
     }
 
@@ -99,7 +95,6 @@ struct AccountSheet: View {
     private struct StatusObservation: Equatable { let session: SyncSession?; let active: Bool }
     private var importNeedsReconnect: Bool {
         guard let session = syncSession else { return false }
-        if stravaImport.scope == session.scope, stravaImport.snapshot?.status == .blocked { return true }
         guard ingestionStatus.scope == session.scope, let status = ingestionStatus.snapshot else { return false }
         return status.history.scheduling == .blocked || status.details.scheduling == .blocked
             || status.photos.scheduling == .blocked || status.streams.scheduling == .blocked
@@ -321,7 +316,7 @@ struct AccountSheet: View {
         return Group {
             syncContent
             if let session = displayedSession {
-                IngestionStatusSection(session: session, controller: ingestionStatus, stravaImport: stravaImport)
+                IngestionStatusSection(session: session, controller: ingestionStatus)
                     .disabled(auth.signingOut)
             }
 

@@ -59,6 +59,33 @@ void test('the import status is the reconciliation sweep, in the command’s ter
     ).status,
     'running',
   );
+  // Between two confirm batches: neither running nor finished.
+  const between = importStatusFromSweep(
+    {
+      ...sweep,
+      phase: 'confirming',
+      running: false,
+      scanStartedAt: Date.parse('2026-11-17T10:00:00Z'),
+      dueAt: Date.parse('2026-11-17T11:00:00Z'),
+      completedAt: Date.parse('2026-11-11T10:00:00Z'),
+    },
+    true,
+  );
+  assert.deepEqual(
+    [between.status, between.reason, between.retryAt, between.finishedAt],
+    ['deferred', null, '2026-11-17T11:00:00.000Z', null],
+  );
+
+  // Finished within the hour: the next request is not accepted before then.
+  const recent = importStatusFromSweep(
+    { ...sweep, requestableAt: Date.parse('2026-11-11T11:00:00Z') },
+    true,
+  );
+  assert.deepEqual(
+    [recent.status, recent.retryAt],
+    ['succeeded', '2026-11-11T11:00:00.000Z'],
+  );
+  assert.equal(finished.retryAt, null);
 
   // Waiting between two runs: for the rate limit, or after another failure.
   const limited = importStatusFromSweep(

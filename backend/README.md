@@ -391,7 +391,7 @@ Convex in one signed write (`applyActivity` on the write bridge,
 - While the account is in `handoff`, both routes answer 503 and ask to try
   again: nobody could record the result.
 
-### Sync status and "Fetch from Strava"
+### Sync status and "Check Strava for missing activities"
 
 `GET /api/v1/ingestion-status` is built from Convex: one read of the counts kept with every write
 (`sync.read` operation `statusSummary`, `convex/stats.ts`) plus the sweep's
@@ -399,9 +399,11 @@ state, with the library walked page by page only while those counts are
 being rebuilt. Outstanding details, photos and recordings are reported as
 scheduled, since the sweep fetches them.
 
-"Fetch from Strava" (`/api/v1/strava-import`) starts the reconciliation sweep now (`sweepNow`), unless
-one is under way or finished within the last five minutes, and its status is
-the sweep's (`src/server/application/convex-import.ts`).
+"Check Strava for missing activities" in Settings (`POST /api/v1/strava-import`)
+starts the reconciliation sweep now (`sweepNow` with `explicit`), unless one is
+under way, already due, or finished within the last hour; its status is the
+sweep's (`src/server/application/convex-import.ts`). The first fetch after
+sign-up uses the same operation with a five-minute limit.
 
 ### Share links and export
 

@@ -29,11 +29,13 @@ export default function SupportPage() {
       <h2>Common questions</h2>
       <h3>My activities are missing or out of date</h3>
       <p>
-        Open Settings and choose <strong>Fetch from Strava</strong>. New
-        activities normally arrive within minutes; a first import of a large
-        history can take a while because Strava limits how fast we may request
-        data. If sync says Strava is disconnected, sign out and connect again
-        from the Account section of Settings.
+        New activities normally arrive from Strava within minutes; a first
+        import of a large history can take a while because Strava limits how
+        fast we may request data. If an activity is still missing, open Settings
+        and choose <strong>Check Strava for missing activities</strong>; to
+        update a single activity, refresh it from its detail view. If sync says
+        Strava is disconnected, sign out and connect again from the Account
+        section of Settings.
       </p>
       <h3>I cannot sign in</h3>
       <p>
