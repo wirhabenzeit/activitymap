@@ -5,8 +5,8 @@ import type { StoredStreamSummary } from '../../src/lib/streams/compact-summary'
 import { internalMutation, internalQuery } from './_generated/server';
 import { activityFor } from './activityWrites';
 import { currentRecording, project } from './liveProjection';
-import { scopeFields } from './ownerScope';
-import { idKey, requireWritableOwner } from './owners';
+import { actorFields, scopeFields } from './ownerScope';
+import { idKey, ownerFor, requireWritableOwner } from './owners';
 
 /**
  * Private share links for an account Convex writes for. A link is a hashed
@@ -110,6 +110,31 @@ export const revoke = internalMutation({
     if (link.revokedAt === undefined)
       await ctx.db.patch('shareLinks', link._id, { revokedAt: Date.now() });
     return true;
+  },
+});
+
+/** Revoke every active share link of an owner (for example when the athlete
+ * deauthorizes Strava). Durable so re-signing in never revives old links;
+ * idempotent and harmless for an owner with no Convex library yet. */
+export const revokeAll = internalMutation({
+  args: actorFields,
+  handler: async (ctx, { userId, athleteId }): Promise<number> => {
+    const owner = await ownerFor(ctx, userId);
+    if (!owner) return 0;
+    if (owner.athleteId !== athleteId)
+      throw new Error('The owner belongs to another athlete');
+    const now = Date.now();
+    let revoked = 0;
+    for (const link of await ctx.db
+      .query('shareLinks')
+      .withIndex('by_owner', (q) => q.eq('owner', owner._id))
+      .collect()) {
+      if (link.revokedAt === undefined) {
+        await ctx.db.patch('shareLinks', link._id, { revokedAt: now });
+        revoked++;
+      }
+    }
+    return revoked;
   },
 });
 

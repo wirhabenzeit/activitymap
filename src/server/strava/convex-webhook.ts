@@ -7,6 +7,7 @@ import {
 import { eraseLibraryInConvex } from '~/server/library/erase';
 import { logger } from '~/server/logging/logger';
 import { sendEventToConvex } from '~/server/sync/convex-events';
+import { revokeAllSharesInConvex } from '~/server/sync/convex-shares';
 import type { WebhookRequest } from '~/types/strava';
 
 /**
@@ -15,7 +16,8 @@ import type { WebhookRequest } from '~/types/strava';
  * event is recorded in Convex before Strava is answered, so an event Convex
  * could not take is answered with an error and Strava delivers it again;
  * the reconciliation sweep finds what is still missed. A deauthorization
- * removes the athlete's tokens and schedules the account's erasure.
+ * removes the athlete's tokens, revokes their share links, and schedules the
+ * account's erasure.
  */
 
 /** How long after access is withdrawn the account is erased. */
@@ -39,6 +41,7 @@ function deliveryId(data: WebhookRequest) {
 export type ConvexWebhookDeps = {
   records?: ConvexAuthRecords;
   send?: typeof sendEventToConvex;
+  revokeShares?: typeof revokeAllSharesInConvex;
   now?: () => Date;
 };
 
@@ -61,6 +64,13 @@ export async function handleWebhookOnConvex(
       now,
       new Date(now.getTime() + ERASURE_WINDOW_MS),
     );
+    // Durably revoke share links even on a repeat delivery, so a retry after
+    // a transient Convex error still invalidates them and a later re-sign-in
+    // cannot revive pre-deauthorization links (#481).
+    await (deps.revokeShares ?? revokeAllSharesInConvex)({
+      userId: account.userId,
+      athleteId: data.owner_id,
+    });
     return revoked ? 'revoked' : 'ignored';
   }
 

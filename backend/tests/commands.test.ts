@@ -41,6 +41,7 @@ import { convexActivityCommands } from '../../src/server/sync/convex-commands';
 import {
   convexShareLinks,
   convexShareView,
+  revokeAllSharesInConvex,
 } from '../../src/server/sync/convex-shares';
 import { convexWriteBridge } from '../../src/server/sync/convex-writer';
 import { api, internal } from '../convex/_generated/api';
@@ -754,6 +755,65 @@ void test('share links of an account Convex writes for are made, shown and revok
     ShareLinkUnavailableError,
   );
   clock += 1;
+});
+
+void test('deauthorization durably revokes share links so re-sign-in cannot revive them (#481)', async (t) => {
+  const { convex, seed } = await setup(t, 'convex');
+  const fetcher: typeof fetch = (url, init) =>
+    convex.fetch(new URL(String(url)).pathname, init);
+  await seed(manual(7, 'Shared ride'));
+  let accountRevoked = false;
+  const deps: ShareLinksServiceDeps = {
+    isAthleteRevoked: async () => accountRevoked,
+    links: (owner) => convexShareLinks(owner, fetcher),
+    view: (tokenHash) => convexShareView(tokenHash, fetcher),
+  };
+  const hour = 60 * 60_000;
+
+  const first = await createShareLinkForActor(
+    actor,
+    { activityIds: [7], expiresInMs: hour },
+    deps,
+  );
+  const second = await createShareLinkForActor(
+    actor,
+    { activityIds: [7], expiresInMs: hour },
+    deps,
+  );
+  assert.equal((await getShareView(first.token, deps)).activities.length, 1);
+
+  // Deauthorization marks the account revoked and durably revokes all shares.
+  accountRevoked = true;
+  assert.equal(await revokeAllSharesInConvex(actor, fetcher), 2);
+  // Repeating the revocation is a no-op and preserves the original timestamps.
+  assert.equal(await revokeAllSharesInConvex(actor, fetcher), 0);
+
+  // Athlete re-signs in within the 30-day window (revokedAt cleared on account).
+  accountRevoked = false;
+  for (const link of [first, second]) {
+    await assert.rejects(
+      getShareView(link.token, deps),
+      ShareLinkUnavailableError,
+    );
+  }
+  assert.deepEqual(
+    (await listShareLinksForActor(actor, deps)).map((item) => item.status),
+    ['revoked', 'revoked'],
+  );
+
+  // A new link created after re-sign-in works normally.
+  const fresh = await createShareLinkForActor(
+    actor,
+    { activityIds: [7], expiresInMs: hour },
+    deps,
+  );
+  assert.equal((await getShareView(fresh.token, deps)).activities.length, 1);
+
+  // Unknown owners (e.g. never provisioned a Convex library) are harmless.
+  assert.equal(
+    await revokeAllSharesInConvex({ userId: 'nobody', athleteId: 99 }, fetcher),
+    0,
+  );
 });
 
 void test('a new account can query native sync immediately after first discovery initializes its library', async (t) => {

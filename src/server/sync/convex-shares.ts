@@ -95,3 +95,17 @@ export async function convexShareView(
   if (!writer) return null;
   return viewSchema.parse(await writer.write({ kind: 'shareView', tokenHash }));
 }
+
+/**
+ * Durably revoke every active share link of an owner (for example when the
+ * athlete withdraws Strava access). Unknown owners are harmless; local
+ * development may have no configured site.
+ */
+export async function revokeAllSharesInConvex(
+  owner: Pick<Actor, 'userId' | 'athleteId'>,
+  fetcher: typeof fetch = fetch,
+): Promise<number> {
+  const writer = convexWriteBridge(owner, fetcher);
+  if (!writer) return 0;
+  return writer.write<number>({ kind: 'revokeAllShares' });
+}

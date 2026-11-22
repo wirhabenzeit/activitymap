@@ -107,8 +107,8 @@ every submission confirm the account still signs in and still has activities.
 ActivityMap is a viewer for the user's own Strava activities. It has no accounts of its own: users sign in with their Strava account.
 
 How to sign in
-1. Open the app and tap "Connect with Strava". A system sign-in sheet opens Strava's own page.
-2. Sign in with the demo account above and tap Authorize. The sheet closes by itself and the activities load. The first import can take a short while because Strava rate-limits data requests; the map fills in as activities arrive.
+1. Open the app and tap "Connect with Strava". If the Strava app is installed it opens there; otherwise a system sign-in sheet opens Strava's own page.
+2. Sign in with the demo account above and tap Authorize. You are returned to ActivityMap automatically and the activities load. The first import can take a short while because Strava rate-limits data requests; the map fills in as activities arrive.
 
 Sign in with Apple (guideline 4.8)
 The app is a client for a single third-party service, and users must sign in directly to their Strava account to see their own content. It does not offer any other login method, and no personal account system of ours exists to substitute for it.

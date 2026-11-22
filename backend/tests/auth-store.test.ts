@@ -448,6 +448,11 @@ void test('a webhook is recorded in Convex or revokes the account, and a failure
   const sent: unknown[] = [];
   const send = async (owner: unknown, event: unknown) =>
     void sent.push([owner, event]);
+  const revokedShares: unknown[] = [];
+  const revokeShares = async (owner: unknown) => {
+    revokedShares.push(owner);
+    return 0;
+  };
   const event = (overrides: object = {}) => ({
     subscription_id: 1,
     object_type: 'activity' as const,
@@ -461,6 +466,7 @@ void test('a webhook is recorded in Convex or revokes the account, and a failure
     handleWebhookOnConvex(data as never, {
       records,
       send: send as never,
+      revokeShares: revokeShares as never,
       now: () => new Date('2026-11-11T10:00:00Z'),
     });
 
@@ -498,8 +504,8 @@ void test('a webhook is recorded in Convex or revokes the account, and a failure
     /unreachable/,
   );
 
-  // Access withdrawn: tokens gone, erasure in thirty days, and a repeat of
-  // the notice does not move the date.
+  // Access withdrawn: tokens gone, share links revoked, erasure in thirty days,
+  // and a repeat of the notice does not move the date.
   const withdrawn = event({
     object_type: 'athlete',
     object_id: 42,
@@ -507,6 +513,10 @@ void test('a webhook is recorded in Convex or revokes the account, and a failure
   });
   assert.equal(await handle(withdrawn), 'revoked');
   assert.equal(await handle(withdrawn), 'ignored');
+  assert.deepEqual(revokedShares, [
+    { userId: 'u1', athleteId: 42 },
+    { userId: 'u1', athleteId: 42 },
+  ]);
   const account = (await records.accountByAthlete(42))!;
   assert.deepEqual(
     [

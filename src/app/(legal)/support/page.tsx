@@ -55,8 +55,9 @@ export default function SupportPage() {
       </p>
       <h3>Where is my shared link?</h3>
       <p>
-        Share links you created are listed under Share in the website, where you
-        can revoke them. Links expire after at most 30 days.
+        Share links you created are listed under <strong>Your links</strong> in
+        the app&rsquo;s Share sheet and under Share on the website, where you
+        can revoke them at any time. Links expire after at most 30 days.
       </p>
 
       <h2>Bug reports</h2>
