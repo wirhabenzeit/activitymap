@@ -40,6 +40,7 @@ final class ConvexSyncConnection: NativeLibraryConnection {
     let subscriptions = ConvexSubscriptionBag()
     private var closed = false
     private var authenticationStarted = false
+    private let releaseGrace: Duration
     private var shutdown: Task<Void, Never>?
     var pages: any SyncPageSource { ConvexSyncPages(connection: self) }
 
@@ -47,7 +48,15 @@ final class ConvexSyncConnection: NativeLibraryConnection {
         self.init(client: ConvexClientWithAuth(deploymentUrl: url.absoluteString, authProvider: ConvexTokenProvider(session: session)))
     }
 
-    init(client: ConvexClientWithAuth<ConvexTokenProvider.Token>) { self.client = client }
+    init(
+        client: ConvexClientWithAuth<ConvexTokenProvider.Token>,
+        authenticationStarted: Bool = false,
+        releaseGrace: Duration = .seconds(3)
+    ) {
+        self.client = client
+        self.authenticationStarted = authenticationStarted
+        self.releaseGrace = releaseGrace
+    }
 
     static func connect(_ session: SyncSession) async throws -> (any NativeLibraryConnection)? {
         let configuration: ActivityMapAPI.NativeSyncConfiguration?
@@ -97,10 +106,25 @@ final class ConvexSyncConnection: NativeLibraryConnection {
         subscriptions.close()
         let previous = client
         let clearAuthentication = authenticationStarted
+        let releaseGrace = self.releaseGrace
         client = nil
         shutdown = Task {
             if clearAuthentication { await previous?.logout() }
-            withExtendedLifetime(previous) {}
+            if clearAuthentication, releaseGrace > .zero, let previous {
+                // `logout()` enqueues `setAuthCallback(provider: nil)` on the
+                // SDK's Rust worker channel and returns before the Tokio worker
+                // drops the old `AuthTokenProviderBridge` (which strongly
+                // captures `ffiClient`). Keep `previous` alive briefly on the
+                // main actor so the worker's `uniffiFree` never performs the
+                // final release of `MobileConvexClient` (and its Tokio runtime)
+                // from inside a Tokio worker thread (#603).
+                Task {
+                    try? await Task.sleep(for: releaseGrace)
+                    withExtendedLifetime(previous) {}
+                }
+            } else {
+                withExtendedLifetime(previous) {}
+            }
         }
     }
 

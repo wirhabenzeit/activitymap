@@ -405,6 +405,21 @@ struct NativeSyncTests {
         for await event in cancelled.stream { unsubscribed = event }
         #expect(unsubscribed && released == nil)
     }
+
+    @Test func closeRetainsAuthenticatedClientAcrossReleaseGrace() async throws {
+        var client: ConvexClientWithAuth<ConvexTokenProvider.Token>? = ConvexClientWithAuth(
+            deploymentUrl: "https://example.convex.cloud", authProvider: ConvexTokenProvider(session: SyncFixtures.session()))
+        weak var released = client
+        let connection = ConvexSyncConnection(client: client!, authenticationStarted: true, releaseGrace: .milliseconds(250))
+        client = nil
+        connection.close()
+        await connection.closeAndWait()
+        // `closeAndWait()` returns as soon as `logout()` finishes while the
+        // client stays alive across the release grace window (#603).
+        #expect(released != nil)
+        try await Task.sleep(for: .milliseconds(400))
+        #expect(released == nil)
+    }
     @Test func matchingVersionUpdateInvalidatesPlacesWithoutDownloadingRoutesAgain() async throws {
         let storage = try await storage()
         var checkpoint = Fixtures.checkpoint
