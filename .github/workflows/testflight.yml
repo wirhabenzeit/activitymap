@@ -47,6 +47,21 @@ jobs:
           APP_STORE_CONNECT_KEY_ID: ${{ secrets.APP_STORE_CONNECT_KEY_ID }}
           APP_STORE_CONNECT_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_ISSUER_ID }}
         run: bash scripts/testflight/upload.sh
+      # Crash logs from the App Store Connect API leave the app's frames
+      # unsymbolicated; these dSYMs let `atos` resolve them later.
+      - name: Package debug symbols
+        run: |
+          mkdir -p "$RUNNER_TEMP/testflight-symbols"
+          ditto -c -k --keepParent "$RUNNER_TEMP/ActivityMap.xcarchive/dSYMs" \
+            "$RUNNER_TEMP/testflight-symbols/ActivityMap-$APP_VERSION-$BUILD_NUMBER-dSYMs.zip"
+          dwarfdump --uuid "$RUNNER_TEMP/ActivityMap.xcarchive/dSYMs/"*.dSYM
+      - name: Save debug symbols for the release
+        uses: actions/upload-artifact@v6
+        with:
+          name: testflight-dsyms
+          path: ${{ runner.temp }}/testflight-symbols/
+          retention-days: 1
+          if-no-files-found: error
       - name: Wait for processing and publish test notes
         timeout-minutes: 20
         env:
@@ -71,3 +86,21 @@ jobs:
           if [ -f "$RUNNER_TEMP/testflight-profile-path" ]; then
             while IFS= read -r profile; do rm -f "$profile"; done < "$RUNNER_TEMP/testflight-profile-path"
           fi
+
+  # A separate job, so only it holds a token that can write to the repository.
+  attach-symbols:
+    needs: upload
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: testflight-dsyms
+          path: dsyms
+      - name: Attach debug symbols to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$RELEASE_TAG" dsyms/*.zip --clobber --repo "$GITHUB_REPOSITORY"
