@@ -4,7 +4,6 @@ struct IngestionStatusSection: View {
     @Environment(\.locale) private var locale
     let session: SyncSession
     let controller: IngestionStatusController
-    var stravaImport: StravaImportController? = nil
 
     private var snapshot: ActivityMapAPI.IngestionStatus? {
         controller.scope == session.scope ? controller.snapshot : nil
@@ -16,26 +15,6 @@ struct IngestionStatusSection: View {
 
     var body: some View {
         Section {
-            if let stravaImport, stravaImport.scope == session.scope {
-                Button {
-                    Task { await stravaImport.start(session) }
-                } label: {
-                    HStack {
-                        Label { Text(AppMessages.statusBrowsingFetchFromStrava(locale: locale)) } icon: { Image(systemName: "arrow.down.circle") }
-                        if stravaImport.isStarting || stravaImport.snapshot?.status == .running {
-                            Spacer()
-                            ProgressView().accessibilityLabel(Text(AppMessages.statusBrowsingFetchingFromStrava(locale: locale)))
-                        }
-                    }
-                }.disabled(!stravaImport.canStart(session))
-                if let message = stravaImport.message(locale: locale) ?? stravaImport.noticeMessage(locale: locale) {
-                    Text(verbatim: message).font(.footnote).foregroundStyle(.secondary)
-                }
-                if stravaImport.retryAt > Date() {
-                    Text(AppMessages.mutationRetryAfter(stravaImport.retryAt.formatted(date: .abbreviated, time: .shortened), locale: locale))
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
-            }
             if let snapshot {
                 LabeledContent(String(localized: AppMessages.statusBrowsingAllActivitiesImported(locale: locale)), value: snapshot.history.progress == .complete ? String(localized: AppMessages.valueYes(locale: locale))
                     : snapshot.history.progress == .unknown ? String(localized: AppMessages.statusProgressUnknown(locale: locale)) : String(localized: AppMessages.valueNo(locale: locale)))

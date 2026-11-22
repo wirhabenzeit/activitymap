@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-
 import test from 'node:test';
 
 import { importStatusFromSweep } from './convex-import';
@@ -58,6 +57,29 @@ void test('the import status is the reconciliation sweep, in the command’s ter
       true,
     ).status,
     'running',
+  );
+  assert.deepEqual(
+    [
+      importStatusFromSweep(
+        {
+          ...sweep,
+          phase: 'confirming',
+          running: false,
+          scanStartedAt: Date.parse('2026-11-17T10:00:00Z'),
+        },
+        true,
+      ).status,
+      importStatusFromSweep(
+        {
+          ...sweep,
+          phase: 'confirming',
+          running: false,
+          scanStartedAt: Date.parse('2026-11-17T10:00:00Z'),
+        },
+        true,
+      ).reason,
+    ],
+    ['succeeded', 'complete'],
   );
 
   // Waiting between two runs: for the rate limit, or after another failure.

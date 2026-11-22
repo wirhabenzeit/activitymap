@@ -70,6 +70,13 @@ export function importStatusFromSweep(
       retryAt: iso(sweep.dueAt),
       summaries,
     };
+  if (sweep.phase === 'confirming' && !sweep.running)
+    return {
+      ...base,
+      status: 'succeeded',
+      reason: 'complete',
+      finishedAt: iso(sweep.completedAt ?? sweep.scanStartedAt),
+    };
   return { ...base, status: 'running', summaries };
 }
 
