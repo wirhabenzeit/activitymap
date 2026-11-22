@@ -254,6 +254,12 @@ router.route({
             ...args,
           });
           break;
+        case 'revokeAllShares':
+          result = await ctx.runMutation(internal.shares.revokeAll, {
+            userId,
+            athleteId,
+          });
+          break;
         // The token is the credential: no owner scope.
         case 'shareView':
           result = await ctx.runQuery(internal.shares.view, {
