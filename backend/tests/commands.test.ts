@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
-import test, { mock } from 'node:test';
 
 import { convexTest } from 'convex-test';
+import test, { mock } from 'node:test';
 
 import {
   createRefreshActivityHandler,

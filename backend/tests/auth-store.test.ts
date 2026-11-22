@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
-import test from 'node:test';
 
 import { betterAuth } from 'better-auth';
 import { convexTest } from 'convex-test';
+import test from 'node:test';
 
 import {
   convexAuthAdapter,
