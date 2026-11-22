@@ -23,6 +23,7 @@ import { LEASE_MS, MAX_ATTEMPTS } from '../convex/ingestion';
 import {
   CONFIRM_INTERVAL_MS,
   CONFIRM_LIMIT,
+  EXPLICIT_REQUEST_COOLDOWN_MS,
   SWEEP_INTERVAL_MS,
 } from '../convex/ingestionSweep';
 import schema from '../convex/schema';
@@ -1573,12 +1574,43 @@ void test('the import command starts the sweep now, but not twice in a row', asy
   await advance(convex, 10 * 60_000);
   assert.equal(provider.lists.length, 1);
 
+  // Settings may ask only an hour after the last sweep; the first fetch
+  // after sign-up only five minutes after.
+  const explicit = () =>
+    convex.mutation(internal.ingestionSweep.requestNow, {
+      scope,
+      explicit: true,
+    });
+  assert.equal(await explicit(), false);
+  assert.notEqual(
+    (
+      await convex.query(internal.ingestionSweep.status, {
+        userId: scope.userId,
+      })
+    )?.requestableAt,
+    null,
+  );
+  await advance(convex, EXPLICIT_REQUEST_COOLDOWN_MS);
+  assert.equal(
+    (
+      await convex.query(internal.ingestionSweep.status, {
+        userId: scope.userId,
+      })
+    )?.requestableAt,
+    null,
+  );
+  assert.equal(await explicit(), true);
+  assert.equal(await explicit(), false);
+  await settle(convex);
+  assert.equal(provider.lists.length, 3);
+  await advance(convex, 10 * 60_000);
+
   assert.equal(await now(), true);
   // Asked again before it has run: one sweep, not two.
   assert.equal(await now(), false);
   await settle(convex);
   assert.deepEqual(provider.reads, ['activity 7']);
-  assert.equal(provider.lists.length, 3);
+  assert.equal(provider.lists.length, 5);
   assert.equal((await state(convex)).sweep!.phase, 'idle');
 
   // Not for an owner another store writes.

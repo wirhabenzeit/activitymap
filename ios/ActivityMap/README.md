@@ -367,8 +367,11 @@ Summary caches reopen offline for a still-valid scoped session regardless of cac
 
 A store-open error is displayed without deleting data or falling back silently to memory. Activity editing and deliberate per-activity Refresh from Strava are supported; background refresh tasks remain pending. Refresh shares the editing coordinator’s mutation lock and account/session fence. Complete responses replace the activity and its photo metadata atomically without moving the sync cursor; partial photo refreshes keep the cached photos and show recovery feedback. Server retry deadlines survive reopening the activity details. Refresh remains available independently of edit permission.
 
-Settings shows Strava import coverage and offers **Sync now**, which downloads
-stored data to this device. See [ingestion status](../../docs/ingestion-status.md).
+Settings shows Strava import coverage and offers **Check Strava for missing
+activities**, which asks the server to read the Strava activity list again in
+the background. Nothing about the request is stored on the device; the line
+under the button comes from the ingestion status. **Sync now** downloads stored
+data to this device. See [ingestion status](../../docs/ingestion-status.md).
 
 ### Edit an activity in Strava
 

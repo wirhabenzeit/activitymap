@@ -112,4 +112,68 @@ import Testing
         #expect(controller.nextCheck.timeIntervalSinceNow > 3500)
     }
 
+    /// A fixture's status with its reconciliation (and history) fields replaced.
+    private func status(_ reconciliation: [String: Any?], history: [String: Any?] = [:]) throws -> ActivityMapAPI.IngestionStatus {
+        let raw = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: shared.appending(path: "ingestion-status-fixtures.v1.json"))) as? [String: Any])
+        var value = try #require(((raw["scenarios"] as? [[String: Any]])?.first { $0["id"] as? String == "initial-import-unknown-total" })?["status"] as? [String: Any])
+        var fields = try #require(value["history"] as? [String: Any])
+        var sweep = try #require(fields["reconciliation"] as? [String: Any])
+        for (key, item) in reconciliation { sweep[key] = item ?? NSNull() }
+        for (key, item) in history { fields[key] = item ?? NSNull() }
+        fields["reconciliation"] = sweep
+        value["history"] = fields
+        return try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.IngestionStatus.self, from: JSONSerialization.data(withJSONObject: value))
+    }
+
+    @Test func stravaCheckShowsTheSweepAsTheServerHasIt() async throws {
+        let en = Locale(identifier: "en_US")
+        let scanning = try status([:])
+        let observed = scanning.observedAt
+        let iso = { (minutes: Double) in ISO8601DateFormatter().string(from: observed.addingTimeInterval(minutes * 60)) }
+        let idle = try status(["phase": "idle", "pagesScanned": nil, "scanStartedAt": nil,
+                               "lastCompletedAt": iso(-120), "nextDueAt": iso(6 * 24 * 60)])
+        let now = observed.addingTimeInterval(60)
+        func view(_ status: ActivityMapAPI.IngestionStatus?, _ request: StravaCheck.Request? = nil, at: Date? = nil) -> StravaCheck.View {
+            StravaCheck.view(status, request: request, now: at ?? now, locale: en)
+        }
+        // Reopened Settings: idle, requested elsewhere, scanning, confirming, waiting, blocked.
+        #expect(view(idle).disabled == false)
+        #expect(view(idle).message?.hasPrefix("Last checked ") == true)
+        let due = try status(["phase": "idle", "pagesScanned": nil, "scanStartedAt": nil, "lastCompletedAt": iso(-120), "nextDueAt": iso(-1)])
+        #expect(view(due) == .init(disabled: true, message: "Check requested. Missing activities appear as they are found."))
+        #expect(view(scanning).disabled)
+        #expect(view(scanning).message?.hasPrefix("Checking your Strava activity list… Started ") == true)
+        #expect(view(try status(["phase": "confirming"])).message?.hasPrefix("Activity list checked ") == true)
+        #expect(view(try status([:], history: ["scheduling": "waiting", "retryAt": iso(30)])).message?.hasPrefix("Strava’s request limit was reached.") == true)
+        #expect(view(try status([:], history: ["scheduling": "blocked"])) == .init(disabled: true, message: nil))
+        #expect(view(nil) == .init(disabled: false, message: nil))
+
+        // A request's answer, until a newer status replaces it.
+        let started = StravaCheck.Request.started(at: now)
+        #expect(view(idle, started).message == "Check requested. Missing activities appear as they are found.")
+        let finished = try status(["phase": "idle", "pagesScanned": nil, "scanStartedAt": nil,
+                                   "lastCompletedAt": iso(2), "nextDueAt": iso(6 * 24 * 60)])
+        let later = try ActivityMapAPI.makeDecoder().decode(ActivityMapAPI.IngestionStatus.self, from: JSONSerialization.data(withJSONObject: {
+            var raw = try JSONSerialization.jsonObject(with: ActivityMapAPI.makeEncoder().encode(finished)) as! [String: Any]
+            raw["observedAt"] = iso(2); return raw
+        }()))
+        #expect(view(later, started, at: observed.addingTimeInterval(180)).disabled == false)
+        let recent = StravaCheck.Request.recent(at: now, retryAt: observed.addingTimeInterval(45 * 60))
+        #expect(view(idle, recent).disabled)
+        #expect(view(idle, recent).message?.hasPrefix("Strava was checked recently.") == true)
+        #expect(view(idle, recent, at: observed.addingTimeInterval(46 * 60)).disabled == false)
+
+        // The command's answer.
+        func run(_ state: ActivityMapAPI.StravaImportStatus, retry: Date? = nil) -> ActivityMapAPI.StravaImport {
+            .init(available: true, runID: "sweep-1", status: state, reason: nil, startedAt: nil, finishedAt: nil,
+                  retryAt: retry, summaries: 0, details: 0, photos: 0)
+        }
+        let session = SyncFixtures.session(), fixed = { Date(timeIntervalSince1970: 1_000) }
+        #expect(await StravaCheck.request(session, now: fixed) { _ in run(.running) } == .started(at: fixed()))
+        #expect(await StravaCheck.request(session, now: fixed) { _ in run(.succeeded, retry: fixed().addingTimeInterval(600)) }
+                == .recent(at: fixed(), retryAt: fixed().addingTimeInterval(600)))
+        #expect(await StravaCheck.request(session, now: fixed) { _ in throw APIClient.RequestError.rateLimited(retryAfter: 3600, requestID: nil) }
+                == .failed(at: fixed(), retryAt: fixed().addingTimeInterval(3600)))
+    }
+
 }

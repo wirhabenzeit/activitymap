@@ -72,6 +72,13 @@ struct AccountSheet: View {
                 await ingestionStatus.observe(session)
             }
         }
+        // Activities a Strava check finds reach the device with its next sync;
+        // ask for one when the account's count grows while Settings shows it.
+        .onChange(of: ingestionStatus.snapshot?.history.knownActivityCount) { old, new in
+            guard let old, let new, new > old, let session = syncSession,
+                  ingestionStatus.scope == session.scope else { return }
+            Task { await refresh?() }
+        }
         .onChange(of: syncSession, initial: true) { _, session in
             if let session { lastSession = session }
         }

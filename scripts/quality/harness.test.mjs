@@ -11,8 +11,9 @@ import {
 import { createServer } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import test from 'node:test';
 import { setTimeout as delay } from 'node:timers/promises';
+
+import test from 'node:test';
 
 import {
   browserFixtures,

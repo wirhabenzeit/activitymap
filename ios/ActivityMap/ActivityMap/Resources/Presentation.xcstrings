@@ -3505,18 +3505,6 @@
         }
       }
     },
-    "status.browsing.fetchFromStrava": {
-      "comment": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fetch from Strava"
-          }
-        }
-      }
-    },
     "status.browsing.stravaImportStatus": {
       "comment": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.",
       "extractionState": "manual",
@@ -3553,18 +3541,6 @@
         }
       }
     },
-    "status.browsing.fetchingFromStrava": {
-      "comment": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fetching from Strava"
-          }
-        }
-      }
-    },
     "status.browsing.fetchedForImportedActivitiesPhotosCountOnlyActivitiesWith": {
       "comment": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.",
       "extractionState": "manual",
@@ -3573,18 +3549,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Fetched for imported activities. Photos count only activities with photos."
-          }
-        }
-      }
-    },
-    "status.browsing.fetchRecentActivitiesMissingDetailsAndPhotosAndMore": {
-      "comment": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fetch recent activities, missing details and photos, and more history in the background."
           }
         }
       }
@@ -4681,6 +4645,114 @@
         }
       }
     },
+    "settings.checkStrava": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check Strava for missing activities"
+          }
+        }
+      }
+    },
+    "settings.checkStravaExplanation": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Looks through your Strava activity list in the background and adds anything missing or changed. A large history can take a while; you can close Settings meanwhile."
+          }
+        }
+      }
+    },
+    "settings.checkStrava.requested": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check requested. Missing activities appear as they are found."
+          }
+        }
+      }
+    },
+    "settings.checkStrava.scanning": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking your Strava activity list… Started %@."
+          }
+        }
+      }
+    },
+    "settings.checkStrava.confirming": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Activity list checked %@. Remaining details are fetched in the background."
+          }
+        }
+      }
+    },
+    "settings.checkStrava.waiting": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strava’s request limit was reached. The check continues after %@."
+          }
+        }
+      }
+    },
+    "settings.checkStrava.lastChecked": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last checked %@."
+          }
+        }
+      }
+    },
+    "settings.checkStrava.recent": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Strava was checked recently. You can check again after %@."
+          }
+        }
+      }
+    },
+    "settings.checkStrava.failed": {
+      "comment": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not request a Strava check. Please try again later."
+          }
+        }
+      }
+    },
     "settings.tagline": {
       "comment": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim.",
       "extractionState": "manual",
@@ -5365,54 +5437,6 @@
         }
       }
     },
-    "error.stravaImport.fetchingPausedWhileTheServiceIsBusyPlease": {
-      "comment": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fetching paused while the service is busy. Please try again when available."
-          }
-        }
-      }
-    },
-    "error.stravaImport.reconnectStravaFromAccountToContinueFetching": {
-      "comment": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Reconnect Strava from Account to continue fetching."
-          }
-        }
-      }
-    },
-    "error.stravaImport.couldNotCheckTheStravaFetchPleaseTry": {
-      "comment": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not check the Strava fetch. Please try again later."
-          }
-        }
-      }
-    },
-    "error.stravaImport.signInAgainToFetchFromStrava": {
-      "comment": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Sign in again to fetch from Strava."
-          }
-        }
-      }
-    },
     "error.edit.serverReconciliation": {
       "comment": "Server error plus a complete local recovery instruction. Server reason is verbatim; do not retry an uncertain write.",
       "extractionState": "manual",
@@ -5425,78 +5449,6 @@
         }
       }
     },
-    "status.stravaImport.running": {
-      "comment": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fetching from Strava in the background… Summaries fetched: %lld · Activities updated: %lld · Photos fetched: %lld."
-          }
-        }
-      }
-    },
-    "status.stravaImport.interrupted": {
-      "comment": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "The fetch was interrupted. Saved progress is kept; try again when available. Summaries fetched: %lld · Activities updated: %lld · Photos fetched: %lld."
-          }
-        }
-      }
-    },
-    "status.stravaImport.rateLimited": {
-      "comment": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Strava’s request limit was reached. Summaries fetched: %lld · Activities updated: %lld · Photos fetched: %lld."
-          }
-        }
-      }
-    },
-    "status.stravaImport.failed": {
-      "comment": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not finish fetching. Saved progress is kept. Summaries fetched: %lld · Activities updated: %lld · Photos fetched: %lld."
-          }
-        }
-      }
-    },
-    "status.stravaImport.deferred": {
-      "comment": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "This fetch has paused. You can continue with another fetch when available. Summaries fetched: %lld · Activities updated: %lld · Photos fetched: %lld."
-          }
-        }
-      }
-    },
-    "status.stravaImport.finished": {
-      "comment": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fetch finished. Summaries fetched: %lld · Activities updated: %lld · Photos fetched: %lld."
-          }
-        }
-      }
-    },
     "activity.edit.saveNative": {
       "comment": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.",
       "extractionState": "manual",
@@ -5505,42 +5457,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Save"
-          }
-        }
-      }
-    },
-    "error.stravaImport.checkFailed": {
-      "comment": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Could not check the Strava fetch. Please try again later."
-          }
-        }
-      }
-    },
-    "error.stravaImport.waitCheck": {
-      "comment": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Please wait before checking again."
-          }
-        }
-      }
-    },
-    "error.stravaImport.waitStart": {
-      "comment": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Please wait before trying again."
           }
         }
       }

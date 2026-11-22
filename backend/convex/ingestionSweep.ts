@@ -495,14 +495,18 @@ export const recover = internalMutation({
 
 /** How long after a finished sweep a request for another is ignored. */
 const REQUEST_COOLDOWN_MS = 5 * 60_000;
+/** The same for a person asking from Settings ("Check Strava for missing
+ * activities"): a whole list scan for one tap, so once an hour at most. */
+export const EXPLICIT_REQUEST_COOLDOWN_MS = 60 * 60_000;
 
-/** Start a sweep now instead of at its due time (the import command).
- * Active sweeps and recently completed scans are left alone. A scan blocked
+/** Start a sweep now instead of at its due time (the first fetch after
+ * sign-up, or `explicit`ly from Settings). Active sweeps and recently
+ * completed scans are left alone. A scan blocked
  * on missing gateway configuration can resume its existing page on retry.
  * Returns whether work was scheduled. */
 export const requestNow = internalMutation({
-  args: { scope: v.object(scopeFields) },
-  handler: async (ctx, { scope }): Promise<boolean> => {
+  args: { scope: v.object(scopeFields), explicit: v.optional(v.boolean()) },
+  handler: async (ctx, { scope, explicit }): Promise<boolean> => {
     const owner = await ownerFor(ctx, scope.userId);
     if (
       !ingests(owner) ||
@@ -533,7 +537,8 @@ export const requestNow = internalMutation({
       (sweep.lease && sweep.lease.expiresAt > now) ||
       sweep.dueAt <= now ||
       (sweep.completedAt !== undefined &&
-        now - sweep.completedAt < REQUEST_COOLDOWN_MS)
+        now - sweep.completedAt <
+          (explicit ? EXPLICIT_REQUEST_COOLDOWN_MS : REQUEST_COOLDOWN_MS))
     )
       return false;
     await ctx.db.patch('ingestionSweeps', sweep._id, { dueAt: now });
@@ -560,6 +565,13 @@ export const status = internalQuery({
       attempt: sweep.attempt,
       error: sweep.error ?? null,
       completedAt: sweep.completedAt ?? null,
+      /** When an explicit request will next be accepted, if not yet. */
+      requestableAt:
+        sweep.phase === 'idle' &&
+        sweep.completedAt !== undefined &&
+        sweep.completedAt + EXPLICIT_REQUEST_COOLDOWN_MS > Date.now()
+          ? sweep.completedAt + EXPLICIT_REQUEST_COOLDOWN_MS
+          : null,
     };
   },
 });

@@ -87,6 +87,13 @@ final class IngestionStatusController {
         }
     }
 
+    /// Read the status now instead of at the next minute, e.g. right after a
+    /// Strava check was requested. A server-imposed wait still applies.
+    func refreshNow(_ session: SyncSession) async {
+        if messageText == nil, scope == session.scope { nextCheck = .distantPast }
+        await refresh(session)
+    }
+
     private func key(_ scope: StoreScope) -> String { "ingestion-status.v1." + scope.key }
     private func save(_ scope: StoreScope) {
         if let data = try? ActivityMapAPI.makeEncoder().encode(Cache(status: snapshot, nextCheck: nextCheck)) {

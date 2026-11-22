@@ -1871,11 +1871,6 @@
       "arguments": {},
       "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
     },
-    "status.browsing.fetchFromStrava": {
-      "source": "Fetch from Strava",
-      "arguments": {},
-      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
-    },
     "status.browsing.stravaImportStatus": {
       "source": "Strava import status",
       "arguments": {},
@@ -1891,18 +1886,8 @@
       "arguments": {},
       "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
     },
-    "status.browsing.fetchingFromStrava": {
-      "source": "Fetching from Strava",
-      "arguments": {},
-      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
-    },
     "status.browsing.fetchedForImportedActivitiesPhotosCountOnlyActivitiesWith": {
       "source": "Fetched for imported activities. Photos count only activities with photos.",
-      "arguments": {},
-      "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
-    },
-    "status.browsing.fetchRecentActivitiesMissingDetailsAndPhotosAndMore": {
-      "source": "Fetch recent activities, missing details and photos, and more history in the background.",
       "arguments": {},
       "context": "Complete browsing/import status or recovery action. Saved library availability is distinct from server import coverage. This text is app-owned, never user content."
     },
@@ -2387,6 +2372,61 @@
       },
       "context": "Settings and account recovery. App-owned copy; account names, email and server diagnostics are passed verbatim."
     },
+    "settings.checkStrava": {
+      "source": "Check Strava for missing activities",
+      "arguments": {},
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
+    "settings.checkStravaExplanation": {
+      "source": "Looks through your Strava activity list in the background and adds anything missing or changed. A large history can take a while; you can close Settings meanwhile.",
+      "arguments": {},
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
+    "settings.checkStrava.requested": {
+      "source": "Check requested. Missing activities appear as they are found.",
+      "arguments": {},
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
+    "settings.checkStrava.scanning": {
+      "source": "Checking your Strava activity list\u2026 Started {time}.",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
+    "settings.checkStrava.confirming": {
+      "source": "Activity list checked {time}. Remaining details are fetched in the background.",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
+    "settings.checkStrava.waiting": {
+      "source": "Strava\u2019s request limit was reached. The check continues after {time}.",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
+    "settings.checkStrava.lastChecked": {
+      "source": "Last checked {time}.",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
+    "settings.checkStrava.recent": {
+      "source": "Strava was checked recently. You can check again after {time}.",
+      "arguments": {
+        "time": "string"
+      },
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
+    "settings.checkStrava.failed": {
+      "source": "Could not request a Strava check. Please try again later.",
+      "arguments": {},
+      "context": "Strava check in Settings: one request that starts a background check of the account's Strava activity list. App-owned copy; {time} is a date and time formatted by the platform."
+    },
     "settings.tagline": {
       "source": "Your activities, on a map and beyond.",
       "arguments": {},
@@ -2672,26 +2712,6 @@
       "arguments": {},
       "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
     },
-    "error.stravaImport.fetchingPausedWhileTheServiceIsBusyPlease": {
-      "source": "Fetching paused while the service is busy. Please try again when available.",
-      "arguments": {},
-      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
-    },
-    "error.stravaImport.reconnectStravaFromAccountToContinueFetching": {
-      "source": "Reconnect Strava from Account to continue fetching.",
-      "arguments": {},
-      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
-    },
-    "error.stravaImport.couldNotCheckTheStravaFetchPleaseTry": {
-      "source": "Could not check the Strava fetch. Please try again later.",
-      "arguments": {},
-      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
-    },
-    "error.stravaImport.signInAgainToFetchFromStrava": {
-      "source": "Sign in again to fetch from Strava.",
-      "arguments": {},
-      "context": "Complete app-owned activity command or import error/recovery. Server messages, protocol IDs and request IDs remain verbatim. Preserve submitted-write uncertainty and reconciliation requirements."
-    },
     "error.edit.serverReconciliation": {
       "source": "{reason} Close this editor and sync before editing again.",
       "arguments": {
@@ -2699,77 +2719,8 @@
       },
       "context": "Server error plus a complete local recovery instruction. Server reason is verbatim; do not retry an uncertain write."
     },
-    "status.stravaImport.running": {
-      "source": "Fetching from Strava in the background\u2026 Summaries fetched: {summaries} \u00b7 Activities updated: {details} \u00b7 Photos fetched: {photos}.",
-      "arguments": {
-        "summaries": "number",
-        "details": "number",
-        "photos": "number"
-      },
-      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
-    },
-    "status.stravaImport.interrupted": {
-      "source": "The fetch was interrupted. Saved progress is kept; try again when available. Summaries fetched: {summaries} \u00b7 Activities updated: {details} \u00b7 Photos fetched: {photos}.",
-      "arguments": {
-        "summaries": "number",
-        "details": "number",
-        "photos": "number"
-      },
-      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
-    },
-    "status.stravaImport.rateLimited": {
-      "source": "Strava\u2019s request limit was reached. Summaries fetched: {summaries} \u00b7 Activities updated: {details} \u00b7 Photos fetched: {photos}.",
-      "arguments": {
-        "summaries": "number",
-        "details": "number",
-        "photos": "number"
-      },
-      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
-    },
-    "status.stravaImport.failed": {
-      "source": "Could not finish fetching. Saved progress is kept. Summaries fetched: {summaries} \u00b7 Activities updated: {details} \u00b7 Photos fetched: {photos}.",
-      "arguments": {
-        "summaries": "number",
-        "details": "number",
-        "photos": "number"
-      },
-      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
-    },
-    "status.stravaImport.deferred": {
-      "source": "This fetch has paused. You can continue with another fetch when available. Summaries fetched: {summaries} \u00b7 Activities updated: {details} \u00b7 Photos fetched: {photos}.",
-      "arguments": {
-        "summaries": "number",
-        "details": "number",
-        "photos": "number"
-      },
-      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
-    },
-    "status.stravaImport.finished": {
-      "source": "Fetch finished. Summaries fetched: {summaries} \u00b7 Activities updated: {details} \u00b7 Photos fetched: {photos}.",
-      "arguments": {
-        "summaries": "number",
-        "details": "number",
-        "photos": "number"
-      },
-      "context": "Complete Strava fetch status and three independent counts. Count labels avoid ambiguous nested plural grammar; preserve saved progress and retry meaning."
-    },
     "activity.edit.saveNative": {
       "source": "Save",
-      "arguments": {},
-      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
-    },
-    "error.stravaImport.checkFailed": {
-      "source": "Could not check the Strava fetch. Please try again later.",
-      "arguments": {},
-      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
-    },
-    "error.stravaImport.waitCheck": {
-      "source": "Please wait before checking again.",
-      "arguments": {},
-      "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
-    },
-    "error.stravaImport.waitStart": {
-      "source": "Please wait before trying again.",
       "arguments": {},
       "context": "App-owned import/mutation recovery. Native Save is a deliberate short toolbar variant of web Save changes; full accessible name remains Save changes."
     },
@@ -3239,7 +3190,7 @@
       "context": "Shared browsing and activity command presentation."
     },
     "stats.historyLoading": {
-      "source": "Loading activity history…",
+      "source": "Loading activity history\u2026",
       "arguments": {},
       "context": "Shared browsing and activity command presentation."
     },
@@ -3274,7 +3225,7 @@
       "context": "Shared browsing and activity command presentation."
     },
     "action.refreshing": {
-      "source": "Refreshing from Strava…",
+      "source": "Refreshing from Strava\u2026",
       "arguments": {},
       "context": "Shared browsing and activity command presentation."
     },
@@ -3286,7 +3237,7 @@
       "context": "Shared browsing and activity command presentation."
     },
     "sharing.statusExpiry": {
-      "source": "{status} · expires {date}",
+      "source": "{status} \u00b7 expires {date}",
       "arguments": {
         "status": "string",
         "date": "string"
@@ -3309,7 +3260,7 @@
       "context": "Shared browsing and activity command presentation."
     },
     "sharing.revoking": {
-      "source": "Revoking…",
+      "source": "Revoking\u2026",
       "arguments": {},
       "context": "Shared browsing and activity command presentation."
     },

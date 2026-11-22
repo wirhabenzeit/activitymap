@@ -230,6 +230,7 @@ router.route({
         case 'sweepNow':
           result = await ctx.runMutation(internal.ingestionSweep.requestNow, {
             scope,
+            ...(args.explicit === true ? { explicit: true } : {}),
           });
           break;
         case 'sweepStatus':

@@ -10,7 +10,7 @@ import { logger } from '~/server/logging/logger';
 import { createStravaImportHandler } from './handler';
 
 export const maxDuration = 60;
-// "Fetch from Strava" is the library's reconciliation sweep
+// "Check Strava for missing activities" is the library's reconciliation sweep
 // (src/server/application/convex-import.ts); it runs in the backend.
 const dependencies = {
   read: (actor: Actor) => readConvexImport(actor, stravaAccessEnabled()),

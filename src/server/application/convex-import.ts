@@ -9,11 +9,14 @@ import { convexWriteBridge } from '~/server/sync/convex-writer';
 import { StravaImportError } from './strava-import';
 
 /**
- * "Fetch from Strava" for an account Convex writes for. There is no import
- * run to start: the account's reconciliation sweep
- * (backend/convex/ingestionSweep.ts) reads the provider's activity list and
- * asks for whatever is missing or changed. The command starts that sweep
- * now, and its status is the sweep's.
+ * "Check Strava for missing activities" (`/api/v1/strava-import`) for an
+ * account Convex writes for. There is no import run to start: the account's
+ * reconciliation sweep (backend/convex/ingestionSweep.ts) reads the
+ * provider's activity list and asks for whatever is missing or changed. The
+ * command starts that sweep now, at most once an hour after the last one
+ * finished, and its status is the sweep's. Settings fires the command and
+ * shows the sweep through `/api/v1/ingestion-status`; the GET stays for v1
+ * clients that poll it.
  */
 
 const sweepSchema = z
@@ -26,6 +29,8 @@ const sweepSchema = z
     running: z.boolean(),
     error: z.string().nullable(),
     completedAt: z.number().nullable(),
+    /** Absent from a backend deployed before it. */
+    requestableAt: z.number().nullable().optional(),
   })
   .nullable();
 type Sweep = z.infer<typeof sweepSchema>;
@@ -59,6 +64,8 @@ export function importStatusFromSweep(
           status: 'succeeded',
           reason: 'complete',
           finishedAt: iso(sweep.completedAt),
+          // A new request is not accepted before then.
+          retryAt: iso(sweep.requestableAt ?? null),
         };
   const summaries = sweep.phase === 'scanning' ? (sweep.page - 1) * PAGE : 0;
   // Between two runs of an unfinished sweep: waiting for its next time.
@@ -70,13 +77,11 @@ export function importStatusFromSweep(
       retryAt: iso(sweep.dueAt),
       summaries,
     };
+  // The list was read; the rest of the library is asked for a batch an
+  // hour. Waiting for the next batch is not running (v1 clients poll a
+  // running fetch every few seconds), and not finished either.
   if (sweep.phase === 'confirming' && !sweep.running)
-    return {
-      ...base,
-      status: 'succeeded',
-      reason: 'complete',
-      finishedAt: iso(sweep.completedAt ?? sweep.scanStartedAt),
-    };
+    return { ...base, status: 'deferred', retryAt: iso(sweep.dueAt) };
   return { ...base, status: 'running', summaries };
 }
 
@@ -112,7 +117,10 @@ export async function startConvexImport(
       'Fetching from Strava is unavailable in this environment.',
     );
   const { writer, epoch } = await bridgeFor(actor, fetcher);
-  const started = await writer.write<boolean>({ kind: 'sweepNow' }, epoch);
+  const started = await writer.write<boolean>(
+    { kind: 'sweepNow', explicit: true },
+    epoch,
+  );
   const status = importStatusFromSweep(
     sweepSchema.parse(await writer.write({ kind: 'sweepStatus' }, epoch)),
     enabled,

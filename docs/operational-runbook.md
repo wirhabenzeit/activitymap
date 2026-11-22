@@ -29,8 +29,10 @@ Ingestion jobs (`ingestionJobs` in Convex, one per account and activity) run
 in phases: the activity, its recording, its place matches. Look for jobs with
 status `failed` or `blocked` and their `error` on the Convex dashboard. A
 failed job is retried by the account's next sweep, which requests every
-activity that is still incomplete. To retry sooner, an operator can
-send the write bridge's `sweepNow` operation for the account.
+activity that is still incomplete. To retry sooner, start the sweep: the
+account's owner can use **Check Strava for missing activities** in Settings
+(at most once an hour), or an operator can send the write bridge's `sweepNow`
+operation for the account.
 
 A `blocked` job waits for the account's Strava credentials to change, for
 example after a reconnect.

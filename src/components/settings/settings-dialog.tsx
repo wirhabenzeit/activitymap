@@ -1,7 +1,8 @@
 'use client';
 
-import { RefreshCw } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { CircleArrowDown, RefreshCw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   AppDialogBody,
@@ -31,6 +32,11 @@ import {
   coverageProgress,
   snapshotIsStale,
 } from '~/lib/ingestion/presentation';
+import {
+  type StravaCheckRequest,
+  requestStravaCheck,
+  stravaCheckView,
+} from '~/lib/ingestion/strava-check';
 import { LEGAL_PATHS } from '~/lib/legal';
 import { message } from '~/lib/presentation/messages';
 import {
@@ -73,6 +79,12 @@ export function SettingsDialog({
     userId,
     open && (tab === 'sync' || tab === 'account'),
   );
+  const client = useQueryClient();
+  const [check, setCheck] = useState<{
+    owner: string;
+    request: StravaCheckRequest;
+  } | null>(null);
+  const [checking, setChecking] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
   const [signOutFailed, setSignOutFailed] = useState(false);
   const [confirmDeletion, setConfirmDeletion] = useState(false);
@@ -146,6 +158,41 @@ export function SettingsDialog({
       ? stravaPermissionNotes(user.stravaPermissions)
       : [];
   const showConnect = !userId || !!needsReconnect || permissionNotes.length > 0;
+  const stravaCheck = stravaCheckView(
+    status,
+    check && check.owner === userId ? check.request : null,
+    clock,
+    date,
+    locale,
+  );
+  const handleCheckStrava = async () => {
+    if (!userId) return;
+    const owner = userId;
+    setChecking(true);
+    try {
+      const request = await requestStravaCheck();
+      if (useShallowStore.getState().user?.id !== owner) return;
+      setCheck({ owner, request });
+      void client.invalidateQueries({ queryKey: ['ingestion-status', owner] });
+    } finally {
+      setChecking(false);
+    }
+  };
+  // Activities a check finds reach this browser with its next sync; ask for
+  // one when the account's count grows while Settings shows it.
+  const knownCount = status?.history.knownActivityCount;
+  const seenCount = useRef<{ owner?: string; count?: number }>({});
+  useEffect(() => {
+    if (!userId || knownCount === undefined) return;
+    const seen = seenCount.current;
+    seenCount.current = { owner: userId, count: knownCount };
+    if (
+      seen.owner === userId &&
+      seen.count !== undefined &&
+      knownCount > seen.count
+    )
+      requestBrowserSync();
+  }, [userId, knownCount]);
   const email = userId ? displayEmail(user?.email) : null;
 
   const handleSignOut = async () => {
@@ -327,6 +374,30 @@ export function SettingsDialog({
                   <h2 id="import-heading" className="text-sm font-semibold">
                     {message('status.browsing.stravaImportStatus')}
                   </h2>
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      className="min-h-11"
+                      onClick={handleCheckStrava}
+                      disabled={
+                        !userId || offline || checking || stravaCheck.disabled
+                      }
+                    >
+                      <CircleArrowDown aria-hidden="true" />
+                      {message('settings.checkStrava')}
+                    </Button>
+                    <p className="text-xs text-muted-foreground">
+                      {message('settings.checkStravaExplanation')}
+                    </p>
+                    {userId && stravaCheck.message && (
+                      <p
+                        role="status"
+                        className="text-xs text-muted-foreground"
+                      >
+                        {stravaCheck.message}
+                      </p>
+                    )}
+                  </div>
                   {status ? (
                     <>
                       <dl className="space-y-3 text-sm [@media(min-width:640px)_and_(max-height:500px)]:space-y-2">

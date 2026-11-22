@@ -31,10 +31,11 @@ export default function SupportPage() {
       <p>
         New activities normally arrive from Strava within minutes; a first
         import of a large history can take a while because Strava limits how
-        fast we may request data. You can check import progress or choose{' '}
-        <strong>Sync now</strong> in Settings, or refresh an individual activity
-        from its detail view. If sync says Strava is disconnected, sign out and
-        connect again from the Account section of Settings.
+        fast we may request data. If an activity is still missing, open Settings
+        and choose <strong>Check Strava for missing activities</strong>; to
+        update a single activity, refresh it from its detail view. If sync says
+        Strava is disconnected, sign out and connect again from the Account
+        section of Settings.
       </p>
       <h3>I cannot sign in</h3>
       <p>

@@ -50,36 +50,30 @@ Warmup does not mark history discovery complete: summary reconciliation still
 owns that proof. No schema migration, new client API or scheduling switch is
 required. The activities route logs the warmup counts and stop reason.
 
-## Fetch from Strava in Settings
+## Check Strava for missing activities
 
-Web and iOS Settings expose **Fetch from Strava** beside import coverage.
-**Sync now** continues to download data already stored by ActivityMap.
-The new action refreshes one recent summary page, enriches up to five pending
-activities (including detailed activities whose photo sets are pending), then
-continues up to three older-history pages. Streams retain their existing
-scheduled/on-demand workers. A manual fetch uses the same 35-second,
-20-request budget and shared quota/load reserves as signup warmup. Expired
-tokens refresh through that budget with an account/run fence.
+Web and iOS Settings offer **Check Strava for missing activities** beside
+import coverage. It is for an activity whose Strava event never arrived: it
+sends one `POST /api/v1/strava-import`, which starts the account's
+reconciliation sweep now (backend/README.md, "Reconciliation") instead of at
+its next due time. The sweep reads Strava's activity list in the background
+and asks for whatever is missing or changed. **Sync now** still only downloads
+data already stored by ActivityMap.
 
-`POST /api/v1/strava-import` returns `202` with run status after claiming the
-work. Duplicate clicks, devices and a five-minute cooldown return the existing
-status with `200` and dispatch no extra work. A global dispatch counter also
-yields to signup warmup. Quota deferrals can extend the cooldown to the shared
-window reset. `GET /api/v1/strava-import` reads only the caller's run, has
-`private, no-store` caching, and never contacts Strava. Clients poll at three
-seconds while running and visible, otherwise thirty seconds while Settings
-is visible, and honor HTTP Retry-After. Closing Settings does not cancel server
-work. Reopening reads its durable status.
+The request is not started while a sweep is under way, already due, or
+finished less than an hour ago; the answer then carries `retryAt`, when a
+request is accepted again. Clients keep nothing about a request. What
+Settings shows comes from `history.reconciliation` in the ingestion status it
+already reads every minute: requested (due, not picked up yet), checking the
+list since `scanStartedAt`, completing the library (`confirming`), waiting
+for Strava's rate limit, or when the list was last checked. Reopening Settings
+or relaunching the app therefore shows the sweep as the server has it. When
+the activity count grows while Settings is open, the client syncs, so found
+activities appear without another tap.
 
-Migration `0022_manual-strava-import` adds one operational row per user, tied
-to the Strava account with cascading deletion. It stores counters, a run token,
-a 90-second lease, retry time and a fixed older-history boundary/page checkpoint.
-Each persisted history page advances the checkpoint. Later clicks continue it;
-fresh recent summaries still refresh every run. Pending detail/photo candidates
-honor existing activity backoffs. Per-activity failures leave other manual work
-eligible; account/quota/deadline stops end the batch. A lost worker reports
-`interrupted` after its lease expires. This is a bounded request follow-up;
-scheduled ingestion remains responsible for eventual completion.
+`GET /api/v1/strava-import` reports the sweep in the v1 import terms for
+clients that poll it. Between two confirm batches it reports `deferred` until
+the next batch, not `running`.
 
 ## Categories
 
