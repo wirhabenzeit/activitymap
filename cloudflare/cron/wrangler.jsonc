@@ -12,6 +12,16 @@
   },
   "vars": {
     "ACTIVITYMAP_URL": "https://activitymap.cc",
+    "APP_STORE_APP_ID": "6819172681",
   },
+  // TestFlight crash reports; schema in migrations/.
+  "d1_databases": [
+    {
+      "binding": "TESTFLIGHT_DB",
+      "database_name": "activitymap-testflight",
+      "database_id": "5c350c6a-fcf8-4f03-962a-525f894b8371",
+      "migrations_dir": "migrations",
+    },
+  ],
   "observability": { "enabled": true },
 }
