@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import test, { after, mock } from 'node:test';
 
 import { convexTest } from 'convex-test';
+import test, { after, mock } from 'node:test';
 
 import {
   EMPTY_SET_DIGEST,
@@ -17,7 +17,7 @@ import schema from '../convex/schema';
 /**
  * The live place catalogue (convex/livePlaces.ts): applying a publication
  * in batches, resuming and abandoning it, the tiles it records, its signed
- * bridge operations and the pruning of old tile changes.
+ * bridge operations and the restart of unfinished re-match walks.
  */
 
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
@@ -513,18 +513,20 @@ void test('catalogue reads pass the bridge without a nonce; writes still need on
   assert.equal(unsigned.status, 401);
 });
 
-void test('pruning removes tile changes of revisions before the completed one', async () => {
+void test('the daily job restarts the re-match walk of completed revisions with tiles left', async () => {
   const convex = setup();
-  const prune = () =>
-    convex.mutation(internal.maintenance.prunePlaceTileChanges, {});
+  const resume = () =>
+    convex.mutation(internal.maintenance.resumeRematchWalks, {});
+  const walk = (revision: number) =>
+    convex.mutation(internal.catalogue.rematchTiles, { revision });
   await convex.run(async (ctx) => {
-    for (let i = 0; i < 257; i++)
+    for (let i = 0; i < 70; i++)
       await ctx.db.insert('placeTileChanges', { revision: 1, tile: `${i},0` });
     await ctx.db.insert('placeTileChanges', { revision: 2, tile: '0,0' });
     await ctx.db.insert('placeTileChanges', { revision: 3, tile: '0,0' });
   });
-  // Nothing completed yet: nothing is old.
-  assert.equal(await prune(), 0);
+  // Nothing completed yet: nothing to walk.
+  assert.deepEqual(await resume(), []);
   await convex.run((ctx) =>
     ctx.db.insert('placeCatalogueState', {
       revision: 2,
@@ -532,17 +534,18 @@ void test('pruning removes tile changes of revisions before the completed one', 
       setDigest: EMPTY_SET_DIGEST,
     }),
   );
-  assert.equal(await prune(), 256);
-  assert.equal(
-    (
-      await convex.run((ctx) =>
-        ctx.db.system.query('_scheduled_functions').collect(),
-      )
-    ).filter((job) => job.name === 'maintenance:prunePlaceTileChanges').length,
-    1,
-  );
-  assert.equal(await prune(), 1);
-  assert.deepEqual(await tileChanges(convex, 1), []);
-  assert.deepEqual(await tileChanges(convex, 2), ['0,0']);
+  // Revision 3 is pending: its tiles wait for its completion.
+  assert.deepEqual(await resume(), [1, 2]);
+  assert.deepEqual(await walks(convex), [{ revision: 1 }, { revision: 2 }]);
+  assert.deepEqual(await walk(3), { done: true });
   assert.deepEqual(await tileChanges(convex, 3), ['0,0']);
+
+  // A walk deletes each tile it has finished, a page of tiles a step, so
+  // what is left is the work left; walking again is harmless.
+  assert.deepEqual(await walk(1), { done: false });
+  assert.equal((await tileChanges(convex, 1)).length, 6);
+  assert.deepEqual(await walk(1), { done: true });
+  assert.deepEqual(await walk(1), { done: true });
+  assert.deepEqual(await tileChanges(convex, 1), []);
+  assert.deepEqual(await resume(), [2]);
 });

@@ -260,10 +260,13 @@ export default defineSchema({
   }).index('by_dataset', ['dataset']),
   /** The catalogue libraries were last told to move to (one row;
    * catalogue.adopt). A continuation of an earlier adoption stops when it
-   * is no longer the one named here. */
+   * is no longer the one named here. `snapshotId` is the rowset's snapshot
+   * or the live catalogue's (`LIVE_CATALOGUE`); absent on adoptions
+   * recorded before it was kept. */
   catalogueAdoptions: defineTable({
     catalogue: v.string(),
     matchingVersion: v.string(),
+    snapshotId: v.optional(v.string()),
   }),
   /** The places of a rowset by quarter-degree tile. `key` is the place ID. */
   places: defineTable({
@@ -313,7 +316,8 @@ export default defineSchema({
   }),
   /** The tiles a publication changed: the old and new tile of every place
    * it wrote or deleted, and the tiles where coverage changed. One row per
-   * revision and tile, deleted when the revision's re-match walk ends. */
+   * revision and tile, deleted when the revision's re-match walk has
+   * finished the tile (catalogue.rematchTiles). */
   placeTileChanges: defineTable({
     revision: v.number(),
     tile: v.string(),

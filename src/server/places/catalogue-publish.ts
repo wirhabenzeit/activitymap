@@ -35,10 +35,6 @@ import type { NormalizedPlace } from './types';
  * the same place the same way without a database that remembers them.
  */
 
-/** How artifact rows become place rows in a rowset (`sendCatalogue`), the
- * format before the live catalogue. Part of a rowset's identity. */
-export const PLACE_ROWS_VERSION = 'osm-rows-v1';
-
 const PLACE_NAMESPACE = Buffer.from('6f1d3c52a8e44b0f9c1e5a7b2d4f6081', 'hex');
 
 /** A name-based UUID (version 5) of the place's OpenStreetMap object. */

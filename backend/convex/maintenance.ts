@@ -57,25 +57,40 @@ export const cleanupRecording = internalMutation({
   },
 });
 
-/** Tile changes of revisions before the last completed one. A revision's
- * re-match walk deletes its own when it ends; these were left behind. */
-export const prunePlaceTileChanges = internalMutation({
+const WALK_RESTARTS = 16;
+
+/** Start the re-match walk (`catalogue.rematchTiles`) again for completed
+ * revisions that still have tile changes. A walk deletes each tile's row
+ * once it has finished it, so rows left are unfinished work: of a walk
+ * still under way, or of one that stopped. A second walk over the same
+ * tiles is harmless. Rows of a pending revision wait for its completion.
+ * Returns the revisions whose walk was started. */
+export const resumeRematchWalks = internalMutation({
   args: {},
-  handler: async (ctx): Promise<number> => {
+  handler: async (ctx): Promise<number[]> => {
     const state = await ctx.db.query('placeCatalogueState').unique();
-    if (!state) return 0;
-    const rows = await ctx.db
+    if (!state) return [];
+    const revisions: number[] = [];
+    let row = await ctx.db
       .query('placeTileChanges')
-      .withIndex('by_revision_tile', (q) => q.lt('revision', state.revision))
-      .take(PAGE_SIZE);
-    for (const row of rows) await ctx.db.delete('placeTileChanges', row._id);
-    if (rows.length === PAGE_SIZE)
-      await ctx.scheduler.runAfter(
-        0,
-        internal.maintenance.prunePlaceTileChanges,
-        {},
-      );
-    return rows.length;
+      .withIndex('by_revision_tile')
+      .first();
+    while (
+      row &&
+      row.revision <= state.revision &&
+      revisions.length < WALK_RESTARTS
+    ) {
+      const { revision } = row;
+      revisions.push(revision);
+      await ctx.scheduler.runAfter(0, internal.catalogue.rematchTiles, {
+        revision,
+      });
+      row = await ctx.db
+        .query('placeTileChanges')
+        .withIndex('by_revision_tile', (q) => q.gt('revision', revision))
+        .first();
+    }
+    return revisions;
   },
 });
 

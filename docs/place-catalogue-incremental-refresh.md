@@ -1,8 +1,13 @@
 # Plan: incremental place catalogue refresh
 
-Status: proposal. Replaces the immutable-rowset publication described in
+Status: PR 1 (the incremental catalogue) has shipped and is described in
 [place-catalogue-refresh.md](place-catalogue-refresh.md#publish-or-refresh)
-so the catalogue can be refreshed automatically every week.
+and `backend/README.md` ("Place catalogue"); the cutover is
+[#609](https://github.com/wirhabenzeit/activitymap/issues/609). PR 2
+(automation and demand-driven regions) is still a proposal. Together they
+replace the immutable-rowset publication so the catalogue can be refreshed
+automatically every week. Where PR 1 ended differently from this plan, the
+sections below say so.
 
 ## Problem
 
@@ -64,7 +69,10 @@ dataset.
 
 `{ revision, tile }`, written by every upsert and delete: the old and the new
 tile for a moved place. On completion it lists the tiles to re-match.
-Rows for completed revisions can be deleted after the re-match walk ends.
+As shipped, the walk deletes each tile's row once it has finished the tile,
+so the rows left are its unfinished work, and a daily job
+(`maintenance.resumeRematchWalks`) restarts the walk of a completed revision
+that still has rows. Nothing deletes rows a walk has not reached.
 
 ### `activityPlaceTiles`
 
@@ -79,8 +87,15 @@ activity. Deleted activities drop their rows.
 
 `projection.match` gains `revision` (the catalogue revision the match read
 at its start). `matchingVersion` and `owner.catalogue` go back to identifying
-the **recipe and the coverage** only, not the place rows. They change only
-when a full re-match is really needed.
+the **recipe and the live lineage** only, not the place rows or the
+coverage. They change only when a full re-match is really needed.
+
+As shipped, the lineage is a constant, `LIVE_CATALOGUE`
+(`{ snapshotId: 'places-live', revision: 'live-rows-v1' }` in
+`src/server/places/catalogue-rows.ts`), and the live matching version is
+`matchingVersion(LIVE_CATALOGUE)`. A stored match's `revision` tells live
+from rowset matches: 1 or more is the live revision it read, 0 or absent a
+rowset.
 
 ## Publication protocol
 
@@ -129,6 +144,8 @@ polygons and adds every tile intersecting the added or removed area to
 `placeTileChanges`. The re-match walk then treats them like tiles with changed
 places. Matching reads coverage from the pending metadata only after
 `completeApply`, so a match never sees the new coverage with old rows.
+`completeApply` deletes the replaced metadata file; a match that was about to
+read it fails as retryable and its retry reads the new one.
 
 Only a matching-recipe change takes the full path: a new `owner.catalogue`
 and matching version, then `catalogue.adopt` (as today's
@@ -211,25 +228,31 @@ an uncovered region appears.
 2. For each tile, page `activityPlaceTiles.by_tile_owner`, deduplicate per
    activity, and skip owners that do not ingest (`ingests(owner)`) or whose
    writer is not Convex.
-3. Call `requestMatch` for activities whose `match.revision` is below the
-   revision. `nextTarget` must accept a stale revision as a reason to match,
-   not only a different `catalogue`.
+3. Call `requestMatch` for activities whose `match.revision` is 1 or more
+   and below the revision. `nextTarget` must accept a stale revision as a
+   reason to match, not only a different `catalogue`.
 4. Keep `REMATCH_PAUSE_MS` pacing so a large diff does not flood ingestion.
+
+As shipped, the walk consumes the tile rows (see `placeTileChanges`), so its
+cursor is only a position within the first tile left. A match that started
+before a completion and is published after the walk passed it (its tiles
+were not written yet) is queued again by `ingestion.matched`. A rowset match
+is never stale by revision.
 
 Old matches are **not** cleared, unlike a full adopt. The new result replaces
 the old one through `publishMatchRecord`, so clients see one sync change per
 re-matched activity.
 
 `ingestion.matched` currently drops a result whose `matchingVersion` is not
-the owner's. That stays, plus: drop a result whose revision is older than the
-activity's stored match revision.
+the owner's. That stays, plus: drop a result whose revision is not newer
+than the activity's stored match revision (`publishMatchRecord`).
 
 ## Migration and cutover
 
 Two PRs. The cutover happens between them, as operator commands rather than
 a deploy.
 
-### PR 1: incremental catalogue (backend and publisher)
+### PR 1: incremental catalogue (backend and publisher), shipped
 
 - `activityPlaceTiles` and `projection.match.revision`, written in
   `ingestion.matched` and removed with deleted activities.
@@ -246,29 +269,40 @@ a deploy.
   provisioned onto the live lineage (`latestCatalogue`, `startLibrary`) once
   `placeCatalogueState` has a completed revision. Deploying the PR therefore
   changes nothing until the first live publication, and owners not adopted
-  yet keep matching consistently.
+  yet keep matching consistently. As shipped, mutations cannot compute
+  matching versions (`node:crypto`), so `matchTarget` hands the worker both
+  the completed live publication and the rowsets, and the worker chooses;
+  live tiles are read by `livePlaces.tilePage`. `places.latestCatalogue`
+  answers the live lineage once a publication has completed, so
+  `latestCatalogue`, `startLibrary` and `catalogueWorker:adopt` needed no
+  other change.
 - `publishMatchRecord` accepts a result whose `revision` is newer than the
   stored match's, not only one for a different catalogue.
 - `beginApply` can abandon a pending apply (`--replace-pending`), so a bad
   artifact that failed partway can be reverted by publishing the previous
   one.
 - A paged internal mutation that deletes old `places` and `placeCatalogues`
-  rows (`places:dropRowsets`), not run on deploy.
+  rows and their files (`places:dropRowsets`), not run on deploy. As
+  shipped, it continues by itself and refuses before a live publication has
+  completed and until the latest adoption (`catalogueAdoptions`) was to the
+  live lineage. It does not check every owner: owners Convex did not ingest
+  for at adoption keep their rowset version until a later adoption.
 - Tests for the diff, idempotent and resumable apply, digest checks, tile
   rows, partial re-match selection and the fallback.
 
-**Cutover after deploy** (operator, documented in the PR):
+**Cutover after deploy** (operator,
+[place-catalogue-refresh.md](place-catalogue-refresh.md#cutover-from-rowsets)):
 
 1. `pnpm places:publish` with the current artifact. The live table is empty,
-   so this is a full insert. Matching switches to the live table when it
-   completes.
-2. `convex run catalogueWorker:adopt`: one final full re-match, which also
-   fills `activityPlaceTiles` for every activity. It costs the same as one of
-   today's publications, once.
-3. Check that a sample of libraries has the same matches as before, then run
-   `places:dropRowsets`.
+   so this is a full insert. New owners start on the live table when it
+   completes; existing owners keep their rowset.
+2. `convex run catalogueWorker:adopt`: one final full re-match, which moves
+   every owner to the live table and fills `activityPlaceTiles` for every
+   activity. It costs the same as one of today's publications, once.
+3. Check that a sample of libraries has the same matches as before.
+4. `convex run places:dropRowsets`.
 
-Rollback before step 3 of the cutover: redeploy the previous version, which
+Rollback before step 4 of the cutover: redeploy the previous version, which
 still serves from the rowsets.
 
 ### PR 2: automation and demand-driven regions
@@ -320,7 +354,10 @@ interrupted. GitHub's failure notification is the alert.
   so no client change is needed.
 - `combine` recomputes hide decisions over all countries, so a filter change
   can hide many places at once. That is a normal diff with many deletes and
-  needs no special case, but the dry-run summary should list hide-reason
-  counts.
-- The cost of the step 3 backfill is known (today's adopt). Time it on the
-  current library count before choosing a deploy window.
+  needs no special case; the report lists hide-reason counts
+  (`hiddenByReason`).
+- The cost of the cutover's adoption (step 2) is known (today's adopt). Time
+  it on the current library count before choosing a window.
+- An activity matched at an older live revision counts as stale even when
+  none of its tiles changed, so its next run for any other reason (an edit,
+  a provider event) matches it again, without a provider read.

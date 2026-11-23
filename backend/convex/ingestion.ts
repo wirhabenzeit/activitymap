@@ -51,15 +51,17 @@ import { applyPhotoSet, photosOfActivities } from './photos';
  *    typed in by hand, or one the provider has no streams for) gets an empty
  *    recording, which is how "nothing to fetch" is remembered.
  * 4. `match` phase, when the activity has a current recording without a
- *    match for the owner's catalogue: the worker matches it against the
- *    copied place catalogue and `matched` publishes the result.
+ *    current match for the owner's catalogue: the worker matches it against
+ *    the place catalogue and `matched` publishes the result.
  * 5. The run ends. If the activity was requested again while it ran, the
  *    job starts over at once.
  *
- * When the owner's catalogue changes, `requestMatch` queues a job that starts
- * at the match phase, so every recording is matched again without a provider
- * read. A job that is running at that moment is marked (`rematch`) and
- * queued for the match when its run ends, however it ends.
+ * When the owner's catalogue changes, or a publication of the live catalogue
+ * changes a tile an activity's match read (`catalogue.rematchTiles`),
+ * `requestMatch` queues a job that starts at the match phase, so the
+ * recording is matched again without a provider read. A job that is running
+ * at that moment is marked (`rematch`) and queued for the match when its run
+ * ends, however it ends.
  *
  * Every write names the job's claim. A worker whose lease was taken over
  * (it expired and `recover` or a later claim moved on) changes nothing, and
@@ -161,9 +163,9 @@ export async function requestIngestion(
 
 /**
  * Ask for an activity's place match to be computed again, without reading
- * the provider: the owner's catalogue changed (convex/catalogue.ts). The
- * caller has already checked that Convex writes for the owner and that the
- * activity has a current recording.
+ * the provider: the owner's catalogue or the places its match read changed
+ * (convex/catalogue.ts). The caller has already checked that Convex writes
+ * for the owner and that the activity has a current recording.
  */
 export async function requestMatch(
   ctx: MutationCtx,
@@ -271,11 +273,35 @@ async function recordingTarget(
   };
 }
 
+/** The live catalogue's last completed publication, or null before the
+ * first: its revision, snapshot and stored manifest and coverage. */
+async function liveCatalogue(ctx: QueryCtx) {
+  const state = await ctx.db.query('placeCatalogueState').unique();
+  return state && state.revision >= 1 && state.snapshotId && state.metadata
+    ? {
+        revision: state.revision,
+        snapshotId: state.snapshotId,
+        metadata: state.metadata,
+      }
+    : null;
+}
+
+/** Whether a match was read from the live catalogue (`revision` 1 or more;
+ * a rowset match has none) at a revision a later publication replaced. */
+function staleMatch(
+  match: { revision?: number } | undefined,
+  live: { revision: number } | null,
+) {
+  const revision = match?.revision ?? 0;
+  return revision >= 1 && revision < (live?.revision ?? 0);
+}
+
 /** What a matching run needs, or null when the activity has no current
- * recording or already has a match for the owner's catalogue. `catalogues`
- * are the newest complete rowsets; the worker uses the one the owner's
- * matching version names. `catalogueRevision` is the live catalogue's
- * revision as the match starts (0 before its first publication). */
+ * recording or already has a current match for the owner's catalogue: one
+ * for that catalogue and, when read from the live catalogue, at its
+ * completed revision. The worker matches against `live` when the owner's
+ * matching version is the live catalogue's, and otherwise against the rowset
+ * among `catalogues` (the newest complete ones) that it names. */
 async function matchTarget(
   ctx: QueryCtx,
   owner: Doc<'owners'>,
@@ -286,14 +312,16 @@ async function matchTarget(
     !row?.dto ||
     row.deleted ||
     !row.recording ||
-    row.projection?.streams?.state !== 'current' ||
-    row.projection.match?.catalogue === owner.catalogue
+    row.projection?.streams?.state !== 'current'
   )
+    return null;
+  const live = await liveCatalogue(ctx);
+  const { match } = row.projection;
+  if (match?.catalogue === owner.catalogue && !staleMatch(match, live))
     return null;
   const recording = await ctx.db.get('recordings', row.recording);
   if (!recording) return null;
   const rowsets = await ctx.db.query('placeCatalogues').order('desc').take(8);
-  const live = await ctx.db.query('placeCatalogueState').first();
   return {
     phase: 'match' as const,
     sourceRevision: row.sourceRevision,
@@ -313,7 +341,7 @@ async function matchTarget(
         revision,
         metadata,
       })),
-    catalogueRevision: live?.revision ?? 0,
+    live,
   };
 }
 
@@ -609,7 +637,9 @@ export const advance = internalMutation({
 /** Publish the match computed for the activity's current recording with the
  * catalogue tiles it read, and end the run. A result for a recording that
  * has been replaced is dropped, and so is one that started at a catalogue
- * revision no newer than the stored match's (`publishMatchRecord`). */
+ * revision no newer than the stored match's (`publishMatchRecord`). One
+ * that started before the live catalogue's last publication completed is
+ * matched again afterwards. */
 export const matched = internalMutation({
   args: {
     job: v.id('ingestionJobs'),
@@ -655,7 +685,14 @@ export const matched = internalMutation({
     });
     if (published)
       await replacePlaceTiles(ctx, owner._id, job.activity, args.tiles);
-    await finish(ctx, job);
+    // A publication completed while this match ran: its re-match walk may
+    // have passed the activity before these tiles were written, so the
+    // match is owed again now.
+    const stale = staleMatch(
+      { revision: args.revision },
+      await liveCatalogue(ctx),
+    );
+    await finish(ctx, stale ? { ...job, rematch: true } : job);
   },
 });
 

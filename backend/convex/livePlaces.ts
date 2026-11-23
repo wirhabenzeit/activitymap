@@ -1,3 +1,4 @@
+import { paginationOptsValidator } from 'convex/server';
 import { v } from 'convex/values';
 
 import {
@@ -114,6 +115,30 @@ export const hashes = internalQuery({
       page: result.page.map(({ key, hash, tile }) => ({ key, hash, tile })),
       isDone: result.isDone,
       continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/** One page of a live tile, shaped for `readMatchingTiles`. During an apply
+ * it holds old and new rows; the re-match walk corrects matches that read
+ * them. */
+export const tilePage = internalQuery({
+  args: { tile: v.string(), paginationOpts: paginationOptsValidator },
+  handler: async (ctx, args) => {
+    if (args.paginationOpts.numItems > 256) throw new Error('Tile page limit');
+    const result = await ctx.db
+      .query('livePlaces')
+      .withIndex('by_tile_key', (q) => q.eq('tile', args.tile))
+      .paginate(args.paginationOpts);
+    return {
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+      page: result.page.map((row) => ({
+        key: row.key,
+        longitude: row.place.location.longitude,
+        latitude: row.place.location.latitude,
+        metadata: row.place,
+      })),
     };
   },
 });

@@ -8,10 +8,11 @@ import { internal } from './_generated/api';
 import { internalAction } from './_generated/server';
 
 /**
- * Make the newest complete place catalogue the one libraries are matched
- * against. Run after a catalogue is published (`pnpm places:publish` does),
- * and after a deployment that changes the matching recipe:
- * `convex run catalogueWorker:adopt`.
+ * Move every library to the latest place catalogue (`places.latest`): the
+ * live catalogue once it has been published, before that the newest
+ * complete rowset. Publishing the live catalogue needs no adoption; run
+ * `convex run catalogueWorker:adopt` once after its first publication, and
+ * after a deployment that changes the matching recipe.
  *
  * The matching version is computed here, from the recipe in the deployed
  * code, so it is the one the ingestion worker looks for when it matches.
@@ -21,11 +22,11 @@ export const adopt = internalAction({
   handler: async (
     ctx,
   ): Promise<{ snapshotId: string; revision: string; libraries: number }> => {
-    const rowset: { snapshotId: string; revision: string } | null =
+    const latest: { snapshotId: string; revision: string } | null =
       await ctx.runQuery(internal.places.latest, {});
-    if (!rowset) throw new Error('No complete place catalogue');
-    const { snapshotId, revision } = rowset;
-    const version = matchingVersion(rowset);
+    if (!latest) throw new Error('No complete place catalogue');
+    const { snapshotId, revision } = latest;
+    const version = matchingVersion(latest);
     const libraries: number = await ctx.runMutation(internal.catalogue.adopt, {
       catalogue: catalogueIdentity(version),
       matchingVersion: version,

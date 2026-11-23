@@ -28,9 +28,9 @@ crons.interval(
   {},
 );
 crons.interval(
-  'prune place tile changes',
+  'resume place re-match walks',
   { hours: 24 },
-  internal.maintenance.prunePlaceTileChanges,
+  internal.maintenance.resumeRematchWalks,
   {},
 );
 export default crons;

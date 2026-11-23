@@ -16,7 +16,11 @@ jobs (`backend/convex/crons.ts`):
 | Expire bridge write nonces     | 1 hour   |
 | Expire provider event receipts | 24 hours |
 | Expire API rate limit windows  | 24 hours |
-| Prune place tile changes       | 24 hours |
+| Resume place re-match walks    | 24 hours |
+
+The last restarts the re-match walk of a place catalogue publication that
+still has changed tiles left (`maintenance.resumeRematchWalks`); a walk
+removes each tile once it has finished it.
 
 Their runs, failures and logs are on the deployment's Convex dashboard.
 

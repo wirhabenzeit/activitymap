@@ -1,9 +1,13 @@
 import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
-import type { Doc } from './_generated/dataModel';
-import { type MutationCtx, internalMutation } from './_generated/server';
-import { publishChange } from './activityWrites';
+import type { Doc, Id } from './_generated/dataModel';
+import {
+  type MutationCtx,
+  type QueryCtx,
+  internalMutation,
+} from './_generated/server';
+import { activityFor, publishChange } from './activityWrites';
 import { ingests, requestMatch } from './ingestion';
 import { writerValidator } from './ownerScope';
 import {
@@ -13,7 +17,7 @@ import {
   scopeFields,
   writerOf,
 } from './owners';
-import { latestRowset } from './places';
+import { latestCatalogue } from './places';
 
 /** How many activities one step of the walk handles, and how long it waits
  * before the next: a rematch asks for about eight matches a second. */
@@ -67,23 +71,24 @@ export async function selectFor(
 }
 
 /**
- * Move every library Convex writes to a catalogue: the newest complete
- * rowset under the deployed matching recipe, as `catalogueWorker.adopt`
- * names it. Each library's old matches are hidden at once and every
- * recording is matched again (`next`). Owners that already have the
- * catalogue are left alone, so this is safe to repeat. Returns how many
- * libraries the first page moved.
+ * Move every library Convex writes to a catalogue: the latest one
+ * (`places.latestCatalogue`: the live catalogue once it has been published)
+ * under the deployed matching recipe, as `catalogueWorker.adopt` names it.
+ * Each library's old matches are hidden at once and every recording is
+ * matched again (`next`). Owners that already have the catalogue are left
+ * alone, so this is safe to repeat. Returns how many libraries the first
+ * page moved.
  *
  * Owners are moved a page at a time, so two adoptions can be under way at
  * once. Only the latest one may change owners: an adoption starts only for
- * the rowset that is still the newest, records itself in
+ * the catalogue that is still the latest, records itself in
  * `catalogueAdoptions`, and each later page stops when another adoption has
  * been recorded since.
  */
 export const adopt = internalMutation({
   args: {
     ...identity,
-    /** The rowset the identity was computed for. */
+    /** The catalogue the identity was computed for. */
     snapshotId: v.string(),
     revision: v.string(),
     cursor: v.optional(v.string()),
@@ -92,22 +97,19 @@ export const adopt = internalMutation({
     const { catalogue, matchingVersion } = args;
     const current = await ctx.db.query('catalogueAdoptions').first();
     if (cursor === undefined) {
-      const latest = await latestRowset(ctx);
+      const latest = await latestCatalogue(ctx);
       if (
         latest?.snapshotId !== args.snapshotId ||
         latest.revision !== args.revision
       )
         return 0;
-      if (!current)
-        await ctx.db.insert('catalogueAdoptions', {
-          catalogue,
-          matchingVersion,
-        });
-      else
-        await ctx.db.patch('catalogueAdoptions', current._id, {
-          catalogue,
-          matchingVersion,
-        });
+      const adoption = {
+        catalogue,
+        matchingVersion,
+        snapshotId: args.snapshotId,
+      };
+      if (!current) await ctx.db.insert('catalogueAdoptions', adoption);
+      else await ctx.db.patch('catalogueAdoptions', current._id, adoption);
     } else if (
       current?.catalogue !== catalogue ||
       current.matchingVersion !== matchingVersion
@@ -219,8 +221,60 @@ export const next = internalMutation({
   },
 });
 
-/** The re-match walk of a completed live catalogue revision
- * (livePlaces.completeApply schedules it). */
+/** How many changed tiles one step of the re-match walk takes on. */
+const TILE_PAGE = 64;
+
+type TilePosition = { owner: Id<'owners'>; activity: string };
+
+/** Up to `limit` activities whose match read `tile`, after `after`. */
+async function tileActivities(
+  ctx: QueryCtx,
+  tile: string,
+  after: TilePosition | undefined,
+  limit: number,
+) {
+  const rows = after
+    ? await ctx.db
+        .query('activityPlaceTiles')
+        .withIndex('by_tile_owner', (q) =>
+          q
+            .eq('tile', tile)
+            .eq('owner', after.owner)
+            .gt('activity', after.activity),
+        )
+        .take(limit)
+    : [];
+  if (rows.length < limit)
+    rows.push(
+      ...(await ctx.db
+        .query('activityPlaceTiles')
+        .withIndex('by_tile_owner', (q) =>
+          after
+            ? q.eq('tile', tile).gt('owner', after.owner)
+            : q.eq('tile', tile),
+        )
+        .take(limit - rows.length)),
+    );
+  return rows;
+}
+
+/**
+ * The re-match walk of a completed live catalogue revision
+ * (livePlaces.completeApply schedules it): ask for a new match
+ * (`ingestion.requestMatch`) of every activity whose match read a tile the
+ * revision changed and started at an older revision. That includes matches
+ * that ran while the revision was being applied. Old matches stay until the
+ * new ones replace them. Owners Convex does not ingest for are skipped.
+ *
+ * The revision's `placeTileChanges` rows are the work left: a tile's row is
+ * deleted once the walk has looked at all of its activities, and `cursor` is
+ * the position within the first tile left. Each step looks at up to
+ * `WALK_PAGE` activities and pauses like `next` when it asked for matches.
+ * A second walk over the same tiles repeats only requests that change
+ * nothing, and an activity in several tiles is matched once: a request for
+ * a job already queued or running adds no run, and once it is matched its
+ * revision is no longer older.
+ */
 export const rematchTiles = internalMutation({
   args: {
     revision: v.number(),
@@ -228,10 +282,73 @@ export const rematchTiles = internalMutation({
     cursor: v.optional(
       v.object({
         tile: v.string(),
-        owner: v.optional(v.id('owners')),
-        activity: v.optional(v.string()),
+        owner: v.id('owners'),
+        activity: v.string(),
       }),
     ),
   },
-  handler: async (): Promise<{ done: boolean }> => ({ done: true }),
+  handler: async (ctx, { revision, cursor }): Promise<{ done: boolean }> => {
+    const state = await ctx.db.query('placeCatalogueState').unique();
+    // A pending revision's tiles wait for its completion.
+    if (!state || state.revision < revision) return { done: true };
+    const changes = await ctx.db
+      .query('placeTileChanges')
+      .withIndex('by_revision_tile', (q) => q.eq('revision', revision))
+      .take(TILE_PAGE);
+    const owners = new Map<Id<'owners'>, Doc<'owners'> | null>();
+    const seen = new Set<string>();
+    let budget = WALK_PAGE;
+    let requested = 0;
+    let next: typeof cursor;
+    for (const change of changes) {
+      const rows = await tileActivities(
+        ctx,
+        change.tile,
+        cursor?.tile === change.tile ? cursor : undefined,
+        budget,
+      );
+      for (const row of rows) {
+        const key = `${row.owner}/${row.activity}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (!owners.has(row.owner))
+          owners.set(row.owner, await ctx.db.get('owners', row.owner));
+        const owner = owners.get(row.owner)!;
+        if (!ingests(owner)) continue;
+        const activity = await activityFor(ctx, owner._id, row.activity);
+        const matchedAt = activity?.projection?.match?.revision ?? 0;
+        if (
+          activity?.dto &&
+          !activity.deleted &&
+          activity.generation === owner.generation &&
+          activity.recording &&
+          activity.projection?.streams?.state === 'current' &&
+          matchedAt >= 1 &&
+          matchedAt < revision
+        ) {
+          await requestMatch(ctx, owner._id, row.activity);
+          requested++;
+        }
+      }
+      budget -= rows.length;
+      if (budget === 0) {
+        const last = rows.at(-1)!;
+        next = {
+          tile: change.tile,
+          owner: last.owner,
+          activity: last.activity,
+        };
+        break;
+      }
+      await ctx.db.delete('placeTileChanges', change._id);
+    }
+    const done = !next && changes.length < TILE_PAGE;
+    if (!done)
+      await ctx.scheduler.runAfter(
+        requested > 0 ? REMATCH_PAUSE_MS : 0,
+        internal.catalogue.rematchTiles,
+        { revision, ...(next && { cursor: next }) },
+      );
+    return { done };
+  },
 });

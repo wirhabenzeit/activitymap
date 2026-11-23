@@ -1,7 +1,6 @@
 /**
- * The place rows of a catalogue as both sides of the catalogue import handle
- * them: the app, which publishes them, and the Convex functions,
- * which store them. Plain TypeScript with Web Crypto only, so it runs in the
+ * The place rows of a catalogue as both sides of a publication handle them:
+ * the app, which publishes them, and the Convex functions, which store them. Plain TypeScript with Web Crypto only, so it runs in the
  * Convex runtime as well as in Node.
  */
 
@@ -16,6 +15,14 @@ export type PlaceRow = {
 };
 
 export const PLACE_BATCH_LIMIT = 500;
+
+/** The live catalogue as matching versions name it: the one live table,
+ * whatever snapshot it holds, so a publication changes no owner's matching
+ * version. Only a recipe change does (`matchingVersion`). */
+export const LIVE_CATALOGUE = Object.freeze({
+  snapshotId: 'places-live',
+  revision: 'live-rows-v1',
+});
 
 /** The quarter-degree tile a point falls in (see `readMatchingTiles`). */
 export function tileOf(location: { longitude: number; latitude: number }) {

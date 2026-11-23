@@ -330,12 +330,15 @@ provider gateway and never holds a provider credential:
    which is not asked for streams, or one whose streams the provider does
    not have) gets an empty recording: that is how "nothing to fetch" is
    remembered, and why such an activity does not stay pending.
-4. **Match.** When the activity has a current recording without a match
-   for the owner's catalogue, the worker matches it against the copied
-   place catalogue (`backend/matching/activity-match.ts`) and publishes the result. A title
-   edit keeps recording and match; a new recording is matched again. If no
-   complete rowset is the one the owner's matching version names, the
-   activity is finished without a match.
+4. **Match.** When the activity has a current recording without a current
+   match for the owner's catalogue, the worker matches it against the place
+   catalogue (`backend/matching/activity-match.ts`) and publishes the
+   result. A title edit keeps recording and match; a new recording is
+   matched again. A match read from the live catalogue at a revision that a
+   later publication replaced is not current either. Which catalogue is read
+   depends on the owner's matching version (see "Place catalogue"); when
+   it names none that is available, the activity is finished without a
+   match.
 5. **Complete.** If the activity was requested again while the run was
    under way, the job starts over at once.
 
@@ -459,58 +462,78 @@ compares with.
 A place catalogue is built from OpenStreetMap extracts
 (`pnpm places:prepare`, `places:combine`) and published here with
 `pnpm places:publish` (`src/server/places/catalogue-publish.ts`,
-[docs/place-catalogue-refresh.md](../docs/place-catalogue-refresh.md)). The
-publisher sends the artifact's places through the write bridge operations
-`catalogueState`, `beginCatalogue`, `importPlaces` and `completeCatalogue`
-(`convex/places.ts`), then calls `adoptCatalogue`.
-
-A rowset is one catalogue snapshot under one row format: the artifact's rows
-that the noise filter does not hide. A place's ID is a name-based UUID of its
-OpenStreetMap object, so the same place has the same ID in every catalogue.
-Rows are stored in `places` by quarter-degree tile; the catalogue manifest
-and coverage are one stored file referenced from `placeCatalogues`.
-
-Rows are sent in ascending place-ID order, 500 a call, and sending continues
-from the last imported ID after a deadline or an error. Both sides keep a
-digest over the rows, and a rowset is marked complete only when its row count
-and digest agree; nothing may read it before. Superseded rowsets are not
-removed yet.
-
-`adoptCatalogue` (`convex/catalogueWorker.ts`) names the newest complete
-rowset under the matching recipe in the deployed code and moves every library
-Convex writes to it (`catalogue.adopt`). For each library the walk
-`catalogue.next` hides the old matches, tells clients, and queues an
-ingestion job that starts at the match phase for every activity with a
-current recording (`ingestion.requestMatch`), so nothing is read from the
-provider. A job that is running when the walk reaches its activity is marked
-`rematch` and queued for the match when its run ends, also without a provider
-read. The walk pauses two seconds between steps of sixteen activities.
-
-Owners are moved a page at a time. An adoption starts only for the rowset
-that is still the newest and records itself in `catalogueAdoptions`; a later
-page of an adoption that another one has replaced there changes nothing. A
-library that already has the catalogue is left alone, so adopting is safe to
-repeat; run `convex run catalogueWorker:adopt` after a deployment that
-changes the matching recipe.
-
-The script reports progress after each minute of sending and can be stopped
-and run again. The eight-country catalogue has about 176,000 such rows.
+[docs/place-catalogue-refresh.md](../docs/place-catalogue-refresh.md)). A
+place's ID is a name-based UUID of its OpenStreetMap object, so the same
+place has the same ID in every catalogue.
 
 ### Live catalogue
 
-The live catalogue (`convex/livePlaces.ts`,
-[docs/place-catalogue-incremental-refresh.md](../docs/place-catalogue-incremental-refresh.md))
-is one table, `livePlaces`, that a publication updates in place. The
+The live catalogue (`convex/livePlaces.ts`) is one table, `livePlaces`, that
+a publication updates in place; rows are stored by quarter-degree tile. The
 publisher reads `liveState` and pages of row hashes (`liveHashes`), both
 signed but without a nonce, and sends only the difference: `beginApply`
 announces the artifact and the row count and set digest the rows must reach,
 `applyBatch` upserts and deletes up to 500 rows a call, and `completeApply`
-accepts the publication when the rows match and schedules the re-match walk
-(`catalogue.rematchTiles`). `placeCatalogueState` holds the completed and the
-pending publication. Every write records its old and new tile in
-`placeTileChanges`; a daily job removes rows of revisions before the last
-completed one. A pending apply of another artifact is only discarded with
-`replacePending`.
+accepts the publication when the rows match. `placeCatalogueState` holds the
+completed publication (its `revision`, snapshot and the stored manifest and
+coverage) and the pending one. A pending apply of another artifact is only
+discarded with `replacePending`.
+
+Every write records its old and new tile in `placeTileChanges`, and the
+publisher adds the tiles where the coverage changed. Each match records the
+tiles it read in `activityPlaceTiles`. On completion the re-match walk
+`catalogue.rematchTiles` goes through the revision's changed tiles and asks
+for a new match (`ingestion.requestMatch`, no provider read) of every
+activity there whose match was read at an older revision, pausing two
+seconds after each step that asked for any. It skips owners Convex does not
+ingest for. Old matches stay visible until the new result replaces them
+(`publishMatchRecord` accepts a newer revision under the same catalogue). The
+walk deletes each tile's row once it has finished the tile, so the rows left
+are its unfinished work; a daily job (`maintenance.resumeRematchWalks`)
+starts the walk again for completed revisions that still have rows.
+
+Matching reads rows while a publication is applied. A match records the live
+revision that was current when it started, so one that overlapped an apply
+is older than the completed revision and is matched again: by the walk, or,
+if it was published after the walk passed, at once (`ingestion.matched`).
+
+### Which catalogue an owner is matched against
+
+`owner.matchingVersion` names the recipe and the catalogue. For the live
+catalogue it names the fixed lineage `LIVE_CATALOGUE`
+(`src/server/places/catalogue-rows.ts`), not a snapshot, so a publication
+changes no owner. The worker (`ingestionWorker.match`) reads the live table
+when the owner's matching version is the live one and a publication has
+completed, and otherwise the rowset its matching version names. A stored
+match's `revision` tells them apart: 1 or more for the live revision it was
+read at, 0 or absent for a rowset. `catalogueSnapshotId` in a result is the
+snapshot of the publication that produced it.
+
+`places.latestCatalogue` is the live catalogue once a publication has
+completed, before that the newest complete rowset. New libraries start on it
+(`latestCatalogue` over the write bridge), and `catalogueWorker.adopt` moves
+every library Convex writes to it (`catalogue.adopt`). For each library the
+walk `catalogue.next` hides the old matches, tells clients, and queues a
+match for every activity with a current recording, without a provider read.
+A job that is running when the walk reaches its activity is marked `rematch`
+and queued for the match when its run ends. Owners are moved a page at a
+time; an adoption starts only for the catalogue that is still the latest and
+records itself in `catalogueAdoptions`, and a later page of an adoption that
+another one has replaced there changes nothing. Adopting is safe to repeat.
+Run `convex run catalogueWorker:adopt` once after the first live
+publication, and after a deployment that changes the matching recipe.
+
+### Rowsets
+
+Before the live catalogue, each publication was an immutable rowset: the
+`places` rows of one snapshot, with its manifest and coverage referenced
+from `placeCatalogues`, imported through `catalogueState`, `beginCatalogue`,
+`importPlaces` and `completeCatalogue` (`convex/places.ts`). Owners whose
+matching version names a rowset keep reading it until they are adopted.
+After the cutover, `convex run places:dropRowsets` deletes the rowsets and
+their files, continuing by itself until none are left. It refuses before a
+live publication has completed and until the latest adoption was to the live
+catalogue.
 
 ## Recordings and publication
 

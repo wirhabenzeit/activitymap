@@ -210,6 +210,8 @@ router.route({
           result = await ctx.runMutation(internal.places.uploadUrls, args);
           break;
         // The place catalogue belongs to no owner: the signature authorizes.
+        // A new library is matched against the latest catalogue
+        // (places.latestCatalogue).
         case 'latestCatalogue':
           result = await ctx.runQuery(internal.places.latest, {});
           break;
@@ -237,10 +239,6 @@ router.route({
             internal.livePlaces.completeApply,
             args,
           );
-          break;
-        // Match every library against the newest complete rowset.
-        case 'adoptCatalogue':
-          result = await ctx.runAction(internal.catalogueWorker.adopt, {});
           break;
         case 'recordEvents':
           result = await ctx.runMutation(internal.providerEvents.record, {
