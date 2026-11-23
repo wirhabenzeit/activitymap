@@ -39,21 +39,48 @@ export function datasetFor(snapshotId: string, revision: string) {
   return sha256Hex(`places-v1\n${snapshotId}\n${revision}`);
 }
 
+/** A place row's fields in the fixed order both digests are taken over. */
+function canonicalRow(place: PlaceRow) {
+  return [
+    place.id,
+    place.displayName,
+    place.kinds,
+    place.subtypes,
+    place.location.longitude,
+    place.location.latitude,
+    place.elevationM ?? null,
+  ];
+}
+
+/** The hash of one live catalogue row: SHA-256 of its canonical form. Two
+ * rows with the same hash are the same place row. */
+export function rowHash(place: PlaceRow) {
+  return sha256Hex(JSON.stringify(canonicalRow(place)));
+}
+
+/** The digest of the live catalogue: the sum of its row hashes modulo
+ * 2^256, as 64 hex digits. It does not depend on the order of the rows, and
+ * a write updates it by subtracting the old row hash and adding the new. */
+export const EMPTY_SET_DIGEST = '0'.repeat(64);
+const SET_DIGEST_MASK = (1n << 256n) - 1n;
+function setDigestStep(digest: string, hash: string, sign: 1n | -1n) {
+  if (!/^[0-9a-f]{64}$/.test(digest) || !/^[0-9a-f]{64}$/.test(hash))
+    throw new Error('Invalid digest');
+  return (
+    (BigInt(`0x${digest}`) + sign * BigInt(`0x${hash}`)) &
+    SET_DIGEST_MASK
+  )
+    .toString(16)
+    .padStart(64, '0');
+}
+export const addToSetDigest = (digest: string, hash: string) =>
+  setDigestStep(digest, hash, 1n);
+export const removeFromSetDigest = (digest: string, hash: string) =>
+  setDigestStep(digest, hash, -1n);
+
 /** The digest after appending `places` to a rowset whose digest so far is
  * `previous` ('' for an empty one). Both sides compute it for every batch,
  * so a finished import is known to hold the rows that were sent, in order. */
 export function chainDigest(previous: string, places: readonly PlaceRow[]) {
-  return sha256Hex(
-    `${previous}\n${JSON.stringify(
-      places.map((place) => [
-        place.id,
-        place.displayName,
-        place.kinds,
-        place.subtypes,
-        place.location.longitude,
-        place.location.latitude,
-        place.elevationM ?? null,
-      ]),
-    )}`,
-  );
+  return sha256Hex(`${previous}\n${JSON.stringify(places.map(canonicalRow))}`);
 }

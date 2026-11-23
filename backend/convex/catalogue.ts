@@ -218,3 +218,20 @@ export const next = internalMutation({
     return { done };
   },
 });
+
+/** The re-match walk of a completed live catalogue revision
+ * (livePlaces.completeApply schedules it). */
+export const rematchTiles = internalMutation({
+  args: {
+    revision: v.number(),
+    /** Where the walk continues: the tile and the last activity seen in it. */
+    cursor: v.optional(
+      v.object({
+        tile: v.string(),
+        owner: v.optional(v.id('owners')),
+        activity: v.optional(v.string()),
+      }),
+    ),
+  },
+  handler: async (): Promise<{ done: boolean }> => ({ done: true }),
+});

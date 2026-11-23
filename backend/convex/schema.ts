@@ -274,6 +274,59 @@ export default defineSchema({
   })
     .index('by_dataset_tile', ['dataset', 'tile', 'key'])
     .index('by_dataset_key', ['dataset', 'key']),
+  /** The live place catalogue (convex/livePlaces.ts): one row per place,
+   * updated in place by a publication. `key` is the place ID, `hash` the
+   * row hash (`rowHash` in src/server/places/catalogue-rows.ts) and
+   * `revision` the catalogue revision that last wrote the row. */
+  livePlaces: defineTable({
+    key: v.string(),
+    tile: v.string(),
+    place: placeValidator,
+    hash: v.string(),
+    revision: v.number(),
+  })
+    .index('by_key', ['key'])
+    .index('by_tile_key', ['tile', 'key']),
+  /** The state of the live catalogue (one row). `revision` counts completed
+   * publications and is 0 before the first. `snapshotId` and `metadata`
+   * (a stored file with the manifest and coverage) are those of the last
+   * completed publication. `count` and `setDigest` describe the rows as
+   * they are now and are maintained by every write. `pending` is the
+   * publication being applied: the revision it will become and the count
+   * and digest the rows must reach. */
+  placeCatalogueState: defineTable({
+    revision: v.number(),
+    snapshotId: v.optional(v.string()),
+    metadata: v.optional(v.id('_storage')),
+    count: v.number(),
+    setDigest: v.string(),
+    pending: v.optional(
+      v.object({
+        snapshotId: v.string(),
+        revision: v.number(),
+        metadata: v.id('_storage'),
+        count: v.number(),
+        setDigest: v.string(),
+        startedAt: v.number(),
+      }),
+    ),
+  }),
+  /** The tiles a publication changed: the old and new tile of every place
+   * it wrote or deleted, and the tiles where coverage changed. One row per
+   * revision and tile, deleted when the revision's re-match walk ends. */
+  placeTileChanges: defineTable({
+    revision: v.number(),
+    tile: v.string(),
+  }).index('by_revision_tile', ['revision', 'tile']),
+  /** The catalogue tiles each activity's match read, so a catalogue change
+   * finds the activities it affects. `activity` is the activity key. */
+  activityPlaceTiles: defineTable({
+    owner: v.id('owners'),
+    activity: v.string(),
+    tile: v.string(),
+  })
+    .index('by_owner_activity', ['owner', 'activity'])
+    .index('by_tile_owner', ['tile', 'owner', 'activity']),
   changes: defineTable({
     owner: v.id('owners'),
     sequence: v.number(),
