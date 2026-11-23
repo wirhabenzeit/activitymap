@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
+import test, { afterEach, beforeEach, mock } from 'node:test';
 
 import { convexTest } from 'convex-test';
-import test, { afterEach, beforeEach, mock } from 'node:test';
 
 import { createProviderGatewayHandler } from '../../src/app/api/internal/provider/v1/handler';
 import {
@@ -1101,6 +1101,140 @@ void test('a new recording is matched against the owner’s place catalogue', as
   );
 });
 
+/** The catalogue tiles recorded for each activity's match. */
+async function placeTiles(convex: Convex) {
+  const tiles = new Map<number, string[]>();
+  for (const row of await convex.run((ctx) =>
+    ctx.db.query('activityPlaceTiles').collect(),
+  ))
+    tiles.set(Number(row.activity), [
+      ...(tiles.get(Number(row.activity)) ?? []),
+      row.tile,
+    ]);
+  for (const list of tiles.values()) list.sort();
+  return tiles;
+}
+
+void test('a match records the catalogue tiles it read, and they go with the match', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  provider.set(detail(8, 'Elsewhere'));
+  provider.record('8', track(46.5, 8.5));
+  await ingest(convex, '7', '8');
+
+  // Each activity has the tiles of its own track, the peak's among them.
+  let tiles = await placeTiles(convex);
+  const peakTile = `${Math.floor((peak.location.longitude + 180) * 4)},${Math.floor((peak.location.latitude + 90) * 4)}`;
+  const elsewhere = tiles.get(8)!;
+  assert(tiles.get(7)!.includes(peakTile));
+  assert(elsewhere.length > 0 && !elsewhere.includes(peakTile));
+
+  // A new recording drops the tiles with the match until it is matched
+  // again, which replaces them.
+  let between: Map<number, string[]> | undefined;
+  provider.during = async () => {
+    // The activity has been read; the samples are next.
+    provider.during = async () => {
+      between = await placeTiles(convex);
+    };
+  };
+  provider.set(detail(7, 'Past the peak', { distance: 2000 }));
+  provider.record('7', track(46.5, 8.5));
+  mock.timers.tick(1000);
+  await event(convex, '7', 'update');
+  await settle(convex);
+  assert.equal(between!.get(7), undefined);
+  tiles = await placeTiles(convex);
+  assert.deepEqual(tiles.get(7), elsewhere);
+  assert.deepEqual(tiles.get(8), elsewhere);
+
+  // A deleted activity has none.
+  provider.remove('7');
+  mock.timers.tick(1000);
+  await event(convex, '7', 'delete');
+  await settle(convex);
+  tiles = await placeTiles(convex);
+  assert.deepEqual([...tiles.keys()], [8]);
+
+  // Nor does an erased account.
+  await convex.mutation(internal.erasure.start, actor);
+  await settle(convex);
+  assert.equal((await placeTiles(convex)).size, 0);
+});
+
+void test('a match result that started at an older or the same catalogue revision is dropped', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+  const stored = async () =>
+    (await state(convex)).activities[0]!.projection!.match!;
+  const first = await stored();
+  assert.equal(first.revision, 0);
+  const tiles = (await placeTiles(convex)).get(7);
+  const { activities, jobs } = await state(convex);
+  const { resultRevision: _revision, ...result } = first.value;
+
+  /** A worker's result for activity 7, as if it held the job's lease. */
+  const publish = async (revision: number, tiles: string[]) => {
+    const claim = jobs[0]!.claims + 1;
+    await convex.run((ctx) =>
+      ctx.db.patch('ingestionJobs', jobs[0]!._id, {
+        claims: claim,
+        lease: {
+          claim,
+          expiresAt: Date.now() + LEASE_MS,
+          requested: jobs[0]!.requested,
+        },
+      }),
+    );
+    jobs[0]!.claims = claim;
+    await convex.mutation(internal.ingestion.matched, {
+      job: jobs[0]!._id,
+      claim,
+      recording: activities[0]!.recording!,
+      result,
+      revision,
+      tiles,
+    });
+  };
+
+  // The same revision changes nothing: not the match, not its tiles.
+  await publish(0, ['1,1']);
+  assert.equal(
+    (await stored()).value.resultRevision,
+    first.value.resultRevision,
+  );
+  assert.deepEqual((await placeTiles(convex)).get(7), tiles);
+
+  // A newer one replaces both.
+  await publish(2, ['1,1']);
+  const second = await stored();
+  assert.equal(second.revision, 2);
+  assert.notEqual(second.value.resultRevision, first.value.resultRevision);
+  assert.deepEqual((await placeTiles(convex)).get(7), ['1,1']);
+
+  // An older one is dropped.
+  await publish(1, ['2,2']);
+  assert.deepEqual(await stored(), second);
+  assert.deepEqual((await placeTiles(convex)).get(7), ['1,1']);
+
+  // Tiles that no match can have read are refused.
+  await assert.rejects(publish(3, ['x']), /Invalid match tiles/);
+  await assert.rejects(
+    publish(
+      3,
+      Array.from({ length: 257 }, (_, x) => `${x},0`),
+    ),
+    /Invalid match tiles/,
+  );
+});
+
 void test('a new catalogue moves every library to it and matches every recording again', async () => {
   const provider = fakeProvider();
   const { convex, identity, complete } = await matchingOwner();
@@ -1357,6 +1491,8 @@ void test('a match is not published after a handoff or by a worker that lost the
       claim: source!.claim,
       recording: recording._id,
       result,
+      revision: 0,
+      tiles: [],
     });
   await assert.rejects(publish(), /written by another store/);
   const unmatched = async () =>

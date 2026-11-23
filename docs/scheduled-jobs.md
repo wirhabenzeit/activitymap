@@ -16,6 +16,7 @@ jobs (`backend/convex/crons.ts`):
 | Expire bridge write nonces     | 1 hour   |
 | Expire provider event receipts | 24 hours |
 | Expire API rate limit windows  | 24 hours |
+| Prune place tile changes       | 24 hours |
 
 Their runs, failures and logs are on the deployment's Convex dashboard.
 

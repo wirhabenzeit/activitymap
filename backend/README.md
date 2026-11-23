@@ -496,6 +496,22 @@ changes the matching recipe.
 The script reports progress after each minute of sending and can be stopped
 and run again. The eight-country catalogue has about 176,000 such rows.
 
+### Live catalogue
+
+The live catalogue (`convex/livePlaces.ts`,
+[docs/place-catalogue-incremental-refresh.md](../docs/place-catalogue-incremental-refresh.md))
+is one table, `livePlaces`, that a publication updates in place. The
+publisher reads `liveState` and pages of row hashes (`liveHashes`), both
+signed but without a nonce, and sends only the difference: `beginApply`
+announces the artifact and the row count and set digest the rows must reach,
+`applyBatch` upserts and deletes up to 500 rows a call, and `completeApply`
+accepts the publication when the rows match and schedules the re-match walk
+(`catalogue.rematchTiles`). `placeCatalogueState` holds the completed and the
+pending publication. Every write records its old and new tile in
+`placeTileChanges`; a daily job removes rows of revisions before the last
+completed one. A pending apply of another artifact is only discarded with
+`replacePending`.
+
 ## Recordings and publication
 
 Activity rows hold bounded DTO metadata and versioned stream/matching

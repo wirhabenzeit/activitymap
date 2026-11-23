@@ -17,6 +17,7 @@ import {
   activityFor,
   applySourceRecord,
   publishMatchRecord,
+  replacePlaceTiles,
 } from './activityWrites';
 import { project } from './liveProjection';
 import { scopeFields } from './ownerScope';
@@ -273,7 +274,8 @@ async function recordingTarget(
 /** What a matching run needs, or null when the activity has no current
  * recording or already has a match for the owner's catalogue. `catalogues`
  * are the newest complete rowsets; the worker uses the one the owner's
- * matching version names. */
+ * matching version names. `catalogueRevision` is the live catalogue's
+ * revision as the match starts (0 before its first publication). */
 async function matchTarget(
   ctx: QueryCtx,
   owner: Doc<'owners'>,
@@ -291,6 +293,7 @@ async function matchTarget(
   const recording = await ctx.db.get('recordings', row.recording);
   if (!recording) return null;
   const rowsets = await ctx.db.query('placeCatalogues').order('desc').take(8);
+  const live = await ctx.db.query('placeCatalogueState').first();
   return {
     phase: 'match' as const,
     sourceRevision: row.sourceRevision,
@@ -310,6 +313,7 @@ async function matchTarget(
         revision,
         metadata,
       })),
+    catalogueRevision: live?.revision ?? 0,
   };
 }
 
@@ -602,16 +606,27 @@ export const advance = internalMutation({
   },
 });
 
-/** Publish the match computed for the activity's current recording, and end
- * the run. A result for a recording that has been replaced is dropped. */
+/** Publish the match computed for the activity's current recording with the
+ * catalogue tiles it read, and end the run. A result for a recording that
+ * has been replaced is dropped, and so is one that started at a catalogue
+ * revision no newer than the stored match's (`publishMatchRecord`). */
 export const matched = internalMutation({
   args: {
     job: v.id('ingestionJobs'),
     claim: v.number(),
     recording: v.id('recordings'),
     result: placeMatchValidator,
+    /** The live catalogue revision current when the match started; 0 for a
+     * match against a rowset. */
+    revision: v.number(),
+    tiles: v.array(v.string()),
   },
   handler: async (ctx, args) => {
+    if (
+      args.tiles.length > 256 ||
+      args.tiles.some((tile) => !/^\d+,\d+$/.test(tile))
+    )
+      throw new Error('Invalid match tiles');
     const holder = await held(ctx, args.job, args.claim);
     if (!holder?.owner) return;
     const { job, owner } = holder;
@@ -623,7 +638,7 @@ export const matched = internalMutation({
     }
     const row = await activityFor(ctx, owner._id, job.activity);
     // Refuses an owner Convex does not write for, which fails the run.
-    await publishMatchRecord(ctx, {
+    const published = await publishMatchRecord(ctx, {
       scope: {
         userId: owner.userId,
         athleteId: owner.athleteId,
@@ -635,8 +650,11 @@ export const matched = internalMutation({
       writer: 'convex',
       recording: args.recording,
       catalogue: owner.catalogue,
+      revision: args.revision,
       result: args.result,
     });
+    if (published)
+      await replacePlaceTiles(ctx, owner._id, job.activity, args.tiles);
     await finish(ctx, job);
   },
 });

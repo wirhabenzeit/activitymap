@@ -6,9 +6,10 @@ import { uploadFile } from '../../src/server/places/convex-catalogue';
 import { convexWriteBridge } from '../../src/server/sync/convex-writer';
 
 /**
- * Publish a place catalogue artifact to the Convex backend, where activities
- * are matched against it, and have every library matched again. Without
- * --apply it only reports what publishing would do.
+ * Publish a place catalogue artifact to the Convex backend's live catalogue,
+ * where activities are matched against it. Only the difference from the live
+ * catalogue is sent, and only activities in the changed tiles are matched
+ * again. Without --apply it only reports what publishing would do.
  */
 const { values } = parseArgs({
   options: {
@@ -20,12 +21,13 @@ const { values } = parseArgs({
     'dry-run': { type: 'boolean' },
     'expect-current': { type: 'string' },
     'allow-large-retirement': { type: 'boolean' },
+    'replace-pending': { type: 'string' },
     help: { type: 'boolean' },
   },
 });
 if (values.help) {
   console.log(
-    'Publish a complete catalogue (default: dry run):\n  pnpm places:publish --artifact <directory> --user <user ID> --athlete <athlete ID> [--apply --expect-current <snapshot-id|none>] [--allow-large-retirement] [--region <region>]\nThe catalogue belongs to no account; the user and athlete only name whose bridge scope signs the requests (use an administrator).\nRequires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_CONVEX_WRITER_KEY_ID and ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY for the backend.',
+    'Publish a complete catalogue (default: dry run):\n  pnpm places:publish --artifact <directory> --user <user ID> --athlete <athlete ID> [--apply --expect-current <snapshot-id|none>] [--allow-large-retirement] [--replace-pending <snapshot-id>] [--region <region>]\nOnly the difference from the live catalogue is sent. Running an interrupted --apply again finishes it; --replace-pending abandons the unfinished publication of another artifact instead.\nThe catalogue belongs to no account; the user and athlete only name whose bridge scope signs the requests (use an administrator).\nRequires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_CONVEX_WRITER_KEY_ID and ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY for the backend.',
   );
   process.exit(0);
 }
@@ -42,6 +44,8 @@ if (values.apply && !values['expect-current'])
   throw new Error(
     '--apply requires --expect-current from the reviewed dry run (or none for a first publication)',
   );
+if (values['replace-pending'] && !values.apply)
+  throw new Error('--replace-pending only applies with --apply');
 const athleteId = Number(values.athlete);
 if (!Number.isSafeInteger(athleteId) || athleteId <= 0)
   throw new Error('--athlete must be a Strava athlete ID');
@@ -56,9 +60,12 @@ const report = await publishCatalogue({
   expectedCurrent:
     values['expect-current'] === 'none' ? null : values['expect-current'],
   allowLargeRetirement: values['allow-large-retirement'],
+  ...(values['replace-pending']
+    ? { replacePending: values['replace-pending'] }
+    : {}),
   ...(values.region ? { regionId: values.region } : {}),
-  progress: (imported, count) =>
-    console.error(`${imported} of ${count} places sent`),
+  progress: (sent, total) =>
+    console.error(`${sent} of ${total} changed places and tiles sent`),
 });
 console.log(JSON.stringify({ dryRun: !values.apply, ...report }, null, 2));
 process.exit(0);

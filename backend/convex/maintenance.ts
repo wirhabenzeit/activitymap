@@ -57,6 +57,28 @@ export const cleanupRecording = internalMutation({
   },
 });
 
+/** Tile changes of revisions before the last completed one. A revision's
+ * re-match walk deletes its own when it ends; these were left behind. */
+export const prunePlaceTileChanges = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<number> => {
+    const state = await ctx.db.query('placeCatalogueState').unique();
+    if (!state) return 0;
+    const rows = await ctx.db
+      .query('placeTileChanges')
+      .withIndex('by_revision_tile', (q) => q.lt('revision', state.revision))
+      .take(PAGE_SIZE);
+    for (const row of rows) await ctx.db.delete('placeTileChanges', row._id);
+    if (rows.length === PAGE_SIZE)
+      await ctx.scheduler.runAfter(
+        0,
+        internal.maintenance.prunePlaceTileChanges,
+        {},
+      );
+    return rows.length;
+  },
+});
+
 const EVENT_RETENTION_MS = 30 * 86_400_000;
 
 /** Provider event receipts only keep a repeated delivery from counting

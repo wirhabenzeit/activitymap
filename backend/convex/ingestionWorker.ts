@@ -225,6 +225,10 @@ async function match(ctx: ActionCtx, step: IngestionStep & { phase: 'match' }) {
     recording: step.recording.id,
     // Published match results name the current matching version.
     result: { ...matched!.result, matchingVersion: step.matchingVersion },
+    // A rowset has no live revision; a match that read the live catalogue
+    // names `step.catalogueRevision`.
+    revision: 0,
+    tiles: matched!.tiles,
   });
   return null;
 }

@@ -22,7 +22,7 @@ import { internal } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import type { ActionCtx } from '../convex/_generated/server';
 import { MAX_RECORDING_BYTES, decodeWhole } from '../recording/codec';
-import { readMatchingTiles } from './tiles';
+import { matchingTiles, readMatchingTiles } from './tiles';
 
 /**
  * Place matching for recordings held here, for Node actions: the application
@@ -107,7 +107,8 @@ export async function prepareActivity(
   };
 }
 
-/** Match prepared activities of one owner against one rowset. */
+/** Match prepared activities of one owner against one rowset. Each result
+ * names the catalogue tiles its own activity's match read. */
 export async function matchPrepared(
   ctx: ActionCtx,
   input: {
@@ -117,15 +118,21 @@ export async function matchPrepared(
   },
   prepared: PreparedActivity[],
 ): Promise<
-  { key: string; recording: Id<'recordings'>; result: ActivityPlacesResponse }[]
+  {
+    key: string;
+    recording: Id<'recordings'>;
+    result: ActivityPlacesResponse;
+    tiles: string[];
+  }[]
 > {
-  const windows: PlaceQueryWindow[] = [];
-  for (const { track } of prepared)
-    if (track)
-      windows.push(
-        ...placeQueryWindows(track.geometry, policy.discoveryRadiusM),
-      );
-  const scoped = uniqueQueryWindows(windows);
+  const windowsOf = prepared.map(({ track }): PlaceQueryWindow[] =>
+    track
+      ? uniqueQueryWindows(
+          placeQueryWindows(track.geometry, policy.discoveryRadiusM),
+        )
+      : [],
+  );
+  const scoped = uniqueQueryWindows(windowsOf.flat());
   const read = await readMatchingTiles(
     scoped,
     (tile, cursor) =>
@@ -146,10 +153,11 @@ export async function matchPrepared(
     policy,
   });
   const results = [];
-  for (const item of prepared)
+  for (const [index, item] of prepared.entries())
     results.push({
       key: item.key,
       recording: item.recording.id,
+      tiles: matchingTiles(windowsOf[index]!),
       result: activityPlacesResponseSchema.parse(
         await matcher.match(
           {

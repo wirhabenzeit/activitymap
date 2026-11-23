@@ -27,4 +27,10 @@ crons.interval(
   internal.appState.expireOldRateLimits,
   {},
 );
+crons.interval(
+  'prune place tile changes',
+  { hours: 24 },
+  internal.maintenance.prunePlaceTileChanges,
+  {},
+);
 export default crons;
