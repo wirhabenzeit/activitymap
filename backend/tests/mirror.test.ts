@@ -286,19 +286,6 @@ void test('a rowset is accepted only in order and when whole', async (t) => {
 
 void test('an artifact is published to the live catalogue after a reviewed dry run, and later only its changes', async (t) => {
   const { convex, fetcher, writer, upload } = setup(t);
-  await convex.mutation(internal.owners.provision, {
-    ...scope,
-    backend: 'convex',
-    generation: 'shadow-generation-01',
-    catalogue: 'c'.repeat(64),
-    matchingVersion: 'd'.repeat(64),
-  });
-  await convex.mutation(internal.owners.setWriter, {
-    userId: scope.userId,
-    athleteId: scope.athleteId,
-    writer: 'convex',
-    expectedEpoch: 0,
-  });
   // What the bridge was asked to apply.
   const applied: { upserts: PlaceRow[]; deletes: string[]; tiles: string[] }[] =
     [];
@@ -310,7 +297,11 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
     }
     return fetcher(url, init);
   };
-  const publisher = convexWriteBridge(actor, recording)!;
+  // No account: the catalogue's writes need the writer key alone.
+  const publisher = convexWriteBridge(
+    { userId: 'place-catalogue', athleteId: 0 },
+    recording,
+  )!;
   // Reads go through the read-only route, with the read bridge's key.
   const reads: string[] = [];
   const reader = convexCatalogueReader(async (url, init) => {

@@ -357,7 +357,7 @@ still serves from the rowsets.
 - `livePlaces.demandTiles`, and a read-only bridge route
   `/internal/places/v1` (`liveState`, `liveHashes`, `demandTiles`) with its
   client `src/server/places/catalogue-reader.ts`. A dry run needs only the
-  read key; `--apply` also needs the writer key, `--user` and `--athlete`.
+  read key; `--apply` also needs the writer key.
 - The publisher defaults to the region `places-live`, refuses a coverage
   boundary above the 500,000-edge budget, reports `coverage`, `regions`,
   `regionsAdded` and `regionsRemoved`, and writes the report to a file with

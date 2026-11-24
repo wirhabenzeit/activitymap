@@ -135,17 +135,14 @@ function fakeBackend() {
   /** Fails the next operation of this kind, before or after it is applied. */
   let failure: { kind: string; after: boolean } | null = null;
 
-  async function handle(
-    operation: { kind: string; [field: string]: unknown },
-    epoch?: string,
-  ): Promise<unknown> {
+  async function handle(operation: {
+    kind: string;
+    [field: string]: unknown;
+  }): Promise<unknown> {
     const args: unknown = operation;
     switch (operation.kind) {
-      case 'state':
-        return { epoch: 'epoch-1' };
-      case 'uploadUrls':
-        assert.equal(epoch, 'epoch-1');
-        return ['https://upload.invalid/1'];
+      case 'catalogueUploadUrl':
+        return 'https://upload.invalid/1';
       case 'liveState':
         return (
           state && {
@@ -303,16 +300,13 @@ function fakeBackend() {
     },
   };
   const writer: ConvexWriter = {
-    async write<T>(
-      operation: { kind: string; [field: string]: unknown },
-      epoch?: string,
-    ) {
+    async write<T>(operation: { kind: string; [field: string]: unknown }) {
       assert.ok(!reads.has(operation.kind), `${operation.kind} is a read`);
       operations.push(structuredClone(operation));
       const fail = failure?.kind === operation.kind ? failure : null;
       if (fail) failure = null;
       if (fail && !fail.after) throw new Error('Connection lost');
-      const result = await handle(structuredClone(operation), epoch);
+      const result = await handle(structuredClone(operation));
       if (fail) throw new Error('Connection lost');
       return result as T;
     },
@@ -501,8 +495,7 @@ void test('a first publication inserts every place after a reviewed dry run', as
   assert.deepEqual([published.status, published.revision], ['published', 1]);
   assert.deepEqual(kinds(backend.take()), [
     'liveState',
-    'state',
-    'uploadUrls',
+    'catalogueUploadUrl',
     'beginApply',
     'applyBatch',
     'completeApply',
@@ -797,7 +790,7 @@ void test('running the same command again finishes an interrupted publication', 
   const operations = backend.take();
   assert.deepEqual(
     kinds(operations).filter((kind) => kind !== 'applyBatch'),
-    ['liveState', 'state', 'uploadUrls', 'beginApply', 'completeApply'],
+    ['liveState', 'catalogueUploadUrl', 'beginApply', 'completeApply'],
   );
   assert.deepEqual(
     batchesOf(operations).flatMap((batch) => batch.tiles),

@@ -17,8 +17,6 @@ import { convexWriteBridge } from '../../src/server/sync/convex-writer';
 const { values } = parseArgs({
   options: {
     artifact: { type: 'string' },
-    user: { type: 'string' },
-    athlete: { type: 'string' },
     region: { type: 'string' },
     apply: { type: 'boolean' },
     'dry-run': { type: 'boolean' },
@@ -31,7 +29,7 @@ const { values } = parseArgs({
 });
 if (values.help) {
   console.log(
-    'Publish a complete catalogue (default: dry run):\n  pnpm places:publish --artifact <directory> [--report <file>] [--region <region>]\n  pnpm places:publish --artifact <directory> --apply --expect-current <snapshot-id|none> --user <user ID> --athlete <athlete ID> [--allow-large-retirement] [--replace-pending <snapshot-id>] [--report <file>] [--region <region>]\nOnly the difference from the live catalogue is sent. Running an interrupted --apply again finishes it; --replace-pending abandons the unfinished publication of another artifact instead. --report also writes the report JSON to a file.\nThe catalogue belongs to no account; with --apply the user and athlete only name whose bridge scope signs the writes (use an administrator).\nA dry run requires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_CONVEX_KEY_ID and ACTIVITYMAP_CONVEX_SIGNING_KEY (the read bridge). --apply also requires ACTIVITYMAP_CONVEX_WRITER_KEY_ID and ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY.',
+    'Publish a complete catalogue (default: dry run):\n  pnpm places:publish --artifact <directory> [--report <file>] [--region <region>]\n  pnpm places:publish --artifact <directory> --apply --expect-current <snapshot-id|none> [--allow-large-retirement] [--replace-pending <snapshot-id>] [--report <file>] [--region <region>]\nOnly the difference from the live catalogue is sent. Running an interrupted --apply again finishes it; --replace-pending abandons the unfinished publication of another artifact instead. --report also writes the report JSON to a file.\nA dry run requires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_CONVEX_KEY_ID and ACTIVITYMAP_CONVEX_SIGNING_KEY (the read bridge). --apply also requires ACTIVITYMAP_CONVEX_WRITER_KEY_ID and ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY.',
   );
   process.exit(0);
 }
@@ -39,8 +37,6 @@ if (!values.artifact || (values.apply && values['dry-run']))
   throw new Error(
     'Supply --artifact, and choose at most one of --apply or --dry-run',
   );
-if (values.apply && (!values.user || !values.athlete))
-  throw new Error('--apply requires --user and --athlete');
 if (values.apply && !values['expect-current'])
   throw new Error(
     '--apply requires --expect-current from the reviewed dry run (or none for a first publication)',
@@ -49,13 +45,11 @@ if (values['replace-pending'] && !values.apply)
   throw new Error('--replace-pending only applies with --apply');
 const reader = convexCatalogueReader();
 if (!reader) throw new Error('ACTIVITYMAP_CONVEX_SITE is not configured');
-let writer;
-if (values.apply) {
-  const athleteId = Number(values.athlete);
-  if (!Number.isSafeInteger(athleteId) || athleteId <= 0)
-    throw new Error('--athlete must be a Strava athlete ID');
-  writer = convexWriteBridge({ userId: values.user!, athleteId })!;
-}
+// The catalogue belongs to no account: its writes are authorized by the
+// writer key alone, and the bridge's owner scope is not used.
+const writer = values.apply
+  ? convexWriteBridge({ userId: 'place-catalogue', athleteId: 0 })!
+  : undefined;
 
 const report = await publishCatalogue({
   catalogue: await loadCatalogueArtifact(values.artifact),

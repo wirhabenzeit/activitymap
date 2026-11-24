@@ -336,18 +336,12 @@ export async function publishCatalogue({
   if (pendingId !== snapshotId && (replacePending ?? null) !== pendingId)
     throw new Error(pendingOther(pendingId));
 
-  // Upload URLs are issued under an owner's current assignment.
-  const owner = await writer.write<{ epoch: string } | null>({ kind: 'state' });
-  if (!owner) throw new Error('The signing owner is not provisioned');
-  const [url] = await writer.write<string[]>(
-    { kind: 'uploadUrls', count: 1 },
-    owner.epoch,
-  );
+  const url = await writer.write<string>({ kind: 'catalogueUploadUrl' });
   const begun = await writer.write<Begun>({
     kind: 'beginApply',
     expectCurrent: expectedCurrent,
     snapshotId,
-    metadata: await upload(url!, metadata),
+    metadata: await upload(url, metadata),
     count: rows.length,
     setDigest: hashes.reduce(addToSetDigest, EMPTY_SET_DIGEST),
     ...(replacePending === undefined ? {} : { replacePending }),

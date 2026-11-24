@@ -212,16 +212,14 @@ The publisher reads the live catalogue through the read bridge's route
 only the read key: `ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_KEY_ID`
 and `ACTIVITYMAP_CONVEX_SIGNING_KEY`, a key ID listed in the deployment's
 `ACTIVITYMAP_BRIDGE_SIGNING_KEYS`. `--apply` also needs the write key,
-`ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and `ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY`,
-and `--user` and `--athlete`: the user and athlete ID of an account whose
-bridge scope signs the writes (use an administrator; the catalogue belongs
-to no account).
+`ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and `ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY`.
+The catalogue belongs to no account, so no user is named.
 
 ```sh
 pnpm places:publish --artifact <dir> [--report <file>] [--region <region>]
 pnpm places:publish --artifact <dir> --apply --expect-current <snapshot-id|none> \
-  --user <user ID> --athlete <athlete ID> [--allow-large-retirement] \
-  [--replace-pending <snapshot ID>] [--report <file>] [--region <region>]
+  [--allow-large-retirement] [--replace-pending <snapshot ID>] \
+  [--report <file>] [--region <region>]
 ```
 
 Default execution is a dry run: it reads the live row hashes, diffs them with
@@ -230,7 +228,6 @@ snapshot ID the report showed, or `none` when nothing was published yet:
 
 ```sh
 pnpm places:publish --artifact output/places/places-live \
-  --user <user ID> --athlete <athlete ID> \
   --apply --expect-current <current-snapshot-id>
 ```
 
@@ -354,9 +351,8 @@ and the secrets of a read-only bridge key, `ACTIVITYMAP_CONVEX_KEY_ID` and
 - `places-read`, without reviewer: enough to resolve regions and to dry-run
   a publication.
 - `places-production`, with a required reviewer, additionally holds
-  `ACTIVITYMAP_CONVEX_WRITER_KEY_ID`, `ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY`,
-  `PLACES_PUBLISH_USER` and `PLACES_PUBLISH_ATHLETE` (the administrator
-  account whose bridge scope signs the writes).
+  `ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and
+  `ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY`.
 
 The read key ID must be listed in the Convex deployment's
 `ACTIVITYMAP_BRIDGE_SIGNING_KEYS` and the writer key ID in
@@ -434,7 +430,7 @@ gh run download <run ID> --name places-live-<date> \
   --dir output/places/places-live-<date>
 pnpm places:publish --artifact output/places/places-live-<date>
 pnpm places:publish --artifact output/places/places-live-<date> --apply \
-  --expect-current <current-snapshot-id> --user <user ID> --athlete <athlete ID>
+  --expect-current <current-snapshot-id>
 ```
 
 The artifacts are kept for 90 days. A rollback that removes regions may need

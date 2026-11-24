@@ -249,6 +249,12 @@ router.route({
         case 'latestCatalogue':
           result = await ctx.runQuery(internal.places.latest, {});
           break;
+        // Where a publication uploads its manifest and coverage.
+        case 'catalogueUploadUrl':
+          [result] = await ctx.runMutation(internal.places.uploadUrls, {
+            count: 1,
+          });
+          break;
         case 'catalogueState':
           result = await ctx.runQuery(internal.places.state, args);
           break;

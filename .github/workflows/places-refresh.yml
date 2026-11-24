@@ -13,10 +13,8 @@ name: Place catalogue refresh
 #   ACTIVITYMAP_CONVEX_KEY_ID, ACTIVITYMAP_CONVEX_SIGNING_KEY, a read-only
 #   bridge key. Enough to resolve regions and to dry-run a publication.
 # - places-production (required reviewer): the same, plus the secrets
-#   ACTIVITYMAP_CONVEX_WRITER_KEY_ID, ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY,
-#   PLACES_PUBLISH_USER and PLACES_PUBLISH_ATHLETE (the account whose bridge
-#   scope signs the writes). The reviewer approves after reading the plan
-#   job's summary.
+#   ACTIVITYMAP_CONVEX_WRITER_KEY_ID and ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY.
+#   The reviewer approves after reading the plan job's summary.
 #
 # The weekly run does nothing until the repository variable
 # PLACES_REFRESH_SCHEDULED is "true": run it by hand first.
@@ -239,13 +237,10 @@ jobs:
           ACTIVITYMAP_CONVEX_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_SIGNING_KEY }}
           ACTIVITYMAP_CONVEX_WRITER_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_WRITER_KEY_ID }}
           ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY }}
-          PUBLISH_USER: ${{ secrets.PLACES_PUBLISH_USER }}
-          PUBLISH_ATHLETE: ${{ secrets.PLACES_PUBLISH_ATHLETE }}
           EXPECT_CURRENT: ${{ needs.plan.outputs.current }}
         run: |
           pnpm --silent places:publish --artifact output/places/places-live \
             --apply --expect-current "$EXPECT_CURRENT" \
-            --user "$PUBLISH_USER" --athlete "$PUBLISH_ATHLETE" \
             --report report.json > /dev/null
           {
             echo "### Published: $(jq -r '.status' report.json), revision $(jq -r '.revision // "unchanged"' report.json)"
