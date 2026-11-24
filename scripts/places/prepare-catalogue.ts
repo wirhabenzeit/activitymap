@@ -2,7 +2,6 @@ import {
   copyFile,
   mkdir,
   mkdtemp,
-  open,
   rename,
   rm,
   writeFile,
@@ -17,6 +16,7 @@ import {
 } from '../../src/server/places/catalogue-artifact';
 import { prepareCatalogue } from '../../src/server/places/catalogue-prepare';
 import { CopernicusDem } from '../../src/server/places/copernicus-dem';
+import { downloadExtract } from '../../src/server/places/extract-download';
 import { fetchGeofabrikIndex } from '../../src/server/places/geofabrik-index';
 
 const { values } = parseArgs({
@@ -30,50 +30,6 @@ const { values } = parseArgs({
     help: { type: 'boolean' },
   },
 });
-function geofabrikUrl(url: string) {
-  const parsed = new URL(url);
-  if (
-    parsed.protocol !== 'https:' ||
-    parsed.hostname !== 'download.geofabrik.de' ||
-    parsed.port
-  )
-    throw new Error('Downloads require an HTTPS download.geofabrik.de URL');
-  return parsed;
-}
-async function download(url: string, path: string) {
-  // `-latest` redirects to the dated extract; follow only Geofabrik redirects.
-  let response = await fetch(geofabrikUrl(url), {
-    signal: AbortSignal.timeout(30 * 60 * 1000),
-    redirect: 'manual',
-  });
-  for (let hops = 0; response.status >= 300 && response.status < 400; hops++) {
-    const location = response.headers.get('location');
-    if (!location || hops >= 3)
-      throw new Error(`Download redirect failed (${response.status})`);
-    const target = new URL(location, url);
-    if (target.hostname !== 'download.geofabrik.de')
-      throw new Error(
-        'Geofabrik redirected to a mirror; download its dated extract (-YYMMDD.osm.pbf) with --source-url',
-      );
-    response = await fetch(geofabrikUrl(target.href), {
-      signal: AbortSignal.timeout(30 * 60 * 1000),
-      redirect: 'manual',
-    });
-  }
-  if (!response.ok || !response.body)
-    throw new Error(`Download failed (${response.status})`);
-  const file = await open(path, 'wx');
-  try {
-    const reader = response.body.getReader();
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      await file.writeFile(value);
-    }
-  } finally {
-    await file.close();
-  }
-}
 if (values.help) {
   console.log(
     `Prepare a complete regional catalogue without database credentials:\n  pnpm places:prepare --region switzerland --out output/places/switzerland-YYYY-MM-DD [--source-url <pbf> --coverage-url <poly>]\nThe region is a Geofabrik extract's region ID (as pnpm places:resolve prints it). Without --source-url and --coverage-url its URLs are read from the Geofabrik index; pass a dated --source-url (-YYMMDD.osm.pbf) to pin the epoch or when -latest redirects to a mirror. Supply --pbf and --poly together to use local source files. Pass and peak terrain is read from Copernicus GLO-30 with HTTP range requests. Runs entirely in TypeScript/Node; no external tools are required.`,
@@ -105,8 +61,9 @@ if (values.help) {
       await copyFile(resolve(values.pbf), pbfPath);
       await copyFile(resolve(values.poly), polyPath);
     } else {
-      await download(sourceUrl, pbfPath);
-      await download(coverageUrl, polyPath);
+      const onProgress = (message: string) => console.error(message);
+      await downloadExtract(sourceUrl, pbfPath, { onProgress });
+      await downloadExtract(coverageUrl, polyPath, { onProgress });
     }
     const dem = new CopernicusDem();
     const catalogue = await prepareCatalogue({
