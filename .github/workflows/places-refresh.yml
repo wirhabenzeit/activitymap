@@ -92,8 +92,9 @@ jobs:
   prepare:
     needs: resolve
     runs-on: ubuntu-24.04
-    # A large country takes 40 to 60 minutes on a hosted runner.
-    timeout-minutes: 150
+    # A large country's extract downloads for up to an hour (the download
+    # itself gives up after two) and then builds for about as long.
+    timeout-minutes: 240
     strategy:
       fail-fast: true
       # Every job reads Copernicus terrain tiles.

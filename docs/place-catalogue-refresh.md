@@ -47,9 +47,13 @@ and `--coverage-url` the URLs are read from the index. Downloads are
 restricted to HTTPS `download.geofabrik.de` URLs, following only redirects
 that stay on that host. `-latest` redirects some regions (Germany) to a
 mirror, which fails: pass the dated extract (`…/germany-261122.osm.pbf`) as
-`--source-url`, as `pnpm places:resolve` prints it. Terrain is always read from
-the public Copernicus bucket, so preparation needs network access even with
-local source files.
+`--source-url`, as `pnpm places:resolve` prints it. Geofabrik serves one
+connection at one to two megabytes a second, so a large country's extract
+(France is 5 GB) takes most of an hour. A download that drops or stalls for a
+minute is resumed from the bytes already received; it fails after two hours
+in total, or after five connections in a row that add nothing. Terrain is
+always read from the public Copernicus bucket, so preparation needs network
+access even with local source files.
 The region identifier is included in new artifact identities. Old frozen v1
 artifacts remain readable, with an explicit publication region.
 
