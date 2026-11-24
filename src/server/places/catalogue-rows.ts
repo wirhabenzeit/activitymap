@@ -1,7 +1,8 @@
 /**
  * The place rows of a catalogue as both sides of a publication handle them:
- * the app, which publishes them, and the Convex functions, which store them. Plain TypeScript with Web Crypto only, so it runs in the
- * Convex runtime as well as in Node.
+ * the app, which publishes them, and the Convex functions, which store them.
+ * Plain TypeScript with Web Crypto only, so it runs in the Convex runtime as
+ * well as in Node.
  */
 
 /** A matcher candidate (`CandidatePlace` in src/server/places/run-types.ts). */
@@ -31,11 +32,10 @@ export function tileOf(location: { longitude: number; latitude: number }) {
   )}`;
 }
 
+const utf8 = new TextEncoder();
+
 async function sha256Hex(text: string) {
-  const hash = await crypto.subtle.digest(
-    'SHA-256',
-    new TextEncoder().encode(text),
-  );
+  const hash = await crypto.subtle.digest('SHA-256', utf8.encode(text));
   return [...new Uint8Array(hash)]
     .map((byte) => byte.toString(16).padStart(2, '0'))
     .join('');
@@ -63,6 +63,17 @@ function canonicalRow(place: PlaceRow) {
  * rows with the same hash are the same place row. */
 export function rowHash(place: PlaceRow) {
   return sha256Hex(JSON.stringify(canonicalRow(place)));
+}
+
+/** The hashes of many rows, in order. A whole catalogue is hashed a slice
+ * at a time: starting every digest at once holds all their buffers. */
+export async function rowHashes(places: readonly PlaceRow[]) {
+  const hashes: string[] = [];
+  for (let start = 0; start < places.length; start += 1024)
+    hashes.push(
+      ...(await Promise.all(places.slice(start, start + 1024).map(rowHash))),
+    );
+  return hashes;
 }
 
 /** The digest of the live catalogue: the sum of its row hashes modulo

@@ -15,7 +15,7 @@ import {
   PLACE_BATCH_LIMIT,
   type PlaceRow,
   addToSetDigest,
-  rowHash,
+  rowHashes,
 } from './catalogue-rows';
 import { type CoverageGeometry, parseCoverageGeometry } from './coverage';
 import { coverageChangeTiles } from './coverage-diff';
@@ -205,7 +205,7 @@ export async function publishCatalogue({
     throw new Error('Publication requires expectedCurrent from a dry run');
   const snapshotId = catalogue.manifest.catalogue_snapshot_id;
   const rows = placeRows(catalogue);
-  const hashes = await Promise.all(rows.map(rowHash));
+  const hashes = await rowHashes(rows);
   const live = await writer.write<LiveState>({ kind: 'liveState' });
   const diff = diffCatalogue(
     rows.map((place, index) => ({ place, hash: hashes[index]! })),
@@ -282,6 +282,10 @@ export async function publishCatalogue({
     throw new Error(
       'The catalogue would lose more than 20% of its places; inspect the artifact and explicitly allow large retirement',
     );
+  // What `beginApply` would refuse, before anything is uploaded for it.
+  const pendingId = live?.pending?.snapshotId ?? null;
+  if (pendingId !== snapshotId && (replacePending ?? null) !== pendingId)
+    throw new Error(pendingOther(pendingId));
 
   // Upload URLs are issued under an owner's current assignment.
   const owner = await writer.write<{ epoch: string } | null>({ kind: 'state' });
@@ -419,11 +423,16 @@ function beginRefusal(
     case 'current_changed':
       return `The live catalogue is now ${refusal.current ?? 'none'}: review a new dry run`;
     case 'pending_other':
-      return `The publication of ${refusal.pending} is not complete. Finish it by running its publish command again, or abandon it with --replace-pending ${refusal.pending}`;
+      return pendingOther(refusal.pending);
     case 'already_current':
       return `${snapshotId} is already the live catalogue, yet the live rows differ from it: inspect the live catalogue before publishing`;
   }
 }
+
+const pendingOther = (pending: string | null) =>
+  pending
+    ? `The publication of ${pending} is not complete. Finish it by running its publish command again, or abandon it with --replace-pending ${pending}`
+    : 'No publication is pending: publish without --replace-pending';
 
 const notPending = (snapshotId: string) =>
   `The publication of ${snapshotId} is no longer pending: another run replaced or completed it. Review a new dry run`;

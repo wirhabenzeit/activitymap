@@ -7,7 +7,11 @@ import {
   type QueryCtx,
   internalMutation,
 } from './_generated/server';
-import { activityFor, publishChange } from './activityWrites';
+import {
+  activityFor,
+  publishChange,
+  replacePlaceTiles,
+} from './activityWrites';
 import { ingests, requestMatch } from './ingestion';
 import { writerValidator } from './ownerScope';
 import {
@@ -83,7 +87,8 @@ export async function selectFor(
  * once. Only the latest one may change owners: an adoption starts only for
  * the catalogue that is still the latest, records itself in
  * `catalogueAdoptions`, and each later page stops when another adoption has
- * been recorded since.
+ * been recorded since. The last page records the catalogue's snapshot: only
+ * then has every owner been moved (`places.dropRowsets` waits for it).
  */
 export const adopt = internalMutation({
   args: {
@@ -103,11 +108,8 @@ export const adopt = internalMutation({
         latest.revision !== args.revision
       )
         return 0;
-      const adoption = {
-        catalogue,
-        matchingVersion,
-        snapshotId: args.snapshotId,
-      };
+      // `snapshotId` is recorded by the last page.
+      const adoption = { catalogue, matchingVersion, snapshotId: undefined };
       if (!current) await ctx.db.insert('catalogueAdoptions', adoption);
       else await ctx.db.patch('catalogueAdoptions', current._id, adoption);
     } else if (
@@ -130,6 +132,12 @@ export const adopt = internalMutation({
         ...args,
         cursor: page.continueCursor,
       });
+    else {
+      const adoption = await ctx.db.query('catalogueAdoptions').first();
+      await ctx.db.patch('catalogueAdoptions', adoption!._id, {
+        snapshotId: args.snapshotId,
+      });
+    }
     return moved;
   },
 });
@@ -192,6 +200,7 @@ export const next = internalMutation({
         await ctx.db.patch('activities', row._id, {
           projection: { ...row.projection, match: undefined },
         });
+        await replacePlaceTiles(ctx, owner._id, row.key, []);
         await publishChange(ctx, owner, row.dto.id, 'upsert');
       }
       if (

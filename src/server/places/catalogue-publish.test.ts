@@ -732,6 +732,7 @@ void test('another pending publication is finished or explicitly replaced', asyn
 
   const dry = await publish(c);
   assert.equal(dry.pending?.snapshotId, bId);
+  backend.take();
   await assert.rejects(
     publish(c, current),
     new RegExp(
@@ -742,6 +743,8 @@ void test('another pending publication is finished or explicitly replaced', asyn
     publish(c, { ...current, replacePending: 'osm-places-v1:other' }),
     /--replace-pending/,
   );
+  // Refused from the live state alone: nothing was uploaded or begun.
+  assert.deepEqual(kinds(backend.take()), ['liveState', 'liveState']);
   const replaced = await publish(c, { ...current, replacePending: bId });
   assert.equal(replaced.status, 'published');
   await assertLive(backend, c);

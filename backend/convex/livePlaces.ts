@@ -174,14 +174,19 @@ export const beginApply = internalMutation({
     }
     const current = row.snapshotId ?? null;
     const { pending } = row;
-    const refuse = (
+    // A refused sender's metadata copy is not needed.
+    const refuse = async (
       reason: 'current_changed' | 'pending_other' | 'already_current',
-    ) => ({
-      ok: false as const,
-      reason,
-      current,
-      pending: pending?.snapshotId ?? null,
-    });
+    ) => {
+      if (args.metadata !== row.metadata && args.metadata !== pending?.metadata)
+        await ctx.storage.delete(args.metadata);
+      return {
+        ok: false as const,
+        reason,
+        current,
+        pending: pending?.snapshotId ?? null,
+      };
+    };
     if (args.expectCurrent !== current) return refuse('current_changed');
     if (pending?.snapshotId === args.snapshotId) {
       if (pending.count !== args.count || pending.setDigest !== args.setDigest)
@@ -219,17 +224,21 @@ export const beginApply = internalMutation({
 async function recordTiles(
   ctx: MutationCtx,
   revision: number,
-  tiles: Iterable<string>,
+  tiles: ReadonlySet<string>,
 ) {
-  for (const tile of tiles) {
-    const seen = await ctx.db
-      .query('placeTileChanges')
-      .withIndex('by_revision_tile', (q) =>
-        q.eq('revision', revision).eq('tile', tile),
-      )
-      .unique();
-    if (!seen) await ctx.db.insert('placeTileChanges', { revision, tile });
-  }
+  const seen = await Promise.all(
+    [...tiles].map((tile) =>
+      ctx.db
+        .query('placeTileChanges')
+        .withIndex('by_revision_tile', (q) =>
+          q.eq('revision', revision).eq('tile', tile),
+        )
+        .unique(),
+    ),
+  );
+  for (const [index, tile] of [...tiles].entries())
+    if (!seen[index])
+      await ctx.db.insert('placeTileChanges', { revision, tile });
 }
 
 /**
@@ -281,11 +290,16 @@ export const applyBatch = internalMutation({
     const { revision } = pending;
     let { count, setDigest } = row;
     const changed = new Set(args.tiles);
-    const hashes = await Promise.all(args.upserts.map(rowHash));
+    // Keys are distinct within a batch, so the rows can be read at once.
+    const [hashes, upserted, deleted] = await Promise.all([
+      Promise.all(args.upserts.map(rowHash)),
+      Promise.all(args.upserts.map((item) => liveRow(ctx, item.id))),
+      Promise.all(args.deletes.map((key) => liveRow(ctx, key))),
+    ]);
     for (const [index, item] of args.upserts.entries()) {
       const hash = hashes[index]!;
       const tile = tileOf(item.location);
-      const live = await liveRow(ctx, item.id);
+      const live = upserted[index];
       if (live?.hash === hash) continue;
       const fields = { key: item.id, tile, place: item, hash, revision };
       if (live) {
@@ -299,8 +313,7 @@ export const applyBatch = internalMutation({
       setDigest = addToSetDigest(setDigest, hash);
       changed.add(tile);
     }
-    for (const key of args.deletes) {
-      const live = await liveRow(ctx, key);
+    for (const live of deleted) {
       if (!live) continue;
       await ctx.db.delete('livePlaces', live._id);
       count--;

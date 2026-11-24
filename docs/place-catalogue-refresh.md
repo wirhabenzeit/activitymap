@@ -159,7 +159,8 @@ its first publication. Then, in this order:
    every match. It costs about as much as one rowset publication did.
 3. Compare the matches of a sample of libraries with those before.
 4. `npx convex run places:dropRowsets` deletes the rowsets and their files,
-   continuing by itself until none are left. It refuses before steps 1 and 2.
+   continuing by itself until none are left. It refuses (`not_adopted`)
+   before step 1 and until step 2 has moved every library.
 
 Before step 4, rollback means redeploying the previous version, which still
 serves from the rowsets.

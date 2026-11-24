@@ -295,6 +295,13 @@ void test('expectCurrent races and other artifacts refuse; replacePending abando
     }),
     { ok: false, reason: 'pending_other', current: 'snap-1', pending: null },
   );
+  // A refused sender's metadata copy is deleted.
+  assert.deepEqual(
+    (await convex.run((ctx) => ctx.db.system.query('_storage').collect())).map(
+      (file) => file._id,
+    ),
+    [firstMetadata],
+  );
 
   // A bad artifact fails halfway: c is deleted, nothing else yet.
   assert.deepEqual(await begin(convex, 'snap-2', [a], 'snap-1'), {

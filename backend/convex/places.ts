@@ -219,7 +219,7 @@ const DROP_PAGE = 1024;
  * left. Returns what this step deleted and whether it continues.
  *
  * It refuses before a live publication has completed, and until the latest
- * adoption (`catalogueWorker.adopt`) moved the libraries to the live
+ * adoption (`catalogueWorker.adopt`) has moved every library to the live
  * catalogue: until then owners still match against their rowset.
  */
 export const dropRowsets = internalMutation({

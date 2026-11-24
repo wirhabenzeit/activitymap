@@ -261,8 +261,8 @@ export default defineSchema({
   /** The catalogue libraries were last told to move to (one row;
    * catalogue.adopt). A continuation of an earlier adoption stops when it
    * is no longer the one named here. `snapshotId` is the rowset's snapshot
-   * or the live catalogue's (`LIVE_CATALOGUE`); absent on adoptions
-   * recorded before it was kept. */
+   * or the live catalogue's (`LIVE_CATALOGUE`), set once the adoption has
+   * moved every owner. */
   catalogueAdoptions: defineTable({
     catalogue: v.string(),
     matchingVersion: v.string(),
