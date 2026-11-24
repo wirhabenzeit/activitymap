@@ -1,14 +1,17 @@
 import polygonClipping from 'polygon-clipping';
 import { z } from 'zod';
 
-import { COVERAGE_EDGE_BUDGET, coverageEdgeCount } from './batch-coverage';
 import {
   type CatalogueManifest,
   MAX_CATALOGUE_REGIONS,
   catalogueRegionSchema,
 } from './catalogue-artifact';
 import { unionCatalogueCoverage } from './catalogue-combine';
-import { parseCoverageGeometry } from './coverage';
+import {
+  COVERAGE_VERTEX_LIMIT,
+  coverageVertexCount,
+  parseCoverageGeometry,
+} from './coverage';
 import {
   type GeofabrikExtract,
   type GeofabrikIndex,
@@ -284,30 +287,31 @@ export async function selectRegions(input: {
   };
 }
 
-/** Of the boundary edges a match can index, the share regions may fill:
- * the rest is room for boundaries that grow from one week to the next. */
-const COVERAGE_EDGE_SHARE = 0.8;
+/** Of the vertices a coverage may hold, the share regions may fill: the
+ * rest is room for boundaries that grow from one week to the next. */
+const COVERAGE_VERTEX_SHARE = 0.8;
 
 export type SkippedRegion = {
   region: string;
   /** `coverage`: with it the combined coverage is not valid or has too many
-   * edges to match against. `limit`: the catalogue holds no more regions. */
+   * vertices. `limit`: the catalogue holds no more regions. */
   reason: 'coverage' | 'limit';
 };
 
 /**
  * Drop the newly demanded regions the serving catalogue cannot take, so one
  * of them cannot stop the refresh of the others: a region whose boundary
- * makes the combined coverage invalid (a ring wider than half the globe,
- * as with Russia) or larger than a match can index, and any region beyond
+ * makes the combined coverage invalid or too large to validate, and any
+ * region beyond
  * the number a catalogue combines. Live and included regions are never
  * dropped; if they do not fit, combining them fails and says why.
  */
 export function servableRegions(
   selection: Awaited<ReturnType<typeof selectRegions>>,
-  limits: { edges?: number; regions?: number } = {},
+  limits: { vertices?: number; regions?: number } = {},
 ) {
-  const maxEdges = limits.edges ?? COVERAGE_EDGE_BUDGET * COVERAGE_EDGE_SHARE;
+  const maxVertices =
+    limits.vertices ?? COVERAGE_VERTEX_LIMIT * COVERAGE_VERTEX_SHARE;
   const maxRegions = limits.regions ?? MAX_CATALOGUE_REGIONS;
   const coverageOf = ({ extract }: SelectedRegion) =>
     parseCoverageGeometry({
@@ -330,7 +334,8 @@ export function servableRegions(
       const next = unionCatalogueCoverage(
         coverage ? [coverage, coverageOf(region)] : [coverageOf(region)],
       );
-      if (coverageEdgeCount(next) > maxEdges) throw new Error('Too many edges');
+      if (coverageVertexCount(next) > maxVertices)
+        throw new Error('Too many vertices');
       coverage = next;
       kept++;
     } catch {

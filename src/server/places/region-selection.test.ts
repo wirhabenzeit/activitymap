@@ -218,7 +218,7 @@ void test('a demanded region the catalogue cannot take is skipped, live ones nev
   assert.equal(limited.counts.demanded, 1);
 
   // No room for more boundary than the live region's own.
-  const tight = servableRegions(selection, { edges: 1 });
+  const tight = servableRegions(selection, { vertices: 1 });
   assert.deepEqual(
     tight.regions.map(({ region }) => region),
     ['alpland'],

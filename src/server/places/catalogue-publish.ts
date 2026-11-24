@@ -2,11 +2,7 @@ import { createHash } from 'node:crypto';
 
 import { z } from 'zod';
 
-import {
-  COVERAGE_EDGE_BUDGET,
-  coverageClearanceM,
-  coverageEdgeCount,
-} from './batch-coverage';
+import { coverageClearanceM } from './batch-coverage';
 import {
   type ValidatedCatalogue,
   listedPlaceCount,
@@ -28,7 +24,7 @@ import {
   addToSetDigest,
   rowHashes,
 } from './catalogue-rows';
-import { parseCoverageGeometry } from './coverage';
+import { coverageVertexCount, parseCoverageGeometry } from './coverage';
 import { coverageChangeTiles } from './coverage-diff';
 import { SERVER_MATCHER_POLICY } from './matching-version';
 import type { NormalizedPlace } from './types';
@@ -154,9 +150,9 @@ export type CataloguePublishReport = {
   /** A publication begun and not completed. */
   pending: { snapshotId: string; startedAt: string; ageMinutes: number } | null;
   /** What every match of the artifact's catalogue reads: its coverage
-   * polygons, the boundary edges the matcher indexes (at most
-   * `COVERAGE_EDGE_BUDGET`) and the size of the metadata file. */
-  coverage: { polygons: number; edges: number; metadataBytes: number };
+   * polygons, their ring vertices (at most `COVERAGE_VERTEX_LIMIT`, which
+   * the artifact's validation enforces) and the size of the metadata file. */
+  coverage: { polygons: number; vertices: number; metadataBytes: number };
   /** The artifact's component regions, against the live catalogue's. Region
    * IDs only: tiles locate users' activities and stay out of reports. */
   regions: string[];
@@ -299,7 +295,7 @@ export async function publishCatalogue({
     },
     coverage: {
       polygons: catalogue.coverage.coordinates.length,
-      edges: coverageEdgeCount(catalogue.coverage),
+      vertices: coverageVertexCount(catalogue.coverage),
       metadataBytes: metadata.byteLength,
     },
     regions,
@@ -321,10 +317,6 @@ export async function publishCatalogue({
   if (expectedCurrent !== current)
     throw new Error(
       `The live catalogue is ${current ?? 'none'}, not ${expectedCurrent ?? 'none'} as expected: review a new dry run`,
-    );
-  if (report.coverage.edges > COVERAGE_EDGE_BUDGET)
-    throw new Error(
-      `The coverage boundary has ${report.coverage.edges} edges; matching fails above ${COVERAGE_EDGE_BUDGET}`,
     );
   if (report.largeRetirement && !allowLargeRetirement)
     throw new Error(

@@ -232,6 +232,20 @@ void test('rejects unsplit antimeridian geometry but accepts separate polygons o
   );
   const split = geometry([square(179, 0, 1)], [square(-180, 0, 1)]);
   assert.deepEqual(parseCoverageGeometry(split), split);
+  // A ring wider than half the globe whose edges are all short is not a
+  // crossing: Europe joined to Russia.
+  const wide = geometry([
+    [
+      [-10, 40],
+      [80, 40],
+      [180, 40],
+      [180, 70],
+      [80, 70],
+      [-10, 70],
+      [-10, 40],
+    ],
+  ]);
+  assert.deepEqual(parseCoverageGeometry(wide), wide);
 });
 
 void test('valid collinear vertices and very small nonzero geometry are preserved', () => {
