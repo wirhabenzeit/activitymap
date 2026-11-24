@@ -9,8 +9,17 @@ type Position = [number, number];
 type Ring = Position[];
 type Polygon = Ring[];
 
-// Pairwise topology checks are deliberately bounded for regional provider files.
-const MAX_VERTICES = 10_000;
+/** The most ring vertices a coverage holds, one region's or the combined
+ * catalogue's: validating it compares every pair of edges. */
+export const COVERAGE_VERTEX_LIMIT = 10_000;
+const MAX_VERTICES = COVERAGE_VERTEX_LIMIT;
+
+export const coverageVertexCount = (coverage: CoverageGeometry) =>
+  coverage.coordinates.reduce(
+    (sum, polygon) =>
+      sum + polygon.reduce((rings, ring) => rings + ring.length, 0),
+    0,
+  );
 const positionSchema = z.tuple([
   z.number().finite().min(-180).max(180),
   z.number().finite().min(-90).max(90),
@@ -132,11 +141,14 @@ function validateRingBoundaries(rings: Ring[]): void {
   for (const ring of rings) {
     if (!samePosition(ring[0]!, ring[ring.length - 1]!))
       throw new Error('Coverage rings must be explicitly closed');
-    const longitudes = ring.map(([longitude]) => longitude);
-    if (Math.max(...longitudes) - Math.min(...longitudes) >= 180)
-      throw new Error(
-        'Coverage rings spanning 180 degrees must be split first',
-      );
+    // A ring that crosses the antimeridian unsplit has an edge that jumps
+    // from one side to the other. A wide ring is not one: Europe joined to
+    // Russia runs from 10°W to 180°E.
+    for (let i = 1; i < ring.length; i++)
+      if (Math.abs(ring[i]![0] - ring[i - 1]![0]) >= 180)
+        throw new Error(
+          'Coverage edges spanning 180 degrees must be split first',
+        );
     if (areaSign(ring) === 0)
       throw new Error('Coverage rings must have nonzero area');
 

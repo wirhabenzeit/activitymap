@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { z } from 'zod';
 
-import { COVERAGE_EDGE_BUDGET, coverageEdgeCount } from './batch-coverage';
 import { combineCatalogues } from './catalogue-combine';
 import {
   applyBatches,
@@ -555,13 +554,10 @@ void test('the report sizes the coverage every match reads and names the regions
   );
   assert.deepEqual(dry.coverage, {
     polygons: 1,
-    edges: coverageEdgeCount(first.coverage),
+    vertices: first.coverage.coordinates.flat(2).length,
     metadataBytes,
   });
-  assert.ok(
-    dry.coverage.edges > 4 && dry.coverage.edges < COVERAGE_EDGE_BUDGET,
-    `${dry.coverage.edges} edges`,
-  );
+  assert.ok(dry.coverage.vertices > 4, `${dry.coverage.vertices} vertices`);
   // Before the first publication every region is new.
   assert.deepEqual(
     [dry.regions, dry.regionsAdded, dry.regionsRemoved],

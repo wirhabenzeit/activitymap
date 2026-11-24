@@ -211,11 +211,6 @@ jobs:
             echo "::error::Another publication is unfinished; see docs/place-catalogue-refresh.md"
             exit 1
           fi
-          # Above this every match would fail (COVERAGE_EDGE_BUDGET).
-          if [ "$(jq -r '.coverage.edges > 500000' report.json)" = "true" ]; then
-            echo "::error::The coverage boundary has too many edges to match against"
-            exit 1
-          fi
 
   apply:
     needs: [resolve, plan]

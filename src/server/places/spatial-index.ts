@@ -159,7 +159,7 @@ export function subdivide(a: Vector, b: Vector): Vector[] {
   result.push(b);
   return result;
 }
-function overlaps(a: Box, b: Box): boolean {
+export function overlaps(a: Box, b: Box): boolean {
   return [0, 1, 2].every(
     (i) => a.low[i]! <= b.high[i]! && a.high[i]! >= b.low[i]!,
   );

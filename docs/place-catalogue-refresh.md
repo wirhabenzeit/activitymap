@@ -165,10 +165,10 @@ runs on.
 A newly demanded region is skipped, and named under `skipped`, on stderr
 and in the workflow's job summary, when the catalogue cannot take it:
 
-- `coverage`: adding its boundary makes the combined coverage invalid (a
-  ring wider than half the globe; Russia today) or brings it above 80% of
-  the 500,000 boundary edges a match can index (`COVERAGE_EDGE_BUDGET`).
-  The rest is room for boundaries that grow from one week to the next.
+- `coverage`: adding its boundary makes the combined coverage invalid or
+  brings it above 80% of the 10,000 ring vertices a coverage may hold
+  (`COVERAGE_VERTEX_LIMIT`). The rest is room for boundaries that grow from
+  one week to the next.
 - `limit`: the catalogue already holds 256 regions
   (`MAX_CATALOGUE_REGIONS`, one `prepare` job each).
 
@@ -195,11 +195,16 @@ regions and places, never a tile.
 
 ### Coverage budget
 
-Every match indexes the edges of the coverage boundary. Measured from the
+A match checks an activity against the coverage boundary near it only, so
+its cost does not grow with the number of regions. What is bounded is the
+boundary itself: a coverage holds at most 10,000 ring vertices
+(`COVERAGE_VERTEX_LIMIT`), because validating it compares every pair of
+edges, and every match validates the coverage it loads. Measured from the
 Geofabrik boundaries in November 2026: the eight countries of `v1-places`
-have 67,986 edges (14% of the 500,000 limit) and about 37 KB of coverage
-JSON; 45 European countries 88,355 edges (18%); all 190 countries would
-have 686,531 (37% over the limit) and are also rejected for the wide ring.
+have 1,835 vertices (9 ms to validate) and about 37 KB of coverage JSON;
+the 45 regions that held activities then, Russia included, 6,913 (86 ms,
+138 KB). All 190 countries have 35,688 vertices before shared borders are
+merged, so a world catalogue needs a higher limit or a cheaper validation.
 
 Known limits that are not addressed yet: artifacts are read whole into one
 string, which bounds a catalogue at about 900,000 rows
@@ -243,9 +248,9 @@ pnpm places:publish --artifact output/places/places-live \
 If another catalogue became current meanwhile, publication fails and requires
 a new dry run. A catalogue with fewer than 80% of the live places is flagged
 and requires `--allow-large-retirement` on apply, after inspecting source
-completeness. An apply refuses a coverage boundary with more than 500,000
-edges (`COVERAGE_EDGE_BUDGET`), because every match would fail against it;
-the dry run reports the count (`coverage.edges`). Only an artifact of the
+completeness. The dry run reports the coverage's size
+(`coverage.vertices`); an artifact above the 10,000-vertex limit is not
+valid and cannot be combined in the first place. Only an artifact of the
 serving region `places-live` (`LIVE_PLACE_REGION`) is accepted; `--region`
 names another one explicitly. `v1-places`, the eight-country catalogue, is
 what is live until the first `places-live` publication, so it needs
@@ -267,7 +272,7 @@ also writes it to a file. Besides `dryRun`, true without `--apply`:
 | `coverageChanged`, `affectedTiles` | whether the coverage changed, and how many tiles are matched again (a count only; tiles are never printed: logs may be public) |
 | `largeRetirement`                  | fewer than 80% of the live places                                                                                              |
 | `pending`                          | an unfinished publication: `snapshotId`, `startedAt`, `ageMinutes`                                                             |
-| `coverage`                         | what every match reads: `polygons`, `edges` (at most 500,000) and `metadataBytes` (manifest and coverage file)                 |
+| `coverage`                         | what every match reads: `polygons`, `vertices` (at most 10,000) and `metadataBytes` (manifest and coverage file)               |
 | `regions`                          | the artifact's component regions                                                                                               |
 | `regionsAdded`, `regionsRemoved`   | regions the artifact has and the live catalogue lacks, and the reverse                                                         |
 
@@ -345,8 +350,7 @@ UTC once enabled, and by hand (`workflow_dispatch`). Runs never overlap
 
 `prepare` fails fast: one failed region fails the run before anything is
 published. `plan` fails when the report flags `largeRetirement` (the
-workflow never passes `--allow-large-retirement`) or when `coverage.edges`
-is above 500,000.
+workflow never passes `--allow-large-retirement`).
 
 The repository and its logs are public. Jobs print region IDs, counts and
 place diffs only ([Privacy](#privacy)).
@@ -414,8 +418,8 @@ summaries:
 - `plan`: the report ([Publish or refresh](#publish-or-refresh)). Check
   `changes` and `examples` against what a week of OpenStreetMap edits
   should do, `regionsAdded` and `regionsRemoved` against the resolve
-  summary, `hiddenByReason` for a filter change, `coverage.edges` against
-  the 500,000 limit, `affectedTiles` for the size of the re-match, and that
+  summary, `hiddenByReason` for a filter change, `coverage.vertices` against
+  the 10,000 limit, `affectedTiles` for the size of the re-match, and that
   `pending` is null.
 
 Rejecting the deployment changes nothing.

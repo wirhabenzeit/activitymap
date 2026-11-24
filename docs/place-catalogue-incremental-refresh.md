@@ -218,17 +218,19 @@ As shipped:
   Removal is only by `exclude`.
 - A newly demanded region the catalogue cannot take is skipped and named
   (`servableRegions`), so it cannot stop the refresh of the others: one
-  whose boundary makes the combined coverage invalid (a ring wider than half
-  the globe; Russia today) or brings it above 80% of the 500,000-edge
-  budget of a match, and any beyond 256 regions. Live and included regions
+  whose boundary makes the combined coverage invalid or brings it above 80% of
+  the 10,000 vertices a coverage may hold, and any beyond 256 regions. Live and included regions
   are never skipped. This was not in the plan; the coverage limits only
   showed when measured.
 - All regions use one extract date: the newest of two to seven days back
   that every region has, so all share one `data_as_of`.
 
-Measured: the eight current countries are 67,986 coverage edges (14% of the
-budget) and about 37 KB of coverage JSON, 45 European countries 88,355
-(18%), and all 190 countries would be 686,531 (37% over).
+Measured: the eight current countries are 1,835 coverage vertices and about
+37 KB of coverage JSON; the 45 regions that held activities in November
+2026 are 6,913 vertices (69% of the limit). The first version indexed the
+whole boundary for every match (395,099 arcs of 500 m for 44 regions,
+against a cap of 500,000); a match now subdivides only the boundary near
+the activity, so that cap is gone.
 
 ### Privacy in a public repository
 
@@ -364,8 +366,7 @@ still serves from the rowsets.
   catalogue's keys (`ACTIVITYMAP_BRIDGE_PLACES_KEYS`,
   `ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS`), which can neither read nor
   write a library; the app's keys are refused there.
-- The publisher defaults to the region `places-live`, refuses a coverage
-  boundary above the 500,000-edge budget, reports `coverage`, `regions`,
+- The publisher defaults to the region `places-live`, reports `coverage`, `regions`,
   `regionsAdded` and `regionsRemoved`, and writes the report to a file with
   `--report`.
 - Combining takes up to 256 regions, and an artifact up to 900,000 rows
@@ -422,8 +423,7 @@ As shipped (commands and operation in
    result as `places-live-<date>`, kept 90 days for rollback.
 4. **`plan`**, in the `places-read` environment with the read key only: the
    dry run, its report in the job summary. It fails when the 80% guard
-   trips (`--allow-large-retirement` is never passed) or the coverage has
-   more than 500,000 edges.
+   trips (`--allow-large-retirement` is never passed).
 5. **`apply`**, in the `places-production` environment, which holds the
    write key and has a required reviewer: apply with `--expect-current`
    from the plan. Skipped when the plan says `unchanged`. The reviewer could
@@ -454,11 +454,11 @@ notification is the alert.
   a provider event) matches it again, without a provider read.
 - Settled: the region list is not stored; it is the live manifest's regions
   plus demand plus the override file.
-- Russia is demanded but skipped: its boundary has a ring wider than half
-  the globe, which the combined coverage cannot hold. Covering it needs
-  either coverage that accepts such rings or taking it in parts.
-- The coverage budget bounds how far demand can grow: all 190 countries
-  would be 37% over it.
+- Russia was first skipped: joined to Europe its boundary forms a ring
+  wider than half the globe, which the coverage check took for an unsplit
+  antimeridian crossing. The check now looks at each edge instead.
+- The 10,000-vertex limit of a coverage bounds how far demand can grow:
+  all 190 countries have 35,688 vertices before shared borders merge.
 - Catalogue size: artifacts are read whole into one string (about 900,000
   rows at most; more needs a streaming reader), and preparation stops at
   100,000 selected sources per region.
