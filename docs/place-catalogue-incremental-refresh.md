@@ -218,8 +218,7 @@ As shipped:
   Removal is only by `exclude`.
 - A newly demanded region the catalogue cannot take is skipped and named
   (`servableRegions`), so it cannot stop the refresh of the others: one
-  whose boundary makes the combined coverage invalid (a ring wider than half
-  the globe; Russia today) or brings it above 80% of the 500,000-edge
+  whose boundary makes the combined coverage invalid or brings it above 80% of the 500,000-edge
   budget of a match, and any beyond 256 regions. Live and included regions
   are never skipped. This was not in the plan; the coverage limits only
   showed when measured.
@@ -454,9 +453,9 @@ notification is the alert.
   a provider event) matches it again, without a provider read.
 - Settled: the region list is not stored; it is the live manifest's regions
   plus demand plus the override file.
-- Russia is demanded but skipped: its boundary has a ring wider than half
-  the globe, which the combined coverage cannot hold. Covering it needs
-  either coverage that accepts such rings or taking it in parts.
+- Russia was first skipped: joined to Europe its boundary forms a ring
+  wider than half the globe, which the coverage check took for an unsplit
+  antimeridian crossing. The check now looks at each edge instead.
 - The coverage budget bounds how far demand can grow: all 190 countries
   would be 37% over it.
 - Catalogue size: artifacts are read whole into one string (about 900,000

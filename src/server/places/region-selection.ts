@@ -298,8 +298,7 @@ export type SkippedRegion = {
 /**
  * Drop the newly demanded regions the serving catalogue cannot take, so one
  * of them cannot stop the refresh of the others: a region whose boundary
- * makes the combined coverage invalid (a ring wider than half the globe,
- * as with Russia) or larger than a match can index, and any region beyond
+ * makes the combined coverage invalid or larger than a match can index, and any region beyond
  * the number a catalogue combines. Live and included regions are never
  * dropped; if they do not fit, combining them fails and says why.
  */

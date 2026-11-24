@@ -165,8 +165,8 @@ runs on.
 A newly demanded region is skipped, and named under `skipped`, on stderr
 and in the workflow's job summary, when the catalogue cannot take it:
 
-- `coverage`: adding its boundary makes the combined coverage invalid (a
-  ring wider than half the globe; Russia today) or brings it above 80% of
+- `coverage`: adding its boundary makes the combined coverage invalid or
+  brings it above 80% of
   the 500,000 boundary edges a match can index (`COVERAGE_EDGE_BUDGET`).
   The rest is room for boundaries that grow from one week to the next.
 - `limit`: the catalogue already holds 256 regions
