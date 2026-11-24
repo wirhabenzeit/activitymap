@@ -10,6 +10,7 @@ import {
   type RegionOverrides,
   resolvedRegionsDocument,
   selectRegions,
+  servableRegions,
 } from './region-selection';
 
 const index = parseGeofabrikIndex(geofabrikIndexFixture());
@@ -197,12 +198,46 @@ void test('a live region the index no longer lists fails unless excluded', async
   assert.equal(removed.counts.excluded, 1);
 });
 
+void test('a demanded region the catalogue cannot take is skipped, live ones never', async () => {
+  const demand = { [TILES.border]: 2, [TILES.bigWest]: 2 };
+  const selection = await run({ live: ['alpland'], demand }).result;
+  assert.deepEqual(
+    selection.regions.map(({ region }) => region),
+    ['alpland', 'bergland', 'bigland'],
+  );
+  assert.deepEqual(servableRegions(selection).skipped, []);
+
+  // No room for more regions than the live one and one more.
+  const limited = servableRegions(selection, { regions: 2 });
+  assert.deepEqual(
+    limited.regions.map(({ region }) => region),
+    ['alpland', 'bergland'],
+  );
+  assert.deepEqual(limited.skipped, [{ region: 'bigland', reason: 'limit' }]);
+  assert.deepEqual(limited.added, ['bergland']);
+  assert.equal(limited.counts.demanded, 1);
+
+  // No room for more boundary than the live region's own.
+  const tight = servableRegions(selection, { edges: 1 });
+  assert.deepEqual(
+    tight.regions.map(({ region }) => region),
+    ['alpland'],
+  );
+  assert.deepEqual(tight.skipped, [
+    { region: 'bergland', reason: 'coverage' },
+    { region: 'bigland', reason: 'coverage' },
+  ]);
+});
+
 void test('the resolve document lists dated URLs and names no tile', async () => {
   const demand = Object.fromEntries(
     Object.values(TILES).map((tile) => [tile, 9]),
   );
   const selection = await run({ live: ['bergland', 'alpland'], demand }).result;
-  const document = resolvedRegionsDocument(selection, '261122');
+  const document = resolvedRegionsDocument(
+    servableRegions(selection),
+    '261122',
+  );
   assert.deepEqual(document.regions[0], {
     region: 'alpland',
     pbf: 'https://download.geofabrik.de/europe/alpland/alpland-261122.osm.pbf',

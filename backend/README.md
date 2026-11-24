@@ -84,10 +84,11 @@ ACTIVITYMAP_CONVEX_WRITER_KEY_ID=devw1
 ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY=<hex>
 ```
 
-The place catalogue publisher reads the live catalogue through a third
-route, `/internal/places/v1`, signed with the read bridge's key under its own
-domain (`activitymap-places-v1`), so a signed library read can never be
-replayed there or the reverse. Its operations (`liveState`, `liveHashes`,
+The place catalogue tools (`pnpm places:publish`, `places:resolve`) read the
+live catalogue through a third route, `/internal/places/v1`, signed with a
+key from `ACTIVITYMAP_BRIDGE_SIGNING_KEYS` under its own domain
+(`activitymap-places-v1`), so a signed library read can never be replayed
+there or the reverse. Its operations (`liveState`, `liveHashes`,
 `demandTiles`) only read and carry no nonce, so a dry run needs no writer
 key.
 
@@ -502,8 +503,8 @@ starts the walk again for completed revisions that still have rows.
 
 `livePlaces.demandTiles` pages through `activityPlaceTiles` in tile order
 and answers each tile with the number of its rows on the page, with no owner
-or activity: the tiles that hold activities, from which the publisher's
-region selection decides what the catalogue must cover.
+or activity: the tiles that hold activities, from which the region selection
+(`pnpm places:resolve`) decides what the catalogue must cover.
 
 Matching reads rows while a publication is applied. A match records the live
 revision that was current when it started, so one that overlapped an apply

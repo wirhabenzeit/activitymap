@@ -21,6 +21,7 @@ import {
   regionOverridesSchema,
   resolvedRegionsDocument,
   selectRegions,
+  servableRegions,
 } from '../../src/server/places/region-selection';
 
 /**
@@ -39,7 +40,7 @@ const { values } = parseArgs({
 });
 if (values.help) {
   console.log(
-    'Resolve the regions and the Geofabrik date of the next catalogue:\n  pnpm places:resolve [--no-demand] [--date YYMMDD] [--overrides <file>]\nPrints { date, regions: [{ region, pbf, poly, reason }], added, counts }. --no-demand keeps the live regions and the overrides only; --date pins the extract date; --overrides defaults to config/place-regions.json.\nRequires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_CONVEX_KEY_ID and ACTIVITYMAP_CONVEX_SIGNING_KEY (the read bridge).',
+    'Resolve the regions and the Geofabrik date of the next catalogue:\n  pnpm places:resolve [--no-demand] [--date YYMMDD] [--overrides <file>]\nPrints { date, regions: [{ region, pbf, poly, reason }], added, skipped, counts }. A demanded region the catalogue cannot take (its coverage, or the region limit) is skipped and named. --no-demand keeps the live regions and the overrides only; --date pins the extract date; --overrides defaults to config/place-regions.json.\nRequires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_CONVEX_KEY_ID and ACTIVITYMAP_CONVEX_SIGNING_KEY (the read bridge).',
   );
   process.exit(0);
 }
@@ -69,7 +70,7 @@ const index = await fetchGeofabrikIndex();
 const demand = values['no-demand'] ? null : await readDemandTiles(reader);
 const dates = values.date ? [values.date] : epochCandidates(new Date());
 
-const selection = await selectRegions({
+const demanded = await selectRegions({
   index,
   live,
   demand,
@@ -88,8 +89,12 @@ const selection = await selectRegions({
     );
   },
 });
-if (!selection.regions.length)
-  throw new Error('The overrides exclude every region');
+// `places:combine` needs two regions.
+if (demanded.regions.length < 2)
+  throw new Error('The overrides leave fewer than two regions');
+const selection = servableRegions(demanded);
+for (const { region, reason } of selection.skipped)
+  console.error(`Skipped ${region}: ${reason}`);
 console.error(
   `Regions: ${selection.regions.length} (${JSON.stringify(selection.counts)}); added: ${selection.added.join(', ') || 'none'}`,
 );

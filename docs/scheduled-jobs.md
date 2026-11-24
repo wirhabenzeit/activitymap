@@ -1,7 +1,8 @@
 # Scheduled jobs
 
 Most background work runs in the Convex backend, which schedules itself. The
-app has one scheduled job of its own.
+app has one scheduled job of its own, and a GitHub Actions workflow refreshes
+the place catalogue weekly.
 
 ## In the Convex backend
 
@@ -115,6 +116,23 @@ pnpm dlx wrangler@4 d1 execute activitymap-testflight --remote --config cloudfla
 `d1 export activitymap-testflight --remote --output crashes.sql` takes a full
 copy for offline analysis. Rows hold testers' email addresses and comments, so
 keep exports out of the repository.
+
+## In GitHub Actions: place catalogue refresh
+
+`.github/workflows/places-refresh.yml` rebuilds the place catalogue from the
+week's Geofabrik extracts, for the regions where users have activities, and
+publishes the difference to the live catalogue in Convex. It runs on Mondays
+at 03:17 UTC (`17 3 * * 1`), and by hand with `workflow_dispatch` (inputs
+`demand` and `date`). The schedule does nothing until the repository
+variable `PLACES_REFRESH_SCHEDULED` is `true`.
+
+The jobs resolve the regions, prepare one per runner, combine them, dry-run
+the publication with a read-only key (`places-read` environment) and apply
+it after a reviewer approves (`places-production` environment). A run whose
+plan says `unchanged` publishes nothing. Each run's summaries, logs and
+artifacts are in the repository's Actions tab, and a failed run sends
+GitHub's failure notification. Setup, review, failures and rollback are in
+[Place catalogue preparation and refresh](place-catalogue-refresh.md#weekly-refresh-workflow).
 
 ## Admin page
 

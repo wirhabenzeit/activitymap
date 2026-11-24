@@ -4,10 +4,13 @@ Status: PR 1 (the incremental catalogue) has shipped and is described in
 [place-catalogue-refresh.md](place-catalogue-refresh.md#publish-or-refresh)
 and `backend/README.md` ("Place catalogue"); the cutover is
 [#609](https://github.com/wirhabenzeit/activitymap/issues/609). PR 2
-(automation and demand-driven regions) is still a proposal. Together they
-replace the immutable-rowset publication so the catalogue can be refreshed
-automatically every week. Where PR 1 ended differently from this plan, the
-sections below say so.
+(automation and demand-driven regions) has shipped too, except removing the
+rowset tables, which follows the cutover in a separate PR; the commands are
+in [place-catalogue-refresh.md](place-catalogue-refresh.md#choose-the-regions)
+and its [weekly workflow](place-catalogue-refresh.md#weekly-refresh-workflow)
+section. Together they replace the immutable-rowset publication so the
+catalogue can be refreshed automatically every week. Where a PR ended
+differently from this plan, the sections below say so.
 
 ## Problem
 
@@ -103,7 +106,8 @@ The publish command keeps its shape and guards (dry run by default,
 `--expect-current`, the 80% retirement check).
 
 1. **Read live hashes.** Page through `livePlaces` (`key`, `hash`, `tile`)
-   over the write bridge: ~176k short rows, a few MB.
+   over the write bridge (since PR 2, the read-only route
+   `/internal/places/v1`): ~176k short rows, a few MB.
 2. **Diff locally.** Compare with the artifact's listed rows to get inserts,
    updates, deletes and the affected tiles. The dry run reports these counts,
    examples and the tile count. When nothing differs and the coverage is
@@ -154,7 +158,7 @@ and matching version, then `catalogue.adopt` (as today's
 ## Demand-driven regions
 
 The catalogue covers wherever users have activities, not a fixed list of
-eight countries (`V1_PLACE_COUNTRIES`).
+eight countries (formerly `V1_PLACE_COUNTRIES`).
 
 ### Unit: Geofabrik extracts, country by default
 
@@ -165,12 +169,18 @@ paths in `src/server/places/catalogue-regions.ts`. Downloads stay restricted
 to `download.geofabrik.de`.
 
 The rule: use the **country extract**. Go one level down only when the
-country is larger than a size cap (about 5 GB, which keeps Germany and France
-whole), for example US states, Canadian provinces or Russian federal
-districts. A finer unit than country buys little. Places are tiny compared
+country is larger than a size cap, for example US states or Canadian
+provinces. A finer unit than country buys little. Places are tiny compared
 with the PBFs, and smaller units add more seams where a track leaves coverage
 at an internal border. The size cap only keeps each prepare job within one
 runner's disk and time limit.
+
+As shipped, the cap is about 6 GB (`REGION_SIZE_CAP_BYTES`), not 5: it
+splits only the United States and Canada and keeps France (5.12 GB),
+Germany (4.89 GB) and Russia (4.21 GB) whole. Russia was an example of a
+split country here; at its size it fits one runner. A split country is
+taken as the sub-extracts that hold demand, and the choice is sticky: a
+country held whole stays whole, one held in parts grows by parts.
 
 ### Which regions are wanted
 
@@ -178,47 +188,76 @@ runner's disk and time limit.
 for every track and not only start points. A track that crosses into a
 neighbouring country therefore pulls in that country too.
 
-- A Convex query (`places.demandTiles`, bridge-authenticated) returns the
-  distinct tiles with at least one activity. It returns no owners or
-  activity IDs. Activities without a match yet (no tile rows) contribute
-  their start tile from the DTO.
-- The publisher maps tiles to Geofabrik extracts by the index polygons, using
-  the rule above.
-- A region needs a minimum demand, for example tiles from at least two
-  activities, so one stray GPS point does not pull in a continent's worth of
-  extract.
+- A Convex query returns the tiles that hold activities, with no owners or
+  activity IDs.
+- The region selection maps tiles to Geofabrik extracts by the index
+  polygons, using the rule above.
+- A region needs a minimum demand, so one stray GPS point does not pull in
+  a continent's worth of extract.
 - **Regions are sticky.** A region that is in the catalogue stays when its
   demand disappears (a deleted account, for instance). Removal is a manual
   decision; otherwise places would churn in and out.
 
-The selected region list is stored in Convex (`placeRegions`: extract ID,
-added at, reason) and edited only by the publisher. The workflow reads it
-from there.
+As shipped:
+
+- The query is `livePlaces.demandTiles`, read over the read-only route
+  `/internal/places/v1`. It answers each tile with the number of activities
+  whose match read it.
+- A region is demanded when one tile intersecting it holds at least two
+  activities (`DEMAND_MIN_ACTIVITIES`).
+- Demand comes from `activityPlaceTiles` only. Activities without a match
+  do not contribute a start tile, unlike planned: a match outside the
+  coverage still records the tiles of its track, so the only activities
+  missing are those without a usable track or over the match budget, and
+  those not matched yet, which count from the first run after their match.
+- There is no `placeRegions` table. The wanted regions are the regions of
+  the live manifest, plus the demanded regions, plus `include`, minus
+  `exclude` from the committed `config/place-regions.json`. The live
+  manifest already records what the catalogue holds, and manual changes go
+  through review in git; a second store would have to be kept in step.
+  Removal is only by `exclude`.
+- A newly demanded region the catalogue cannot take is skipped and named
+  (`servableRegions`), so it cannot stop the refresh of the others: one
+  whose boundary makes the combined coverage invalid (a ring wider than half
+  the globe; Russia today) or brings it above 80% of the 500,000-edge
+  budget of a match, and any beyond 256 regions. Live and included regions
+  are never skipped. This was not in the plan; the coverage limits only
+  showed when measured.
+- All regions use one extract date: the newest of two to seven days back
+  that every region has, so all share one `data_as_of`.
+
+Measured: the eight current countries are 67,986 coverage edges (14% of the
+budget) and about 37 KB of coverage JSON, 45 European countries 88,355
+(18%), and all 190 countries would be 686,531 (37% over).
 
 ### Privacy in a public repository
 
 The repository and its Actions logs are public. Tiles never leave the
-publisher process: the workflow logs, job summaries and uploaded artifacts
-contain only region IDs, counts and place diffs. A region name reveals at
-most that someone has an activity in that country, which is acceptable for
-the country unit. Finer units would reveal more, which is another reason to
-stay at country level.
+resolve process (`pnpm places:resolve`): the workflow logs, job summaries
+and uploaded artifacts contain only region IDs, counts and place diffs. A
+region name reveals at most that someone has an activity in that country,
+which is acceptable for the country unit. Finer units would reveal more,
+which is another reason to stay at country level.
 
 ### Workflow changes
 
-`resolve` first asks Convex for the wanted regions (stored plus newly
-demanded), then emits one `prepare` matrix entry per region. GitHub allows
-256 matrix jobs per workflow and 20 concurrent jobs for a free public
-repository, which is plenty of headroom. `combine` takes the dynamic list.
-The combined region ID becomes `places-live` and the snapshot identity
-includes the sorted region list. Adding a region is then an ordinary
-publication: many inserts, a coverage diff, and a partial re-match of
-exactly the activities in the new area.
+`resolve` first works out the wanted regions, then emits one `prepare`
+matrix entry per region. GitHub allows 256 matrix jobs per workflow and 20
+concurrent jobs for a free public repository, which is plenty of headroom.
+`combine` takes the dynamic list. The combined region ID becomes
+`places-live`. Adding a region is then an ordinary publication: many
+inserts, a coverage diff, and a partial re-match of exactly the activities
+in the new area.
+
+As shipped, `resolve` reads the live manifest's regions and the demand tiles
+with the read key, not a stored list; a catalogue holds at most 256 regions
+(`MAX_CATALOGUE_REGIONS`, one `prepare` job each), and `prepare` runs at
+most four jobs at a time, because each reads Copernicus terrain tiles.
 
 A new user in a new country waits for the next weekly run. If that turns out
 too slow, Convex can trigger the workflow early (`repository_dispatch`, with
 a fine-grained token limited to Actions on this repository) when demand for
-an uncovered region appears.
+an uncovered region appears. This is not built.
 
 ## Re-match walk
 
@@ -249,8 +288,9 @@ than the activity's stored match revision (`publishMatchRecord`).
 
 ## Migration and cutover
 
-Two PRs. The cutover happens between them, as operator commands rather than
-a deploy.
+Two PRs. The cutover was planned between them, as operator commands rather
+than a deploy. As it turned out, both PRs ship before the cutover, and a
+third PR removes the rowsets after it.
 
 ### PR 1: incremental catalogue (backend and publisher), shipped
 
@@ -293,9 +333,10 @@ a deploy.
 **Cutover after deploy** (operator,
 [place-catalogue-refresh.md](place-catalogue-refresh.md#cutover-from-rowsets)):
 
-1. `pnpm places:publish` with the current artifact. The live table is empty,
-   so this is a full insert. New owners start on the live table when it
-   completes; existing owners keep their rowset.
+1. `pnpm places:publish` with the current artifact (`--region v1-places`
+   since PR 2). The live table is empty, so this is a full insert. New
+   owners start on the live table when it completes; existing owners keep
+   their rowset.
 2. `convex run catalogueWorker:adopt`: one final full re-match, which moves
    every owner to the live table and fills `activityPlaceTiles` for every
    activity. It costs the same as one of today's publications, once.
@@ -305,20 +346,49 @@ a deploy.
 Rollback before step 4 of the cutover: redeploy the previous version, which
 still serves from the rowsets.
 
-### PR 2: automation and demand-driven regions
+### PR 2: automation and demand-driven regions, shipped
 
-- Remove the rowset tables and the `begin`/`importBatch`/`complete` routes
-  from the schema and code (the data is gone after the cutover).
-- The Geofabrik index reader, replacing the hard-coded paths in
-  `catalogue-regions.ts`, with the size-cap rule.
-- `placeRegions`, seeded with the eight current countries, and
-  `places.demandTiles`.
+- The Geofabrik index reader (`src/server/places/geofabrik-index.ts`),
+  replacing the hard-coded paths in `catalogue-regions.ts`, with dated
+  extract URLs and one extract date for all regions.
+- Region selection with the size-cap rule
+  (`src/server/places/region-selection.ts`), `pnpm places:resolve` and the
+  override file `config/place-regions.json`.
+- `livePlaces.demandTiles`, and a read-only bridge route
+  `/internal/places/v1` (`liveState`, `liveHashes`, `demandTiles`) with its
+  client `src/server/places/catalogue-reader.ts`. A dry run needs only the
+  read key; `--apply` also needs the writer key, `--user` and `--athlete`.
+- The publisher defaults to the region `places-live`, refuses a coverage
+  boundary above the 500,000-edge budget, reports `coverage`, `regions`,
+  `regionsAdded` and `regionsRemoved`, and writes the report to a file with
+  `--report`.
+- Combining takes up to 256 regions, and an artifact up to 900,000 rows
+  (500 MiB).
 - `.github/workflows/places-refresh.yml` with demand-based region selection
   in `resolve`.
-- Update `place-catalogue-refresh.md` and `scheduled-jobs.md`.
+- `place-catalogue-refresh.md` and `scheduled-jobs.md`.
 
-Run the workflow once with `workflow_dispatch` and approval before relying on
-the weekly schedule.
+Where it differs from the plan:
+
+- No `placeRegions` table (see
+  [Which regions are wanted](#which-regions-are-wanted)).
+- Removing the rowset tables and the `begin`/`importBatch`/`complete`
+  routes moves to a separate PR after the cutover
+  ([#609](https://github.com/wirhabenzeit/activitymap/issues/609)): the
+  rowsets are still serving until then.
+- The live catalogue's reads moved from the write route to a read-only
+  route, so the jobs that plan and review a publication never hold a key
+  that can write.
+
+First use, after the cutover: run the workflow by hand with `demand` off
+(a no-op or a small diff on the live regions), then with `demand` on, then
+enable the schedule. The setup it needs first, two GitHub environments and a
+read key ID in the deployment's `ACTIVITYMAP_BRIDGE_SIGNING_KEYS`, is in
+[place-catalogue-refresh.md](place-catalogue-refresh.md#setup).
+
+Known limits not addressed: artifacts are read whole into one string, which
+bounds a catalogue at about 900,000 rows, and preparation stops at 100,000
+selected sources per region.
 
 ## Automation: GitHub Actions
 
@@ -327,25 +397,37 @@ over a launchd job on a laptop: it has no wake, disk or local-secrets
 problems, it keeps logs and artifacts, and a GitHub environment can gate the
 apply step.
 
-`.github/workflows/places-refresh.yml`, weekly (and `workflow_dispatch`):
+`.github/workflows/places-refresh.yml`, weekly (and `workflow_dispatch`).
+As shipped (commands and operation in
+[place-catalogue-refresh.md](place-catalogue-refresh.md#weekly-refresh-workflow)):
 
-1. **`resolve`**: pick one Geofabrik date and emit dated URLs
-   (`europe/germany-YYMMDD.osm.pbf`) for all eight countries, so the epochs
-   agree.
-2. **`prepare`**: one matrix job per country (one runner each, because ~13 GB
-   of extracts don't fit on one runner disk). `pnpm places:prepare --pbf
-… --poly …`. Upload each artifact.
-3. **`combine`**: `pnpm places:combine --region v1-places`. Upload the
-   result, which is also kept for rollback.
-4. **`publish`** in the `places-production` environment, which holds the
-   bridge secrets: run the dry run, write its diff summary to the job summary,
-   then apply with `--expect-current` from the dry run. It never passes
-   `--allow-large-retirement`; tripping the 80% guard fails the run.
-   Start with a required reviewer on the environment and remove it after a
-   few clean runs.
+1. **`resolve`**: choose the regions
+   ([Demand-driven regions](#demand-driven-regions)) and one Geofabrik date,
+   and emit dated URLs (`europe/germany-YYMMDD.osm.pbf`) for all of them, so
+   the epochs agree.
+2. **`prepare`**: one matrix job per region (one runner each, because the
+   extracts don't fit on one runner disk), at most four at a time:
+   `pnpm places:prepare --source-url … --coverage-url …`. Upload each
+   artifact.
+3. **`combine`**: `pnpm places:combine --region places-live`. Upload the
+   result as `places-live-<date>`, kept 90 days for rollback.
+4. **`plan`**, in the `places-read` environment with the read key only: the
+   dry run, its report in the job summary. It fails when the 80% guard
+   trips (`--allow-large-retirement` is never passed) or the coverage has
+   more than 500,000 edges.
+5. **`apply`**, in the `places-production` environment, which holds the
+   writer key and has a required reviewer: apply with `--expect-current`
+   from the plan. Skipped when the plan says `unchanged`. The reviewer could
+   be removed after a few clean runs.
 
-A failed run leaves the live catalogue unchanged, or resumable when apply was
-interrupted. GitHub's failure notification is the alert.
+The plan had one `publish` job holding every secret. Splitting it lets the
+reviewer approve after reading the diff, and keeps the write key out of
+every job before the approval.
+
+The schedule does nothing until the repository variable
+`PLACES_REFRESH_SCHEDULED` is `true`. A failed run leaves the live catalogue
+unchanged, or resumable when apply was interrupted. GitHub's failure
+notification is the alert.
 
 ## Open questions
 
@@ -361,3 +443,16 @@ interrupted. GitHub's failure notification is the alert.
 - An activity matched at an older live revision counts as stale even when
   none of its tiles changed, so its next run for any other reason (an edit,
   a provider event) matches it again, without a provider read.
+- Settled: the region list is not stored; it is the live manifest's regions
+  plus demand plus the override file.
+- Russia is demanded but skipped: its boundary has a ring wider than half
+  the globe, which the combined coverage cannot hold. Covering it needs
+  either coverage that accepts such rings or taking it in parts.
+- The coverage budget bounds how far demand can grow: all 190 countries
+  would be 37% over it.
+- Catalogue size: artifacts are read whole into one string (about 900,000
+  rows at most; more needs a streaming reader), and preparation stops at
+  100,000 selected sources per region.
+- Whether two activities in one tile is the right demand threshold, and
+  whether a weekly run is soon enough for a new country
+  (`repository_dispatch` above).

@@ -85,6 +85,8 @@ jobs:
             jq -r '.regions[] | "| \(.region) | \(.reason) |"' resolved.json
             echo
             echo "Added this run: $(jq -r '.added | if length == 0 then "none" else join(", ") end' resolved.json)"
+            echo
+            echo "Demanded but skipped: $(jq -r '.skipped | if length == 0 then "none" else map("\(.region) (\(.reason))") | join(", ") end' resolved.json)"
           } >> "$GITHUB_STEP_SUMMARY"
 
   prepare:
@@ -198,6 +200,17 @@ jobs:
           # needs a person to look at the catalogue.
           if [ "$(jq -r '.largeRetirement' report.json)" = "true" ]; then
             echo "::error::The catalogue would lose more than 20% of its places"
+            exit 1
+          fi
+          # The apply would be refused: an unfinished publication of another
+          # catalogue is finished or abandoned by hand first.
+          if [ "$(jq -r '.pending != null and .pending.snapshotId != .snapshotId' report.json)" = "true" ]; then
+            echo "::error::Another publication is unfinished; see docs/place-catalogue-refresh.md"
+            exit 1
+          fi
+          # Above this every match would fail (COVERAGE_EDGE_BUDGET).
+          if [ "$(jq -r '.coverage.edges > 500000' report.json)" = "true" ]; then
+            echo "::error::The coverage boundary has too many edges to match against"
             exit 1
           fi
 

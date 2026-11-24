@@ -4,7 +4,11 @@ import { z } from 'zod';
 
 import type { ConvexWriter } from '~/server/sync/convex-writer';
 
-import { coverageClearanceM, coverageEdgeCount } from './batch-coverage';
+import {
+  COVERAGE_EDGE_BUDGET,
+  coverageClearanceM,
+  coverageEdgeCount,
+} from './batch-coverage';
 import {
   type ValidatedCatalogue,
   listedPlaceCount,
@@ -318,6 +322,10 @@ export async function publishCatalogue({
   if (expectedCurrent !== current)
     throw new Error(
       `The live catalogue is ${current ?? 'none'}, not ${expectedCurrent ?? 'none'} as expected: review a new dry run`,
+    );
+  if (report.coverage.edges > COVERAGE_EDGE_BUDGET)
+    throw new Error(
+      `The coverage boundary has ${report.coverage.edges} edges; matching fails above ${COVERAGE_EDGE_BUDGET}`,
     );
   if (report.largeRetirement && !allowLargeRetirement)
     throw new Error(
