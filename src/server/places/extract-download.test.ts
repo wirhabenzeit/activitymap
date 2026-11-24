@@ -137,16 +137,17 @@ void test('connections that add nothing end the download', () =>
   inDirectory(async (path) => {
     const { calls, fetcher } = server(
       content,
-      Array.from({ length: 10 }, () => ({ bytes: 0, end: 'error' as const })),
+      Array.from({ length: 1000 }, () => ({ bytes: 0, end: 'error' as const })),
     );
     await assert.rejects(
       downloadExtract(URL_DATED, path, {
         fetcher,
-        limits: { ...limits, attemptsWithoutProgress: 3 },
+        limits: { retryMs: 1, retryMaxMs: 20, noProgressMs: 150 },
       }),
-      /failed 3 times in a row/,
+      /made no progress/,
     );
-    assert.equal(calls.length, 3);
+    // The waits double up to 20 ms: about a dozen connections in 150 ms.
+    assert.ok(calls.length >= 5 && calls.length <= 40, String(calls.length));
   }));
 
 void test('the overall limit ends a slow download', () =>

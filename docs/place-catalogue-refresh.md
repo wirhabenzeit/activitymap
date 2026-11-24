@@ -50,8 +50,11 @@ mirror, which fails: pass the dated extract (`…/germany-261122.osm.pbf`) as
 `--source-url`, as `pnpm places:resolve` prints it. Geofabrik serves one
 connection at one to two megabytes a second, so a large country's extract
 (France is 5 GB) takes most of an hour. A download that drops or stalls for a
-minute is resumed from the bytes already received; it fails after two hours
-in total, or after five connections in a row that add nothing. Terrain is
+minute is resumed from the bytes already received. Geofabrik also refuses
+connections beyond a few at a time from one network (the fourth concurrent
+workflow job was refused), so a refused download keeps trying, at most once
+a minute. It fails after two hours in total, or after 20 minutes without a
+further byte. Terrain is
 always read from the public Copernicus bucket, so preparation needs network
 access even with local source files.
 The region identifier is included in new artifact identities. Old frozen v1
@@ -332,13 +335,13 @@ Geofabrik extracts and publishes the difference. It runs on Mondays at 03:17
 UTC once enabled, and by hand (`workflow_dispatch`). Runs never overlap
 (concurrency group `places-refresh`), also while one waits for its reviewer.
 
-| Job       | Environment         | What it does                                                                                                                                                          |
-| --------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `resolve` | `places-read`       | `pnpm places:resolve`; writes the regions, why each is there, the added and the skipped regions to the job summary                                                    |
-| `prepare` | none                | one matrix job per region, at most four at a time (each reads Copernicus): `pnpm places:prepare` from the dated URLs; artifact `places-region-<region>`, kept 14 days |
-| `combine` | none                | `pnpm places:combine --region places-live` over every region; artifact `places-live-<date>`, kept 90 days for rollback                                                |
-| `plan`    | `places-read`       | dry run with the read key, `--report report.json`; the report goes to the job summary                                                                                 |
-| `apply`   | `places-production` | waits for the reviewer, then publishes with `--apply --expect-current` from the plan; skipped when the plan says `unchanged`                                          |
+| Job       | Environment         | What it does                                                                                                                                                                                         |
+| --------- | ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resolve` | `places-read`       | `pnpm places:resolve`; writes the regions, why each is there, the added and the skipped regions to the job summary                                                                                   |
+| `prepare` | none                | one matrix job per region, at most two at a time (Geofabrik refuses more than a few connections at once): `pnpm places:prepare` from the dated URLs; artifact `places-region-<region>`, kept 14 days |
+| `combine` | none                | `pnpm places:combine --region places-live` over every region; artifact `places-live-<date>`, kept 90 days for rollback                                                                               |
+| `plan`    | `places-read`       | dry run with the read key, `--report report.json`; the report goes to the job summary                                                                                                                |
+| `apply`   | `places-production` | waits for the reviewer, then publishes with `--apply --expect-current` from the plan; skipped when the plan says `unchanged`                                                                         |
 
 `prepare` fails fast: one failed region fails the run before anything is
 published. `plan` fails when the report flags `largeRetirement` (the
