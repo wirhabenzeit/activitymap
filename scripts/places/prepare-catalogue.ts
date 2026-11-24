@@ -16,8 +16,8 @@ import {
   serializeCatalogueRows,
 } from '../../src/server/places/catalogue-artifact';
 import { prepareCatalogue } from '../../src/server/places/catalogue-prepare';
-import { GEOFABRIK_PATHS } from '../../src/server/places/catalogue-regions';
 import { CopernicusDem } from '../../src/server/places/copernicus-dem';
+import { fetchGeofabrikIndex } from '../../src/server/places/geofabrik-index';
 
 const { values } = parseArgs({
   options: {
@@ -50,7 +50,12 @@ async function download(url: string, path: string) {
     const location = response.headers.get('location');
     if (!location || hops >= 3)
       throw new Error(`Download redirect failed (${response.status})`);
-    response = await fetch(geofabrikUrl(new URL(location, url).href), {
+    const target = new URL(location, url);
+    if (target.hostname !== 'download.geofabrik.de')
+      throw new Error(
+        'Geofabrik redirected to a mirror; download its dated extract (-YYMMDD.osm.pbf) with --source-url',
+      );
+    response = await fetch(geofabrikUrl(target.href), {
       signal: AbortSignal.timeout(30 * 60 * 1000),
       redirect: 'manual',
     });
@@ -71,7 +76,7 @@ async function download(url: string, path: string) {
 }
 if (values.help) {
   console.log(
-    `Prepare a complete regional catalogue without database credentials:\n  pnpm places:prepare --region switzerland --out output/places/switzerland-YYYY-MM-DD\nThe V1 countries (${Object.keys(GEOFABRIK_PATHS).join(', ')}) have predefined Geofabrik URLs. Other regions require --source-url and --coverage-url. Supply --pbf and --poly together to use local source files. Pass and peak terrain is read from Copernicus GLO-30 with HTTP range requests. Runs entirely in TypeScript/Node; no external tools are required.`,
+    `Prepare a complete regional catalogue without database credentials:\n  pnpm places:prepare --region switzerland --out output/places/switzerland-YYYY-MM-DD [--source-url <pbf> --coverage-url <poly>]\nThe region is a Geofabrik extract's region ID (as pnpm places:resolve prints it). Without --source-url and --coverage-url its URLs are read from the Geofabrik index; pass a dated --source-url (-YYMMDD.osm.pbf) to pin the epoch or when -latest redirects to a mirror. Supply --pbf and --poly together to use local source files. Pass and peak terrain is read from Copernicus GLO-30 with HTTP range requests. Runs entirely in TypeScript/Node; no external tools are required.`,
   );
 } else {
   const started = performance.now();
@@ -79,19 +84,17 @@ if (values.help) {
   if (!values.out) throw new Error('--out is required');
   if (!!values.pbf !== !!values.poly)
     throw new Error('Supply both --pbf and --poly, or neither');
-  const path = Object.hasOwn(GEOFABRIK_PATHS, region)
-    ? GEOFABRIK_PATHS[region as keyof typeof GEOFABRIK_PATHS]
-    : undefined;
-  const sourceUrl =
-    values['source-url'] ??
-    (path ? `https://download.geofabrik.de/${path}-latest.osm.pbf` : undefined);
-  const coverageUrl =
-    values['coverage-url'] ??
-    (path ? `https://download.geofabrik.de/${path}.poly` : undefined);
-  if (!sourceUrl || !coverageUrl)
-    throw new Error(
-      'Other regions require explicit --source-url and --coverage-url',
-    );
+  let sourceUrl = values['source-url'],
+    coverageUrl = values['coverage-url'];
+  if (!sourceUrl || !coverageUrl) {
+    const extract = (await fetchGeofabrikIndex()).byRegion.get(region);
+    if (!extract)
+      throw new Error(
+        `${region} is not in the Geofabrik index; supply --source-url and --coverage-url`,
+      );
+    sourceUrl ??= extract.pbf;
+    coverageUrl ??= extract.poly;
+  }
   const output = resolve(values.out);
   await mkdir(dirname(output), { recursive: true });
   const temporary = await mkdtemp(join(dirname(output), '.catalogue-prepare-'));

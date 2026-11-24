@@ -2,8 +2,10 @@
 
 The places v1 catalogue is independent of activity ingestion. Prepare a complete
 regional snapshot without database access, then publish that exact artifact with
-a separate command. Both commands can run locally; a future CI job can use the
-same entry points. Nothing runs automatically when the web application starts.
+a separate command. Every command can run locally; the weekly GitHub Actions
+workflow runs the same entry points
+([Weekly refresh workflow](#weekly-refresh-workflow)). Nothing runs
+automatically when the web application starts.
 
 ## Where the catalogue lives
 
@@ -13,7 +15,8 @@ catalogue to the Convex backend (`backend/convex/livePlaces.ts`), which
 matches activities against it. The measured runs further down record extraction timings and counts.
 
 Publication is not automatically undone. Keep the input artifacts: going back
-to an earlier catalogue means publishing it again.
+to an earlier catalogue means publishing it again. The workflow keeps each
+combined artifact for 90 days ([Roll back](#roll-back)).
 
 ## Prepare an artifact
 
@@ -37,11 +40,14 @@ malformed geometry within the supported building model fails preparation.
 Unnamed/unselected objects are excluded by the existing normalization policy.
 
 To prepare already downloaded files, supply both `--pbf /path/to/snapshot.osm.pbf`
-and `--poly /path/to/coverage.poly`. The V1 countries in
-`src/server/places/catalogue-regions.ts` have predefined URLs; other regions
-require `--source-url` and `--coverage-url`. Downloads are restricted to HTTPS
-`download.geofabrik.de` URLs, following only redirects that stay on that host
-(`-latest` redirects to the dated extract). Terrain is always read from
+and `--poly /path/to/coverage.poly`. The region is a Geofabrik extract's
+region ID: its ID in [Geofabrik's index](https://download.geofabrik.de/index-v1.json)
+with `/` as `-` (`us/california` is `us-california`). Without `--source-url`
+and `--coverage-url` the URLs are read from the index. Downloads are
+restricted to HTTPS `download.geofabrik.de` URLs, following only redirects
+that stay on that host. `-latest` redirects some regions (Germany) to a
+mirror, which fails: pass the dated extract (`…/germany-261122.osm.pbf`) as
+`--source-url`, as `pnpm places:resolve` prints it. Terrain is always read from
 the public Copernicus bucket, so preparation needs network access even with
 local source files.
 The region identifier is included in new artifact identities. Old frozen v1
@@ -57,6 +63,142 @@ Temporary source files are removed afterwards. Retain the completed artifact
 for publication retries and reproduction; retain original downloads separately
 if you need to rerun the extraction itself.
 
+## Choose the regions
+
+The serving catalogue is one combined region, `places-live`
+(`LIVE_PLACE_REGION`), built from Geofabrik extracts. The extracts and one
+extract date for all of them are chosen by
+
+```sh
+pnpm places:resolve [--no-demand] [--date YYMMDD] [--overrides <file>]
+```
+
+(`scripts/places/resolve-regions.ts`; the rules are in
+`src/server/places/region-selection.ts`). It prints one JSON document on
+stdout and its progress on stderr:
+
+```json
+{
+  "date": "261122",
+  "regions": [
+    {
+      "region": "austria",
+      "pbf": "https://download.geofabrik.de/europe/austria-261122.osm.pbf",
+      "poly": "https://download.geofabrik.de/europe/austria.poly",
+      "reason": "live"
+    }
+  ],
+  "added": ["us-colorado"],
+  "skipped": [{ "region": "russia", "reason": "coverage" }],
+  "counts": { "live": 8, "demanded": 1, "included": 0, "excluded": 0 }
+}
+```
+
+`regions` is sorted by region ID and is what the workflow's `prepare` matrix
+runs. `added` lists the regions the live catalogue does not hold yet,
+`skipped` the demanded regions left out (below), and `counts` the regions
+by reason; `demanded` counts only those kept. `--no-demand` keeps the live
+regions and the overrides only, `--date` pins the extract date, and
+`--overrides` replaces `config/place-regions.json`.
+
+It reads the live catalogue with the catalogue's read key
+(`ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_PLACES_KEY_ID`,
+`ACTIVITYMAP_PLACES_SIGNING_KEY`; see [Publish or refresh](#publish-or-refresh))
+and fails before the first live publication.
+
+### Which regions
+
+The wanted regions are the live catalogue's regions, plus the demanded
+regions, plus `include`, minus `exclude`. Each carries its `reason`:
+
+- `live`: every region of the live catalogue's manifest stays, whatever its
+  demand.
+- `include`: named in the override file.
+- `demand`: a region that one quarter-degree tile holding at least two
+  activities (`DEMAND_MIN_ACTIVITIES`) intersects. A tile on a border
+  demands every country it touches.
+
+Demand is read from `activityPlaceTiles` only (`livePlaces.demandTiles`):
+the tiles each activity's current match read along its track. A match that
+ran outside the coverage still records its tiles, so activities in a
+country the catalogue does not cover yet demand it. An activity without
+rows adds no demand: one with no track (no GPS, or more than 100,000
+samples), one whose match exceeded the tile or window budget, and one never
+matched.
+
+The unit is the country extract. A country above about 6 GB
+(`REGION_SIZE_CAP_BYTES`; today the United States and Canada) is taken as
+the sub-extracts that hold demand, such as `us-colorado`, so each prepare
+job fits one runner's disk and time. France (5.12 GB), Germany (4.89 GB) and
+Russia (4.21 GB) stay whole. The choice is sticky: a country the catalogue
+holds whole stays whole, and one it holds in parts grows by parts. Sizes are
+read only for a newly demanded country neither held whole nor in parts.
+
+### Override file
+
+`config/place-regions.json` lists region IDs, Geofabrik IDs with `/` as `-`:
+
+```json
+{
+  "include": ["iceland"],
+  "exclude": []
+}
+```
+
+`include` adds a country or a part of one (not a continent). `exclude` wins
+over every reason and is the only way a region leaves the catalogue: the
+next publication deletes its places and its coverage (`regionsRemoved` in
+the report), which can trip the 80% guard. An unknown region in either list
+fails the run, and so does a live region the Geofabrik index no longer
+lists, until it is excluded. The workflow reads the file from the branch it
+runs on.
+
+### Skipped regions
+
+A newly demanded region is skipped, and named under `skipped`, on stderr
+and in the workflow's job summary, when the catalogue cannot take it:
+
+- `coverage`: adding its boundary makes the combined coverage invalid (a
+  ring wider than half the globe; Russia today) or brings it above 80% of
+  the 500,000 boundary edges a match can index (`COVERAGE_EDGE_BUDGET`).
+  The rest is room for boundaries that grow from one week to the next.
+- `limit`: the catalogue already holds 256 regions
+  (`MAX_CATALOGUE_REGIONS`, one `prepare` job each).
+
+A skipped region is tried again on every run. Live and included regions are
+never skipped; if they do not fit, combining or publishing fails and says
+why.
+
+### Extract date
+
+All regions use one date: the newest of two to seven days back
+(`EPOCH_DAYS_BACK`) on which every region's dated extract
+(`…-YYMMDD.osm.pbf`) exists. All extracts of one day are cut from the same
+planet state and carry the same `data_as_of`, as `combine` requires. Dated
+files are used because `-latest` redirects some regions to a mirror, which
+preparation refuses. The `.poly` boundary is Geofabrik's current one; it
+has no dated copy.
+
+### Privacy
+
+The repository and its Actions logs are public. Tiles locate users'
+activities, so they never leave the resolve process: its output and logs
+name region IDs, URLs and counts only, and the publication report names
+regions and places, never a tile.
+
+### Coverage budget
+
+Every match indexes the edges of the coverage boundary. Measured from the
+Geofabrik boundaries in November 2026: the eight countries of `v1-places`
+have 67,986 edges (14% of the 500,000 limit) and about 37 KB of coverage
+JSON; 45 European countries 88,355 edges (18%); all 190 countries would
+have 686,531 (37% over the limit) and are also rejected for the wide ring.
+
+Known limits that are not addressed yet: artifacts are read whole into one
+string, which bounds a catalogue at about 900,000 rows
+(`MAX_CATALOGUE_ROWS`, 500 MiB), and preparation stops at 100,000 selected
+sources per region.
+
 ## Publish or refresh
 
 A catalogue is published to the Convex backend's live catalogue
@@ -65,16 +207,21 @@ updates in place. Only the difference from what is live is sent, and only
 activities whose match read a changed tile are matched again. Nothing else
 stores the catalogue.
 
-The publisher signs its requests with the write bridge key. It needs
-`ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and
-`ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY` in the operator's environment, and
-the user and athlete ID of an account whose bridge scope signs the requests
-(use an administrator; the catalogue belongs to no account).
+The publisher reads the live catalogue through `/internal/places/v1` and
+writes through `/internal/places/write/v1`, each with a key of the
+catalogue's own that can neither read nor write a library. A dry run needs
+only the read key: `ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_PLACES_KEY_ID`
+and `ACTIVITYMAP_PLACES_SIGNING_KEY`, a key ID listed in the deployment's
+`ACTIVITYMAP_BRIDGE_PLACES_KEYS`. `--apply` also needs the write key,
+`ACTIVITYMAP_PLACES_WRITER_KEY_ID` and `ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY`,
+a key ID listed in `ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS`. The catalogue
+belongs to no account, so no user is named.
 
 ```sh
-pnpm places:publish --artifact <dir> --user <user ID> --athlete <athlete ID> \
-  [--apply --expect-current <snapshot-id|none>] [--replace-pending <snapshot ID>] \
-  [--allow-large-retirement] [--region <region>]
+pnpm places:publish --artifact <dir> [--report <file>] [--region <region>]
+pnpm places:publish --artifact <dir> --apply --expect-current <snapshot-id|none> \
+  [--allow-large-retirement] [--replace-pending <snapshot ID>] \
+  [--report <file>] [--region <region>]
 ```
 
 Default execution is a dry run: it reads the live row hashes, diffs them with
@@ -82,19 +229,23 @@ the artifact and writes nothing. When reviewed, apply with the current
 snapshot ID the report showed, or `none` when nothing was published yet:
 
 ```sh
-pnpm places:publish --artifact output/places/v1-places-current \
-  --user <user ID> --athlete <athlete ID> \
+pnpm places:publish --artifact output/places/places-live \
   --apply --expect-current <current-snapshot-id>
 ```
 
 If another catalogue became current meanwhile, publication fails and requires
 a new dry run. A catalogue with fewer than 80% of the live places is flagged
 and requires `--allow-large-retirement` on apply, after inspecting source
-completeness. Only an artifact of the serving region (`v1-places`) is
-accepted; `--region` names another one explicitly. `--replace-pending` is
-only accepted with `--apply`.
+completeness. An apply refuses a coverage boundary with more than 500,000
+edges (`COVERAGE_EDGE_BUDGET`), because every match would fail against it;
+the dry run reports the count (`coverage.edges`). Only an artifact of the
+serving region `places-live` (`LIVE_PLACE_REGION`) is accepted; `--region`
+names another one explicitly. `v1-places`, the eight-country catalogue, is
+what is live until the first `places-live` publication, so it needs
+`--region v1-places`. `--replace-pending` is only accepted with `--apply`.
 
-The report is JSON:
+The report is JSON on stdout (progress goes to stderr); `--report <file>`
+also writes it to a file. Besides `dryRun`, true without `--apply`:
 
 | Field                              | Meaning                                                                                                                        |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -109,6 +260,9 @@ The report is JSON:
 | `coverageChanged`, `affectedTiles` | whether the coverage changed, and how many tiles are matched again (a count only; tiles are never printed: logs may be public) |
 | `largeRetirement`                  | fewer than 80% of the live places                                                                                              |
 | `pending`                          | an unfinished publication: `snapshotId`, `startedAt`, `ageMinutes`                                                             |
+| `coverage`                         | what every match reads: `polygons`, `edges` (at most 500,000) and `metadataBytes` (manifest and coverage file)                 |
+| `regions`                          | the artifact's component regions                                                                                               |
+| `regionsAdded`, `regionsRemoved`   | regions the artifact has and the live catalogue lacks, and the reverse                                                         |
 
 `unchanged` means no row changes, no coverage change and nothing pending. It
 writes nothing, also with `--apply`, even when the snapshot ID differs.
@@ -151,9 +305,10 @@ Before the live catalogue, each publication was a new immutable rowset and
 moved every library to it. Deploying the live catalogue changes nothing until
 its first publication. Then, in this order:
 
-1. `pnpm places:publish` the current `v1-places` artifact. The live table is
-   empty, so this is a full insert. New libraries start on the live
-   catalogue from then on; existing ones keep matching against their rowset.
+1. `pnpm places:publish --region v1-places` the current `v1-places`
+   artifact. The live table is empty, so this is a full insert. New
+   libraries start on the live catalogue from then on; existing ones keep
+   matching against their rowset.
 2. `npx convex run catalogueWorker:adopt` in `backend/`: one full re-match
    that moves every library to the live catalogue and records the tiles of
    every match. It costs about as much as one rowset publication did.
@@ -163,7 +318,129 @@ its first publication. Then, in this order:
    before step 1 and until step 2 has moved every library.
 
 Before step 4, rollback means redeploying the previous version, which still
-serves from the rowsets.
+serves from the rowsets. After the cutover, start the weekly workflow as
+described under [First run](#first-run).
+
+## Weekly refresh workflow
+
+`.github/workflows/places-refresh.yml` rebuilds the catalogue from the week's
+Geofabrik extracts and publishes the difference. It runs on Mondays at 03:17
+UTC once enabled, and by hand (`workflow_dispatch`). Runs never overlap
+(concurrency group `places-refresh`), also while one waits for its reviewer.
+
+| Job       | Environment         | What it does                                                                                                                                                          |
+| --------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `resolve` | `places-read`       | `pnpm places:resolve`; writes the regions, why each is there, the added and the skipped regions to the job summary                                                    |
+| `prepare` | none                | one matrix job per region, at most four at a time (each reads Copernicus): `pnpm places:prepare` from the dated URLs; artifact `places-region-<region>`, kept 14 days |
+| `combine` | none                | `pnpm places:combine --region places-live` over every region; artifact `places-live-<date>`, kept 90 days for rollback                                                |
+| `plan`    | `places-read`       | dry run with the read key, `--report report.json`; the report goes to the job summary                                                                                 |
+| `apply`   | `places-production` | waits for the reviewer, then publishes with `--apply --expect-current` from the plan; skipped when the plan says `unchanged`                                          |
+
+`prepare` fails fast: one failed region fails the run before anything is
+published. `plan` fails when the report flags `largeRetirement` (the
+workflow never passes `--allow-large-retirement`) or when `coverage.edges`
+is above 500,000.
+
+The repository and its logs are public. Jobs print region IDs, counts and
+place diffs only ([Privacy](#privacy)).
+
+### Setup
+
+Two GitHub environments, each with the variable `ACTIVITYMAP_CONVEX_SITE`
+and the secrets of the catalogue's read key, `ACTIVITYMAP_PLACES_KEY_ID` and
+`ACTIVITYMAP_PLACES_SIGNING_KEY`:
+
+- `places-read`, without reviewer: enough to resolve regions and to dry-run
+  a publication.
+- `places-production`, with a required reviewer, additionally holds
+  `ACTIVITYMAP_PLACES_WRITER_KEY_ID` and
+  `ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY`, the catalogue's write key.
+
+The Convex deployment holds `ACTIVITYMAP_BRIDGE_PLACES_KEYS` and
+`ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS`, each a JSON object of key ID →
+64-hex secret, like the other key maps (`backend/README.md`); the read key
+ID must be listed in the first and the write key ID in the second. Neither
+key can read or write a user's library, and the app's keys are refused on
+the catalogue's routes, so either side can be revoked without touching the
+other.
+
+### Run it by hand
+
+```sh
+gh workflow run places-refresh.yml -f demand=false
+gh workflow run places-refresh.yml -f demand=true -f date=261122
+```
+
+`demand` (default on) adds the regions that hold activities; off keeps the
+live regions and the overrides only. `date` pins the extract date (`YYMMDD`);
+by default it is the newest every region has.
+
+### Enable the schedule
+
+The scheduled run does nothing until the repository variable
+`PLACES_REFRESH_SCHEDULED` is `true`:
+
+```sh
+gh variable set PLACES_REFRESH_SCHEDULED --body true
+```
+
+Scheduled runs always use demand. Set the variable to anything else to pause
+them.
+
+### First run
+
+After the [cutover](#cutover-from-rowsets), with the setup above in place:
+
+1. Run the workflow by hand with `demand` off. It rebuilds the live regions
+   as `places-live`, which should be a no-op or a small diff against
+   `v1-places`.
+2. Run it with `demand` on and review the added regions.
+3. Set `PLACES_REFRESH_SCHEDULED`.
+
+### Review
+
+The reviewer approves the `apply` job's deployment after reading two job
+summaries:
+
+- `resolve`: the regions with their reasons, the added ones and the skipped
+  ones with why.
+- `plan`: the report ([Publish or refresh](#publish-or-refresh)). Check
+  `changes` and `examples` against what a week of OpenStreetMap edits
+  should do, `regionsAdded` and `regionsRemoved` against the resolve
+  summary, `hiddenByReason` for a filter change, `coverage.edges` against
+  the 500,000 limit, `affectedTiles` for the size of the re-match, and that
+  `pending` is null.
+
+Rejecting the deployment changes nothing.
+
+### When a run fails
+
+A run that fails before `apply`, or whose deployment is rejected, leaves the
+live catalogue unchanged. An `apply` interrupted partway leaves a pending
+publication: re-run the failed job (Re-run failed jobs, approved again),
+which publishes the same artifact with the same `--expect-current` and sends
+only what is still missing. Until it is finished, later runs fail at
+`apply`, because a different artifact is pending; finish it, or abandon it
+by hand with `--replace-pending <its snapshot ID>`. GitHub's failure
+notification is the alert.
+
+### Roll back
+
+Publishing an earlier catalogue reverts a newer one. Download the kept
+`places-live-<date>` artifact of an earlier run and publish it by hand:
+
+```sh
+gh run list --workflow places-refresh.yml
+gh run download <run ID> --name places-live-<date> \
+  --dir output/places/places-live-<date>
+pnpm places:publish --artifact output/places/places-live-<date>
+pnpm places:publish --artifact output/places/places-live-<date> --apply \
+  --expect-current <current-snapshot-id>
+```
+
+The artifacts are kept for 90 days. A rollback that removes regions may need
+`--allow-large-retirement`. To revert a half-applied publication, publish
+the previous artifact with `--replace-pending <the pending snapshot ID>`.
 
 ## Noise filter: OSM roads and terrain
 
@@ -337,8 +614,8 @@ production or modify activity evidence.
 
 The first combined serving catalogue, `ch-at-it`, was built from the three
 complete country extracts. It is replaced by `v1-places` (below); the workflow
-is the same. Prepare each country separately; all three have predefined
-Geofabrik download URLs:
+is the same. Prepare each country separately; their download URLs are read
+from the Geofabrik index:
 
 ```sh
 pnpm places:prepare --region switzerland --out output/places/switzerland-current
@@ -428,9 +705,8 @@ The artifact is `output/places/ch-at-it-2026-10-20`, with snapshot identity
 ## Eight countries (`v1-places`)
 
 `v1-places` replaces `ch-at-it` with Switzerland, Austria, Italy, Germany,
-France, Norway, New Zealand and Kyrgyzstan (`V1_PLACE_COUNTRIES` in
-`src/server/places/catalogue-regions.ts`, with their Geofabrik paths). Prepare
-each country from extracts with the same source epoch, then combine:
+France, Norway, New Zealand and Kyrgyzstan. Prepare each country from
+extracts with the same source epoch, then combine:
 
 ```sh
 pnpm places:prepare --region germany --out output/places/germany-current
@@ -446,7 +722,10 @@ over several hours. Each extract only contains the roads inside it, so a pass
 on a border can list different roads per country; combining merges them and
 recomputes the filter. Other filter inputs and all OSM fields must still agree.
 
-Publish the combined artifact as described under [Publish or refresh](#publish-or-refresh).
+Publish the combined artifact as described under
+[Publish or refresh](#publish-or-refresh), with `--region v1-places`. It is
+live until the first `places-live` publication, which the weekly workflow
+builds from the regions it resolves.
 
 ### Measured eight-country catalogue
 

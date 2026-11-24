@@ -12,6 +12,7 @@
     "places:prepare": "tsx --conditions=react-server scripts/places/prepare-catalogue.ts",
     "places:combine": "tsx --conditions=react-server scripts/places/combine-catalogues.ts",
     "places:publish": "tsx --conditions=react-server scripts/places/publish-catalogue.ts",
+    "places:resolve": "tsx --conditions=react-server scripts/places/resolve-regions.ts",
     "test": "tsx --conditions=react-server --test \"src/**/*.test.ts\" \"cloudflare/**/*.test.ts\"",
     "test:settings-ui": "tsx --test src/hooks/use-ingestion-status.test.tsx src/lib/first-summary-fetch.test.tsx",
     "test:account-deletion-ui": "node scripts/verify-account-deletion.mjs",

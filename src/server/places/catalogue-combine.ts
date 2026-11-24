@@ -3,6 +3,7 @@ import polygonClipping, { type MultiPolygon } from 'polygon-clipping';
 import {
   type CatalogueDuplicate,
   type CatalogueIdentity,
+  MAX_CATALOGUE_REGIONS,
   type ValidatedCatalogue,
   canonicalJson,
   catalogueCounts,
@@ -14,6 +15,7 @@ import {
   validateCatalogue,
 } from './catalogue-artifact';
 import { type CoverageGeometry, parseCoverageGeometry } from './coverage';
+import { GEOFABRIK_INDEX_URL } from './geofabrik-index';
 import { applyPlaceFilter, passNeedsTerrain } from './place-filter';
 import type { NormalizedPlace } from './types';
 
@@ -91,13 +93,15 @@ export function combineCatalogues(
   const catalogues = inputs.map(validateCatalogue);
   if (
     catalogues.length < 2 ||
-    catalogues.length > 16 ||
+    catalogues.length > MAX_CATALOGUE_REGIONS ||
     catalogues.some(
       (catalogue) =>
         !catalogue.manifest.region_id || catalogue.manifest.components,
     )
   )
-    throw new Error('Combine 2–16 named single-region catalogues');
+    throw new Error(
+      `Combine 2–${MAX_CATALOGUE_REGIONS} named single-region catalogues`,
+    );
   catalogues.sort((a, b) =>
     a.manifest.region_id!.localeCompare(b.manifest.region_id!, 'en'),
   );
@@ -213,7 +217,7 @@ export function combineCatalogues(
     },
     source: {
       ...first.manifest.source,
-      url: 'https://download.geofabrik.de/europe.html',
+      url: GEOFABRIK_INDEX_URL,
       ...(exclusions.length ? { exclusions } : {}),
       pbf_sha256: digest('pbf_sha256'),
       selector_script_sha256: digest('selector_script_sha256'),
@@ -237,7 +241,7 @@ export function combineCatalogues(
           })),
         ),
       ),
-      source_url: 'https://download.geofabrik.de/europe.html',
+      source_url: GEOFABRIK_INDEX_URL,
     },
     toolchain: first.manifest.toolchain,
     selectors: first.manifest.selectors,

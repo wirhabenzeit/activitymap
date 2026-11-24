@@ -12,6 +12,11 @@ import {
   publishCatalogue,
 } from '../../src/server/places/catalogue-publish';
 import {
+  convexCatalogueReader,
+  convexCatalogueWriter,
+} from '../../src/server/places/catalogue-reader';
+import { LIVE_PLACE_REGION } from '../../src/server/places/catalogue-regions';
+import {
   LIVE_CATALOGUE,
   type PlaceRow,
   datasetFor,
@@ -31,7 +36,8 @@ import { previewFixtureActivity } from './fixtures';
 
 /**
  * The signed write bridge end to end against backend/convex in convex-test:
- * its keys and nonces, the place catalogue publication, and provider events.
+ * its keys and nonces, the place catalogue publication (through the
+ * catalogue's own routes and keys), and provider events.
  */
 
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
@@ -65,6 +71,8 @@ const scope = {
 };
 const writerSecret = 'f'.repeat(64);
 const readerSecret = '1'.repeat(64);
+const placesReaderSecret = '2'.repeat(64);
+const placesWriterSecret = '3'.repeat(64);
 const streams: RawActivityStreams = {
   time: {
     data: [0, 1],
@@ -78,10 +86,22 @@ function setup(t: test.TestContext) {
   const convex = convexTest(schema, modules);
   const env = {
     ACTIVITYMAP_CONVEX_SITE: 'https://convex.invalid',
+    ACTIVITYMAP_CONVEX_KEY_ID: 'reader',
+    ACTIVITYMAP_CONVEX_SIGNING_KEY: readerSecret,
     ACTIVITYMAP_CONVEX_WRITER_KEY_ID: 'writer',
     ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY: writerSecret,
     ACTIVITYMAP_BRIDGE_WRITER_KEYS: JSON.stringify({ writer: writerSecret }),
     ACTIVITYMAP_BRIDGE_SIGNING_KEYS: JSON.stringify({ reader: readerSecret }),
+    ACTIVITYMAP_PLACES_KEY_ID: 'places',
+    ACTIVITYMAP_PLACES_SIGNING_KEY: placesReaderSecret,
+    ACTIVITYMAP_PLACES_WRITER_KEY_ID: 'publisher',
+    ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY: placesWriterSecret,
+    ACTIVITYMAP_BRIDGE_PLACES_KEYS: JSON.stringify({
+      places: placesReaderSecret,
+    }),
+    ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS: JSON.stringify({
+      publisher: placesWriterSecret,
+    }),
   };
   for (const [name, value] of Object.entries(env)) {
     const previous = process.env[name];
@@ -282,23 +302,12 @@ void test('a rowset is accepted only in order and when whole', async (t) => {
 
 void test('an artifact is published to the live catalogue after a reviewed dry run, and later only its changes', async (t) => {
   const { convex, fetcher, writer, upload } = setup(t);
-  await convex.mutation(internal.owners.provision, {
-    ...scope,
-    backend: 'convex',
-    generation: 'shadow-generation-01',
-    catalogue: 'c'.repeat(64),
-    matchingVersion: 'd'.repeat(64),
-  });
-  await convex.mutation(internal.owners.setWriter, {
-    userId: scope.userId,
-    athleteId: scope.athleteId,
-    writer: 'convex',
-    expectedEpoch: 0,
-  });
   // What the bridge was asked to apply.
   const applied: { upserts: PlaceRow[]; deletes: string[]; tiles: string[] }[] =
     [];
+  // Writes go through the catalogue's write route, with its write key.
   const recording: typeof fetch = async (url, init) => {
+    assert.equal(new URL(String(url)).pathname, '/internal/places/write/v1');
     const { operation } = JSON.parse(String(init?.body));
     if (operation?.kind === 'applyBatch') {
       const { upserts, deletes, tiles } = operation;
@@ -306,7 +315,14 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
     }
     return fetcher(url, init);
   };
-  const publisher = convexWriteBridge(actor, recording)!;
+  const publisher = convexCatalogueWriter(recording)!;
+  // Reads go through the read-only route, with the catalogue's read key.
+  const reads: string[] = [];
+  const reader = convexCatalogueReader(async (url, init) => {
+    assert.equal(new URL(String(url)).pathname, '/internal/places/v1');
+    reads.push(JSON.parse(String(init?.body)).operation.kind);
+    return fetcher(url, init);
+  })!;
   // The live catalogue's metadata file, by the URL convex-test gives it.
   const storage: typeof fetch = async (url) => {
     const sha256 = String(url).split('/api/storage/')[1];
@@ -320,7 +336,7 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
       ? new Response(null, { status: 404 })
       : new Response(text);
   };
-  const catalogue = createSyntheticCatalogue({ regionId: 'v1-places' });
+  const catalogue = createSyntheticCatalogue({ regionId: LIVE_PLACE_REGION });
   const snapshotId = catalogue.manifest.catalogue_snapshot_id;
   const rows = placeRows(catalogue);
   const publish = (
@@ -328,8 +344,9 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
   ) =>
     publishCatalogue({
       catalogue,
-      writer: publisher,
-      upload,
+      reader,
+      // A dry run needs no writer.
+      ...(options.apply ? { writer: publisher, upload } : {}),
       fetcher: storage,
       ...options,
     });
@@ -379,6 +396,7 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
     [dry.status, dry.snapshotId, dry.current, dry.count, dry.revision],
     ['would_publish', snapshotId, null, rows.length, undefined],
   );
+  assert.deepEqual(new Set(reads), new Set(['liveState', 'liveHashes']));
   assert.deepEqual(dry.changes, {
     inserts: rows.length,
     updates: 0,
@@ -448,7 +466,7 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
 
   // A newer artifact with one renamed place sends that place alone.
   const renamed = createSyntheticCatalogue({
-    regionId: 'v1-places',
+    regionId: LIVE_PLACE_REGION,
     dataAsOf: '2026-11-01T00:00:00Z',
     transformRows: (all) =>
       all.map((item) =>
@@ -487,7 +505,7 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
 
   // A catalogue that lost most of its places is refused unless allowed.
   const smaller = createSyntheticCatalogue({
-    regionId: 'v1-places',
+    regionId: LIVE_PLACE_REGION,
     dataAsOf: '2026-11-02T00:00:00Z',
     transformRows: (all) => all.slice(0, 1),
   });

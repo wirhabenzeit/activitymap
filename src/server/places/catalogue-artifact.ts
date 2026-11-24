@@ -28,9 +28,14 @@ import {
 } from './types';
 
 export const CATALOGUE_FORMAT_VERSION = 1;
-/** The combined eight-country catalogue has about 200,000 rows (~120 MB). */
-export const MAX_CATALOGUE_ROWS = 400_000;
-const MAX_ARTIFACT_BYTES = 268_435_456;
+/** An artifact file is read and serialized as one string, which V8 caps at
+ * 2^29 - 24 (about 536.9 million) characters, so a catalogue is bounded at
+ * 500 MiB. Rows average about 550 bytes (eight countries: 178,151 rows,
+ * 97 MB), so 900,000 rows stay below it; more needs a streaming reader. */
+export const MAX_CATALOGUE_ROWS = 900_000;
+const MAX_ARTIFACT_BYTES = 524_288_000;
+/** One region per prepare job, and GitHub runs at most 256 jobs a matrix. */
+export const MAX_CATALOGUE_REGIONS = 256;
 export const COVERAGE_NOTE =
   'Provider boundary downloaded with the snapshot, not a guaranteed historical boundary or strict national border. Complete crossing features can lie outside it; coverage completeness must be evaluated separately.';
 export const CATALOGUE_ATTRIBUTION = {
@@ -178,7 +183,7 @@ export const catalogueManifestSchema = z.strictObject({
       }),
     )
     .min(2)
-    .max(16)
+    .max(MAX_CATALOGUE_REGIONS)
     .optional(),
   deduplication: z
     .strictObject({
@@ -196,7 +201,7 @@ export const catalogueDuplicateSchema = z.strictObject({
   osm_id: z.string().regex(/^[1-9][0-9]*$/),
   osm_version: count.positive(),
   name: rawNonblank,
-  regions: z.array(catalogueRegionSchema).min(2).max(16),
+  regions: z.array(catalogueRegionSchema).min(2).max(MAX_CATALOGUE_REGIONS),
 });
 export type CatalogueDuplicate = z.infer<typeof catalogueDuplicateSchema>;
 export type CatalogueManifest = z.infer<typeof catalogueManifestSchema>;

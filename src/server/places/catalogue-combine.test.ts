@@ -19,6 +19,7 @@ import {
 } from './catalogue-combine';
 import { createSyntheticCatalogue } from './catalogue.fixture';
 import { parseCoverageGeometry } from './coverage';
+import { GEOFABRIK_INDEX_URL } from './geofabrik-index';
 import type { NormalizedPlace } from './types';
 
 const rectangle = (west: number, east: number) =>
@@ -133,6 +134,26 @@ void test('country overlap deduplicates source IDs and records full input proven
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+});
+void test('a combined catalogue takes one region per matrix job and cites the Geofabrik index', () => {
+  const regions = Array.from({ length: 40 }, (_, i) => `region-${i}`);
+  const result = combineCatalogues(
+    'places-live',
+    regions.map((regionId) => createSyntheticCatalogue({ regionId })),
+  );
+  assert.equal(result.manifest.components!.length, 40);
+  assert.equal(result.manifest.source.url, GEOFABRIK_INDEX_URL);
+  assert.equal(result.manifest.coverage.source_url, GEOFABRIK_INDEX_URL);
+  assert.throws(
+    () =>
+      combineCatalogues(
+        'places-live',
+        Array.from({ length: 257 }, (_, i) =>
+          createSyntheticCatalogue({ regionId: `region-${i}` }),
+        ),
+      ),
+    /Combine 2–256/,
+  );
 });
 void test('different snapshot epochs, versions and same-version contents are rejected', () => {
   const swiss = createSyntheticCatalogue({ regionId: 'switzerland' });

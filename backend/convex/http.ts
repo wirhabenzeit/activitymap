@@ -49,6 +49,17 @@ const channels = {
     keys: 'ACTIVITYMAP_BRIDGE_WRITER_KEYS',
     domain: 'activitymap-auth-v1',
   },
+  // The live place catalogue's reads and writes. Keys of their own, so a key
+  // that publishes the catalogue can neither read nor write a library, and
+  // the app's keys cannot change the catalogue.
+  places: {
+    keys: 'ACTIVITYMAP_BRIDGE_PLACES_KEYS',
+    domain: 'activitymap-places-v1',
+  },
+  placesWrite: {
+    keys: 'ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS',
+    domain: 'activitymap-places-write-v1',
+  },
 } as const;
 
 async function allowed(
@@ -160,10 +171,100 @@ router.route({
 });
 
 /**
+ * The live place catalogue's reads (convex/livePlaces.ts), for the
+ * publisher's dry run (src/server/places/catalogue-reader.ts). They change
+ * nothing and carry no nonce, so a job that only reviews a publication
+ * needs no writer key.
+ */
+router.route({
+  path: '/internal/places/v1',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await readBody(request);
+      if (body === null) return new Response(null, { status: 413, headers });
+      if (!(await allowed(request, body, 'places')))
+        return new Response(null, { status: 401, headers });
+      const { kind, ...args } = JSON.parse(body).operation ?? {};
+      let result: unknown;
+      switch (kind) {
+        case 'liveState':
+          result = await ctx.runQuery(internal.livePlaces.state, {});
+          break;
+        case 'liveHashes':
+          result = await ctx.runQuery(internal.livePlaces.hashes, args);
+          break;
+        case 'demandTiles':
+          result = await ctx.runQuery(internal.livePlaces.demandTiles, args);
+          break;
+        default:
+          return new Response(null, { status: 400, headers });
+      }
+      return Response.json(result, { headers });
+    } catch {
+      return new Response(null, { status: 400, headers });
+    }
+  }),
+});
+
+/**
+ * The live place catalogue's writes (convex/livePlaces.ts), for the
+ * publisher's apply (src/server/places/catalogue-reader.ts). Every request
+ * carries a single-use nonce inside the signed body, as the app's writes do.
+ */
+router.route({
+  path: '/internal/places/write/v1',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await readBody(request, WRITE_LIMIT);
+      if (body === null) return new Response(null, { status: 413, headers });
+      if (!(await allowed(request, body, 'placesWrite')))
+        return new Response(null, { status: 401, headers });
+      const { nonce, operation } = JSON.parse(body);
+      if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(nonce))
+        return new Response(null, { status: 400, headers });
+      const fresh = await ctx.runMutation(internal.bridge.consumeNonce, {
+        nonce,
+        expiresAt: Date.now() + 2 * SIGNATURE_WINDOW_MS,
+      });
+      if (!fresh) return new Response(null, { status: 409, headers });
+      const { kind, ...args } = operation ?? {};
+      let result: unknown;
+      switch (kind) {
+        // Where a publication uploads its manifest and coverage.
+        case 'uploadUrl':
+          [result] = await ctx.runMutation(internal.places.uploadUrls, {
+            count: 1,
+          });
+          break;
+        case 'beginApply':
+          result = await ctx.runMutation(internal.livePlaces.beginApply, args);
+          break;
+        case 'applyBatch':
+          result = await ctx.runMutation(internal.livePlaces.applyBatch, args);
+          break;
+        case 'completeApply':
+          result = await ctx.runMutation(
+            internal.livePlaces.completeApply,
+            args,
+          );
+          break;
+        default:
+          return new Response(null, { status: 400, headers });
+      }
+      return Response.json(result ?? null, { headers });
+    } catch (error) {
+      console.error('Catalogue write failed', error);
+      return new Response(null, { status: 400, headers });
+    }
+  }),
+});
+
+/**
  * The app's writes. Every request carries a single-use nonce inside the
  * signed body; the writes themselves are fenced by revision, so even an
- * accepted duplicate would be a no-op. The live catalogue's reads are
- * signed but carry no nonce.
+ * accepted duplicate would be a no-op.
  */
 router.route({
   path: '/internal/write/v1',
@@ -175,16 +276,6 @@ router.route({
       if (!(await allowed(request, body, 'write')))
         return new Response(null, { status: 401, headers });
       const { userId, athleteId, epoch, nonce, operation } = JSON.parse(body);
-      const { kind, ...args } = operation ?? {};
-      // The live catalogue's reads, paged many times per publication run,
-      // change nothing: they need no nonce.
-      if (kind === 'liveState' || kind === 'liveHashes') {
-        const result =
-          kind === 'liveState'
-            ? await ctx.runQuery(internal.livePlaces.state, {})
-            : await ctx.runQuery(internal.livePlaces.hashes, args);
-        return Response.json(result, { headers });
-      }
       if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(nonce))
         return new Response(null, { status: 400, headers });
       const fresh = await ctx.runMutation(internal.bridge.consumeNonce, {
@@ -193,6 +284,7 @@ router.route({
       });
       if (!fresh) return new Response(null, { status: 409, headers });
       const scope = { userId, athleteId, epoch };
+      const { kind, ...args } = operation ?? {};
       let result: unknown;
       switch (kind) {
         case 'state':
@@ -226,19 +318,6 @@ router.route({
           break;
         case 'completeCatalogue':
           result = await ctx.runMutation(internal.places.complete, args);
-          break;
-        // The live catalogue (convex/livePlaces.ts).
-        case 'beginApply':
-          result = await ctx.runMutation(internal.livePlaces.beginApply, args);
-          break;
-        case 'applyBatch':
-          result = await ctx.runMutation(internal.livePlaces.applyBatch, args);
-          break;
-        case 'completeApply':
-          result = await ctx.runMutation(
-            internal.livePlaces.completeApply,
-            args,
-          );
           break;
         case 'recordEvents':
           result = await ctx.runMutation(internal.providerEvents.record, {
