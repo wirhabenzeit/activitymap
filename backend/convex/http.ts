@@ -162,7 +162,8 @@ router.route({
 /**
  * The app's writes. Every request carries a single-use nonce inside the
  * signed body; the writes themselves are fenced by revision, so even an
- * accepted duplicate would be a no-op.
+ * accepted duplicate would be a no-op. The live catalogue's reads are
+ * signed but carry no nonce.
  */
 router.route({
   path: '/internal/write/v1',
@@ -174,6 +175,16 @@ router.route({
       if (!(await allowed(request, body, 'write')))
         return new Response(null, { status: 401, headers });
       const { userId, athleteId, epoch, nonce, operation } = JSON.parse(body);
+      const { kind, ...args } = operation ?? {};
+      // The live catalogue's reads, paged many times per publication run,
+      // change nothing: they need no nonce.
+      if (kind === 'liveState' || kind === 'liveHashes') {
+        const result =
+          kind === 'liveState'
+            ? await ctx.runQuery(internal.livePlaces.state, {})
+            : await ctx.runQuery(internal.livePlaces.hashes, args);
+        return Response.json(result, { headers });
+      }
       if (typeof nonce !== 'string' || !/^[A-Za-z0-9_-]{16,64}$/.test(nonce))
         return new Response(null, { status: 400, headers });
       const fresh = await ctx.runMutation(internal.bridge.consumeNonce, {
@@ -182,7 +193,6 @@ router.route({
       });
       if (!fresh) return new Response(null, { status: 409, headers });
       const scope = { userId, athleteId, epoch };
-      const { kind, ...args } = operation ?? {};
       let result: unknown;
       switch (kind) {
         case 'state':
@@ -200,6 +210,8 @@ router.route({
           result = await ctx.runMutation(internal.places.uploadUrls, args);
           break;
         // The place catalogue belongs to no owner: the signature authorizes.
+        // A new library is matched against the latest catalogue
+        // (places.latestCatalogue).
         case 'latestCatalogue':
           result = await ctx.runQuery(internal.places.latest, {});
           break;
@@ -215,9 +227,18 @@ router.route({
         case 'completeCatalogue':
           result = await ctx.runMutation(internal.places.complete, args);
           break;
-        // Match every library against the newest complete rowset.
-        case 'adoptCatalogue':
-          result = await ctx.runAction(internal.catalogueWorker.adopt, {});
+        // The live catalogue (convex/livePlaces.ts).
+        case 'beginApply':
+          result = await ctx.runMutation(internal.livePlaces.beginApply, args);
+          break;
+        case 'applyBatch':
+          result = await ctx.runMutation(internal.livePlaces.applyBatch, args);
+          break;
+        case 'completeApply':
+          result = await ctx.runMutation(
+            internal.livePlaces.completeApply,
+            args,
+          );
           break;
         case 'recordEvents':
           result = await ctx.runMutation(internal.providerEvents.record, {

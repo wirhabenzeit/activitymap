@@ -2,29 +2,38 @@ import { createHash } from 'node:crypto';
 
 import type { ConvexWriter } from '~/server/sync/convex-writer';
 
+import { coverageClearanceM } from './batch-coverage';
 import {
   type ValidatedCatalogue,
   listedPlaceCount,
   validateCatalogue,
 } from './catalogue-artifact';
+import { type LiveRowHash, diffCatalogue } from './catalogue-diff';
 import { V1_PLACE_REGION } from './catalogue-regions';
-import type { PlaceRow } from './catalogue-rows';
-import { type CatalogueSource, sendCatalogue } from './convex-catalogue';
+import {
+  EMPTY_SET_DIGEST,
+  PLACE_BATCH_LIMIT,
+  type PlaceRow,
+  addToSetDigest,
+  rowHashes,
+} from './catalogue-rows';
+import { type CoverageGeometry, parseCoverageGeometry } from './coverage';
+import { coverageChangeTiles } from './coverage-diff';
+import { SERVER_MATCHER_POLICY } from './matching-version';
 import type { NormalizedPlace } from './types';
 
 /**
  * Publishes a catalogue artifact (`pnpm places:prepare`, `places:combine`)
- * to the Convex backend, and has every library matched against it.
+ * to the Convex backend's live catalogue (`backend/convex/livePlaces.ts`).
+ *
+ * A publication sends only the difference between the artifact and the live
+ * rows, plus the tiles where the coverage changed. When it completes, the
+ * backend matches again the activities that pass through a changed tile.
  *
  * A place keeps its ID for as long as its OpenStreetMap object exists: the
  * ID is derived from the object's type and number, so two catalogues name
  * the same place the same way without a database that remembers them.
  */
-
-/** How artifact rows become place rows: which rows are sent and how their
- * IDs are derived. Part of a rowset's identity, so a change here publishes
- * the same artifact as a new rowset. */
-export const PLACE_ROWS_VERSION = 'osm-rows-v1';
 
 const PLACE_NAMESPACE = Buffer.from('6f1d3c52a8e44b0f9c1e5a7b2d4f6081', 'hex');
 
@@ -72,142 +81,358 @@ export function placeRows(catalogue: ValidatedCatalogue): PlaceRow[] {
   return rows;
 }
 
-/** An artifact as a source of `sendCatalogue`. */
-export function artifactSource(catalogue: ValidatedCatalogue): CatalogueSource {
-  const rows = placeRows(catalogue);
-  const snapshotId = catalogue.manifest.catalogue_snapshot_id;
-  return {
-    current: async () => ({
-      snapshotId,
-      revision: PLACE_ROWS_VERSION,
-      count: rows.length,
-      metadata: { manifest: catalogue.manifest, coverage: catalogue.coverage },
-    }),
-    async places(snapshot, after, limit) {
-      if (snapshot !== snapshotId)
-        throw new Error('Unknown catalogue snapshot');
-      // Binary search for the first ID after `after`.
-      let low = 0;
-      let high = rows.length;
-      while (low < high) {
-        const middle = (low + high) >> 1;
-        if (rows[middle]!.id <= after) low = middle + 1;
-        else high = middle;
-      }
-      return rows.slice(low, low + limit);
-    },
-  };
-}
+/** The bridge's request limit is 1 MiB; leave room for the envelope. */
+const BATCH_BYTES = 768 * 1024;
+const EXAMPLES = 5;
 
-type Rowset = { snapshotId: string; revision: string; count: number };
+type LiveState = {
+  revision: number;
+  snapshotId: string | null;
+  count: number;
+  setDigest: string;
+  metadataUrl: string | null;
+  pending: {
+    snapshotId: string;
+    revision: number;
+    count: number;
+    setDigest: string;
+    startedAt: number;
+  } | null;
+} | null;
+type Refusal<Reason extends string> = { ok: false; reason: Reason };
+type Begun =
+  | { ok: true; revision: number; resumed: boolean }
+  | (Refusal<'current_changed' | 'pending_other' | 'already_current'> & {
+      current: string | null;
+      pending: string | null;
+    });
+type Applied =
+  { ok: true; count: number; setDigest: string } | Refusal<'not_pending'>;
+type Completed =
+  | { ok: true; revision: number }
+  | (Refusal<'not_pending' | 'mismatch'> & {
+      count: number;
+      setDigest: string;
+    });
+
+export type ApplyBatch = {
+  upserts: PlaceRow[];
+  deletes: string[];
+  tiles: string[];
+};
 
 export type CataloguePublishReport = {
   status: 'unchanged' | 'would_publish' | 'published';
   snapshotId: string;
-  /** Places sent: the artifact's rows without those the filter hides. */
+  /** The snapshot applied last; null before the first publication. */
+  current: string | null;
+  /** The live revision this run completed (status `published`). */
+  revision?: number;
+  /** Places in the artifact: its rows without those the filter hides. */
   count: number;
+  /** Live places now. */
+  liveCount: number;
   hidden: number;
+  hiddenByReason: Record<string, number>;
   sourceDataAsOf: string;
-  /** What libraries are matched against now; null before the first one. */
-  current: Rowset | null;
-  /** The share of the current count that the new catalogue lacks. */
+  changes: {
+    inserts: number;
+    updates: number;
+    /** Updates that moved to another tile. */
+    moved: number;
+    deletes: number;
+    unchanged: number;
+  };
+  examples: {
+    inserts: { id: string; displayName: string }[];
+    updates: { id: string; displayName: string; moved: boolean }[];
+    deletes: string[];
+  };
+  coverageChanged: boolean;
+  /** Tiles whose activities are matched again: those of the changed rows
+   * and of the coverage change. Only the count: logs may be public. */
+  affectedTiles: number;
+  /** The artifact has fewer than 80% of the live places. */
   largeRetirement: boolean;
-  /** Libraries moved to the catalogue by this run. */
-  libraries?: number;
+  /** A publication begun and not completed. */
+  pending: { snapshotId: string; startedAt: string; ageMinutes: number } | null;
 };
 
 /**
  * Publish `catalogue`, or with `apply: false` report what publishing would
- * do. Publishing sends the rowset, then moves every library to it, which
- * hides their old matches and matches every recording again. Safe to repeat:
- * a rowset that is already complete sends nothing, and libraries that are
- * already on it are left alone, so a run that was interrupted is finished by
- * running it again.
+ * do. Publishing begins an apply of the artifact, sends the changed rows and
+ * tiles, and completes it. Safe to repeat: a run that was interrupted is
+ * finished by running it again, which sends only what is still missing.
+ * Publishing an older artifact rolls back to it.
  */
 export async function publishCatalogue({
   catalogue: input,
   writer,
   upload,
+  fetcher = fetch,
   apply = false,
   expectedCurrent,
   allowLargeRetirement = false,
+  replacePending,
   regionId = V1_PLACE_REGION,
   progress,
+  now = Date.now,
 }: {
   catalogue: ValidatedCatalogue;
   writer: ConvexWriter;
+  /** POST a file to a Convex upload URL; returns its storage ID. */
   upload: (url: string, file: Uint8Array) => Promise<string>;
+  /** Reads the live catalogue's metadata file. */
+  fetcher?: typeof fetch;
   apply?: boolean;
   /** Compare-and-set: the snapshot the dry run reported as current; null
    * when nothing was published yet. Required to apply. */
   expectedCurrent?: string | null;
   allowLargeRetirement?: boolean;
+  /** Abandon the pending publication of this snapshot. */
+  replacePending?: string;
   regionId?: string;
-  progress?: (imported: number, count: number) => void;
+  /** Rows and tiles sent of those to send. */
+  progress?: (sent: number, total: number) => void;
+  now?: () => number;
 }): Promise<CataloguePublishReport> {
   const catalogue = validateCatalogue(input);
   if (catalogue.manifest.region_id !== regionId)
     throw new Error(
       `The artifact is for region ${catalogue.manifest.region_id ?? '(none)'}, not ${regionId}`,
     );
-  const source = artifactSource(catalogue);
-  const next = await source.current();
-  const current = await writer.write<Rowset | null>({
-    kind: 'latestCatalogue',
-  });
-  const same =
-    current?.snapshotId === next.snapshotId &&
-    current.revision === next.revision;
-  const report = {
-    snapshotId: next.snapshotId,
-    count: next.count,
-    hidden: catalogue.rows.length - next.count,
-    sourceDataAsOf: catalogue.manifest.source.data_as_of,
-    current,
-    largeRetirement: !!current && next.count < current.count * 0.8,
-  };
-  if (!apply)
-    return { status: same ? 'unchanged' : 'would_publish', ...report };
-
-  if (expectedCurrent === undefined)
+  if (apply && expectedCurrent === undefined)
     throw new Error('Publication requires expectedCurrent from a dry run');
-  if (!same && expectedCurrent !== (current?.snapshotId ?? null))
-    throw new Error('Catalogue changed since dry run; review a new dry run');
+  const snapshotId = catalogue.manifest.catalogue_snapshot_id;
+  const rows = placeRows(catalogue);
+  const hashes = await rowHashes(rows);
+  const live = await writer.write<LiveState>({ kind: 'liveState' });
+  const diff = diffCatalogue(
+    rows.map((place, index) => ({ place, hash: hashes[index]! })),
+    await liveHashes(writer),
+  );
+  // Before the first completed publication nothing was matched against the
+  // live catalogue, so a coverage change concerns no activity.
+  const previous = live?.metadataUrl
+    ? await readCoverage(live.metadataUrl, fetcher)
+    : null;
+  const coverageTiles = previous
+    ? coverageChangeTiles(
+        previous,
+        catalogue.coverage,
+        coverageClearanceM(SERVER_MATCHER_POLICY.discoveryRadiusM),
+      )
+    : [];
+  const upserts = [...diff.inserts, ...diff.updates.map(({ place }) => place)];
+  const hiddenByReason: Record<string, number> = {};
+  for (const { hidden_reason: reason } of catalogue.rows)
+    if (reason) hiddenByReason[reason] = (hiddenByReason[reason] ?? 0) + 1;
+  const current = live?.snapshotId ?? null;
+  const pending = live?.pending ?? null;
+  const report = {
+    snapshotId,
+    current,
+    count: rows.length,
+    liveCount: live?.count ?? 0,
+    hidden: catalogue.rows.length - rows.length,
+    hiddenByReason,
+    sourceDataAsOf: catalogue.manifest.source.data_as_of,
+    changes: {
+      inserts: diff.inserts.length,
+      updates: diff.updates.length,
+      moved: diff.updates.filter(({ moved }) => moved).length,
+      deletes: diff.deletes.length,
+      unchanged: diff.unchanged,
+    },
+    examples: {
+      inserts: diff.inserts
+        .slice(0, EXAMPLES)
+        .map(({ id, displayName }) => ({ id, displayName })),
+      updates: diff.updates.slice(0, EXAMPLES).map(({ place, moved }) => ({
+        id: place.id,
+        displayName: place.displayName,
+        moved,
+      })),
+      deletes: diff.deletes.slice(0, EXAMPLES),
+    },
+    coverageChanged: coverageTiles.length > 0,
+    affectedTiles: new Set([...diff.tiles, ...coverageTiles]).size,
+    largeRetirement: !!live && rows.length < live.count * 0.8,
+    pending: pending && {
+      snapshotId: pending.snapshotId,
+      startedAt: new Date(pending.startedAt).toISOString(),
+      ageMinutes: Math.floor((now() - pending.startedAt) / 60_000),
+    },
+  };
+  // A pending apply, even of this artifact, still has to be completed or
+  // replaced, so only a settled catalogue is unchanged.
+  const unchanged =
+    !pending &&
+    !upserts.length &&
+    !diff.deletes.length &&
+    !coverageTiles.length;
+  if (unchanged) return { status: 'unchanged', ...report };
+  if (!apply) return { status: 'would_publish', ...report };
+
+  if (expectedCurrent !== current)
+    throw new Error(
+      `The live catalogue is ${current ?? 'none'}, not ${expectedCurrent ?? 'none'} as expected: review a new dry run`,
+    );
   if (report.largeRetirement && !allowLargeRetirement)
     throw new Error(
       'The catalogue would lose more than 20% of its places; inspect the artifact and explicitly allow large retirement',
     );
-  if (!same) {
-    for (;;) {
-      const sent = await sendCatalogue({
-        source,
-        writer,
-        upload,
-        // One run sends for at most a minute, then reports and continues.
-        deadline: Date.now() + 60_000,
-      });
-      progress?.(sent.imported, sent.count);
-      if (sent.complete) break;
-    }
-    // Libraries move to the newest complete rowset. A rowset that was
-    // complete before a newer one cannot become current again.
-    const latest = await writer.write<Rowset | null>({
-      kind: 'latestCatalogue',
-    });
-    if (
-      latest?.snapshotId !== next.snapshotId ||
-      latest.revision !== next.revision
-    )
-      throw new Error(
-        'A catalogue published after this one was first sent is current; this one is not published',
-      );
-  }
-  const adopted = await writer.write<{ libraries: number }>({
-    kind: 'adoptCatalogue',
+  // What `beginApply` would refuse, before anything is uploaded for it.
+  const pendingId = live?.pending?.snapshotId ?? null;
+  if (pendingId !== snapshotId && (replacePending ?? null) !== pendingId)
+    throw new Error(pendingOther(pendingId));
+
+  // Upload URLs are issued under an owner's current assignment.
+  const owner = await writer.write<{ epoch: string } | null>({ kind: 'state' });
+  if (!owner) throw new Error('The signing owner is not provisioned');
+  const [url] = await writer.write<string[]>(
+    { kind: 'uploadUrls', count: 1 },
+    owner.epoch,
+  );
+  const metadata = await upload(
+    url!,
+    new TextEncoder().encode(
+      JSON.stringify({
+        manifest: catalogue.manifest,
+        coverage: catalogue.coverage,
+      }),
+    ),
+  );
+  const begun = await writer.write<Begun>({
+    kind: 'beginApply',
+    expectCurrent: expectedCurrent,
+    snapshotId,
+    metadata,
+    count: rows.length,
+    setDigest: hashes.reduce(addToSetDigest, EMPTY_SET_DIGEST),
+    ...(replacePending === undefined ? {} : { replacePending }),
   });
-  return {
-    status: same && adopted.libraries === 0 ? 'unchanged' : 'published',
-    ...report,
-    libraries: adopted.libraries,
-  };
+  if (!begun.ok) throw new Error(beginRefusal(snapshotId, begun));
+
+  const batches = applyBatches(diff.deletes, upserts, coverageTiles);
+  const total = diff.deletes.length + upserts.length + coverageTiles.length;
+  let sent = 0;
+  progress?.(sent, total);
+  for (const batch of batches) {
+    const applied = await writer.write<Applied>({
+      kind: 'applyBatch',
+      snapshotId,
+      ...batch,
+    });
+    if (!applied.ok) throw new Error(notPending(snapshotId));
+    sent += batch.upserts.length + batch.deletes.length + batch.tiles.length;
+    progress?.(sent, total);
+  }
+
+  const completed = await writer.write<Completed>({
+    kind: 'completeApply',
+    snapshotId,
+  });
+  if (!completed.ok)
+    throw new Error(
+      completed.reason === 'not_pending'
+        ? notPending(snapshotId)
+        : `The live catalogue holds ${completed.count} places with digest ${completed.setDigest}, not the artifact's ${rows.length}: run the same command again to send what is still missing`,
+    );
+  return { status: 'published', ...report, revision: completed.revision };
 }
+
+/** Every live row's key, hash and tile. */
+async function liveHashes(writer: ConvexWriter) {
+  const rows: LiveRowHash[] = [];
+  for (let cursor: string | null = null; ;) {
+    const result: {
+      page: LiveRowHash[];
+      isDone: boolean;
+      continueCursor: string;
+    } = await writer.write({ kind: 'liveHashes', cursor });
+    rows.push(...result.page);
+    if (result.isDone) return rows;
+    cursor = result.continueCursor;
+  }
+}
+
+/** The coverage of the last completed publication, from its metadata file. */
+async function readCoverage(
+  url: string,
+  fetcher: typeof fetch,
+): Promise<CoverageGeometry> {
+  const response = await fetcher(url, { signal: AbortSignal.timeout(60_000) });
+  if (!response.ok)
+    throw new Error(
+      `Reading the live catalogue's metadata failed: ${response.status}`,
+    );
+  const { coverage } = (await response.json()) as { coverage: unknown };
+  return parseCoverageGeometry(coverage);
+}
+
+/**
+ * Split the writes into `applyBatch` requests: deletes, then upserts, at most
+ * `PLACE_BATCH_LIMIT` a request and well under the bridge's request size;
+ * then the coverage tiles, `PLACE_BATCH_LIMIT` a request.
+ */
+export function applyBatches(
+  deletes: readonly string[],
+  upserts: readonly PlaceRow[],
+  tiles: readonly string[],
+  maxBytes = BATCH_BYTES,
+): ApplyBatch[] {
+  const batches: ApplyBatch[] = [];
+  let batch: ApplyBatch = { upserts: [], deletes: [], tiles: [] };
+  let bytes = 0;
+  const add = (item: { delete: string } | { upsert: PlaceRow }) => {
+    const size =
+      Buffer.byteLength(
+        JSON.stringify('delete' in item ? item.delete : item.upsert),
+      ) + 1;
+    if (size > maxBytes) throw new Error('A place row exceeds the batch size');
+    if (
+      batch.upserts.length + batch.deletes.length >= PLACE_BATCH_LIMIT ||
+      bytes + size > maxBytes
+    ) {
+      batches.push(batch);
+      batch = { upserts: [], deletes: [], tiles: [] };
+      bytes = 0;
+    }
+    if ('delete' in item) batch.deletes.push(item.delete);
+    else batch.upserts.push(item.upsert);
+    bytes += size;
+  };
+  for (const key of deletes) add({ delete: key });
+  for (const place of upserts) add({ upsert: place });
+  if (bytes) batches.push(batch);
+  for (let start = 0; start < tiles.length; start += PLACE_BATCH_LIMIT)
+    batches.push({
+      upserts: [],
+      deletes: [],
+      tiles: tiles.slice(start, start + PLACE_BATCH_LIMIT),
+    });
+  return batches;
+}
+
+function beginRefusal(
+  snapshotId: string,
+  refusal: Extract<Begun, { ok: false }>,
+): string {
+  switch (refusal.reason) {
+    case 'current_changed':
+      return `The live catalogue is now ${refusal.current ?? 'none'}: review a new dry run`;
+    case 'pending_other':
+      return pendingOther(refusal.pending);
+    case 'already_current':
+      return `${snapshotId} is already the live catalogue, yet the live rows differ from it: inspect the live catalogue before publishing`;
+  }
+}
+
+const pendingOther = (pending: string | null) =>
+  pending
+    ? `The publication of ${pending} is not complete. Finish it by running its publish command again, or abandon it with --replace-pending ${pending}`
+    : 'No publication is pending: publish without --replace-pending';
+
+const notPending = (snapshotId: string) =>
+  `The publication of ${snapshotId} is no longer pending: another run replaced or completed it. Review a new dry run`;

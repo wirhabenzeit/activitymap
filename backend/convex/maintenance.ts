@@ -57,6 +57,43 @@ export const cleanupRecording = internalMutation({
   },
 });
 
+const WALK_RESTARTS = 16;
+
+/** Start the re-match walk (`catalogue.rematchTiles`) again for completed
+ * revisions that still have tile changes. A walk deletes each tile's row
+ * once it has finished it, so rows left are unfinished work: of a walk
+ * still under way, or of one that stopped. A second walk over the same
+ * tiles is harmless. Rows of a pending revision wait for its completion.
+ * Returns the revisions whose walk was started. */
+export const resumeRematchWalks = internalMutation({
+  args: {},
+  handler: async (ctx): Promise<number[]> => {
+    const state = await ctx.db.query('placeCatalogueState').unique();
+    if (!state) return [];
+    const revisions: number[] = [];
+    let row = await ctx.db
+      .query('placeTileChanges')
+      .withIndex('by_revision_tile')
+      .first();
+    while (
+      row &&
+      row.revision <= state.revision &&
+      revisions.length < WALK_RESTARTS
+    ) {
+      const { revision } = row;
+      revisions.push(revision);
+      await ctx.scheduler.runAfter(0, internal.catalogue.rematchTiles, {
+        revision,
+      });
+      row = await ctx.db
+        .query('placeTileChanges')
+        .withIndex('by_revision_tile', (q) => q.gt('revision', revision))
+        .first();
+    }
+    return revisions;
+  },
+});
+
 const EVENT_RETENTION_MS = 30 * 86_400_000;
 
 /** Provider event receipts only keep a repeated delivery from counting

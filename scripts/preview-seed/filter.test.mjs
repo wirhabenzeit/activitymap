@@ -14,32 +14,17 @@ import test from 'node:test';
 
 import {
   filterSnapshot,
+  schemaTableNames,
   stripCredentials,
   strippedAuthRecord,
 } from './filter.mjs';
 
-const schemaTables = new Set([
-  'owners',
-  'ownerHeads',
-  'ownerStats',
-  'ownerEpochs',
-  'activities',
-  'photos',
-  'photoSets',
-  'changes',
-  'ingestionSweeps',
-  'recordings',
-  'authRecords',
-  'placeCatalogues',
-  'places',
-  'catalogueAdoptions',
-  'providerEvents',
-  'ingestionJobs',
-  'shareLinks',
-  'rateLimits',
-  'providerBudget',
-  'bridgeNonces',
-]);
+const schemaTables = schemaTableNames(
+  await readFile(
+    join(import.meta.dirname, '../../backend/convex/schema.ts'),
+    'utf8',
+  ),
+);
 
 async function snapshot(t, tables, files = []) {
   const directory = await mkdtemp(join(tmpdir(), 'preview-seed-test-'));
@@ -122,6 +107,15 @@ void test('a snapshot keeps only the chosen athletes and no credentials', async 
       ],
       placeCatalogues: [{ _id: 'c1', metadata: 'f3' }],
       places: [{ _id: 'p1' }],
+      livePlaces: [{ _id: 'q1' }],
+      placeCatalogueState: [
+        { _id: 't1', metadata: 'f5', pending: { metadata: 'f6' } },
+      ],
+      placeTileChanges: [{ _id: 'g1', revision: 1, tile: '1,1' }],
+      activityPlaceTiles: [
+        { _id: 'h1', owner: 'o1', activity: '1', tile: '1,1' },
+        { _id: 'h2', owner: 'o2', activity: '2', tile: '1,1' },
+      ],
       authRecords: [
         { _id: 'x1', model: 'user', key: 'u1', doc: { athlete_id: 100 } },
         { _id: 'x2', model: 'user', key: 'u2', doc: { athlete_id: 200 } },
@@ -145,7 +139,7 @@ void test('a snapshot keeps only the chosen athletes and no credentials', async 
       shareLinks: [{ _id: 'l1', owner: 'o1', tokenHash: 'h' }],
       shadowMatches: [{ _id: 'm1' }],
     },
-    ['f1', 'f2', 'f3', 'f4'],
+    ['f1', 'f2', 'f3', 'f4', 'f5', 'f6'],
   );
 
   const { counts } = await filterSnapshot(directory, {
@@ -170,6 +164,13 @@ void test('a snapshot keeps only the chosen athletes and no credentials', async 
     ['s1'],
   );
   assert.equal((await rows(directory, 'places')).length, 1);
+  assert.equal((await rows(directory, 'livePlaces')).length, 1);
+  assert.equal((await rows(directory, 'placeCatalogueState')).length, 1);
+  assert.deepEqual(await rows(directory, 'placeTileChanges'), []);
+  assert.deepEqual(
+    (await rows(directory, 'activityPlaceTiles')).map((r) => r._id),
+    ['h1'],
+  );
   assert.deepEqual(await rows(directory, 'shareLinks'), []);
   const auth = await rows(directory, 'authRecords');
   assert.deepEqual(
@@ -182,10 +183,12 @@ void test('a snapshot keeps only the chosen athletes and no credentials', async 
     'documents.jsonl',
     'f1.gz',
     'f3.gz',
+    'f5.gz',
+    'f6.gz',
   ]);
   assert.deepEqual(
     (await rows(directory, '_storage')).map((r) => r._id).sort(),
-    ['f1', 'f3'],
+    ['f1', 'f3', 'f5', 'f6'],
   );
   assert.ok(
     !(await rows(directory, '_tables')).some((r) => r.name === 'shadowMatches'),

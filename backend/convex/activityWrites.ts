@@ -52,6 +52,27 @@ export function activityFor(
     .unique();
 }
 
+/** Make the activity's catalogue tile rows the tiles its current match
+ * read; no tiles when it has no valid match any more. Unchanged rows stay. */
+export async function replacePlaceTiles(
+  ctx: MutationCtx,
+  owner: Doc<'owners'>['_id'],
+  activity: string,
+  tiles: readonly string[],
+) {
+  const wanted = new Set(tiles);
+  for (const row of await ctx.db
+    .query('activityPlaceTiles')
+    .withIndex('by_owner_activity', (q) =>
+      q.eq('owner', owner).eq('activity', activity),
+    )
+    .collect())
+    if (!wanted.delete(row.tile))
+      await ctx.db.delete('activityPlaceTiles', row._id);
+  for (const tile of wanted)
+    await ctx.db.insert('activityPlaceTiles', { owner, activity, tile });
+}
+
 export async function publishChange(
   ctx: MutationCtx,
   owner: Doc<'owners'>,
@@ -120,6 +141,8 @@ export async function applySourceRecord(
     await ctx.storage.delete(oldRecording.file);
     await ctx.db.delete('recordings', oldRecording._id);
   }
+  // The match goes with the samples (or the activity) it was computed from.
+  if (!preserve) await replacePlaceTiles(ctx, owner._id, key, []);
   const common = {
     owner: owner._id,
     key,
@@ -329,6 +352,7 @@ export const publishRecording = internalMutation({
         match: undefined,
       }),
     });
+    await replacePlaceTiles(ctx, owner._id, row.key, []);
     if (prior) {
       await ctx.storage.delete(prior.file);
       await ctx.db.delete('recordings', prior._id);
@@ -349,6 +373,9 @@ export const publishMatchArgs = {
   ...fence,
   recording: v.id('recordings'),
   catalogue: v.string(),
+  /** The live catalogue revision current when the match started; 0 (the
+   * default) for a match against a rowset. */
+  revision: v.optional(v.number()),
   result: placeMatchValidator,
 };
 
@@ -372,14 +399,21 @@ export async function publishMatchRecord(
     result.streamRevision !== projection.streams?.revision
   )
     throw new Error('Matching result source mismatch');
+  const revision = args.revision ?? 0;
+  if (!Number.isSafeInteger(revision) || revision < 0)
+    throw new Error('Invalid catalogue revision');
   const prior = projection.match;
-  if (prior?.catalogue === args.catalogue) return false;
+  // A catalogue that is refreshed in place is matched again under the same
+  // identity: only a match that started at a newer revision replaces it.
+  if (prior?.catalogue === args.catalogue && revision <= (prior.revision ?? 0))
+    return false;
   const head = await requireHead(ctx, owner._id);
   await ctx.db.patch('activities', row._id, {
     projection: boundedProjection(dto, {
       ...projection,
       match: {
         catalogue: args.catalogue,
+        revision,
         value: { ...result, resultRevision: String(head.sequence + 1) },
       },
     }),

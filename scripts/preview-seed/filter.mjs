@@ -12,6 +12,8 @@ export const SHARED_TABLES = [
   'placeCatalogues',
   'places',
   'catalogueAdoptions',
+  'livePlaces',
+  'placeCatalogueState',
 ];
 
 /** Per-owner library tables, filtered by their `owner` field. */
@@ -24,12 +26,14 @@ export const OWNER_TABLES = [
   'photoSets',
   'changes',
   'ingestionSweeps',
+  'activityPlaceTiles',
 ];
 
 /**
  * Tables emptied on Preview: operational state (queues, nonces, budgets,
- * rate limits), delivered events, and share links, whose tokens would grant
- * access to production libraries from Preview.
+ * rate limits, the tiles a re-match walk has left), delivered events, and
+ * share links, whose tokens would grant access to production libraries from
+ * Preview.
  */
 export const EMPTIED_TABLES = [
   'providerEvents',
@@ -38,6 +42,7 @@ export const EMPTIED_TABLES = [
   'rateLimits',
   'providerBudget',
   'bridgeNonces',
+  'placeTileChanges',
 ];
 
 /** Auth models that identify a person; sessions, verifications and keys are
@@ -57,6 +62,22 @@ export function stripCredentials(value) {
       .map(([key, inner]) => [key, stripCredentials(inner)]),
   );
 }
+
+/** The stored files a shared table's document refers to: the manifest and
+ * coverage of a rowset, and of the live catalogue's completed and pending
+ * publications. */
+const SHARED_FILES = {
+  placeCatalogues: (row) => [row.metadata],
+  placeCatalogueState: (row) => [row.metadata, row.pending?.metadata],
+};
+
+/** The table names a Convex schema source defines. */
+export const schemaTableNames = (source) =>
+  new Set(
+    [...source.matchAll(/^ {2}(\w+): defineTable\(/gm)].map(
+      (match) => match[1],
+    ),
+  );
 
 /** The decision for one document of a table, given what was kept so far. */
 export function keepDocument(table, document, kept) {
@@ -162,9 +183,11 @@ export async function filterSnapshot(directory, { athleteIds, schemaTables }) {
   for (const table of SHARED_TABLES)
     await run(
       table,
-      table === 'placeCatalogues'
-        ? (catalogue) => kept.files.add(catalogue.metadata)
-        : undefined,
+      SHARED_FILES[table] &&
+        ((row) => {
+          for (const file of SHARED_FILES[table](row))
+            if (file) kept.files.add(file);
+        }),
     );
   await run('authRecords');
   for (const table of EMPTIED_TABLES) {

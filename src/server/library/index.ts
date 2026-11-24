@@ -52,12 +52,14 @@ export async function startLibrary(
   };
   let state = await writer.write<State | null>({ kind: 'state' });
   if (!state) {
-    const rowset = await writer.write<{
+    // The live catalogue once it has been published, before that the newest
+    // complete rowset (`places.latestCatalogue` in the backend).
+    const latest = await writer.write<{
       snapshotId: string;
       revision: string;
     } | null>({ kind: 'latestCatalogue' });
     const version = matchingVersion(
-      rowset ?? { snapshotId: null, revision: '0' },
+      latest ?? { snapshotId: null, revision: '0' },
     );
     try {
       await writer.write({

@@ -4,6 +4,7 @@ import type { CoverageGeometry } from './coverage';
 import {
   type Arc,
   SpatialIndex,
+  type Vector,
   arc,
   arcDistanceM,
   combine,
@@ -29,14 +30,38 @@ export function routeSections(geometry: GeometryCollection): Arc[][] {
   });
 }
 
-/** Local coverage is a spherical corridor wholly inside the published region,
- * including holes. Edges are subdivided only for tight index envelopes. The
- * extra 2% + 2m conservatively accommodates ellipsoid/sphere distance variation.
- * This explicit, versioned rule replaces the projected PostGIS buffer check. */
-export function createBatchCoverage(coverage: CoverageGeometry) {
-  const polygons = coverage.coordinates.map((polygon) =>
+/** How far a covered section must stay from the coverage boundary. The
+ * extra 2% + 2m conservatively accommodates ellipsoid/sphere distance
+ * variation. */
+export function coverageClearanceM(radiusM: number) {
+  return radiusM * 1.02 + 2;
+}
+
+/** The coverage's rings as unit vectors, for `coverageContains`. */
+export function coveragePolygons(coverage: CoverageGeometry): Vector[][][] {
+  return coverage.coordinates.map((polygon) =>
     polygon.map((ring) => ring.map(vector)),
   );
+}
+
+/** Whether `p` lies inside the coverage, outside its holes. */
+export function coverageContains(
+  polygons: readonly Vector[][][],
+  p: Vector,
+): boolean {
+  return polygons.some(
+    ([outer, ...holes]) =>
+      ringContains(p, outer!) &&
+      !holes.some((hole) => ringContains(p, hole, true)),
+  );
+}
+
+/** Local coverage is a spherical corridor wholly inside the published region,
+ * including holes, at `coverageClearanceM` from its boundary. Edges are
+ * subdivided only for tight index envelopes. This explicit, versioned rule
+ * replaces the projected PostGIS buffer check. */
+export function createBatchCoverage(coverage: CoverageGeometry) {
+  const polygons = coveragePolygons(coverage);
   const edges: Arc[] = [];
   for (const polygon of polygons)
     for (const ring of polygon)
@@ -53,17 +78,9 @@ export function createBatchCoverage(coverage: CoverageGeometry) {
   return {
     covers(sections: Arc[][], radiusM: number): boolean {
       if (!sections.length) return false;
-      const clearance = radiusM * 1.02 + 2;
+      const clearance = coverageClearanceM(radiusM);
       for (const section of sections) {
-        const p = section[0]!.a;
-        if (
-          !polygons.some(
-            ([outer, ...holes]) =>
-              ringContains(p, outer!) &&
-              !holes.some((hole) => ringContains(p, hole, true)),
-          )
-        )
-          return false;
+        if (!coverageContains(polygons, section[0]!.a)) return false;
         for (let start = 0; start < section.length; start += 64) {
           const block = section.slice(start, start + 64);
           const nearby = index.query(

@@ -2,10 +2,12 @@ import { paginationOptsValidator } from 'convex/server';
 import { v } from 'convex/values';
 
 import {
+  LIVE_CATALOGUE,
   PLACE_BATCH_LIMIT,
   chainDigest,
   tileOf,
 } from '../../src/server/places/catalogue-rows';
+import { internal } from './_generated/api';
 import type { Doc } from './_generated/dataModel';
 import {
   type QueryCtx,
@@ -25,6 +27,11 @@ import { placeValidator as place } from './placeValidators';
  * imported ID and extends a digest over them, and `complete` accepts the
  * rowset only when the row count and the digest match the sender's. Until
  * then nothing reads it. A changed catalogue is a new dataset.
+ *
+ * Rowsets are what libraries were matched against before the live catalogue
+ * (convex/livePlaces.ts). An owner whose matching version names a rowset
+ * keeps reading it until `catalogueWorker.adopt` moves it to the live
+ * catalogue; `dropRowsets` removes them afterwards.
  */
 
 const dataset = v.string();
@@ -54,17 +61,25 @@ export const state = internalQuery({
   },
 });
 
-/** The newest complete rowset, or null: what a library that starts here is
- * matched against. */
-export async function latestRowset(ctx: QueryCtx) {
+/** The catalogue a library that starts here is matched against, and the
+ * one `catalogueWorker.adopt` moves libraries to: the live catalogue
+ * (`LIVE_CATALOGUE`) once a publication of it has completed, before that
+ * the newest complete rowset, or null. */
+export async function latestCatalogue(
+  ctx: QueryCtx,
+): Promise<{ snapshotId: string; revision: string } | null> {
+  if (await liveCompleted(ctx)) return { ...LIVE_CATALOGUE };
   const rows = await ctx.db.query('placeCatalogues').order('desc').take(8);
   const row = rows.find((candidate) => candidate.complete);
-  return row
-    ? { snapshotId: row.snapshotId, revision: row.revision, count: row.count }
-    : null;
+  return row ? { snapshotId: row.snapshotId, revision: row.revision } : null;
 }
 
-export const latest = internalQuery({ args: {}, handler: latestRowset });
+async function liveCompleted(ctx: QueryCtx) {
+  const state = await ctx.db.query('placeCatalogueState').unique();
+  return (state?.revision ?? 0) >= 1;
+}
+
+export const latest = internalQuery({ args: {}, handler: latestCatalogue });
 
 /** Start a dataset, or return the progress of one already started. `metadata`
  * is a stored file holding the catalogue manifest and coverage. */
@@ -190,6 +205,49 @@ export const tilePage = internalQuery({
         latitude: row.place.location.latitude,
         metadata: row.place,
       })),
+    };
+  },
+});
+
+const DROP_PAGE = 1024;
+
+/**
+ * Delete the rowsets once nothing matches against them any more: their
+ * `places` rows first, then their `placeCatalogues` rows with their stored
+ * files. Run by hand after the cutover to the live catalogue
+ * (`convex run places:dropRowsets`); it continues by itself until nothing is
+ * left. Returns what this step deleted and whether it continues.
+ *
+ * It refuses before a live publication has completed, and until the latest
+ * adoption (`catalogueWorker.adopt`) has moved every library to the live
+ * catalogue: until then owners still match against their rowset.
+ */
+export const dropRowsets = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    if (!(await liveCompleted(ctx)))
+      return { ok: false as const, reason: 'no_live_catalogue' as const };
+    const adoption = await ctx.db.query('catalogueAdoptions').first();
+    if (adoption?.snapshotId !== LIVE_CATALOGUE.snapshotId)
+      return { ok: false as const, reason: 'not_adopted' as const };
+    const places = await ctx.db.query('places').take(DROP_PAGE);
+    for (const row of places) await ctx.db.delete('places', row._id);
+    const catalogues =
+      places.length < DROP_PAGE
+        ? await ctx.db.query('placeCatalogues').take(DROP_PAGE - places.length)
+        : [];
+    for (const row of catalogues) {
+      if (await ctx.db.system.get('_storage', row.metadata))
+        await ctx.storage.delete(row.metadata);
+      await ctx.db.delete('placeCatalogues', row._id);
+    }
+    const more = places.length + catalogues.length === DROP_PAGE;
+    if (more) await ctx.scheduler.runAfter(0, internal.places.dropRowsets, {});
+    return {
+      ok: true as const,
+      places: places.length,
+      catalogues: catalogues.length,
+      more,
     };
   },
 });

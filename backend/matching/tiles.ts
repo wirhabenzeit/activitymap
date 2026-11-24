@@ -8,12 +8,9 @@ type Candidate = {
 };
 type TilePage = { page: Candidate[]; isDone: boolean; continueCursor: string };
 
-export async function readMatchingTiles(
-  windows: readonly PlaceQueryWindow[],
-  readPage: (tile: string, cursor: string | null) => Promise<TilePage>,
-  parallelism: 1 | 4,
-) {
-  const started = Date.now();
+/** The quarter-degree tiles ("x,y") that hold every place inside the
+ * windows. At most 256: a larger set would make a match incomplete. */
+export function matchingTiles(windows: readonly PlaceQueryWindow[]) {
   const tiles = new Set<string>();
   if (windows.length > 2000) throw new Error('Window budget exceeded');
   for (const box of windows) {
@@ -43,6 +40,16 @@ export async function readMatchingTiles(
       }
     }
   }
+  return [...tiles];
+}
+
+export async function readMatchingTiles(
+  windows: readonly PlaceQueryWindow[],
+  readPage: (tile: string, cursor: string | null) => Promise<TilePage>,
+  parallelism: 1 | 4,
+) {
+  const started = Date.now();
+  const tiles = matchingTiles(windows);
   const found = new Map<string, unknown>();
   let pages = 0;
   let scanned = 0;
@@ -75,14 +82,13 @@ export async function readMatchingTiles(
       cursor = page.continueCursor;
     }
   };
-  const keys = [...tiles];
-  for (let start = 0; start < keys.length; start += parallelism)
-    await Promise.all(keys.slice(start, start + parallelism).map(scanTile));
+  for (let start = 0; start < tiles.length; start += parallelism)
+    await Promise.all(tiles.slice(start, start + parallelism).map(scanTile));
   return {
     places: [...found.values()],
     pages,
     scanned,
-    tiles: tiles.size,
+    tiles,
     elapsedMs: Date.now() - started,
   };
 }

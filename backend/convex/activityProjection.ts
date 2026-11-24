@@ -28,7 +28,11 @@ export type ActivityProjection = {
   generation?: string;
   sourceVersion?: string;
   streams?: StreamMetadata;
-  match?: { catalogue: string; value: ActivityPlacesResponse };
+  match?: {
+    catalogue: string;
+    revision?: number;
+    value: ActivityPlacesResponse;
+  };
 };
 
 export function jsonBytes(value: unknown) {

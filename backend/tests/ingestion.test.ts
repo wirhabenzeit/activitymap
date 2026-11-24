@@ -5,8 +5,13 @@ import test, { afterEach, beforeEach, mock } from 'node:test';
 
 import { createProviderGatewayHandler } from '../../src/app/api/internal/provider/v1/handler';
 import {
+  EMPTY_SET_DIGEST,
+  LIVE_CATALOGUE,
   type PlaceRow,
+  addToSetDigest,
   datasetFor,
+  rowHash,
+  tileOf,
 } from '../../src/server/places/catalogue-rows';
 import { createSyntheticCatalogue } from '../../src/server/places/catalogue.fixture';
 import {
@@ -19,7 +24,7 @@ import type {
 } from '../../src/server/provider-gateway/contract';
 import type { RawActivityStreams } from '../../src/server/strava/streams';
 import { internal } from '../convex/_generated/api';
-import { LEASE_MS, MAX_ATTEMPTS } from '../convex/ingestion';
+import { LEASE_MS, MAX_ATTEMPTS, requestMatch } from '../convex/ingestion';
 import {
   CONFIRM_INTERVAL_MS,
   CONFIRM_LIMIT,
@@ -48,6 +53,7 @@ const modules = {
   './ingestion.ts': () => import('../convex/ingestion'),
   './ingestionSweep.ts': () => import('../convex/ingestionSweep'),
   './ingestionWorker.ts': () => import('../convex/ingestionWorker'),
+  './livePlaces.ts': () => import('../convex/livePlaces'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
   './places.ts': () => import('../convex/places'),
@@ -1101,6 +1107,140 @@ void test('a new recording is matched against the owner’s place catalogue', as
   );
 });
 
+/** The catalogue tiles recorded for each activity's match. */
+async function placeTiles(convex: Convex) {
+  const tiles = new Map<number, string[]>();
+  for (const row of await convex.run((ctx) =>
+    ctx.db.query('activityPlaceTiles').collect(),
+  ))
+    tiles.set(Number(row.activity), [
+      ...(tiles.get(Number(row.activity)) ?? []),
+      row.tile,
+    ]);
+  for (const list of tiles.values()) list.sort();
+  return tiles;
+}
+
+void test('a match records the catalogue tiles it read, and they go with the match', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  provider.set(detail(8, 'Elsewhere'));
+  provider.record('8', track(46.5, 8.5));
+  await ingest(convex, '7', '8');
+
+  // Each activity has the tiles of its own track, the peak's among them.
+  let tiles = await placeTiles(convex);
+  const peakTile = `${Math.floor((peak.location.longitude + 180) * 4)},${Math.floor((peak.location.latitude + 90) * 4)}`;
+  const elsewhere = tiles.get(8)!;
+  assert(tiles.get(7)!.includes(peakTile));
+  assert(elsewhere.length > 0 && !elsewhere.includes(peakTile));
+
+  // A new recording drops the tiles with the match until it is matched
+  // again, which replaces them.
+  let between: Map<number, string[]> | undefined;
+  provider.during = async () => {
+    // The activity has been read; the samples are next.
+    provider.during = async () => {
+      between = await placeTiles(convex);
+    };
+  };
+  provider.set(detail(7, 'Past the peak', { distance: 2000 }));
+  provider.record('7', track(46.5, 8.5));
+  mock.timers.tick(1000);
+  await event(convex, '7', 'update');
+  await settle(convex);
+  assert.equal(between!.get(7), undefined);
+  tiles = await placeTiles(convex);
+  assert.deepEqual(tiles.get(7), elsewhere);
+  assert.deepEqual(tiles.get(8), elsewhere);
+
+  // A deleted activity has none.
+  provider.remove('7');
+  mock.timers.tick(1000);
+  await event(convex, '7', 'delete');
+  await settle(convex);
+  tiles = await placeTiles(convex);
+  assert.deepEqual([...tiles.keys()], [8]);
+
+  // Nor does an erased account.
+  await convex.mutation(internal.erasure.start, actor);
+  await settle(convex);
+  assert.equal((await placeTiles(convex)).size, 0);
+});
+
+void test('a match result that started at an older or the same catalogue revision is dropped', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+  const stored = async () =>
+    (await state(convex)).activities[0]!.projection!.match!;
+  const first = await stored();
+  assert.equal(first.revision, 0);
+  const tiles = (await placeTiles(convex)).get(7);
+  const { activities, jobs } = await state(convex);
+  const { resultRevision: _revision, ...result } = first.value;
+
+  /** A worker's result for activity 7, as if it held the job's lease. */
+  const publish = async (revision: number, tiles: string[]) => {
+    const claim = jobs[0]!.claims + 1;
+    await convex.run((ctx) =>
+      ctx.db.patch('ingestionJobs', jobs[0]!._id, {
+        claims: claim,
+        lease: {
+          claim,
+          expiresAt: Date.now() + LEASE_MS,
+          requested: jobs[0]!.requested,
+        },
+      }),
+    );
+    jobs[0]!.claims = claim;
+    await convex.mutation(internal.ingestion.matched, {
+      job: jobs[0]!._id,
+      claim,
+      recording: activities[0]!.recording!,
+      result,
+      revision,
+      tiles,
+    });
+  };
+
+  // The same revision changes nothing: not the match, not its tiles.
+  await publish(0, ['1,1']);
+  assert.equal(
+    (await stored()).value.resultRevision,
+    first.value.resultRevision,
+  );
+  assert.deepEqual((await placeTiles(convex)).get(7), tiles);
+
+  // A newer one replaces both.
+  await publish(2, ['1,1']);
+  const second = await stored();
+  assert.equal(second.revision, 2);
+  assert.notEqual(second.value.resultRevision, first.value.resultRevision);
+  assert.deepEqual((await placeTiles(convex)).get(7), ['1,1']);
+
+  // An older one is dropped.
+  await publish(1, ['2,2']);
+  assert.deepEqual(await stored(), second);
+  assert.deepEqual((await placeTiles(convex)).get(7), ['1,1']);
+
+  // Tiles that no match can have read are refused.
+  await assert.rejects(publish(3, ['x']), /Invalid match tiles/);
+  await assert.rejects(
+    publish(
+      3,
+      Array.from({ length: 257 }, (_, x) => `${x},0`),
+    ),
+    /Invalid match tiles/,
+  );
+});
+
 void test('a new catalogue moves every library to it and matches every recording again', async () => {
   const provider = fakeProvider();
   const { convex, identity, complete } = await matchingOwner();
@@ -1301,6 +1441,457 @@ void test('an adoption that a newer one overtook moves no library back', async (
   assert.deepEqual(await on(), [second.identity]);
 });
 
+const liveVersion = versionFor(LIVE_CATALOGUE);
+let publications = 0;
+
+/** Begin a publication of `places` as the whole live catalogue, under the
+ * synthetic manifest of a new snapshot, and write its rows; `complete`
+ * finishes it. */
+async function beginLive(convex: Convex, places: PlaceRow[]) {
+  const artifact = createSyntheticCatalogue({
+    dataAsOf: `2026-11-${String(++publications).padStart(2, '0')}T00:00:00Z`,
+  });
+  const liveSnapshot = artifact.manifest.catalogue_snapshot_id;
+  const metadata = await convex.run((ctx) =>
+    ctx.storage.store(
+      new Blob([
+        JSON.stringify({
+          manifest: artifact.manifest,
+          coverage: artifact.coverage,
+        }),
+      ]),
+    ),
+  );
+  let setDigest = EMPTY_SET_DIGEST;
+  for (const place of places)
+    setDigest = addToSetDigest(setDigest, await rowHash(place));
+  const current = await convex.query(internal.livePlaces.state, {});
+  const begun = await convex.mutation(internal.livePlaces.beginApply, {
+    expectCurrent: current?.snapshotId ?? null,
+    snapshotId: liveSnapshot,
+    metadata,
+    count: places.length,
+    setDigest,
+  });
+  assert(begun.ok);
+  const keys = new Set(places.map((place) => place.id));
+  const deletes = (
+    await convex.run((ctx) => ctx.db.query('livePlaces').collect())
+  )
+    .map((row) => row.key)
+    .filter((key) => !keys.has(key));
+  await convex.mutation(internal.livePlaces.applyBatch, {
+    snapshotId: liveSnapshot,
+    upserts: places,
+    deletes,
+    tiles: [],
+  });
+  const complete = async () => {
+    const completed = await convex.mutation(internal.livePlaces.completeApply, {
+      snapshotId: liveSnapshot,
+    });
+    assert(completed.ok);
+    return completed.revision;
+  };
+  return { snapshotId: liveSnapshot, complete };
+}
+
+async function publishLive(convex: Convex, places: PlaceRow[]) {
+  const publication = await beginLive(convex, places);
+  return { ...publication, revision: await publication.complete() };
+}
+
+/** An owner on the live catalogue, as one provisioned after its first
+ * publication. */
+const liveOwner = () =>
+  owner({
+    catalogue: catalogueIdentity(liveVersion),
+    matchingVersion: liveVersion,
+  });
+
+async function matches(convex: Convex) {
+  const { activities } = await state(convex);
+  return new Map(
+    activities.map((row) => [Number(row.key), row.projection?.match]),
+  );
+}
+
+const other: PlaceRow = {
+  ...peak,
+  id: '33333333-3333-4333-8333-333333333333',
+  displayName: 'Other',
+  location: { longitude: 8.5, latitude: 46.5 },
+};
+
+void test('an owner keeps its rowset after the live publication until adoption moves it to the live table', async () => {
+  const provider = fakeProvider();
+  const { convex, identity, version, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+
+  // The live catalogue holds the same place under another ID.
+  const renamed = { ...peak, id: '22222222-2222-4222-8222-222222222222' };
+  const live = await publishLive(convex, [renamed]);
+  await settle(convex);
+  // Its walk asks for nothing: a rowset match is never stale by revision.
+  assert.deepEqual(
+    (await state(convex)).jobs.map((job) => job.claims),
+    [1],
+  );
+  provider.set(detail(8, 'Same track'));
+  provider.record('8', pastThePeak);
+  await ingest(convex, '8');
+  for (const match of (await matches(convex)).values())
+    assert.deepEqual(
+      [
+        match!.catalogue,
+        match!.revision,
+        match!.value.matchingVersion,
+        match!.value.catalogueSnapshotId,
+        match!.value.places.map((place) => place.id),
+      ],
+      [identity, 0, version, snapshotId, [peak.id]],
+    );
+  const reads = provider.reads.length;
+
+  // Adoption moves the owner to the live table and matches every recording
+  // there, which also records its tiles.
+  assert.deepEqual(await convex.action(internal.catalogueWorker.adopt, {}), {
+    ...LIVE_CATALOGUE,
+    libraries: 1,
+  });
+  const moved = await convex.run((ctx) => ctx.db.query('owners').first());
+  assert.deepEqual(
+    [moved!.catalogue, moved!.matchingVersion],
+    [catalogueIdentity(liveVersion), liveVersion],
+  );
+  await convex.run(async (ctx) => {
+    for (const row of await ctx.db.query('activityPlaceTiles').collect())
+      await ctx.db.delete('activityPlaceTiles', row._id);
+  });
+  await settle(convex);
+  for (const match of (await matches(convex)).values())
+    assert.deepEqual(
+      [
+        match!.catalogue,
+        match!.revision,
+        match!.value.matchingVersion,
+        match!.value.catalogueSnapshotId,
+        match!.value.places.map((place) => place.id),
+      ],
+      [
+        catalogueIdentity(liveVersion),
+        live.revision,
+        liveVersion,
+        live.snapshotId,
+        [renamed.id],
+      ],
+    );
+  assert.deepEqual([...(await placeTiles(convex)).keys()].sort(), [7, 8]);
+  assert.equal(provider.reads.length, reads);
+});
+
+void test('only activities in changed tiles are matched again, and their old matches stay until then', async () => {
+  const provider = fakeProvider();
+  const convex = await liveOwner();
+  await publishLive(convex, [peak, other]);
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  provider.set(detail(8, 'Past the other'));
+  provider.record(
+    '8',
+    track(other.location.latitude, other.location.longitude),
+  );
+  await ingest(convex, '7', '8');
+  const before = await matches(convex);
+  assert.deepEqual([before.get(7)!.revision, before.get(8)!.revision], [1, 1]);
+  const claims = async () =>
+    new Map(
+      (await state(convex)).jobs.map((job) => [
+        Number(job.activity),
+        job.claims,
+      ]),
+    );
+  const ran = await claims();
+  const reads = provider.reads.length;
+
+  // The peak is renamed: only its tile changes.
+  const second = await beginLive(convex, [
+    { ...peak, displayName: 'Renamed peak' },
+    other,
+  ]);
+  const revision = await second.complete();
+  // Until the walk has matched it again, the old match is what clients see.
+  assert.deepEqual(await matches(convex), before);
+
+  await settle(convex);
+  await advance(convex, 2_000);
+  const after = await matches(convex);
+  assert.deepEqual(
+    [
+      after.get(7)!.revision,
+      after.get(7)!.value.catalogueSnapshotId,
+      after.get(7)!.value.places.map((place) => place.name),
+    ],
+    [revision, second.snapshotId, ['Renamed peak']],
+  );
+  assert.notEqual(
+    after.get(7)!.value.resultRevision,
+    before.get(7)!.value.resultRevision,
+  );
+  assert.deepEqual(after.get(8), before.get(8));
+  const now = await claims();
+  assert.deepEqual(
+    [now.get(7)! - ran.get(7)!, now.get(8)! - ran.get(8)!],
+    [1, 0],
+  );
+  assert.equal(provider.reads.length, reads);
+  // The walk has consumed the revision's tiles.
+  assert.deepEqual(
+    await convex.run((ctx) => ctx.db.query('placeTileChanges').collect()),
+    [],
+  );
+});
+
+void test('a match that overlapped an apply is matched again', async () => {
+  const provider = fakeProvider();
+  const convex = await liveOwner();
+  await publishLive(convex, [peak]);
+
+  // Activity 7 is matched while the next publication's rows are written:
+  // it reads them, at the revision current when it started.
+  const second = await beginLive(convex, [
+    { ...peak, displayName: 'Renamed peak' },
+  ]);
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+  let match = (await matches(convex)).get(7)!;
+  assert.deepEqual(
+    [match.revision, match.value.places.map((place) => place.name)],
+    [1, ['Renamed peak']],
+  );
+  const revision = await second.complete();
+  await settle(convex);
+  await advance(convex, 2_000);
+  match = (await matches(convex)).get(7)!;
+  assert.deepEqual(
+    [match.revision, match.value.catalogueSnapshotId],
+    [revision, second.snapshotId],
+  );
+
+  // A result that started before a publication completed, and arrives
+  // after its walk passed, is matched again too.
+  const third = await publishLive(convex, [
+    { ...peak, displayName: 'Renamed peak' },
+    other,
+  ]);
+  await settle(convex);
+  const { jobs, activities } = await state(convex);
+  const { resultRevision: _revision, ...result } = match.value;
+  const claim = jobs[0]!.claims + 1;
+  await convex.run((ctx) =>
+    ctx.db.patch('ingestionJobs', jobs[0]!._id, {
+      claims: claim,
+      lease: {
+        claim,
+        expiresAt: Date.now() + LEASE_MS,
+        requested: jobs[0]!.requested,
+      },
+    }),
+  );
+  await convex.mutation(internal.ingestion.matched, {
+    job: jobs[0]!._id,
+    claim,
+    recording: activities[0]!.recording!,
+    result,
+    revision,
+    tiles: [],
+  });
+  await settle(convex);
+  match = (await matches(convex)).get(7)!;
+  assert.equal(match.revision, third.revision);
+});
+
+void test('a match whose catalogue metadata a publication replaced meanwhile is retried', async () => {
+  const provider = fakeProvider();
+  const convex = await liveOwner();
+  await publishLive(convex, [peak]);
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+  const { activities } = await state(convex);
+  const row = activities[0]!;
+  await convex.run((ctx) =>
+    ctx.db.patch('activities', row._id, {
+      projection: { ...row.projection!, match: undefined },
+    }),
+  );
+
+  // The worker has its step and reads the recording when the next
+  // publication completes and deletes the metadata the step names.
+  let next: Awaited<ReturnType<typeof publishLive>> | undefined;
+  const read = Blob.prototype.arrayBuffer;
+  mock.method(Blob.prototype, 'arrayBuffer', async function (this: Blob) {
+    Blob.prototype.arrayBuffer = read;
+    next = await publishLive(convex, [{ ...peak, displayName: 'Renamed' }]);
+    return read.call(this);
+  });
+  await convex.run((ctx) => requestMatch(ctx, row.owner, row.key));
+  await settle(convex);
+  assert(next);
+  let { jobs } = await state(convex);
+  assert.deepEqual(
+    [jobs[0]!.status, jobs[0]!.phase, jobs[0]!.error],
+    ['queued', 'match', 'Catalogue metadata missing'],
+  );
+  assert.equal((await matches(convex)).get(7), undefined);
+
+  // The retry reads the new publication.
+  await advance(convex, 60_000);
+  const match = (await matches(convex)).get(7)!;
+  assert.deepEqual(
+    [match.revision, match.value.places.map((place) => place.name)],
+    [next.revision, ['Renamed']],
+  );
+  ({ jobs } = await state(convex));
+  assert.equal(jobs[0]!.status, 'idle');
+});
+
+void test('dropRowsets removes rowsets with their files, and only after the cutover', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  // More rows than one step deletes.
+  const dataset = await datasetFor(snapshotId, '7');
+  await convex.run(async (ctx) => {
+    for (let index = 0; index < 1100; index++)
+      await ctx.db.insert('places', {
+        dataset,
+        key: `extra-${index}`,
+        tile: '0,0',
+        place: peak,
+      });
+  });
+  const files = () =>
+    convex.run(async (ctx) =>
+      (await ctx.db.system.query('_storage').collect()).map((file) => file._id),
+    );
+  const rowsetFile = (await convex.run((ctx) =>
+    ctx.db.query('placeCatalogues').first(),
+  ))!.metadata;
+  const drop = () => convex.mutation(internal.places.dropRowsets, {});
+
+  // Before the live catalogue, and before libraries move to it, matching
+  // still needs the rowsets.
+  assert.deepEqual(await drop(), {
+    ok: false,
+    reason: 'no_live_catalogue',
+  });
+  await publishLive(convex, [peak]);
+  await settle(convex);
+  assert.deepEqual(await drop(), { ok: false, reason: 'not_adopted' });
+  await convex.action(internal.catalogueWorker.adopt, {});
+  await settle(convex);
+
+  assert.deepEqual(await drop(), {
+    ok: true,
+    places: 1024,
+    catalogues: 0,
+    more: true,
+  });
+  await settle(convex);
+  const left = await convex.run(async (ctx) => ({
+    places: (await ctx.db.query('places').collect()).length,
+    catalogues: (await ctx.db.query('placeCatalogues').collect()).length,
+  }));
+  assert.deepEqual(left, { places: 0, catalogues: 0 });
+  assert(!(await files()).includes(rowsetFile));
+  const liveFile = (await convex.run((ctx) =>
+    ctx.db.query('placeCatalogueState').unique(),
+  ))!.metadata!;
+  assert((await files()).includes(liveFile));
+  assert.deepEqual(await drop(), {
+    ok: true,
+    places: 0,
+    catalogues: 0,
+    more: false,
+  });
+
+  // Matching goes on from the live table.
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+  assert.equal((await matches(convex)).get(7)!.value.places[0]!.id, peak.id);
+});
+
+void test('the re-match walk continues within a tile, leaves pending tiles alone and is harmless twice', async () => {
+  const provider = fakeProvider();
+  const convex = await liveOwner();
+  await publishLive(convex, [peak]);
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+  const { activities, jobs } = await state(convex);
+  const tile = tileOf(peak.location);
+  // More activities in the peak's tile than one step looks at, ahead of 7.
+  await convex.run(async (ctx) => {
+    for (let index = 0; index < 40; index++)
+      await ctx.db.insert('activityPlaceTiles', {
+        owner: activities[0]!.owner,
+        activity: `000000000000000000000${String(index).padStart(2, '0')}`,
+        tile,
+      });
+  });
+  const walk = (revision: number) =>
+    convex.mutation(internal.catalogue.rematchTiles, { revision });
+  const left = (revision: number) =>
+    convex.run(async (ctx) =>
+      (
+        await ctx.db
+          .query('placeTileChanges')
+          .withIndex('by_revision_tile', (q) => q.eq('revision', revision))
+          .collect()
+      ).map((row) => row.tile),
+    );
+
+  // A pending revision is not walked.
+  const second = await beginLive(convex, [
+    { ...peak, displayName: 'Renamed peak' },
+  ]);
+  assert.deepEqual(await walk(2), { done: true });
+  assert.deepEqual(await left(2), [tile]);
+  const revision = await second.complete();
+
+  // A step looks at a page of the tile and keeps it; a second walk runs
+  // alongside the one the completion started.
+  assert.deepEqual(await walk(revision), { done: false });
+  assert.deepEqual(await left(revision), [tile]);
+  assert.equal((await state(convex)).jobs[0]!.claims, jobs[0]!.claims);
+  await settle(convex);
+  await advance(convex, 2_000);
+  await advance(convex, 2_000);
+  assert.deepEqual(await left(revision), []);
+  const match = (await matches(convex)).get(7)!;
+  assert.equal(match.revision, revision);
+  // Matched once, however many walks asked.
+  assert.equal((await state(convex)).jobs[0]!.claims, jobs[0]!.claims + 1);
+
+  // An owner Convex does not ingest for is skipped.
+  await convex.mutation(internal.owners.setWriter, {
+    ...actor,
+    writer: 'handoff',
+    expectedEpoch: 1,
+  });
+  await publishLive(convex, [{ ...peak, displayName: 'Again' }]);
+  await settle(convex);
+  await advance(convex, 2_000);
+  assert.equal((await matches(convex)).get(7)!.revision, revision);
+  assert.equal((await state(convex)).jobs[0]!.status, 'idle');
+});
+
 void test('a match is not published after a handoff or by a worker that lost the job', async () => {
   const provider = fakeProvider();
   const { convex, complete } = await matchingOwner();
@@ -1357,6 +1948,8 @@ void test('a match is not published after a handoff or by a worker that lost the
       claim: source!.claim,
       recording: recording._id,
       result,
+      revision: 0,
+      tiles: [],
     });
   await assert.rejects(publish(), /written by another store/);
   const unmatched = async () =>

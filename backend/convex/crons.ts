@@ -27,4 +27,10 @@ crons.interval(
   internal.appState.expireOldRateLimits,
   {},
 );
+crons.interval(
+  'resume place re-match walks',
+  { hours: 24 },
+  internal.maintenance.resumeRematchWalks,
+  {},
+);
 export default crons;

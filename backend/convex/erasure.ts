@@ -81,6 +81,13 @@ export const step = internalMutation({
       removed++;
     }
     for (const doc of await ctx.db
+      .query('activityPlaceTiles')
+      .withIndex('by_owner_activity', (q) => q.eq('owner', id))
+      .take(DOCUMENTS_PER_STEP)) {
+      await ctx.db.delete('activityPlaceTiles', doc._id);
+      removed++;
+    }
+    for (const doc of await ctx.db
       .query('changes')
       .withIndex('by_owner_sequence', (q) => q.eq('owner', id))
       .take(DOCUMENTS_PER_STEP)) {

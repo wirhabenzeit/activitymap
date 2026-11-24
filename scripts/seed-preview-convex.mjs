@@ -13,7 +13,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { parseArgs, promisify } from 'node:util';
 
-import { filterSnapshot } from './preview-seed/filter.mjs';
+import { filterSnapshot, schemaTableNames } from './preview-seed/filter.mjs';
 
 const run = promisify(execFile);
 const repo = resolve(import.meta.dirname, '..');
@@ -56,12 +56,8 @@ if (
     `The target ${values.target} does not name a preview deployment; refusing to replace its data`,
   );
 
-const schemaTables = new Set(
-  [
-    ...(await readFile(join(backend, 'convex/schema.ts'), 'utf8')).matchAll(
-      /^ {2}(\w+): defineTable\(/gm,
-    ),
-  ].map((match) => match[1]),
+const schemaTables = schemaTableNames(
+  await readFile(join(backend, 'convex/schema.ts'), 'utf8'),
 );
 
 const convex = (...args) =>

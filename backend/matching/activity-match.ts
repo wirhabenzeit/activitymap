@@ -3,6 +3,7 @@ import {
   activityPlacesResponseSchema,
 } from '../../src/contracts/activity-places';
 import { createBatchActivityPlaceMatcher } from '../../src/server/application/batch-activity-places';
+import { LIVE_CATALOGUE } from '../../src/server/places/catalogue-rows';
 import {
   SERVER_MATCHER_POLICY,
   matchingVersion,
@@ -22,7 +23,7 @@ import { internal } from '../convex/_generated/api';
 import type { Id } from '../convex/_generated/dataModel';
 import type { ActionCtx } from '../convex/_generated/server';
 import { MAX_RECORDING_BYTES, decodeWhole } from '../recording/codec';
-import { readMatchingTiles } from './tiles';
+import { matchingTiles, readMatchingTiles } from './tiles';
 
 /**
  * Place matching for recordings held here, for Node actions: the application
@@ -32,12 +33,13 @@ import { readMatchingTiles } from './tiles';
 
 const policy = SERVER_MATCHER_POLICY;
 
+/** What a match reads: a rowset (`dataset`), or the live catalogue at a
+ * completed revision (`live`). `metadata` is the stored manifest and
+ * coverage, whose snapshot match results name as `catalogueSnapshotId`. */
 export type MatchCatalogue = {
-  dataset: string;
   snapshotId: string;
-  revision: string;
   metadata: Id<'_storage'>;
-};
+} & ({ dataset: string; revision: string } | { live: number });
 
 export type MatchRecording = {
   id: Id<'recordings'>;
@@ -55,10 +57,10 @@ export type PreparedActivity = {
   tooLarge: boolean;
 };
 
-/** Whether a rowset and the matching recipe in this code are the ones a
- * matching version names. */
+/** Whether a rowset (or `LIVE_CATALOGUE`) and the matching recipe in this
+ * code are the ones a matching version names. */
 export function isMatchingVersion(
-  catalogue: Pick<MatchCatalogue, 'snapshotId' | 'revision'>,
+  catalogue: { snapshotId: string; revision: string },
   version: string,
 ) {
   return (
@@ -69,7 +71,14 @@ export function isMatchingVersion(
   );
 }
 
-/** The catalogue manifest and coverage stored with a rowset. */
+/** Whether a matching version names the live catalogue under the matching
+ * recipe in this code. */
+export const isLiveMatchingVersion = (version: string) =>
+  isMatchingVersion(LIVE_CATALOGUE, version);
+
+/** The catalogue manifest and coverage stored with a rowset or a live
+ * publication. Missing once a newer publication replaced it: the run fails
+ * and is retried against the new one. */
 export async function readCatalogue(
   ctx: ActionCtx,
   catalogue: MatchCatalogue,
@@ -107,7 +116,8 @@ export async function prepareActivity(
   };
 }
 
-/** Match prepared activities of one owner against one rowset. */
+/** Match prepared activities of one owner against one catalogue. Each
+ * result names the catalogue tiles its own activity's match read. */
 export async function matchPrepared(
   ctx: ActionCtx,
   input: {
@@ -117,39 +127,52 @@ export async function matchPrepared(
   },
   prepared: PreparedActivity[],
 ): Promise<
-  { key: string; recording: Id<'recordings'>; result: ActivityPlacesResponse }[]
+  {
+    key: string;
+    recording: Id<'recordings'>;
+    result: ActivityPlacesResponse;
+    tiles: string[];
+  }[]
 > {
-  const windows: PlaceQueryWindow[] = [];
-  for (const { track } of prepared)
-    if (track)
-      windows.push(
-        ...placeQueryWindows(track.geometry, policy.discoveryRadiusM),
-      );
-  const scoped = uniqueQueryWindows(windows);
+  const windowsOf = prepared.map(({ track }): PlaceQueryWindow[] =>
+    track
+      ? uniqueQueryWindows(
+          placeQueryWindows(track.geometry, policy.discoveryRadiusM),
+        )
+      : [],
+  );
+  const scoped = uniqueQueryWindows(windowsOf.flat());
+  const { catalogue } = input;
   const read = await readMatchingTiles(
     scoped,
-    (tile, cursor) =>
-      ctx.runQuery(internal.places.tilePage, {
-        dataset: input.catalogue.dataset,
-        tile,
-        paginationOpts: { numItems: 256, cursor },
-      }),
+    (tile, cursor) => {
+      const paginationOpts = { numItems: 256, cursor };
+      return 'dataset' in catalogue
+        ? ctx.runQuery(internal.places.tilePage, {
+            dataset: catalogue.dataset,
+            tile,
+            paginationOpts,
+          })
+        : ctx.runQuery(internal.livePlaces.tilePage, { tile, paginationOpts });
+    },
     1,
   );
   const matcher = createBatchActivityPlaceMatcher({
     snapshot: {
       catalogue: input.published,
-      revision: input.catalogue.revision,
+      revision:
+        'dataset' in catalogue ? catalogue.revision : String(catalogue.live),
       places: read.places as CandidatePlace[],
       windows: scoped,
     },
     policy,
   });
   const results = [];
-  for (const item of prepared)
+  for (const [index, item] of prepared.entries())
     results.push({
       key: item.key,
       recording: item.recording.id,
+      tiles: matchingTiles(windowsOf[index]!),
       result: activityPlacesResponseSchema.parse(
         await matcher.match(
           {

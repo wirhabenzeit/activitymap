@@ -26,6 +26,12 @@ export const activityProjectionValidator = v.object({
   sourceVersion: v.optional(v.string()),
   streams: v.optional(streamMetadataValidator),
   match: v.optional(
-    v.object({ catalogue: v.string(), value: placeMatchValidator }),
+    v.object({
+      catalogue: v.string(),
+      /** The live catalogue revision current when the match started; absent
+       * or 0 for a match against a rowset. */
+      revision: v.optional(v.number()),
+      value: placeMatchValidator,
+    }),
   ),
 });

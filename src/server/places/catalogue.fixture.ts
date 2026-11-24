@@ -23,6 +23,8 @@ export function createSyntheticCatalogue(
     dataAsOf?: string;
     regionId?: string;
     transformRows?: (rows: NormalizedPlace[]) => NormalizedPlace[];
+    /** A GeoJSON MultiPolygon in place of the default box. */
+    coverage?: unknown;
     /** A pre-terrain artifact, as published before osm-places-v2. */
     legacy?: boolean;
   } = {},
@@ -30,7 +32,7 @@ export function createSyntheticCatalogue(
   const normalizationVersion = options.legacy
     ? 'osm-places-v1'
     : NORMALIZATION_VERSION;
-  const coverage = {
+  const coverage = options.coverage ?? {
     type: 'MultiPolygon',
     coordinates: [
       [

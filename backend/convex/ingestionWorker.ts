@@ -18,6 +18,8 @@ import {
   photoSources,
 } from '../ingestion/provider';
 import {
+  type MatchCatalogue,
+  isLiveMatchingVersion,
   isMatchingVersion,
   matchPrepared,
   prepareActivity,
@@ -196,11 +198,24 @@ async function recording(
 /** The places along the activity's recording. */
 async function match(ctx: ActionCtx, step: IngestionStep & { phase: 'match' }) {
   const { job, claim, id } = step;
-  const catalogue = step.catalogues.find((rowset) =>
-    isMatchingVersion(rowset, step.matchingVersion),
-  );
-  // Without the rowset the owner's matching version names there is nothing
-  // to match against, and the activity is finished without a match.
+  // The owner's matching version decides: the live catalogue once the owner
+  // has been moved to it, the rowset it names before. Matching versions
+  // need node:crypto, so this is decided here and not when the step is made.
+  const catalogue: MatchCatalogue | undefined = isLiveMatchingVersion(
+    step.matchingVersion,
+  )
+    ? step.live
+      ? {
+          live: step.live.revision,
+          snapshotId: step.live.snapshotId,
+          metadata: step.live.metadata,
+        }
+      : undefined
+    : step.catalogues.find((rowset) =>
+        isMatchingVersion(rowset, step.matchingVersion),
+      );
+  // Without the catalogue the owner's matching version names there is
+  // nothing to match against, and the activity is finished without a match.
   if (!catalogue) {
     await ctx.runMutation(internal.ingestion.complete, { job, claim });
     return null;
@@ -225,6 +240,9 @@ async function match(ctx: ActionCtx, step: IngestionStep & { phase: 'match' }) {
     recording: step.recording.id,
     // Published match results name the current matching version.
     result: { ...matched!.result, matchingVersion: step.matchingVersion },
+    // The live revision the match read; a rowset has none.
+    revision: 'live' in catalogue ? catalogue.live : 0,
+    tiles: matched!.tiles,
   });
   return null;
 }

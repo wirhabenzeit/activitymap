@@ -8,13 +8,12 @@ same entry points. Nothing runs automatically when the web application starts.
 ## Where the catalogue lives
 
 Preparation and combination have no database access: they turn OpenStreetMap
-extracts into an artifact on disk. Publication sends that artifact to the
-Convex backend (`backend/convex/places.ts`), which matches activities against
-it. The measured runs further down record extraction timings and counts.
+extracts into an artifact on disk. Publication sends the difference between that artifact and the live
+catalogue to the Convex backend (`backend/convex/livePlaces.ts`), which
+matches activities against it. The measured runs further down record extraction timings and counts.
 
-Publication is not automatically undone, and libraries only ever move to the
-newest complete rowset. Keep the input artifacts: going back to an earlier
-catalogue means publishing it again as a new artifact.
+Publication is not automatically undone. Keep the input artifacts: going back
+to an earlier catalogue means publishing it again.
 
 ## Prepare an artifact
 
@@ -60,8 +59,11 @@ if you need to rerun the extraction itself.
 
 ## Publish or refresh
 
-A catalogue is published to the Convex backend, where activities are matched
-against it. Nothing else stores it.
+A catalogue is published to the Convex backend's live catalogue
+(`backend/convex/livePlaces.ts`), one table of places that each publication
+updates in place. Only the difference from what is live is sent, and only
+activities whose match read a changed tile are matched again. Nothing else
+stores the catalogue.
 
 The publisher signs its requests with the write bridge key. It needs
 `ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and
@@ -70,15 +72,14 @@ the user and athlete ID of an account whose bridge scope signs the requests
 (use an administrator; the catalogue belongs to no account).
 
 ```sh
-pnpm places:publish --artifact output/places/v1-places-current \
-  --user <user ID> --athlete <athlete ID>
+pnpm places:publish --artifact <dir> --user <user ID> --athlete <athlete ID> \
+  [--apply --expect-current <snapshot-id|none>] [--replace-pending <snapshot ID>] \
+  [--allow-large-retirement] [--region <region>]
 ```
 
-Default execution is a dry run. It reports the proposed snapshot ID, its
-source timestamp, how many places would be sent and how many the filter
-hides, and the catalogue that is current now. It writes nothing. When
-reviewed, publish with the current snapshot ID the report showed, or `none`
-when nothing was published yet:
+Default execution is a dry run: it reads the live row hashes, diffs them with
+the artifact and writes nothing. When reviewed, apply with the current
+snapshot ID the report showed, or `none` when nothing was published yet:
 
 ```sh
 pnpm places:publish --artifact output/places/v1-places-current \
@@ -87,10 +88,37 @@ pnpm places:publish --artifact output/places/v1-places-current \
 ```
 
 If another catalogue became current meanwhile, publication fails and requires
-a new dry run. A catalogue with fewer than 80% of the current number of
-places is flagged in the dry run and requires `--allow-large-retirement` on
-apply, after inspecting source completeness. Only an artifact of the serving
-region (`v1-places`) is accepted; `--region` names another one explicitly.
+a new dry run. A catalogue with fewer than 80% of the live places is flagged
+and requires `--allow-large-retirement` on apply, after inspecting source
+completeness. Only an artifact of the serving region (`v1-places`) is
+accepted; `--region` names another one explicitly. `--replace-pending` is
+only accepted with `--apply`.
+
+The report is JSON:
+
+| Field                              | Meaning                                                                                                                        |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| `status`                           | `unchanged`, `would_publish` or `published`                                                                                    |
+| `snapshotId`, `current`            | the artifact's snapshot and the completed live one (null before the first)                                                     |
+| `revision`                         | the live revision this run completed (when published)                                                                          |
+| `count`, `liveCount`               | places in the artifact (without hidden ones) and live now                                                                      |
+| `hidden`, `hiddenByReason`         | places the noise filter hides, by `hidden_reason`                                                                              |
+| `sourceDataAsOf`                   | the artifact's source timestamp                                                                                                |
+| `changes`                          | `inserts`, `updates`, `moved` (updates to another tile), `deletes`, `unchanged`                                                |
+| `examples`                         | up to 5 inserts, updates and deletes                                                                                           |
+| `coverageChanged`, `affectedTiles` | whether the coverage changed, and how many tiles are matched again (a count only; tiles are never printed: logs may be public) |
+| `largeRetirement`                  | fewer than 80% of the live places                                                                                              |
+| `pending`                          | an unfinished publication: `snapshotId`, `startedAt`, `ageMinutes`                                                             |
+
+`unchanged` means no row changes, no coverage change and nothing pending. It
+writes nothing, also with `--apply`, even when the snapshot ID differs.
+
+An interrupted apply is finished by running the same command again, with the
+same `--expect-current` as the first time: the completed snapshot has not
+changed yet. A different pending publication refuses until it is finished or
+abandoned with `--replace-pending <its snapshot ID>`; publishing the previous
+artifact that way is the rollback of a half-applied one. Publishing an older
+artifact is the rollback of a completed one.
 
 ## Refresh behavior
 
@@ -101,23 +129,41 @@ region (`v1-places`) is accepted; `--region` names another one explicitly.
   the same number remain distinct. A representation replaced by a different
   OSM object is a new place; there is no name or proximity merging.
 - The places sent are the artifact's rows that the noise filter does not
-  hide. A place that is missing from a newer catalogue is simply not in it.
-- A rowset is one snapshot under one row format (`PLACE_ROWS_VERSION`). It is
-  sent in ID order, 500 places a call, and accepted only when its row count
-  and digest agree with the publisher's; nothing reads it before. An
-  interrupted publication is finished by running the same command again.
-- A repeated identical artifact sends nothing and moves no library.
-- Once the rowset is complete, every library moves to it
-  (`catalogueWorker.adopt`): its old matches are hidden at once, and each
-  recording is matched again in the background, about eight a second per
-  library, without reading the provider.
-- Libraries follow the newest complete rowset. A rowset that was complete
-  before a newer one cannot become current again; publish a new artifact
-  instead.
+  hide. A place that is missing from a newer catalogue is deleted.
+- An apply announces the row count and an order-independent digest of the
+  rows, sends at most 500 changes a call, and completes only when the live
+  rows have reached both. Each completed publication counts the live
+  `revision` up.
+- On completion every activity whose match read a changed tile (the old and
+  new tile of each changed place, and the tiles where the coverage changed)
+  is matched again in the background, without reading the provider. Its old
+  match stays visible until the new one arrives. A match that ran while the
+  publication was being applied is matched again too.
+- Matches read the coverage of the last completed publication, never of a
+  pending one.
 - After a deployment that changes the matching recipe, run
   `convex run catalogueWorker:adopt` in `backend/` to match every library
   again under the new recipe.
-- Superseded rowsets are not removed yet.
+
+### Cutover from rowsets
+
+Before the live catalogue, each publication was a new immutable rowset and
+moved every library to it. Deploying the live catalogue changes nothing until
+its first publication. Then, in this order:
+
+1. `pnpm places:publish` the current `v1-places` artifact. The live table is
+   empty, so this is a full insert. New libraries start on the live
+   catalogue from then on; existing ones keep matching against their rowset.
+2. `npx convex run catalogueWorker:adopt` in `backend/`: one full re-match
+   that moves every library to the live catalogue and records the tiles of
+   every match. It costs about as much as one rowset publication did.
+3. Compare the matches of a sample of libraries with those before.
+4. `npx convex run places:dropRowsets` deletes the rowsets and their files,
+   continuing by itself until none are left. It refuses (`not_adopted`)
+   before step 1 and until step 2 has moved every library.
+
+Before step 4, rollback means redeploying the previous version, which still
+serves from the rowsets.
 
 ## Noise filter: OSM roads and terrain
 
@@ -128,7 +174,7 @@ versioned rule set to passes and huts in all countries. It uses OSM data plus a
 single terrain number, so it scales worldwide without national gazetteers or
 elevation models. Peaks are never hidden.
 
-Hidden places stay in the artifact and the `places` table, with their filter
+Hidden places stay in the artifact, with their filter
 inputs and a `hidden_reason`, so publication keeps their UUIDs and references.
 Candidate discovery and the batch matching catalogue skip them. A new filter
 policy or terrain method changes the catalogue snapshot identity, so existing
@@ -241,11 +287,10 @@ are kept. New Zealand's hidden passes are mostly elevation-only names (`1212m`).
 ### Compatibility
 
 `osm-places-v1` artifacts and manifests stay readable: they have no `terrain`
-section and no filter counts, and every place is listed. Already published v1
-catalogues keep serving until a v2 artifact is published.
+section and no filter counts, and every place is listed.
 `counts.filter` in the manifest reports hidden places by kind and reason and
-the road passes without terrain. Publication dry runs list up to 20 hidden
-examples.
+the road passes without terrain. Publication reports count hidden places by
+reason.
 
 Attribution: © DLR e.V. and Airbus, Copernicus programme. The Copernicus DEM is
 free to use with this attribution; the map layers that show places carry it
