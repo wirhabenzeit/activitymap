@@ -1,15 +1,23 @@
 import { createHash } from 'node:crypto';
 
+import { z } from 'zod';
+
 import type { ConvexWriter } from '~/server/sync/convex-writer';
 
-import { coverageClearanceM } from './batch-coverage';
+import { coverageClearanceM, coverageEdgeCount } from './batch-coverage';
 import {
   type ValidatedCatalogue,
   listedPlaceCount,
   validateCatalogue,
 } from './catalogue-artifact';
-import { type LiveRowHash, diffCatalogue } from './catalogue-diff';
-import { V1_PLACE_REGION } from './catalogue-regions';
+import { diffCatalogue } from './catalogue-diff';
+import {
+  type CatalogueReader,
+  readLiveHashes,
+  readLiveMetadata,
+  readLiveState,
+} from './catalogue-reader';
+import { LIVE_PLACE_REGION } from './catalogue-regions';
 import {
   EMPTY_SET_DIGEST,
   PLACE_BATCH_LIMIT,
@@ -17,7 +25,7 @@ import {
   addToSetDigest,
   rowHashes,
 } from './catalogue-rows';
-import { type CoverageGeometry, parseCoverageGeometry } from './coverage';
+import { parseCoverageGeometry } from './coverage';
 import { coverageChangeTiles } from './coverage-diff';
 import { SERVER_MATCHER_POLICY } from './matching-version';
 import type { NormalizedPlace } from './types';
@@ -85,20 +93,6 @@ export function placeRows(catalogue: ValidatedCatalogue): PlaceRow[] {
 const BATCH_BYTES = 768 * 1024;
 const EXAMPLES = 5;
 
-type LiveState = {
-  revision: number;
-  snapshotId: string | null;
-  count: number;
-  setDigest: string;
-  metadataUrl: string | null;
-  pending: {
-    snapshotId: string;
-    revision: number;
-    count: number;
-    setDigest: string;
-    startedAt: number;
-  } | null;
-} | null;
 type Refusal<Reason extends string> = { ok: false; reason: Reason };
 type Begun =
   | { ok: true; revision: number; resumed: boolean }
@@ -156,7 +150,31 @@ export type CataloguePublishReport = {
   largeRetirement: boolean;
   /** A publication begun and not completed. */
   pending: { snapshotId: string; startedAt: string; ageMinutes: number } | null;
+  /** What every match of the artifact's catalogue reads: its coverage
+   * polygons, the boundary edges the matcher indexes (at most
+   * `COVERAGE_EDGE_BUDGET`) and the size of the metadata file. */
+  coverage: { polygons: number; edges: number; metadataBytes: number };
+  /** The artifact's component regions, against the live catalogue's. Region
+   * IDs only: tiles locate users' activities and stay out of reports. */
+  regions: string[];
+  regionsAdded: string[];
+  regionsRemoved: string[];
 };
+
+/** The regions a manifest covers: a combined catalogue's components, or the
+ * single region itself. Lenient, for the live manifest an earlier publisher
+ * wrote. */
+const regionsManifest = z.object({
+  region_id: z.string().optional(),
+  components: z.array(z.object({ region_id: z.string() })).optional(),
+});
+function manifestRegions(manifest: unknown) {
+  const { region_id, components } = regionsManifest.parse(manifest);
+  return (
+    components?.map((component) => component.region_id) ??
+    (region_id ? [region_id] : [])
+  ).sort();
+}
 
 /**
  * Publish `catalogue`, or with `apply: false` report what publishing would
@@ -167,6 +185,7 @@ export type CataloguePublishReport = {
  */
 export async function publishCatalogue({
   catalogue: input,
+  reader,
   writer,
   upload,
   fetcher = fetch,
@@ -174,14 +193,18 @@ export async function publishCatalogue({
   expectedCurrent,
   allowLargeRetirement = false,
   replacePending,
-  regionId = V1_PLACE_REGION,
+  regionId = LIVE_PLACE_REGION,
   progress,
   now = Date.now,
 }: {
   catalogue: ValidatedCatalogue;
-  writer: ConvexWriter;
-  /** POST a file to a Convex upload URL; returns its storage ID. */
-  upload: (url: string, file: Uint8Array) => Promise<string>;
+  /** Reads the live catalogue: all a dry run needs. */
+  reader: CatalogueReader;
+  /** Writes the publication; required to apply. */
+  writer?: ConvexWriter;
+  /** POST a file to a Convex upload URL; returns its storage ID. Required to
+   * apply. */
+  upload?: (url: string, file: Uint8Array) => Promise<string>;
   /** Reads the live catalogue's metadata file. */
   fetcher?: typeof fetch;
   apply?: boolean;
@@ -203,26 +226,34 @@ export async function publishCatalogue({
     );
   if (apply && expectedCurrent === undefined)
     throw new Error('Publication requires expectedCurrent from a dry run');
+  if (apply && (!writer || !upload))
+    throw new Error('Publication requires the Convex writer and upload');
   const snapshotId = catalogue.manifest.catalogue_snapshot_id;
   const rows = placeRows(catalogue);
   const hashes = await rowHashes(rows);
-  const live = await writer.write<LiveState>({ kind: 'liveState' });
+  const live = await readLiveState(reader);
   const diff = diffCatalogue(
     rows.map((place, index) => ({ place, hash: hashes[index]! })),
-    await liveHashes(writer),
+    await readLiveHashes(reader),
   );
   // Before the first completed publication nothing was matched against the
   // live catalogue, so a coverage change concerns no activity.
-  const previous = live?.metadataUrl
-    ? await readCoverage(live.metadataUrl, fetcher)
-    : null;
+  const previous = await readLiveMetadata(live, fetcher);
   const coverageTiles = previous
     ? coverageChangeTiles(
-        previous,
+        parseCoverageGeometry(previous.coverage),
         catalogue.coverage,
         coverageClearanceM(SERVER_MATCHER_POLICY.discoveryRadiusM),
       )
     : [];
+  const metadata = new TextEncoder().encode(
+    JSON.stringify({
+      manifest: catalogue.manifest,
+      coverage: catalogue.coverage,
+    }),
+  );
+  const regions = manifestRegions(catalogue.manifest);
+  const liveRegions = previous ? manifestRegions(previous.manifest) : [];
   const upserts = [...diff.inserts, ...diff.updates.map(({ place }) => place)];
   const hiddenByReason: Record<string, number> = {};
   for (const { hidden_reason: reason } of catalogue.rows)
@@ -263,6 +294,14 @@ export async function publishCatalogue({
       startedAt: new Date(pending.startedAt).toISOString(),
       ageMinutes: Math.floor((now() - pending.startedAt) / 60_000),
     },
+    coverage: {
+      polygons: catalogue.coverage.coordinates.length,
+      edges: coverageEdgeCount(catalogue.coverage),
+      metadataBytes: metadata.byteLength,
+    },
+    regions,
+    regionsAdded: regions.filter((region) => !liveRegions.includes(region)),
+    regionsRemoved: liveRegions.filter((region) => !regions.includes(region)),
   };
   // A pending apply, even of this artifact, still has to be completed or
   // replaced, so only a settled catalogue is unchanged.
@@ -272,7 +311,9 @@ export async function publishCatalogue({
     !diff.deletes.length &&
     !coverageTiles.length;
   if (unchanged) return { status: 'unchanged', ...report };
-  if (!apply) return { status: 'would_publish', ...report };
+  // An apply without the writer was refused above.
+  if (!apply || !writer || !upload)
+    return { status: 'would_publish', ...report };
 
   if (expectedCurrent !== current)
     throw new Error(
@@ -294,20 +335,11 @@ export async function publishCatalogue({
     { kind: 'uploadUrls', count: 1 },
     owner.epoch,
   );
-  const metadata = await upload(
-    url!,
-    new TextEncoder().encode(
-      JSON.stringify({
-        manifest: catalogue.manifest,
-        coverage: catalogue.coverage,
-      }),
-    ),
-  );
   const begun = await writer.write<Begun>({
     kind: 'beginApply',
     expectCurrent: expectedCurrent,
     snapshotId,
-    metadata,
+    metadata: await upload(url!, metadata),
     count: rows.length,
     setDigest: hashes.reduce(addToSetDigest, EMPTY_SET_DIGEST),
     ...(replacePending === undefined ? {} : { replacePending }),
@@ -340,35 +372,6 @@ export async function publishCatalogue({
         : `The live catalogue holds ${completed.count} places with digest ${completed.setDigest}, not the artifact's ${rows.length}: run the same command again to send what is still missing`,
     );
   return { status: 'published', ...report, revision: completed.revision };
-}
-
-/** Every live row's key, hash and tile. */
-async function liveHashes(writer: ConvexWriter) {
-  const rows: LiveRowHash[] = [];
-  for (let cursor: string | null = null; ;) {
-    const result: {
-      page: LiveRowHash[];
-      isDone: boolean;
-      continueCursor: string;
-    } = await writer.write({ kind: 'liveHashes', cursor });
-    rows.push(...result.page);
-    if (result.isDone) return rows;
-    cursor = result.continueCursor;
-  }
-}
-
-/** The coverage of the last completed publication, from its metadata file. */
-async function readCoverage(
-  url: string,
-  fetcher: typeof fetch,
-): Promise<CoverageGeometry> {
-  const response = await fetcher(url, { signal: AbortSignal.timeout(60_000) });
-  if (!response.ok)
-    throw new Error(
-      `Reading the live catalogue's metadata failed: ${response.status}`,
-    );
-  const { coverage } = (await response.json()) as { coverage: unknown };
-  return parseCoverageGeometry(coverage);
 }
 
 /**

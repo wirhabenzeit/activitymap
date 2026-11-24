@@ -1,0 +1,243 @@
+name: Place catalogue refresh
+
+# Rebuilds the place catalogue from this week's OpenStreetMap extracts and
+# publishes the difference to the live catalogue
+# (docs/place-catalogue-refresh.md).
+#
+# This repository and its logs are public. Jobs print region IDs, counts and
+# place diffs only; the tiles that hold activities never leave the resolve
+# step's process.
+#
+# Environments:
+# - places-read (no reviewer): variable ACTIVITYMAP_CONVEX_SITE and secrets
+#   ACTIVITYMAP_CONVEX_KEY_ID, ACTIVITYMAP_CONVEX_SIGNING_KEY, a read-only
+#   bridge key. Enough to resolve regions and to dry-run a publication.
+# - places-production (required reviewer): the same, plus the secrets
+#   ACTIVITYMAP_CONVEX_WRITER_KEY_ID, ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY,
+#   PLACES_PUBLISH_USER and PLACES_PUBLISH_ATHLETE (the account whose bridge
+#   scope signs the writes). The reviewer approves after reading the plan
+#   job's summary.
+#
+# The weekly run does nothing until the repository variable
+# PLACES_REFRESH_SCHEDULED is "true": run it by hand first.
+
+on:
+  schedule:
+    # Mondays 03:17 UTC.
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+    inputs:
+      demand:
+        description: Add regions that hold activities (off keeps the live regions)
+        type: boolean
+        default: true
+      date:
+        description: Geofabrik extract date as YYMMDD (default the newest every region has)
+        type: string
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: places-refresh
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    if: github.event_name != 'schedule' || vars.PLACES_REFRESH_SCHEDULED == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: places-read
+    outputs:
+      regions: ${{ steps.resolve.outputs.regions }}
+      date: ${{ steps.resolve.outputs.date }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Resolve the regions and one extract date
+        id: resolve
+        env:
+          ACTIVITYMAP_CONVEX_SITE: ${{ vars.ACTIVITYMAP_CONVEX_SITE }}
+          ACTIVITYMAP_CONVEX_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_KEY_ID }}
+          ACTIVITYMAP_CONVEX_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_SIGNING_KEY }}
+          DEMAND: ${{ github.event_name == 'schedule' || inputs.demand }}
+          EXTRACT_DATE: ${{ inputs.date }}
+        run: |
+          args=()
+          [ "$DEMAND" = "true" ] || args+=(--no-demand)
+          [ -z "$EXTRACT_DATE" ] || args+=(--date "$EXTRACT_DATE")
+          pnpm --silent places:resolve "${args[@]}" > resolved.json
+          {
+            echo "regions=$(jq -c '.regions' resolved.json)"
+            echo "date=$(jq -r '.date' resolved.json)"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Regions for extract date $(jq -r '.date' resolved.json)"
+            echo
+            echo "| Region | Reason |"
+            echo "| --- | --- |"
+            jq -r '.regions[] | "| \(.region) | \(.reason) |"' resolved.json
+            echo
+            echo "Added this run: $(jq -r '.added | if length == 0 then "none" else join(", ") end' resolved.json)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  prepare:
+    needs: resolve
+    runs-on: ubuntu-24.04
+    # A large country takes 40 to 60 minutes on a hosted runner.
+    timeout-minutes: 150
+    strategy:
+      fail-fast: true
+      # Every job reads Copernicus terrain tiles.
+      max-parallel: 4
+      matrix:
+        include: ${{ fromJSON(needs.resolve.outputs.regions) }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Prepare ${{ matrix.region }}
+        env:
+          REGION: ${{ matrix.region }}
+          PBF_URL: ${{ matrix.pbf }}
+          POLY_URL: ${{ matrix.poly }}
+        run: |
+          pnpm places:prepare --region "$REGION" \
+            --source-url "$PBF_URL" --coverage-url "$POLY_URL" \
+            --out "output/places/$REGION"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: places-region-${{ matrix.region }}
+          path: output/places/${{ matrix.region }}/
+          if-no-files-found: error
+          retention-days: 14
+
+  combine:
+    needs: [resolve, prepare]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v7
+        with:
+          pattern: places-region-*
+          path: output/places/regions
+      - name: Combine the regions
+        run: |
+          inputs=()
+          for directory in output/places/regions/places-region-*; do
+            inputs+=(--input "$directory")
+          done
+          pnpm places:combine --region places-live "${inputs[@]}" \
+            --out output/places/places-live
+      # Kept for rollback: publishing an older catalogue reverts a newer one.
+      - uses: actions/upload-artifact@v7
+        with:
+          name: places-live-${{ needs.resolve.outputs.date }}
+          path: output/places/places-live/
+          if-no-files-found: error
+          retention-days: 90
+
+  plan:
+    needs: [resolve, combine]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: places-read
+    outputs:
+      status: ${{ steps.plan.outputs.status }}
+      current: ${{ steps.plan.outputs.current }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v7
+        with:
+          name: places-live-${{ needs.resolve.outputs.date }}
+          path: output/places/places-live
+      - name: Dry run
+        id: plan
+        env:
+          ACTIVITYMAP_CONVEX_SITE: ${{ vars.ACTIVITYMAP_CONVEX_SITE }}
+          ACTIVITYMAP_CONVEX_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_KEY_ID }}
+          ACTIVITYMAP_CONVEX_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_SIGNING_KEY }}
+        run: |
+          pnpm --silent places:publish --artifact output/places/places-live \
+            --report report.json > /dev/null
+          {
+            echo "status=$(jq -r '.status' report.json)"
+            echo "current=$(jq -r '.current // "none"' report.json)"
+          } >> "$GITHUB_OUTPUT"
+          {
+            echo "### Publication plan: $(jq -r '.status' report.json)"
+            echo
+            echo '```json'
+            cat report.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          # The guard is never overridden here: losing a fifth of the places
+          # needs a person to look at the catalogue.
+          if [ "$(jq -r '.largeRetirement' report.json)" = "true" ]; then
+            echo "::error::The catalogue would lose more than 20% of its places"
+            exit 1
+          fi
+
+  apply:
+    needs: [resolve, plan]
+    if: needs.plan.outputs.status == 'would_publish'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    environment: places-production
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - uses: actions/download-artifact@v7
+        with:
+          name: places-live-${{ needs.resolve.outputs.date }}
+          path: output/places/places-live
+      - name: Publish
+        env:
+          ACTIVITYMAP_CONVEX_SITE: ${{ vars.ACTIVITYMAP_CONVEX_SITE }}
+          ACTIVITYMAP_CONVEX_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_KEY_ID }}
+          ACTIVITYMAP_CONVEX_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_SIGNING_KEY }}
+          ACTIVITYMAP_CONVEX_WRITER_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_WRITER_KEY_ID }}
+          ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY }}
+          PUBLISH_USER: ${{ secrets.PLACES_PUBLISH_USER }}
+          PUBLISH_ATHLETE: ${{ secrets.PLACES_PUBLISH_ATHLETE }}
+          EXPECT_CURRENT: ${{ needs.plan.outputs.current }}
+        run: |
+          pnpm --silent places:publish --artifact output/places/places-live \
+            --apply --expect-current "$EXPECT_CURRENT" \
+            --user "$PUBLISH_USER" --athlete "$PUBLISH_ATHLETE" \
+            --report report.json > /dev/null
+          {
+            echo "### Published: $(jq -r '.status' report.json), revision $(jq -r '.revision // "unchanged"' report.json)"
+            echo
+            echo '```json'
+            cat report.json
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

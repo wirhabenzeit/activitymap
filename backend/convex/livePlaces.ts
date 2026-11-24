@@ -44,6 +44,10 @@ const SNAPSHOT_ID_LIMIT = 256;
  * documents and 16 MiB read. */
 const HASH_PAGE_LIMIT = 4096;
 const TILE_BATCH_LIMIT = 500;
+/** `activityPlaceTiles` rows hold an owner ID, an activity key and a tile,
+ * well under 256 bytes: a page reads about 2 MiB at most, far below a
+ * query's 32,000 documents and 16 MiB read, and answers fewer entries. */
+const DEMAND_PAGE_LIMIT = 8192;
 
 function stateRow(ctx: QueryCtx) {
   return ctx.db.query('placeCatalogueState').unique();
@@ -113,6 +117,39 @@ export const hashes = internalQuery({
       .paginate({ cursor, numItems: limit });
     return {
       page: result.page.map(({ key, hash, tile }) => ({ key, hash, tile })),
+      isDone: result.isDone,
+      continueCursor: result.continueCursor,
+    };
+  },
+});
+
+/**
+ * One page of the tiles that hold activities, from `activityPlaceTiles` in
+ * tile order: each tile with the number of its rows on the page, that is of
+ * activities whose current match read it. A tile that continues on the next
+ * page is listed on both; the reader sums them. Names no owner or activity:
+ * the publisher's region selection needs only where the demand is.
+ */
+export const demandTiles = internalQuery({
+  args: {
+    cursor: v.union(v.string(), v.null()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, { cursor, limit = DEMAND_PAGE_LIMIT }) => {
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > DEMAND_PAGE_LIMIT)
+      throw new Error(`Demand pages read 1-${DEMAND_PAGE_LIMIT} rows`);
+    const result = await ctx.db
+      .query('activityPlaceTiles')
+      .withIndex('by_tile_owner')
+      .paginate({ cursor, numItems: limit });
+    const activities = new Map<string, number>();
+    for (const { tile } of result.page)
+      activities.set(tile, (activities.get(tile) ?? 0) + 1);
+    return {
+      page: [...activities].map(([tile, count]) => ({
+        tile,
+        activities: count,
+      })),
       isDone: result.isDone,
       continueCursor: result.continueCursor,
     };

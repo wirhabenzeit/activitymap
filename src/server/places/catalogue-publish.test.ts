@@ -5,12 +5,16 @@ import { z } from 'zod';
 
 import type { ConvexWriter } from '~/server/sync/convex-writer';
 
+import { COVERAGE_EDGE_BUDGET, coverageEdgeCount } from './batch-coverage';
+import { combineCatalogues } from './catalogue-combine';
 import {
   applyBatches,
   placeId,
   placeRows,
   publishCatalogue,
 } from './catalogue-publish';
+import type { CatalogueReader } from './catalogue-reader';
+import { LIVE_PLACE_REGION } from './catalogue-regions';
 import {
   EMPTY_SET_DIGEST,
   PLACE_BATCH_LIMIT,
@@ -36,7 +40,7 @@ void test('a place is named after its OpenStreetMap object', () => {
 });
 
 void test('the rows sent are the listed places, in ID order, under stable IDs', () => {
-  const catalogue = createSyntheticCatalogue({ regionId: 'v1-places' });
+  const catalogue = createSyntheticCatalogue({ regionId: LIVE_PLACE_REGION });
   const rows = placeRows(catalogue);
   assert.equal(
     rows.length,
@@ -48,7 +52,7 @@ void test('the rows sent are the listed places, in ID order, under stable IDs', 
   );
   // A later extract with the same objects names them the same way.
   const later = createSyntheticCatalogue({
-    regionId: 'v1-places',
+    regionId: LIVE_PLACE_REGION,
     dataAsOf: '2026-11-01T00:00:00Z',
   });
   assert.notEqual(
@@ -100,8 +104,10 @@ void test('writes are batched by count and by request size', () => {
 });
 
 /**
- * An in-memory live catalogue that answers the write bridge's operations as
- * `backend/convex/livePlaces.ts` does, including its refusals.
+ * An in-memory live catalogue that answers the catalogue reader's and the
+ * write bridge's operations as `backend/convex/livePlaces.ts` does,
+ * including its refusals. Each operation is only answered on its own
+ * channel.
  */
 function fakeBackend() {
   type Live = { place: PlaceRow; hash: string; tile: string };
@@ -288,11 +294,20 @@ function fakeBackend() {
     }
   }
 
+  const reads = new Set(['liveState', 'liveHashes']);
+  const reader: CatalogueReader = {
+    async read<T>(operation: { kind: string; [field: string]: unknown }) {
+      assert.ok(reads.has(operation.kind), `${operation.kind} is no read`);
+      operations.push(structuredClone(operation));
+      return (await handle(structuredClone(operation))) as T;
+    },
+  };
   const writer: ConvexWriter = {
     async write<T>(
       operation: { kind: string; [field: string]: unknown },
       epoch?: string,
     ) {
+      assert.ok(!reads.has(operation.kind), `${operation.kind} is a read`);
       operations.push(structuredClone(operation));
       const fail = failure?.kind === operation.kind ? failure : null;
       if (fail) failure = null;
@@ -304,6 +319,7 @@ function fakeBackend() {
   };
   let uploads = 0;
   return {
+    reader,
     writer,
     upload: async (url: string, file: Uint8Array) => {
       assert.equal(url, 'https://upload.invalid/1');
@@ -360,7 +376,7 @@ function artifact({
   east?: number;
 }) {
   return createSyntheticCatalogue({
-    regionId: 'v1-places',
+    regionId: LIVE_PLACE_REGION,
     sourceSha256: source.repeat(64),
     coverage: coverageBox(east),
     transformRows: (rows) =>
@@ -422,6 +438,7 @@ function publisher(backend: ReturnType<typeof fakeBackend>) {
   ) =>
     publishCatalogue({
       catalogue,
+      reader: backend.reader,
       writer: backend.writer,
       upload: backend.upload,
       fetcher: backend.fetcher,
@@ -503,6 +520,81 @@ void test('a first publication inserts every place after a reviewed dry run', as
     )
   ).json();
   assert.deepEqual(metadata, { manifest: a.manifest, coverage: a.coverage });
+});
+
+void test('a dry run needs only the reader; applying needs the writer', async () => {
+  const backend = fakeBackend();
+  const a = artifact({ source: 'a' });
+  const dry = await publishCatalogue({ catalogue: a, reader: backend.reader });
+  assert.equal(dry.status, 'would_publish');
+  assert.deepEqual(new Set(kinds(backend.take())), new Set(['liveState']));
+  for (const missing of [
+    { upload: backend.upload },
+    { writer: backend.writer },
+  ])
+    await assert.rejects(
+      publishCatalogue({
+        catalogue: a,
+        reader: backend.reader,
+        apply: true,
+        expectedCurrent: null,
+        ...missing,
+      }),
+      /requires the Convex writer and upload/,
+    );
+  assert.deepEqual(backend.take(), []);
+  assert.equal(backend.state(), null);
+});
+
+void test('the report sizes the coverage every match reads and names the regions added and removed', async () => {
+  const backend = fakeBackend();
+  const publish = publisher(backend);
+  const combined = (...regions: string[]) =>
+    combineCatalogues(
+      LIVE_PLACE_REGION,
+      regions.map((regionId) =>
+        createSyntheticCatalogue({ regionId, coverage: coverageBox(10) }),
+      ),
+    );
+  const first = combined('switzerland', 'austria');
+
+  const dry = await publish(first);
+  const metadataBytes = Buffer.byteLength(
+    JSON.stringify({ manifest: first.manifest, coverage: first.coverage }),
+  );
+  assert.deepEqual(dry.coverage, {
+    polygons: 1,
+    edges: coverageEdgeCount(first.coverage),
+    metadataBytes,
+  });
+  assert.ok(
+    dry.coverage.edges > 4 && dry.coverage.edges < COVERAGE_EDGE_BUDGET,
+    `${dry.coverage.edges} edges`,
+  );
+  // Before the first publication every region is new.
+  assert.deepEqual(
+    [dry.regions, dry.regionsAdded, dry.regionsRemoved],
+    [['austria', 'switzerland'], ['austria', 'switzerland'], []],
+  );
+  await publish(first, { apply: true, expectedCurrent: null });
+  // The size is that of the file every match downloads.
+  const stored = await backend.fetcher(
+    `https://storage.invalid/${backend.state()!.metadata}`,
+  );
+  assert.equal(Buffer.byteLength(await stored.text()), metadataBytes);
+
+  const next = await publish(combined('italy', 'switzerland'));
+  assert.deepEqual(
+    [next.regions, next.regionsAdded, next.regionsRemoved],
+    [['italy', 'switzerland'], ['italy'], ['austria']],
+  );
+  // A single-region artifact is its own region; no tile is ever reported.
+  const single = await publish(artifact({ source: 'a' }));
+  assert.deepEqual(
+    [single.regions, single.regionsAdded, single.regionsRemoved],
+    [[LIVE_PLACE_REGION], [LIVE_PLACE_REGION], ['austria', 'switzerland']],
+  );
+  assert.doesNotMatch(JSON.stringify(single), /"\d+,\d+"/);
 });
 
 void test('an unchanged catalogue writes nothing, even under a new snapshot', async () => {

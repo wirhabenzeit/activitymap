@@ -37,11 +37,14 @@ malformed geometry within the supported building model fails preparation.
 Unnamed/unselected objects are excluded by the existing normalization policy.
 
 To prepare already downloaded files, supply both `--pbf /path/to/snapshot.osm.pbf`
-and `--poly /path/to/coverage.poly`. The V1 countries in
-`src/server/places/catalogue-regions.ts` have predefined URLs; other regions
-require `--source-url` and `--coverage-url`. Downloads are restricted to HTTPS
-`download.geofabrik.de` URLs, following only redirects that stay on that host
-(`-latest` redirects to the dated extract). Terrain is always read from
+and `--poly /path/to/coverage.poly`. The region is a Geofabrik extract's
+region ID: its ID in [Geofabrik's index](https://download.geofabrik.de/index-v1.json)
+with `/` as `-` (`us/california` is `us-california`). Without `--source-url`
+and `--coverage-url` the URLs are read from the index. Downloads are
+restricted to HTTPS `download.geofabrik.de` URLs, following only redirects
+that stay on that host. `-latest` redirects some regions (Germany) to a
+mirror, which fails: pass the dated extract (`…/germany-261122.osm.pbf`) as
+`--source-url`, as `pnpm places:resolve` prints it. Terrain is always read from
 the public Copernicus bucket, so preparation needs network access even with
 local source files.
 The region identifier is included in new artifact identities. Old frozen v1
@@ -56,6 +59,52 @@ attribution. Preparation opens no database connection.
 Temporary source files are removed afterwards. Retain the completed artifact
 for publication retries and reproduction; retain original downloads separately
 if you need to rerun the extraction itself.
+
+## Choose the regions
+
+```sh
+pnpm places:resolve [--no-demand] [--date YYMMDD] [--overrides <file>]
+```
+
+prints the regions of the next `places-live` catalogue and one Geofabrik
+date for all of them (`src/server/places/region-selection.ts`):
+
+```json
+{
+  "date": "261122",
+  "regions": [
+    {
+      "region": "austria",
+      "pbf": "https://download.geofabrik.de/europe/austria/austria-261122.osm.pbf",
+      "poly": "https://download.geofabrik.de/europe/austria/austria.poly",
+      "reason": "live"
+    }
+  ],
+  "added": ["us-colorado"],
+  "counts": { "live": 8, "demanded": 1, "included": 0, "excluded": 0 }
+}
+```
+
+- `live`: every region of the live catalogue stays, whatever its demand.
+- `demand`: a quarter-degree tile that at least two activities read
+  (`DEMAND_MIN_ACTIVITIES`) adds every country extract whose boundary it
+  intersects. A country above 6 GB (`REGION_SIZE_CAP_BYTES`: the United
+  States, Canada) is added as its parts the tiles intersect. That choice
+  sticks: a country the catalogue holds whole stays whole, one it holds a
+  part of grows by parts.
+- `include` and `exclude` in `config/place-regions.json` add or remove
+  regions by ID. `exclude` wins over everything and is the only way a region
+  leaves the catalogue. A live region the Geofabrik index no longer lists
+  fails the run until it is excluded.
+
+The date is the newest of the last two to seven days on which every
+region's dated extract exists; all extracts of a day share one source
+timestamp, as `combine` requires. `--no-demand` keeps the live regions and
+the overrides only; `--date` pins the date. It reads the live catalogue with
+the read bridge (`ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_KEY_ID`,
+`ACTIVITYMAP_CONVEX_SIGNING_KEY`) and fails before the first publication.
+Tiles locate users' activities, so the output and the logs name regions and
+counts only.
 
 ## Publish or refresh
 
@@ -428,9 +477,8 @@ The artifact is `output/places/ch-at-it-2026-10-20`, with snapshot identity
 ## Eight countries (`v1-places`)
 
 `v1-places` replaces `ch-at-it` with Switzerland, Austria, Italy, Germany,
-France, Norway, New Zealand and Kyrgyzstan (`V1_PLACE_COUNTRIES` in
-`src/server/places/catalogue-regions.ts`, with their Geofabrik paths). Prepare
-each country from extracts with the same source epoch, then combine:
+France, Norway, New Zealand and Kyrgyzstan. Prepare each country from
+extracts with the same source epoch, then combine:
 
 ```sh
 pnpm places:prepare --region germany --out output/places/germany-current

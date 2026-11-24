@@ -56,22 +56,41 @@ export function coverageContains(
   );
 }
 
-/** Local coverage is a spherical corridor wholly inside the published region,
- * including holes, at `coverageClearanceM` from its boundary. Edges are
- * subdivided only for tight index envelopes. This explicit, versioned rule
- * replaces the projected PostGIS buffer check. */
-export function createBatchCoverage(coverage: CoverageGeometry) {
-  const polygons = coveragePolygons(coverage);
-  const edges: Arc[] = [];
+/** The most boundary edges a match indexes; above it every match fails. */
+export const COVERAGE_EDGE_BUDGET = 500_000;
+
+/** The coverage boundary's edges: each ring segment subdivided only for tight
+ * index envelopes. */
+function* boundaryEdges(polygons: readonly Vector[][][]) {
   for (const polygon of polygons)
     for (const ring of polygon)
       for (let i = 1; i < ring.length; i++) {
         const points = subdivide(ring[i - 1]!, ring[i]!);
         for (let j = 1; j < points.length; j++)
-          edges.push(arc(points[j - 1]!, points[j]!));
-        if (edges.length > 500_000)
-          throw new Error('Coverage boundary budget exceeded');
+          yield arc(points[j - 1]!, points[j]!);
       }
+}
+
+/** How many boundary edges a match indexes for this coverage, to compare
+ * with `COVERAGE_EDGE_BUDGET` before publishing it. */
+export function coverageEdgeCount(coverage: CoverageGeometry) {
+  const edges = boundaryEdges(coveragePolygons(coverage));
+  let count = 0;
+  while (!edges.next().done) count++;
+  return count;
+}
+
+/** Local coverage is a spherical corridor wholly inside the published region,
+ * including holes, at `coverageClearanceM` from its boundary. This explicit,
+ * versioned rule replaces the projected PostGIS buffer check. */
+export function createBatchCoverage(coverage: CoverageGeometry) {
+  const polygons = coveragePolygons(coverage);
+  const edges: Arc[] = [];
+  for (const edge of boundaryEdges(polygons)) {
+    edges.push(edge);
+    if (edges.length > COVERAGE_EDGE_BUDGET)
+      throw new Error('Coverage boundary budget exceeded');
+  }
   const index = new SpatialIndex(
     edges.map((edge) => ({ box: edge.box, value: edge })),
   );

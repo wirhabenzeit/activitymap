@@ -1655,6 +1655,36 @@ void test('only activities in changed tiles are matched again, and their old mat
   );
 });
 
+void test('an activity outside the coverage is matched as uncovered and still records its tiles', async () => {
+  const provider = fakeProvider();
+  const convex = await liveOwner();
+  await publishLive(convex, [peak]);
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  // Far outside the synthetic coverage.
+  provider.set(detail(9, 'Elsewhere entirely'));
+  provider.record('9', track(35.1, 139.1));
+  await ingest(convex, '7', '9');
+
+  const found = await matches(convex);
+  assert.deepEqual(
+    [found.get(7)!.value.status, found.get(9)!.value.status],
+    ['complete', 'uncovered'],
+  );
+  // Its tiles are the demand for a region that covers it, and what a later
+  // coverage change there matches again.
+  const far = `${Math.floor((139.1 + 180) * 4)},${Math.floor((35.1 + 90) * 4)}`;
+  const tiles = await placeTiles(convex);
+  assert.deepEqual(tiles.get(9), [far]);
+  const demand = await convex.query(internal.livePlaces.demandTiles, {
+    cursor: null,
+  });
+  assert.deepEqual(
+    demand.page.find((entry) => entry.tile === far),
+    { tile: far, activities: 1 },
+  );
+});
+
 void test('a match that overlapped an apply is matched again', async () => {
   const provider = fakeProvider();
   const convex = await liveOwner();

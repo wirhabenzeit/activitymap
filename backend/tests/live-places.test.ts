@@ -17,7 +17,8 @@ import schema from '../convex/schema';
 /**
  * The live place catalogue (convex/livePlaces.ts): applying a publication
  * in batches, resuming and abandoning it, the tiles it records, its signed
- * bridge operations and the restart of unfinished re-match walks.
+ * bridge operations, the demand tiles and the restart of unfinished
+ * re-match walks.
  */
 
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
@@ -434,90 +435,248 @@ void test('tile changes record inserts, updates, moves and deletes, not no-ops',
   );
 });
 
-void test('catalogue reads pass the bridge without a nonce; writes still need one', async (t) => {
-  const convex = setup();
-  const secret = 'e'.repeat(64);
-  const previous = process.env.ACTIVITYMAP_BRIDGE_WRITER_KEYS;
-  process.env.ACTIVITYMAP_BRIDGE_WRITER_KEYS = JSON.stringify({ app: secret });
-  t.after(() => {
-    if (previous === undefined)
-      delete process.env.ACTIVITYMAP_BRIDGE_WRITER_KEYS;
-    else process.env.ACTIVITYMAP_BRIDGE_WRITER_KEYS = previous;
-  });
-  const send = (body: string) => {
-    const timestamp = String(Date.now());
-    return convex.fetch('/internal/write/v1', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-ActivityMap-Key-Id': 'app',
-        'X-ActivityMap-Timestamp': timestamp,
-        'X-ActivityMap-Signature': createHmac(
-          'sha256',
-          Buffer.from(secret, 'hex'),
-        )
-          .update(`activitymap-write-v1\napp\n${timestamp}\n${body}`)
-          .digest('hex'),
-      },
-      body,
+/** Set bridge key maps for one test. */
+function keys(t: test.TestContext, env: Record<string, string>) {
+  for (const [name, value] of Object.entries(env)) {
+    const previous = process.env[name];
+    process.env[name] = value;
+    t.after(() => {
+      if (previous === undefined) delete process.env[name];
+      else process.env[name] = previous;
     });
-  };
-  const request = (operation: object, nonce?: string) =>
-    JSON.stringify({ nonce, operation });
+  }
+}
 
-  const empty = await send(request({ kind: 'liveState' }));
+/** POST `body` to `path`, signed under `domain` with key `id`. */
+function signed(
+  convex: Convex,
+  path: string,
+  { domain, id, secret }: { domain: string; id: string; secret: string },
+  body: string,
+) {
+  const timestamp = String(Date.now());
+  return convex.fetch(path, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'X-ActivityMap-Key-Id': id,
+      'X-ActivityMap-Timestamp': timestamp,
+      'X-ActivityMap-Signature': createHmac(
+        'sha256',
+        Buffer.from(secret, 'hex'),
+      )
+        .update(`${domain}\n${id}\n${timestamp}\n${body}`)
+        .digest('hex'),
+    },
+    body,
+  });
+}
+
+const readerKey = { id: 'reader', secret: 'd'.repeat(64) };
+const writerKey = { id: 'app', secret: 'e'.repeat(64) };
+
+void test('catalogue reads pass their own route with the read key and no nonce', async (t) => {
+  const convex = setup();
+  keys(t, {
+    ACTIVITYMAP_BRIDGE_SIGNING_KEYS: JSON.stringify({
+      [readerKey.id]: readerKey.secret,
+    }),
+    ACTIVITYMAP_BRIDGE_WRITER_KEYS: JSON.stringify({
+      [writerKey.id]: writerKey.secret,
+    }),
+  });
+  const read = (operation: object, key = readerKey, domain = 'places') =>
+    signed(
+      convex,
+      '/internal/places/v1',
+      { domain: `activitymap-${domain}-v1`, ...key },
+      JSON.stringify({ operation }),
+    );
+
+  const empty = await read({ kind: 'liveState' });
   assert.equal(empty.status, 200);
   assert.equal(await empty.json(), null);
 
   await publish(convex, 'snap-1', [a, b, c], null);
-  const state = await send(request({ kind: 'liveState' }));
-  assert.equal(state.status, 200);
+  const state = await read({ kind: 'liveState' });
   assert.equal(((await state.json()) as { revision: number }).revision, 1);
 
-  const page = request({ kind: 'liveHashes', cursor: null, limit: 2 });
-  type Page = {
-    page: { key: string; hash: string; tile: string }[];
-    isDone: boolean;
-    continueCursor: string;
-  };
-  const first = (await (await send(page)).json()) as Page;
+  type Page<Row> = { page: Row[]; isDone: boolean; continueCursor: string };
+  const page = { kind: 'liveHashes', cursor: null, limit: 2 };
+  const first = (await (await read(page)).json()) as Page<{ key: string }>;
   // The same signed read again is answered too.
-  assert.deepEqual((await (await send(page)).json()) as Page, first);
+  assert.deepEqual(await (await read(page)).json(), first);
   assert.deepEqual(first.page, [
     { key: 'a', hash: await rowHash(a), tile: tileOf(a.location) },
     { key: 'b', hash: await rowHash(b), tile: tileOf(b.location) },
   ]);
-  assert.equal(first.isDone, false);
   const rest = (await (
-    await send(request({ kind: 'liveHashes', cursor: first.continueCursor }))
-  ).json()) as Page;
+    await read({ kind: 'liveHashes', cursor: first.continueCursor })
+  ).json()) as Page<{ key: string }>;
   assert.deepEqual(
-    rest.page.map((row) => row.key),
-    ['c'],
+    [rest.page.map((row) => row.key), rest.isDone],
+    [['c'], true],
   );
-  assert.equal(rest.isDone, true);
   assert.equal(
-    (await send(request({ kind: 'liveHashes', cursor: null, limit: 4097 })))
-      .status,
+    (await read({ kind: 'liveHashes', cursor: null, limit: 4097 })).status,
     400,
   );
+  const demand = await read({ kind: 'demandTiles', cursor: null });
+  assert.equal(demand.status, 200);
+  const tiles = (await demand.json()) as Page<unknown>;
+  assert.deepEqual([tiles.page, tiles.isDone], [[], true]);
   assert.deepEqual(
     await convex.run((ctx) => ctx.db.query('bridgeNonces').collect()),
     [],
   );
 
+  // Only reads, and only signed for this route by a read key.
+  assert.equal((await read({ kind: 'completeApply' })).status, 400);
+  assert.equal((await read({ kind: 'beginApply' })).status, 400);
+  assert.equal(
+    (await read({ kind: 'liveState' }, readerKey, 'sync')).status,
+    401,
+  );
+  assert.equal(
+    (await read({ kind: 'liveState' }, readerKey, 'write')).status,
+    401,
+  );
+  assert.equal((await read({ kind: 'liveState' }, writerKey)).status, 401);
+  assert.equal(
+    (
+      await convex.fetch('/internal/places/v1', {
+        method: 'POST',
+        body: JSON.stringify({ operation: { kind: 'liveState' } }),
+      })
+    ).status,
+    401,
+  );
+  // A places signature is no library read either.
+  assert.equal(
+    (
+      await signed(
+        convex,
+        '/internal/sync/v1',
+        { domain: 'activitymap-places-v1', ...readerKey },
+        JSON.stringify({ operation: { kind: 'head' } }),
+      )
+    ).status,
+    401,
+  );
+});
+
+void test('the write route no longer reads the live catalogue, and every write needs a nonce', async (t) => {
+  const convex = setup();
+  keys(t, {
+    ACTIVITYMAP_BRIDGE_WRITER_KEYS: JSON.stringify({
+      [writerKey.id]: writerKey.secret,
+    }),
+  });
+  await publish(convex, 'snap-1', [a, b, c], null);
+  const write = (operation: object, nonce?: string) =>
+    signed(
+      convex,
+      '/internal/write/v1',
+      { domain: 'activitymap-write-v1', ...writerKey },
+      JSON.stringify({ nonce, operation }),
+    );
+  for (const kind of ['liveState', 'liveHashes', 'demandTiles']) {
+    assert.equal((await write({ kind, cursor: null })).status, 400);
+    assert.equal(
+      (await write({ kind, cursor: null }, `nonce-for-${kind}-01`)).status,
+      400,
+    );
+  }
+
   const complete = { kind: 'completeApply', snapshotId: 'snap-1' };
-  assert.equal((await send(request(complete))).status, 400);
-  const signed = request(complete, 'nonce-for-complete-1');
-  const accepted = await send(signed);
+  assert.equal((await write(complete)).status, 400);
+  const accepted = await write(complete, 'nonce-for-complete-1');
   assert.equal(accepted.status, 200);
   assert.deepEqual(await accepted.json(), { ok: true, revision: 1 });
-  assert.equal((await send(signed)).status, 409);
-  const unsigned = await convex.fetch('/internal/write/v1', {
-    method: 'POST',
-    body: request({ kind: 'liveState' }),
+  assert.equal((await write(complete, 'nonce-for-complete-1')).status, 409);
+});
+
+void test('demand tiles count the activities of each tile, a page at a time, naming none', async () => {
+  const convex = setup();
+  const tiles = await convex.run(async (ctx) => {
+    const owners = [];
+    for (const userId of ['user-1', 'user-2'])
+      owners.push(
+        await ctx.db.insert('owners', {
+          userId,
+          athleteId: userId.at(-1)!,
+          backend: 'convex',
+          epoch: `${userId}-epoch-0001`,
+          generation: 'generation-01',
+          revoked: false,
+          catalogue: 'c'.repeat(64),
+          matchingVersion: 'd'.repeat(64),
+          projectionVersion: 1,
+        }),
+      );
+    // Two owners' activities in 10,10; one activity across three tiles.
+    const rows = [
+      [owners[0]!, '1', '10,10'],
+      [owners[0]!, '2', '10,10'],
+      [owners[1]!, '1', '10,10'],
+      [owners[1]!, '2', '10,11'],
+      [owners[1]!, '2', '11,10'],
+      [owners[1]!, '2', '12,10'],
+    ] as const;
+    for (const [owner, activity, tile] of rows)
+      await ctx.db.insert('activityPlaceTiles', { owner, activity, tile });
+    return rows.length;
   });
-  assert.equal(unsigned.status, 401);
+
+  const all = await convex.query(internal.livePlaces.demandTiles, {
+    cursor: null,
+  });
+  assert.deepEqual(all.page, [
+    { tile: '10,10', activities: 3 },
+    { tile: '10,11', activities: 1 },
+    { tile: '11,10', activities: 1 },
+    { tile: '12,10', activities: 1 },
+  ]);
+  assert.equal(all.isDone, true);
+
+  // Pages of two rows: 10,10 continues on the second page and is listed on
+  // both; the sums agree.
+  const pages = [];
+  for (let cursor: string | null = null; ;) {
+    const page: typeof all = await convex.query(
+      internal.livePlaces.demandTiles,
+      { cursor, limit: 2 },
+    );
+    pages.push(page.page);
+    for (const entry of page.page)
+      assert.deepEqual(Object.keys(entry).sort(), ['activities', 'tile']);
+    if (page.isDone) break;
+    cursor = page.continueCursor;
+  }
+  assert.deepEqual(pages.slice(0, 3), [
+    [{ tile: '10,10', activities: 2 }],
+    [
+      { tile: '10,10', activities: 1 },
+      { tile: '10,11', activities: 1 },
+    ],
+    [
+      { tile: '11,10', activities: 1 },
+      { tile: '12,10', activities: 1 },
+    ],
+  ]);
+  assert.equal(
+    pages.flat().reduce((sum, entry) => sum + entry.activities, 0),
+    tiles,
+  );
+  await assert.rejects(
+    convex.query(internal.livePlaces.demandTiles, { cursor: null, limit: 0 }),
+  );
+  await assert.rejects(
+    convex.query(internal.livePlaces.demandTiles, {
+      cursor: null,
+      limit: 8193,
+    }),
+  );
 });
 
 void test('the daily job restarts the re-match walk of completed revisions with tiles left', async () => {

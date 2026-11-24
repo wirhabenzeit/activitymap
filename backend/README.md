@@ -84,6 +84,13 @@ ACTIVITYMAP_CONVEX_WRITER_KEY_ID=devw1
 ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY=<hex>
 ```
 
+The place catalogue publisher reads the live catalogue through a third
+route, `/internal/places/v1`, signed with the read bridge's key under its own
+domain (`activitymap-places-v1`), so a signed library read can never be
+replayed there or the reverse. Its operations (`liveState`, `liveHashes`,
+`demandTiles`) only read and carry no nonce, so a dry run needs no writer
+key.
+
 ## Authenticated clients
 
 Public functions (`convex/library.ts`) identify the caller from a short-lived
@@ -470,8 +477,9 @@ place has the same ID in every catalogue.
 
 The live catalogue (`convex/livePlaces.ts`) is one table, `livePlaces`, that
 a publication updates in place; rows are stored by quarter-degree tile. The
-publisher reads `liveState` and pages of row hashes (`liveHashes`), both
-signed but without a nonce, and sends only the difference: `beginApply`
+publisher reads `liveState` and pages of row hashes (`liveHashes`) through
+`/internal/places/v1`, and sends only the difference through the write
+route: `beginApply`
 announces the artifact and the row count and set digest the rows must reach,
 `applyBatch` upserts and deletes up to 500 rows a call, and `completeApply`
 accepts the publication when the rows match. `placeCatalogueState` holds the
@@ -491,6 +499,11 @@ ingest for. Old matches stay visible until the new result replaces them
 walk deletes each tile's row once it has finished the tile, so the rows left
 are its unfinished work; a daily job (`maintenance.resumeRematchWalks`)
 starts the walk again for completed revisions that still have rows.
+
+`livePlaces.demandTiles` pages through `activityPlaceTiles` in tile order
+and answers each tile with the number of its rows on the page, with no owner
+or activity: the tiles that hold activities, from which the publisher's
+region selection decides what the catalogue must cover.
 
 Matching reads rows while a publication is applied. A match records the live
 revision that was current when it started, so one that overlapped an apply
