@@ -252,8 +252,7 @@ in the new area.
 As shipped, `resolve` reads the live manifest's regions and the demand tiles
 with the read key, not a stored list; a catalogue holds at most 256 regions
 (`MAX_CATALOGUE_REGIONS`, one `prepare` job each), and `prepare` runs at
-most two jobs at a time, because Geofabrik refuses more than a few
-connections at once from the runners' network.
+most four jobs at a time, because each reads Copernicus terrain tiles.
 
 A new user in a new country waits for the next weekly run. If that turns out
 too slow, Convex can trigger the workflow early (`repository_dispatch`, with
@@ -416,7 +415,7 @@ As shipped (commands and operation in
    and emit dated URLs (`europe/germany-YYMMDD.osm.pbf`) for all of them, so
    the epochs agree.
 2. **`prepare`**: one matrix job per region (one runner each, because the
-   extracts don't fit on one runner disk), at most two at a time:
+   extracts don't fit on one runner disk), at most four at a time:
    `pnpm places:prepare --source-url … --coverage-url …`. Upload each
    artifact.
 3. **`combine`**: `pnpm places:combine --region places-live`. Upload the
