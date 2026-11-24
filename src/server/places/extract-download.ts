@@ -12,10 +12,13 @@ export const DOWNLOAD_LIMITS = {
   totalMs: 2 * 60 * 60 * 1000,
   /** No answer, or no further bytes, for this long ends one connection. */
   stallMs: 60_000,
-  /** The download fails after this long without a further byte. Geofabrik
-   * refuses connections beyond a few at a time from one network (seen from
-   * GitHub's runners), and accepts again when another download ends. */
+  /** The download fails after this long without a further byte. */
   noProgressMs: 20 * 60 * 1000,
+  /** The download fails after this long without any answer from Geofabrik.
+   * Geofabrik refuses every connection from some addresses (about a third
+   * of GitHub's runners, for as long as tried); the same download works at
+   * once from another machine, so waiting longer only delays that. */
+  unansweredMs: 2 * 60 * 1000,
   /** The wait after the first connection that adds no bytes; it doubles each
    * time, up to `retryMaxMs`. */
   retryMs: 2_000,
@@ -69,6 +72,7 @@ export async function downloadExtract(
     let validator: string | null = null;
     let idle = 0;
     let progressAt = performance.now();
+    let answered = false;
     for (;;) {
       const before = written;
       let failure: unknown;
@@ -94,6 +98,7 @@ export async function downloadExtract(
           redirect: 'manual',
           headers,
         });
+        answered = true;
         for (
           let hops = 0;
           response.status >= 300 && response.status < 400;
@@ -180,6 +185,11 @@ export async function downloadExtract(
           { cause: failure },
         );
       idle = written > before ? 0 : idle + 1;
+      if (!answered && performance.now() - progressAt >= limits.unansweredMs)
+        throw new Error(
+          `Geofabrik answered no connection for ${Math.round(limits.unansweredMs / 60_000)} minutes (${idle} tried); it refuses some addresses, so run this again from another machine or re-run the job`,
+          { cause: failure },
+        );
       if (performance.now() - progressAt >= limits.noProgressMs)
         throw new Error(
           `Download made no progress for ${Math.round(limits.noProgressMs / 60_000)} minutes (${idle} connections) at ${megabytes(written)}`,

@@ -150,6 +150,30 @@ void test('connections that add nothing end the download', () =>
     assert.ok(calls.length >= 5 && calls.length <= 40, String(calls.length));
   }));
 
+void test('a machine Geofabrik never answers gives up early', () =>
+  inDirectory(async (path) => {
+    let calls = 0;
+    const refused = (() => {
+      calls++;
+      return Promise.reject(new TypeError('fetch failed'));
+    }) as typeof fetch;
+    const started = performance.now();
+    await assert.rejects(
+      downloadExtract(URL_DATED, path, {
+        fetcher: refused,
+        limits: {
+          retryMs: 1,
+          retryMaxMs: 20,
+          unansweredMs: 100,
+          noProgressMs: 60_000,
+        },
+      }),
+      /answered no connection/,
+    );
+    assert.ok(calls >= 4, String(calls));
+    assert.ok(performance.now() - started < 5_000);
+  }));
+
 void test('the overall limit ends a slow download', () =>
   inDirectory(async (path) => {
     const { fetcher } = server(
