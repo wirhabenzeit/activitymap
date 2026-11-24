@@ -96,9 +96,11 @@ jobs:
     # itself gives up after two) and then builds for about as long.
     timeout-minutes: 240
     strategy:
-      fail-fast: true
-      # Every job reads Copernicus terrain tiles.
-      max-parallel: 4
+      # A region that failed is re-run alone ("Re-run failed jobs").
+      fail-fast: false
+      # Geofabrik refuses connections beyond a few at a time from the
+      # runners' network; every job also reads Copernicus terrain tiles.
+      max-parallel: 2
       matrix:
         include: ${{ fromJSON(needs.resolve.outputs.regions) }}
     steps:

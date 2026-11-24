@@ -12,10 +12,14 @@ export const DOWNLOAD_LIMITS = {
   totalMs: 2 * 60 * 60 * 1000,
   /** No answer, or no further bytes, for this long ends one connection. */
   stallMs: 60_000,
-  /** Connections in a row that add no bytes before the download fails. */
-  attemptsWithoutProgress: 5,
-  /** The wait after the first such connection; it doubles each time. */
+  /** The download fails after this long without a further byte. Geofabrik
+   * refuses connections beyond a few at a time from one network (seen from
+   * GitHub's runners), and accepts again when another download ends. */
+  noProgressMs: 20 * 60 * 1000,
+  /** The wait after the first connection that adds no bytes; it doubles each
+   * time, up to `retryMaxMs`. */
   retryMs: 2_000,
+  retryMaxMs: 60_000,
 };
 
 export type DownloadOptions = {
@@ -64,6 +68,7 @@ export async function downloadExtract(
     // Names the version of the file whose bytes are on disk.
     let validator: string | null = null;
     let idle = 0;
+    let progressAt = performance.now();
     for (;;) {
       const before = written;
       let failure: unknown;
@@ -153,6 +158,7 @@ export async function downloadExtract(
             alive();
             await file.write(value, 0, value.length, written);
             written += value.length;
+            progressAt = performance.now();
           }
         } finally {
           await reader.cancel().catch(() => undefined);
@@ -174,9 +180,9 @@ export async function downloadExtract(
           { cause: failure },
         );
       idle = written > before ? 0 : idle + 1;
-      if (idle >= limits.attemptsWithoutProgress)
+      if (performance.now() - progressAt >= limits.noProgressMs)
         throw new Error(
-          `Download failed ${idle} times in a row at ${megabytes(written)}`,
+          `Download made no progress for ${Math.round(limits.noProgressMs / 60_000)} minutes (${idle} connections) at ${megabytes(written)}`,
           { cause: failure },
         );
       options.onProgress?.(
@@ -184,7 +190,10 @@ export async function downloadExtract(
       );
       if (idle > 0)
         await new Promise((done) =>
-          setTimeout(done, limits.retryMs * 2 ** (idle - 1)),
+          setTimeout(
+            done,
+            Math.min(limits.retryMs * 2 ** (idle - 1), limits.retryMaxMs),
+          ),
         );
     }
   } finally {
