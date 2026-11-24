@@ -1,18 +1,22 @@
-import { createHmac } from 'node:crypto';
+import { createHmac, randomBytes } from 'node:crypto';
 
 /**
- * Read-only access to the live place catalogue on the Convex backend
- * (`/internal/places/v1` in `backend/convex/http.ts`): its state, its row
- * hashes and the tiles that hold activities. Signed with the read bridge's
- * key under a domain of its own, so a job that only reviews or plans a
- * publication never holds the key that can write.
+ * Signed access to the live place catalogue on the Convex backend
+ * (`backend/convex/http.ts`). Reads (`/internal/places/v1`: its state, its
+ * row hashes and the tiles that hold activities) and writes
+ * (`/internal/places/write/v1`) each have their own key, so a job that only
+ * reviews or plans a publication never holds the key that can write. Neither
+ * key can read or write a library.
  */
 
+type Operation = { kind: string; [field: string]: unknown };
+
 export type CatalogueReader = {
-  read<T = unknown>(operation: {
-    kind: string;
-    [field: string]: unknown;
-  }): Promise<T>;
+  read<T = unknown>(operation: Operation): Promise<T>;
+};
+
+export type CatalogueWriter = {
+  write<T = unknown>(operation: Operation): Promise<T>;
 };
 
 /** The live catalogue's state (`livePlaces.state`), null before anything was
@@ -35,17 +39,33 @@ export type LiveState = {
 
 export type LiveRowHash = { key: string; hash: string; tile: string };
 
-/** Null when no Convex site is configured. Uses
- * `ACTIVITYMAP_CONVEX_KEY_ID` and `ACTIVITYMAP_CONVEX_SIGNING_KEY`, the read
- * bridge's key. */
-export function convexCatalogueReader(
-  fetcher: typeof fetch = fetch,
-): CatalogueReader | null {
+/** Posts signed operations to one catalogue route; null when no Convex site
+ * is configured. */
+function catalogueClient(
+  {
+    path,
+    domain,
+    keyId,
+    signingKey,
+    name,
+    timeout,
+    nonce,
+  }: {
+    path: string;
+    domain: string;
+    keyId: string;
+    signingKey: string;
+    name: string;
+    timeout: number;
+    nonce: boolean;
+  },
+  fetcher: typeof fetch,
+) {
   const origin = process.env.ACTIVITYMAP_CONVEX_SITE;
   if (!origin) return null;
-  const url = new URL('/internal/places/v1', origin);
-  const version = process.env.ACTIVITYMAP_CONVEX_KEY_ID ?? '';
-  const secret = process.env.ACTIVITYMAP_CONVEX_SIGNING_KEY ?? '';
+  const url = new URL(path, origin);
+  const version = process.env[keyId] ?? '';
+  const secret = process.env[signingKey] ?? '';
   if (
     url.protocol !== 'https:' ||
     url.username ||
@@ -53,34 +73,81 @@ export function convexCatalogueReader(
     !/^[A-Za-z0-9_-]{1,32}$/.test(version) ||
     !/^[0-9a-f]{64}$/.test(secret)
   )
-    throw new Error('Invalid Convex catalogue reader configuration');
-  return {
-    async read<T>(operation: { kind: string; [field: string]: unknown }) {
-      const body = JSON.stringify({ operation });
-      const timestamp = String(Date.now());
-      const signature = createHmac('sha256', Buffer.from(secret, 'hex'))
-        .update(`activitymap-places-v1\n${version}\n${timestamp}\n${body}`)
-        .digest('hex');
-      const response = await fetcher(url, {
-        method: 'POST',
-        cache: 'no-store',
-        redirect: 'error',
-        signal: AbortSignal.timeout(60_000),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-ActivityMap-Key-Id': version,
-          'X-ActivityMap-Timestamp': timestamp,
-          'X-ActivityMap-Signature': signature,
-        },
-        body,
-      });
-      if (!response.ok)
-        throw new Error(
-          `Convex catalogue reader rejected ${operation.kind} (${response.status})`,
-        );
-      return (await response.json()) as T;
-    },
+    throw new Error(
+      `Invalid Convex ${name} configuration (check ${keyId} and ${signingKey})`,
+    );
+  return async <T>(operation: Operation) => {
+    const body = JSON.stringify(
+      nonce
+        ? { nonce: randomBytes(18).toString('base64url'), operation }
+        : { operation },
+    );
+    const timestamp = String(Date.now());
+    const signature = createHmac('sha256', Buffer.from(secret, 'hex'))
+      .update(`${domain}\n${version}\n${timestamp}\n${body}`)
+      .digest('hex');
+    const response = await fetcher(url, {
+      method: 'POST',
+      cache: 'no-store',
+      redirect: 'error',
+      signal: AbortSignal.timeout(timeout),
+      headers: {
+        'Content-Type': 'application/json',
+        'X-ActivityMap-Key-Id': version,
+        'X-ActivityMap-Timestamp': timestamp,
+        'X-ActivityMap-Signature': signature,
+      },
+      body,
+    });
+    if (!response.ok)
+      throw new Error(
+        `Convex ${name} rejected ${operation.kind} (${response.status})`,
+      );
+    return (await response.json()) as T;
   };
+}
+
+/** Null when no Convex site is configured. Uses `ACTIVITYMAP_PLACES_KEY_ID`
+ * and `ACTIVITYMAP_PLACES_SIGNING_KEY`. */
+export function convexCatalogueReader(
+  fetcher: typeof fetch = fetch,
+): CatalogueReader | null {
+  const read = catalogueClient(
+    {
+      path: '/internal/places/v1',
+      domain: 'activitymap-places-v1',
+      keyId: 'ACTIVITYMAP_PLACES_KEY_ID',
+      signingKey: 'ACTIVITYMAP_PLACES_SIGNING_KEY',
+      name: 'catalogue reader',
+      timeout: 60_000,
+      nonce: false,
+    },
+    fetcher,
+  );
+  return read && { read };
+}
+
+/** Null when no Convex site is configured. Uses
+ * `ACTIVITYMAP_PLACES_WRITER_KEY_ID` and
+ * `ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY`; every request carries a fresh
+ * single-use nonce. */
+export function convexCatalogueWriter(
+  fetcher: typeof fetch = fetch,
+): CatalogueWriter | null {
+  const write = catalogueClient(
+    {
+      path: '/internal/places/write/v1',
+      domain: 'activitymap-places-write-v1',
+      keyId: 'ACTIVITYMAP_PLACES_WRITER_KEY_ID',
+      signingKey: 'ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY',
+      name: 'catalogue writer',
+      // A batch of 500 rows in one call.
+      timeout: 120_000,
+      nonce: true,
+    },
+    fetcher,
+  );
+  return write && { write };
 }
 
 type Page<Row> = { page: Row[]; isDone: boolean; continueCursor: string };

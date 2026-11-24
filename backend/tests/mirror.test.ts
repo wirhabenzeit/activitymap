@@ -11,7 +11,10 @@ import {
   placeRows,
   publishCatalogue,
 } from '../../src/server/places/catalogue-publish';
-import { convexCatalogueReader } from '../../src/server/places/catalogue-reader';
+import {
+  convexCatalogueReader,
+  convexCatalogueWriter,
+} from '../../src/server/places/catalogue-reader';
 import { LIVE_PLACE_REGION } from '../../src/server/places/catalogue-regions';
 import {
   LIVE_CATALOGUE,
@@ -33,7 +36,8 @@ import { previewFixtureActivity } from './fixtures';
 
 /**
  * The signed write bridge end to end against backend/convex in convex-test:
- * its keys and nonces, the place catalogue publication, and provider events.
+ * its keys and nonces, the place catalogue publication (through the
+ * catalogue's own routes and keys), and provider events.
  */
 
 mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.now() });
@@ -67,6 +71,8 @@ const scope = {
 };
 const writerSecret = 'f'.repeat(64);
 const readerSecret = '1'.repeat(64);
+const placesReaderSecret = '2'.repeat(64);
+const placesWriterSecret = '3'.repeat(64);
 const streams: RawActivityStreams = {
   time: {
     data: [0, 1],
@@ -86,6 +92,16 @@ function setup(t: test.TestContext) {
     ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY: writerSecret,
     ACTIVITYMAP_BRIDGE_WRITER_KEYS: JSON.stringify({ writer: writerSecret }),
     ACTIVITYMAP_BRIDGE_SIGNING_KEYS: JSON.stringify({ reader: readerSecret }),
+    ACTIVITYMAP_PLACES_KEY_ID: 'places',
+    ACTIVITYMAP_PLACES_SIGNING_KEY: placesReaderSecret,
+    ACTIVITYMAP_PLACES_WRITER_KEY_ID: 'publisher',
+    ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY: placesWriterSecret,
+    ACTIVITYMAP_BRIDGE_PLACES_KEYS: JSON.stringify({
+      places: placesReaderSecret,
+    }),
+    ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS: JSON.stringify({
+      publisher: placesWriterSecret,
+    }),
   };
   for (const [name, value] of Object.entries(env)) {
     const previous = process.env[name];
@@ -289,7 +305,9 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
   // What the bridge was asked to apply.
   const applied: { upserts: PlaceRow[]; deletes: string[]; tiles: string[] }[] =
     [];
+  // Writes go through the catalogue's write route, with its write key.
   const recording: typeof fetch = async (url, init) => {
+    assert.equal(new URL(String(url)).pathname, '/internal/places/write/v1');
     const { operation } = JSON.parse(String(init?.body));
     if (operation?.kind === 'applyBatch') {
       const { upserts, deletes, tiles } = operation;
@@ -297,12 +315,8 @@ void test('an artifact is published to the live catalogue after a reviewed dry r
     }
     return fetcher(url, init);
   };
-  // No account: the catalogue's writes need the writer key alone.
-  const publisher = convexWriteBridge(
-    { userId: 'place-catalogue', athleteId: 0 },
-    recording,
-  )!;
-  // Reads go through the read-only route, with the read bridge's key.
+  const publisher = convexCatalogueWriter(recording)!;
+  // Reads go through the read-only route, with the catalogue's read key.
   const reads: string[] = [];
   const reader = convexCatalogueReader(async (url, init) => {
     assert.equal(new URL(String(url)).pathname, '/internal/places/v1');

@@ -101,9 +101,9 @@ by reason; `demanded` counts only those kept. `--no-demand` keeps the live
 regions and the overrides only, `--date` pins the extract date, and
 `--overrides` replaces `config/place-regions.json`.
 
-It reads the live catalogue through the read bridge
-(`ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_KEY_ID`,
-`ACTIVITYMAP_CONVEX_SIGNING_KEY`; see [Publish or refresh](#publish-or-refresh))
+It reads the live catalogue with the catalogue's read key
+(`ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_PLACES_KEY_ID`,
+`ACTIVITYMAP_PLACES_SIGNING_KEY`; see [Publish or refresh](#publish-or-refresh))
 and fails before the first live publication.
 
 ### Which regions
@@ -207,13 +207,15 @@ updates in place. Only the difference from what is live is sent, and only
 activities whose match read a changed tile are matched again. Nothing else
 stores the catalogue.
 
-The publisher reads the live catalogue through the read bridge's route
-`/internal/places/v1` and writes through the write route. A dry run needs
-only the read key: `ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_CONVEX_KEY_ID`
-and `ACTIVITYMAP_CONVEX_SIGNING_KEY`, a key ID listed in the deployment's
-`ACTIVITYMAP_BRIDGE_SIGNING_KEYS`. `--apply` also needs the write key,
-`ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and `ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY`.
-The catalogue belongs to no account, so no user is named.
+The publisher reads the live catalogue through `/internal/places/v1` and
+writes through `/internal/places/write/v1`, each with a key of the
+catalogue's own that can neither read nor write a library. A dry run needs
+only the read key: `ACTIVITYMAP_CONVEX_SITE`, `ACTIVITYMAP_PLACES_KEY_ID`
+and `ACTIVITYMAP_PLACES_SIGNING_KEY`, a key ID listed in the deployment's
+`ACTIVITYMAP_BRIDGE_PLACES_KEYS`. `--apply` also needs the write key,
+`ACTIVITYMAP_PLACES_WRITER_KEY_ID` and `ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY`,
+a key ID listed in `ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS`. The catalogue
+belongs to no account, so no user is named.
 
 ```sh
 pnpm places:publish --artifact <dir> [--report <file>] [--region <region>]
@@ -345,19 +347,22 @@ place diffs only ([Privacy](#privacy)).
 ### Setup
 
 Two GitHub environments, each with the variable `ACTIVITYMAP_CONVEX_SITE`
-and the secrets of a read-only bridge key, `ACTIVITYMAP_CONVEX_KEY_ID` and
-`ACTIVITYMAP_CONVEX_SIGNING_KEY`:
+and the secrets of the catalogue's read key, `ACTIVITYMAP_PLACES_KEY_ID` and
+`ACTIVITYMAP_PLACES_SIGNING_KEY`:
 
 - `places-read`, without reviewer: enough to resolve regions and to dry-run
   a publication.
 - `places-production`, with a required reviewer, additionally holds
-  `ACTIVITYMAP_CONVEX_WRITER_KEY_ID` and
-  `ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY`.
+  `ACTIVITYMAP_PLACES_WRITER_KEY_ID` and
+  `ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY`, the catalogue's write key.
 
-The read key ID must be listed in the Convex deployment's
-`ACTIVITYMAP_BRIDGE_SIGNING_KEYS` and the writer key ID in
-`ACTIVITYMAP_BRIDGE_WRITER_KEYS` (`backend/README.md`). Use a read key of
-its own for the workflow, so it can be revoked without touching the app.
+The Convex deployment holds `ACTIVITYMAP_BRIDGE_PLACES_KEYS` and
+`ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS`, each a JSON object of key ID →
+64-hex secret, like the other key maps (`backend/README.md`); the read key
+ID must be listed in the first and the write key ID in the second. Neither
+key can read or write a user's library, and the app's keys are refused on
+the catalogue's routes, so either side can be revoked without touching the
+other.
 
 ### Run it by hand
 

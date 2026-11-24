@@ -3,8 +3,6 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { z } from 'zod';
 
-import type { ConvexWriter } from '~/server/sync/convex-writer';
-
 import { COVERAGE_EDGE_BUDGET, coverageEdgeCount } from './batch-coverage';
 import { combineCatalogues } from './catalogue-combine';
 import {
@@ -13,7 +11,7 @@ import {
   placeRows,
   publishCatalogue,
 } from './catalogue-publish';
-import type { CatalogueReader } from './catalogue-reader';
+import type { CatalogueReader, CatalogueWriter } from './catalogue-reader';
 import { LIVE_PLACE_REGION } from './catalogue-regions';
 import {
   EMPTY_SET_DIGEST,
@@ -141,7 +139,7 @@ function fakeBackend() {
   }): Promise<unknown> {
     const args: unknown = operation;
     switch (operation.kind) {
-      case 'catalogueUploadUrl':
+      case 'uploadUrl':
         return 'https://upload.invalid/1';
       case 'liveState':
         return (
@@ -299,7 +297,7 @@ function fakeBackend() {
       return (await handle(structuredClone(operation))) as T;
     },
   };
-  const writer: ConvexWriter = {
+  const writer: CatalogueWriter = {
     async write<T>(operation: { kind: string; [field: string]: unknown }) {
       assert.ok(!reads.has(operation.kind), `${operation.kind} is a read`);
       operations.push(structuredClone(operation));
@@ -495,7 +493,7 @@ void test('a first publication inserts every place after a reviewed dry run', as
   assert.deepEqual([published.status, published.revision], ['published', 1]);
   assert.deepEqual(kinds(backend.take()), [
     'liveState',
-    'catalogueUploadUrl',
+    'uploadUrl',
     'beginApply',
     'applyBatch',
     'completeApply',
@@ -790,7 +788,7 @@ void test('running the same command again finishes an interrupted publication', 
   const operations = backend.take();
   assert.deepEqual(
     kinds(operations).filter((kind) => kind !== 'applyBatch'),
-    ['liveState', 'catalogueUploadUrl', 'beginApply', 'completeApply'],
+    ['liveState', 'uploadUrl', 'beginApply', 'completeApply'],
   );
   assert.deepEqual(
     batchesOf(operations).flatMap((batch) => batch.tiles),

@@ -127,8 +127,12 @@ at 03:17 UTC (`17 3 * * 1`), and by hand with `workflow_dispatch` (inputs
 variable `PLACES_REFRESH_SCHEDULED` is `true`.
 
 The jobs resolve the regions, prepare one per runner, combine them, dry-run
-the publication with a read-only key (`places-read` environment) and apply
-it after a reviewer approves (`places-production` environment). A run whose
+the publication with the catalogue's read-only key (`places-read`
+environment) and apply it with the catalogue's write key after a reviewer
+approves (`places-production` environment). Neither key can read or write a
+user's library: the Convex deployment lists them in
+`ACTIVITYMAP_BRIDGE_PLACES_KEYS` and `ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS`,
+not in the app's key maps. A run whose
 plan says `unchanged` publishes nothing. Each run's summaries, logs and
 artifacts are in the repository's Actions tab, and a failed run sends
 GitHub's failure notification. Setup, review, failures and rollback are in

@@ -6,12 +6,14 @@ import test from 'node:test';
 import {
   type CatalogueReader,
   convexCatalogueReader,
+  convexCatalogueWriter,
   readDemandTiles,
   readLiveHashes,
   readLiveMetadata,
 } from './catalogue-reader';
 
 const secret = '3'.repeat(64);
+const writerSecret = '4'.repeat(64);
 
 function withEnv(t: test.TestContext, env: Record<string, string | undefined>) {
   for (const [name, value] of Object.entries(env)) {
@@ -27,8 +29,10 @@ function withEnv(t: test.TestContext, env: Record<string, string | undefined>) {
 
 const configured = {
   ACTIVITYMAP_CONVEX_SITE: 'https://convex.invalid',
-  ACTIVITYMAP_CONVEX_KEY_ID: 'reader',
-  ACTIVITYMAP_CONVEX_SIGNING_KEY: secret,
+  ACTIVITYMAP_PLACES_KEY_ID: 'reader',
+  ACTIVITYMAP_PLACES_SIGNING_KEY: secret,
+  ACTIVITYMAP_PLACES_WRITER_KEY_ID: 'publisher',
+  ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY: writerSecret,
 };
 
 void test('reads are signed with the read key under the places domain', async (t) => {
@@ -63,15 +67,73 @@ void test('a missing site gives no reader, a bad key or a refusal throws', async
   process.env.ACTIVITYMAP_CONVEX_SITE = 'http://convex.invalid';
   assert.throws(() => convexCatalogueReader(), /configuration/);
   process.env.ACTIVITYMAP_CONVEX_SITE = configured.ACTIVITYMAP_CONVEX_SITE;
-  process.env.ACTIVITYMAP_CONVEX_SIGNING_KEY = 'short';
+  process.env.ACTIVITYMAP_PLACES_SIGNING_KEY = 'short';
   assert.throws(() => convexCatalogueReader(), /configuration/);
-  process.env.ACTIVITYMAP_CONVEX_SIGNING_KEY = secret;
+  process.env.ACTIVITYMAP_PLACES_SIGNING_KEY = secret;
   const refused = convexCatalogueReader(
     async () => new Response(null, { status: 401 }),
   )!;
   await assert.rejects(
     refused.read({ kind: 'liveHashes', cursor: null }),
     /rejected liveHashes \(401\)/,
+  );
+});
+
+void test('writes are signed with the write key under their own domain, each with a fresh nonce', async (t) => {
+  withEnv(t, configured);
+  const requests: { url: string; init: RequestInit }[] = [];
+  const writer = convexCatalogueWriter(async (url, init) => {
+    requests.push({ url: (url as URL).href, init: init! });
+    return Response.json('https://upload.invalid');
+  })!;
+  const operation = { kind: 'uploadUrl' };
+  assert.equal(await writer.write(operation), 'https://upload.invalid');
+  await writer.write(operation);
+
+  const [first, second] = requests as [
+    (typeof requests)[number],
+    (typeof requests)[number],
+  ];
+  assert.equal(first.url, 'https://convex.invalid/internal/places/write/v1');
+  assert.equal(first.init.method, 'POST');
+  const body = first.init.body as string;
+  const { nonce, ...rest } = JSON.parse(body) as {
+    nonce: string;
+    operation: unknown;
+  };
+  assert.deepEqual(rest, { operation });
+  assert.match(nonce, /^[A-Za-z0-9_-]{16,64}$/);
+  const next = JSON.parse(second.init.body as string) as { nonce: string };
+  assert.notEqual(next.nonce, nonce);
+  const headers = first.init.headers as Record<string, string>;
+  assert.equal(headers['X-ActivityMap-Key-Id'], 'publisher');
+  const timestamp = headers['X-ActivityMap-Timestamp']!;
+  assert.equal(
+    headers['X-ActivityMap-Signature'],
+    createHmac('sha256', Buffer.from(writerSecret, 'hex'))
+      .update(`activitymap-places-write-v1\npublisher\n${timestamp}\n${body}`)
+      .digest('hex'),
+  );
+});
+
+void test('a missing site gives no writer, a missing write key or a refusal throws', async (t) => {
+  withEnv(t, { ...configured, ACTIVITYMAP_CONVEX_SITE: undefined });
+  assert.equal(convexCatalogueWriter(), null);
+  process.env.ACTIVITYMAP_CONVEX_SITE = configured.ACTIVITYMAP_CONVEX_SITE;
+  Reflect.deleteProperty(process.env, 'ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY');
+  // The read key alone signs no write.
+  assert.throws(
+    () => convexCatalogueWriter(),
+    /writer configuration.*ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY/,
+  );
+  assert.ok(convexCatalogueReader());
+  process.env.ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY = writerSecret;
+  const refused = convexCatalogueWriter(
+    async () => new Response(null, { status: 409 }),
+  )!;
+  await assert.rejects(
+    refused.write({ kind: 'completeApply' }),
+    /catalogue writer rejected completeApply \(409\)/,
   );
 });
 

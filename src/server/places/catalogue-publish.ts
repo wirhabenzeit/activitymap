@@ -2,8 +2,6 @@ import { createHash } from 'node:crypto';
 
 import { z } from 'zod';
 
-import type { ConvexWriter } from '~/server/sync/convex-writer';
-
 import {
   COVERAGE_EDGE_BUDGET,
   coverageClearanceM,
@@ -17,6 +15,7 @@ import {
 import { diffCatalogue } from './catalogue-diff';
 import {
   type CatalogueReader,
+  type CatalogueWriter,
   readLiveHashes,
   readLiveMetadata,
   readLiveState,
@@ -205,7 +204,7 @@ export async function publishCatalogue({
   /** Reads the live catalogue: all a dry run needs. */
   reader: CatalogueReader;
   /** Writes the publication; required to apply. */
-  writer?: ConvexWriter;
+  writer?: CatalogueWriter;
   /** POST a file to a Convex upload URL; returns its storage ID. Required to
    * apply. */
   upload?: (url: string, file: Uint8Array) => Promise<string>;
@@ -336,7 +335,7 @@ export async function publishCatalogue({
   if (pendingId !== snapshotId && (replacePending ?? null) !== pendingId)
     throw new Error(pendingOther(pendingId));
 
-  const url = await writer.write<string>({ kind: 'catalogueUploadUrl' });
+  const url = await writer.write<string>({ kind: 'uploadUrl' });
   const begun = await writer.write<Begun>({
     kind: 'beginApply',
     expectCurrent: expectedCurrent,

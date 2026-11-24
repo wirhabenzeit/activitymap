@@ -10,11 +10,13 @@ name: Place catalogue refresh
 #
 # Environments:
 # - places-read (no reviewer): variable ACTIVITYMAP_CONVEX_SITE and secrets
-#   ACTIVITYMAP_CONVEX_KEY_ID, ACTIVITYMAP_CONVEX_SIGNING_KEY, a read-only
-#   bridge key. Enough to resolve regions and to dry-run a publication.
+#   ACTIVITYMAP_PLACES_KEY_ID, ACTIVITYMAP_PLACES_SIGNING_KEY, the catalogue's
+#   read-only key. Enough to resolve regions and to dry-run a publication.
 # - places-production (required reviewer): the same, plus the secrets
-#   ACTIVITYMAP_CONVEX_WRITER_KEY_ID and ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY.
-#   The reviewer approves after reading the plan job's summary.
+#   ACTIVITYMAP_PLACES_WRITER_KEY_ID and ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY,
+#   the catalogue's write key. The reviewer approves after reading the plan
+#   job's summary.
+# Neither key can read or write a user's library.
 #
 # The weekly run does nothing until the repository variable
 # PLACES_REFRESH_SCHEDULED is "true": run it by hand first.
@@ -62,8 +64,8 @@ jobs:
         id: resolve
         env:
           ACTIVITYMAP_CONVEX_SITE: ${{ vars.ACTIVITYMAP_CONVEX_SITE }}
-          ACTIVITYMAP_CONVEX_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_KEY_ID }}
-          ACTIVITYMAP_CONVEX_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_SIGNING_KEY }}
+          ACTIVITYMAP_PLACES_KEY_ID: ${{ secrets.ACTIVITYMAP_PLACES_KEY_ID }}
+          ACTIVITYMAP_PLACES_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_PLACES_SIGNING_KEY }}
           DEMAND: ${{ github.event_name == 'schedule' || inputs.demand }}
           EXTRACT_DATE: ${{ inputs.date }}
         run: |
@@ -178,8 +180,8 @@ jobs:
         id: plan
         env:
           ACTIVITYMAP_CONVEX_SITE: ${{ vars.ACTIVITYMAP_CONVEX_SITE }}
-          ACTIVITYMAP_CONVEX_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_KEY_ID }}
-          ACTIVITYMAP_CONVEX_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_SIGNING_KEY }}
+          ACTIVITYMAP_PLACES_KEY_ID: ${{ secrets.ACTIVITYMAP_PLACES_KEY_ID }}
+          ACTIVITYMAP_PLACES_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_PLACES_SIGNING_KEY }}
         run: |
           pnpm --silent places:publish --artifact output/places/places-live \
             --report report.json > /dev/null
@@ -233,10 +235,10 @@ jobs:
       - name: Publish
         env:
           ACTIVITYMAP_CONVEX_SITE: ${{ vars.ACTIVITYMAP_CONVEX_SITE }}
-          ACTIVITYMAP_CONVEX_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_KEY_ID }}
-          ACTIVITYMAP_CONVEX_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_SIGNING_KEY }}
-          ACTIVITYMAP_CONVEX_WRITER_KEY_ID: ${{ secrets.ACTIVITYMAP_CONVEX_WRITER_KEY_ID }}
-          ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY }}
+          ACTIVITYMAP_PLACES_KEY_ID: ${{ secrets.ACTIVITYMAP_PLACES_KEY_ID }}
+          ACTIVITYMAP_PLACES_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_PLACES_SIGNING_KEY }}
+          ACTIVITYMAP_PLACES_WRITER_KEY_ID: ${{ secrets.ACTIVITYMAP_PLACES_WRITER_KEY_ID }}
+          ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY: ${{ secrets.ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY }}
           EXPECT_CURRENT: ${{ needs.plan.outputs.current }}
         run: |
           pnpm --silent places:publish --artifact output/places/places-live \

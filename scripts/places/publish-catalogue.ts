@@ -3,16 +3,18 @@ import { parseArgs } from 'node:util';
 
 import { loadCatalogueArtifact } from '../../src/server/places/catalogue-artifact';
 import { publishCatalogue } from '../../src/server/places/catalogue-publish';
-import { convexCatalogueReader } from '../../src/server/places/catalogue-reader';
+import {
+  convexCatalogueReader,
+  convexCatalogueWriter,
+} from '../../src/server/places/catalogue-reader';
 import { uploadFile } from '../../src/server/places/convex-catalogue';
-import { convexWriteBridge } from '../../src/server/sync/convex-writer';
 
 /**
  * Publish a place catalogue artifact to the Convex backend's live catalogue,
  * where activities are matched against it. Only the difference from the live
  * catalogue is sent, and only activities in the changed tiles are matched
  * again. Without --apply it only reports what publishing would do, with the
- * read bridge's key alone.
+ * catalogue's read key alone.
  */
 const { values } = parseArgs({
   options: {
@@ -29,7 +31,7 @@ const { values } = parseArgs({
 });
 if (values.help) {
   console.log(
-    'Publish a complete catalogue (default: dry run):\n  pnpm places:publish --artifact <directory> [--report <file>] [--region <region>]\n  pnpm places:publish --artifact <directory> --apply --expect-current <snapshot-id|none> [--allow-large-retirement] [--replace-pending <snapshot-id>] [--report <file>] [--region <region>]\nOnly the difference from the live catalogue is sent. Running an interrupted --apply again finishes it; --replace-pending abandons the unfinished publication of another artifact instead. --report also writes the report JSON to a file.\nA dry run requires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_CONVEX_KEY_ID and ACTIVITYMAP_CONVEX_SIGNING_KEY (the read bridge). --apply also requires ACTIVITYMAP_CONVEX_WRITER_KEY_ID and ACTIVITYMAP_CONVEX_WRITER_SIGNING_KEY.',
+    'Publish a complete catalogue (default: dry run):\n  pnpm places:publish --artifact <directory> [--report <file>] [--region <region>]\n  pnpm places:publish --artifact <directory> --apply --expect-current <snapshot-id|none> [--allow-large-retirement] [--replace-pending <snapshot-id>] [--report <file>] [--region <region>]\nOnly the difference from the live catalogue is sent. Running an interrupted --apply again finishes it; --replace-pending abandons the unfinished publication of another artifact instead. --report also writes the report JSON to a file.\nA dry run requires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_PLACES_KEY_ID and ACTIVITYMAP_PLACES_SIGNING_KEY (the catalogue read key). --apply also requires ACTIVITYMAP_PLACES_WRITER_KEY_ID and ACTIVITYMAP_PLACES_WRITER_SIGNING_KEY (the catalogue write key).',
   );
   process.exit(0);
 }
@@ -45,11 +47,9 @@ if (values['replace-pending'] && !values.apply)
   throw new Error('--replace-pending only applies with --apply');
 const reader = convexCatalogueReader();
 if (!reader) throw new Error('ACTIVITYMAP_CONVEX_SITE is not configured');
-// The catalogue belongs to no account: its writes are authorized by the
-// writer key alone, and the bridge's owner scope is not used.
-const writer = values.apply
-  ? convexWriteBridge({ userId: 'place-catalogue', athleteId: 0 })!
-  : undefined;
+const writer = values.apply ? convexCatalogueWriter() : undefined;
+if (values.apply && !writer)
+  throw new Error('--apply requires the Convex catalogue writer');
 
 const report = await publishCatalogue({
   catalogue: await loadCatalogueArtifact(values.artifact),

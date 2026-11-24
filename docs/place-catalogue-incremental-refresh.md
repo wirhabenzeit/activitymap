@@ -357,7 +357,13 @@ still serves from the rowsets.
 - `livePlaces.demandTiles`, and a read-only bridge route
   `/internal/places/v1` (`liveState`, `liveHashes`, `demandTiles`) with its
   client `src/server/places/catalogue-reader.ts`. A dry run needs only the
-  read key; `--apply` also needs the writer key.
+  read key; `--apply` also needs the write key.
+- The catalogue's writes (`uploadUrl`, `beginApply`, `applyBatch`,
+  `completeApply`) on a route of their own, `/internal/places/write/v1`,
+  with the same client file. Both catalogue routes take only the
+  catalogue's keys (`ACTIVITYMAP_BRIDGE_PLACES_KEYS`,
+  `ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS`), which can neither read nor
+  write a library; the app's keys are refused there.
 - The publisher defaults to the region `places-live`, refuses a coverage
   boundary above the 500,000-edge budget, reports `coverage`, `regions`,
   `regionsAdded` and `regionsRemoved`, and writes the report to a file with
@@ -376,14 +382,17 @@ Where it differs from the plan:
   routes moves to a separate PR after the cutover
   ([#609](https://github.com/wirhabenzeit/activitymap/issues/609)): the
   rowsets are still serving until then.
-- The live catalogue's reads moved from the write route to a read-only
-  route, so the jobs that plan and review a publication never hold a key
-  that can write.
+- The live catalogue's reads moved from the app's write route to a
+  read-only route, so the jobs that plan and review a publication never
+  hold a key that can write. Its writes moved to a route of their own too,
+  and both take keys of the catalogue's own, so the workflow's secrets
+  cannot read or write a user's library.
 
 First use, after the cutover: run the workflow by hand with `demand` off
 (a no-op or a small diff on the live regions), then with `demand` on, then
-enable the schedule. The setup it needs first, two GitHub environments and a
-read key ID in the deployment's `ACTIVITYMAP_BRIDGE_SIGNING_KEYS`, is in
+enable the schedule. The setup it needs first, two GitHub environments and
+the deployment's `ACTIVITYMAP_BRIDGE_PLACES_KEYS` and
+`ACTIVITYMAP_BRIDGE_PLACES_WRITER_KEYS`, is in
 [place-catalogue-refresh.md](place-catalogue-refresh.md#setup).
 
 Known limits not addressed: artifacts are read whole into one string, which
@@ -416,7 +425,7 @@ As shipped (commands and operation in
    trips (`--allow-large-retirement` is never passed) or the coverage has
    more than 500,000 edges.
 5. **`apply`**, in the `places-production` environment, which holds the
-   writer key and has a required reviewer: apply with `--expect-current`
+   write key and has a required reviewer: apply with `--expect-current`
    from the plan. Skipped when the plan says `unchanged`. The reviewer could
    be removed after a few clean runs.
 

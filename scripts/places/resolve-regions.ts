@@ -40,7 +40,7 @@ const { values } = parseArgs({
 });
 if (values.help) {
   console.log(
-    'Resolve the regions and the Geofabrik date of the next catalogue:\n  pnpm places:resolve [--no-demand] [--date YYMMDD] [--overrides <file>]\nPrints { date, regions: [{ region, pbf, poly, reason }], added, skipped, counts }. A demanded region the catalogue cannot take (its coverage, or the region limit) is skipped and named. --no-demand keeps the live regions and the overrides only; --date pins the extract date; --overrides defaults to config/place-regions.json.\nRequires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_CONVEX_KEY_ID and ACTIVITYMAP_CONVEX_SIGNING_KEY (the read bridge).',
+    'Resolve the regions and the Geofabrik date of the next catalogue:\n  pnpm places:resolve [--no-demand] [--date YYMMDD] [--overrides <file>]\nPrints { date, regions: [{ region, pbf, poly, reason }], added, skipped, counts }. A demanded region the catalogue cannot take (its coverage, or the region limit) is skipped and named. --no-demand keeps the live regions and the overrides only; --date pins the extract date; --overrides defaults to config/place-regions.json.\nRequires ACTIVITYMAP_CONVEX_SITE, ACTIVITYMAP_PLACES_KEY_ID and ACTIVITYMAP_PLACES_SIGNING_KEY (the catalogue read key).',
   );
   process.exit(0);
 }
