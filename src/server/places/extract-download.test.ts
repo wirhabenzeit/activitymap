@@ -36,7 +36,9 @@ function body(
       else if (end === 'error') controller.error(new Error('socket reset'));
       else
         return new Promise<void>((_, reject) =>
-          signal?.addEventListener('abort', () => reject(signal.reason as Error)),
+          signal?.addEventListener('abort', () =>
+            reject(signal.reason as Error),
+          ),
         );
     },
   });
