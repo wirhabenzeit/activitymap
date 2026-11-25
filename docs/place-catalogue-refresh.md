@@ -208,7 +208,7 @@ merged, so a world catalogue needs a higher limit or a cheaper validation.
 
 Known limits that are not addressed yet: artifacts are read whole into one
 string, which bounds a catalogue at about 900,000 rows
-(`MAX_CATALOGUE_ROWS`, 500 MiB), and preparation stops at 100,000 selected
+(`MAX_CATALOGUE_ROWS`, 500 MiB), and preparation stops at 500,000 selected
 sources per region.
 
 ## Publish or refresh
@@ -595,7 +595,8 @@ emitted. The reader follows the [official OSM PBF schemas](https://github.com/op
 
 Only selected place sources and required hut member ways/node positions are
 retained between passes. There is no complete node-location index. Preparation
-limits selected sources to 100,000 and 64 MiB of serialized source data, and hut
+limits selected sources to 500,000 and 256 MiB of serialized source data
+(Spain, the largest region measured, selects 100,097 of 25 MB), and hut
 node dependencies to 1,000,000. Hut geometry is bounded to 10,000 vertices and
 uses the existing robust coverage topology checks. Unclosed/branching rings,
 self-intersections, holes outside an exterior, touching boundaries, overlapping

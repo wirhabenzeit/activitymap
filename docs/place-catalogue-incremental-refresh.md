@@ -397,7 +397,7 @@ the deployment's `ACTIVITYMAP_BRIDGE_PLACES_KEYS` and
 [place-catalogue-refresh.md](place-catalogue-refresh.md#setup).
 
 Known limits not addressed: artifacts are read whole into one string, which
-bounds a catalogue at about 900,000 rows, and preparation stops at 100,000
+bounds a catalogue at about 900,000 rows, and preparation stops at 500,000
 selected sources per region.
 
 ## Automation: GitHub Actions
@@ -461,7 +461,7 @@ notification is the alert.
   all 190 countries have 35,688 vertices before shared borders merge.
 - Catalogue size: artifacts are read whole into one string (about 900,000
   rows at most; more needs a streaming reader), and preparation stops at
-  100,000 selected sources per region.
+  500,000 selected sources per region.
 - Whether two activities in one tile is the right demand threshold, and
   whether a weekly run is soon enough for a new country
   (`repository_dispatch` above).
