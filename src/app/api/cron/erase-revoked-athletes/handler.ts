@@ -9,6 +9,8 @@ export interface ErasureCronHandlerDependencies {
   externalEffectsDisabledMessage: string;
   getCronSecret: () => string | undefined;
   eraseDue: (options: { batchSize: number }) => Promise<ErasureRunResult>;
+  /** Records the run's success; a failure here does not fail the run. */
+  onSucceeded?: () => Promise<unknown>;
   onError?: (message: string, error?: unknown) => void;
 }
 
@@ -42,6 +44,7 @@ export function createErasureCronHandler({
   externalEffectsDisabledMessage,
   getCronSecret,
   eraseDue,
+  onSucceeded = async () => undefined,
   onError = () => undefined,
 }: ErasureCronHandlerDependencies) {
   return async function POST(request: Request): Promise<Response> {
@@ -83,6 +86,11 @@ export function createErasureCronHandler({
           { error: 'One or more due erasures failed', ...result },
           { status: 500 },
         );
+      }
+      try {
+        await onSucceeded();
+      } catch (error) {
+        onError('[Cron] erase-revoked-athletes success not recorded', error);
       }
       return Response.json(result);
     } catch (error) {

@@ -4,6 +4,7 @@ import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, internalQuery } from './_generated/server';
 import { activityFor } from './activityWrites';
 import { ingests, needsRecording } from './ingestion';
+import { jobHealth } from './jobHealth';
 
 /**
  * What the app's operator dashboard (`/admin`) reads, through the signed
@@ -49,7 +50,7 @@ export const overview = internalQuery({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    const [state, budget, event, publications] = await Promise.all([
+    const [state, budget, event, publications, jobs] = await Promise.all([
       ctx.db.query('placeCatalogueState').unique(),
       ctx.db.query('providerBudget').take(8),
       ctx.db
@@ -62,6 +63,7 @@ export const overview = internalQuery({
         .withIndex('by_revision')
         .order('desc')
         .take(PUBLICATIONS),
+      jobHealth(ctx),
     ]);
     // Tiles of a pending revision wait for its completion.
     const tiles = state
@@ -105,6 +107,7 @@ export const overview = internalQuery({
           blockedUntil: blockedUntil ?? null,
         }),
       ),
+      jobs,
     };
   },
 });

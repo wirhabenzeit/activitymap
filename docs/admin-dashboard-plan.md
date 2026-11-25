@@ -141,7 +141,7 @@ One pull request each.
    argument; the progress bar, source date, publications and matched counts, and
    the problem of a stopped walk. Done.
 3. **Job health**: `jobHeartbeats`, the job list on System and the problem of a
-   late job. Also the problem of old source data.
+   late job. Also the problem of old source data. Done.
 
 Later: retry and re-match actions on a user's page, and the refresh workflow's
 last run on Places (after #622).

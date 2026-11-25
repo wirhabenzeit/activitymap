@@ -37,6 +37,7 @@ const modules = {
   './authStore.ts': () => import('../convex/authStore'),
   './bridge.ts': () => import('../convex/bridge'),
   './http.ts': () => import('../convex/http'),
+  './jobHealth.ts': () => import('../convex/jobHealth'),
 };
 const secret = 'e'.repeat(64);
 
@@ -882,4 +883,22 @@ void test('rate-limit compatibility never falls back on authorization, conflict,
     /network unavailable/,
   );
   assert.equal(requests, 1);
+});
+
+void test('a scheduled job of the app reports its success, once per request and by a known name', async (t) => {
+  const { convex, call, requests } = setup(t);
+  const heartbeats = () =>
+    convex.run((ctx) => ctx.db.query('jobHeartbeats').collect());
+  await call({ kind: 'jobSucceeded', job: 'erase-revoked-athletes' });
+  const [first] = await heartbeats();
+  assert.equal(first!.job, 'erase-revoked-athletes');
+  assert.deepEqual(requests.at(-1), { kind: 'jobSucceeded', nonce: true });
+
+  await call({ kind: 'jobSucceeded', job: 'erase-revoked-athletes' });
+  assert.equal((await heartbeats()).length, 1);
+  await assert.rejects(
+    call({ kind: 'jobSucceeded', job: 'something-else' }),
+    BridgeResponseError,
+  );
+  assert.equal((await heartbeats()).length, 1);
 });

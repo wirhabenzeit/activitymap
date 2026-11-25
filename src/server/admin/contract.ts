@@ -46,6 +46,18 @@ export const adminOverviewSchema = z.strictObject({
       blockedUntil: time.nullable(),
     }),
   ),
+  /** Scheduled jobs and their last success. None from a backend before
+   * they were recorded. */
+  jobs: z
+    .array(
+      z.strictObject({
+        job: z.string().regex(/^[a-z-]{1,64}$/),
+        intervalMs: count,
+        /** Null until the job has succeeded once since this was recorded. */
+        succeededAt: time.nullable(),
+      }),
+    )
+    .default([]),
 });
 
 const jobs = z.strictObject({

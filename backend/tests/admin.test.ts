@@ -17,7 +17,11 @@ import { previewFixtureActivity } from './fixtures';
 const modules = {
   './_generated/api.js': () => import('../convex/_generated/api.js'),
   './admin.ts': () => import('../convex/admin'),
+  './appState.ts': () => import('../convex/appState'),
+  './bridge.ts': () => import('../convex/bridge'),
   './http.ts': () => import('../convex/http'),
+  './jobHealth.ts': () => import('../convex/jobHealth'),
+  './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
 };
 
@@ -89,7 +93,44 @@ void test('an empty backend answers with nothing', async () => {
     catalogue: null,
     budget: [],
     users: [],
+    jobs: JOB_KEYS.map(([job, intervalMs]) => ({
+      job,
+      intervalMs,
+      succeededAt: null,
+    })),
   });
+});
+
+const HOUR = 60 * 60_000;
+const JOB_KEYS = [
+  ['compact-changes', 24 * HOUR],
+  ['expire-nonces', HOUR],
+  ['expire-provider-events', 24 * HOUR],
+  ['expire-rate-limits', 24 * HOUR],
+  ['resume-rematch-walks', 24 * HOUR],
+  ['erase-revoked-athletes', HOUR],
+] as const;
+
+void test('every scheduled Convex job records its success when it runs', async () => {
+  const convex = convexTest(schema, modules);
+  await convex.mutation(internal.maintenance.compactChanges, {});
+  await convex.mutation(internal.bridge.expireNonces, {});
+  await convex.mutation(internal.maintenance.expireProviderEvents, {});
+  await convex.mutation(internal.appState.expireOldRateLimits, {});
+  await convex.mutation(internal.maintenance.resumeRematchWalks, {});
+  await convex.mutation(internal.maintenance.resumeRematchWalks, {});
+  const { jobs } = await figures(convex);
+  assert.deepEqual(
+    jobs.map(({ job, succeededAt }) => [job, succeededAt]),
+    JOB_KEYS.map(([job]) => [
+      job,
+      job === 'erase-revoked-athletes' ? null : now,
+    ]),
+  );
+  assert.equal(
+    (await convex.run((ctx) => ctx.db.query('jobHeartbeats').collect())).length,
+    5,
+  );
 });
 
 void test('a user is counts, states and times, and nothing personal', async () => {
@@ -363,7 +404,7 @@ void test('the catalogue, its changed tiles and the request budget', async () =>
       ceiling: 100,
     });
   });
-  const { users: _users, ...overview } = await figures(convex);
+  const { users: _users, jobs: _jobs, ...overview } = await figures(convex);
   assert.deepEqual(overview, {
     observedAt: now,
     lastEventAt: null,

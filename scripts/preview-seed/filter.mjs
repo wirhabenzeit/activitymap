@@ -32,7 +32,7 @@ export const OWNER_TABLES = [
 
 /**
  * Tables emptied on Preview: operational state (queues, nonces, budgets,
- * rate limits, publication records and the tiles a re-match walk has left), delivered events, and
+ * rate limits, publication records, job runs and the tiles a re-match walk has left), delivered events, and
  * share links, whose tokens would grant access to production libraries from
  * Preview.
  */
@@ -46,6 +46,8 @@ export const EMPTIED_TABLES = [
   'placeTileChanges',
   // Its walk progress belongs to the tiles above.
   'placePublications',
+  // Production's job runs say nothing about Preview's.
+  'jobHeartbeats',
 ];
 
 /** Auth models that identify a person; sessions, verifications and keys are

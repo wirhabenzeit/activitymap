@@ -110,6 +110,7 @@ void test('a snapshot keeps only the chosen athletes and no credentials', async 
         { _id: 'n2', owner: 'o2' },
       ],
       placePublications: [{ _id: 'b1', revision: 1 }],
+      jobHeartbeats: [{ _id: 'j1', job: 'expire-nonces', succeededAt: 1 }],
       placeCatalogues: [{ _id: 'c1', metadata: 'f3' }],
       places: [{ _id: 'p1' }],
       livePlaces: [{ _id: 'q1' }],
@@ -173,6 +174,7 @@ void test('a snapshot keeps only the chosen athletes and no credentials', async 
   assert.equal((await rows(directory, 'placeCatalogueState')).length, 1);
   assert.deepEqual(await rows(directory, 'placeTileChanges'), []);
   assert.deepEqual(await rows(directory, 'placePublications'), []);
+  assert.deepEqual(await rows(directory, 'jobHeartbeats'), []);
   assert.deepEqual(
     (await rows(directory, 'placeMatchCounts')).map((r) => r._id),
     ['n1'],

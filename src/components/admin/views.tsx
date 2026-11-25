@@ -8,6 +8,9 @@ import {
   clock,
   date,
   disconnected,
+  every,
+  jobLate,
+  jobName,
   lastSyncAt,
   limitedUntil,
   livePublication,
@@ -15,6 +18,7 @@ import {
   number,
   problemHref,
   problems,
+  pushState,
   reasonText,
   rematchProgress,
   tabStates,
@@ -456,13 +460,14 @@ export function SystemView({
   snapshot,
   controls,
 }: Props & { controls: React.ReactNode }) {
-  const { system } = tabStates(snapshot);
+  const push = pushState(snapshot);
   const windows = budgetWindows(snapshot);
+  const now = snapshot.observedAt;
   return (
     <>
       <Section title="Strava push subscription">
         <Box>
-          <Row label={<State tone={system.tone}>{system.text}</State>} />
+          <Row label={<State tone={push.tone}>{push.text}</State>} />
           {controls}
         </Box>
       </Section>
@@ -482,6 +487,37 @@ export function SystemView({
                     ? undefined
                     : `Blocked until ${clock(blockedUntil)}`
                 }
+              />
+            ))
+          )}
+        </Box>
+      </Section>
+      <Section title="Scheduled jobs">
+        <Box>
+          {snapshot.jobs.length === 0 ? (
+            <Row label="Not recorded by this backend" />
+          ) : (
+            snapshot.jobs.map((job) => (
+              <Row
+                key={job.job}
+                label={
+                  <State
+                    tone={
+                      jobLate(job, now)
+                        ? 'bad'
+                        : job.succeededAt === null
+                          ? 'off'
+                          : 'ok'
+                    }
+                  >
+                    {jobName(job.job)}
+                  </State>
+                }
+                value={`${every(job.intervalMs)}, ${
+                  job.succeededAt === null
+                    ? 'no success recorded'
+                    : `last success ${ago(job.succeededAt, now)}`
+                }`}
               />
             ))
           )}
