@@ -35,6 +35,11 @@ export default defineSchema({
     retentionFloor: v.number(),
     catalogueAfter: v.optional(v.string()),
   }).index('by_owner', ['owner']),
+  /** The last success of each scheduled job (convex/jobHealth.ts). */
+  jobHeartbeats: defineTable({
+    job: v.string(),
+    succeededAt: v.number(),
+  }).index('by_job', ['job']),
   /** Library counts per owner (convex/stats.ts). `rebuildAfter` is set while
    * a recount runs: the last activity key it has counted. */
   ownerStats: defineTable({

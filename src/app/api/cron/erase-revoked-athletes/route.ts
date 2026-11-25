@@ -1,3 +1,4 @@
+import { convexAuthStore } from '~/server/auth/convex-adapter';
 import {
   EXTERNAL_EFFECTS_DISABLED_MESSAGE,
   externalEffectsEnabled,
@@ -21,5 +22,11 @@ export const POST = createErasureCronHandler({
       await eraseDueAccountsOnConvex();
     return { candidates, erased, cancelled, stale: 0, failed };
   },
+  // Shown on /admin (backend/convex/jobHealth.ts).
+  onSucceeded: () =>
+    convexAuthStore()({
+      kind: 'jobSucceeded',
+      job: 'erase-revoked-athletes',
+    }),
   onError: (message, error) => logger.error(message, error),
 });

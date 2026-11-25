@@ -29,6 +29,34 @@ const JOB_LATE_MS = 30 * MINUTE;
 const WALK_LIMIT_MS = 30 * MINUTE;
 const APPLY_LIMIT_MS = 2 * HOUR;
 const ERASURE_LATE_MS = DAY;
+/** The weekly refresh's source data is a few days old when it publishes. */
+const SOURCE_LIMIT_MS = 14 * DAY;
+
+const JOB_NAMES: Record<string, string> = {
+  'compact-changes': 'Compact expired sync changes',
+  'expire-nonces': 'Expire bridge write nonces',
+  'expire-provider-events': 'Expire Strava event receipts',
+  'expire-rate-limits': 'Expire API rate limit windows',
+  'resume-rematch-walks': 'Resume place re-match walks',
+  'erase-revoked-athletes': 'Erase revoked accounts',
+};
+export const jobName = (job: string) => JOB_NAMES[job] ?? job;
+
+type Job = AdminSnapshot['jobs'][number];
+
+/** A job is late when it has not succeeded for twice its interval. One
+ * without a recorded success yet is not: it may not have been due since
+ * deployment, and the app's job runs in Production only. */
+export const jobLate = (job: Job, now: number) =>
+  job.succeededAt !== null && now - job.succeededAt > 2 * job.intervalMs;
+
+/** How often a job runs, in words. */
+export function every(ms: number) {
+  if (ms % DAY === 0) return ms === DAY ? 'daily' : `every ${ms / DAY} days`;
+  if (ms % HOUR === 0)
+    return ms === HOUR ? 'hourly' : `every ${ms / HOUR} hours`;
+  return `every ${Math.round(ms / MINUTE)} min`;
+}
 
 const REASONS: Record<string, string> = {
   rate_limited: 'Strava request limit',
@@ -236,6 +264,20 @@ export function problems(snapshot: AdminSnapshot): Problem[] {
         text: `Re-matching for revision ${item.revision} stopped ${ago(steppedAt, now)} with ${number(left)} changed ${left === 1 ? 'area' : 'areas'} left`,
       });
   }
+  const source = livePublication(snapshot)?.source;
+  if (source && now - source.dataAsOf > SOURCE_LIMIT_MS)
+    found.push({
+      tone: 'warn',
+      tab: 'places',
+      text: `Place source data is ${days(now - source.dataAsOf)} old`,
+    });
+  for (const job of snapshot.jobs)
+    if (jobLate(job, now))
+      found.push({
+        tone: 'bad',
+        tab: 'system',
+        text: `${jobName(job.job)} last succeeded ${ago(job.succeededAt, now)}, runs ${every(job.intervalMs)}`,
+      });
   if (snapshot.leftovers > 0)
     found.push({
       tone: 'warn',
@@ -339,6 +381,27 @@ export function totals({ users, catalogue }: AdminSnapshot) {
   };
 }
 
+/** The push subscription in a few words. */
+export function pushState({ subscription }: AdminSnapshot): {
+  tone: Tone;
+  text: string;
+} {
+  return {
+    tone:
+      subscription === 'registered'
+        ? 'ok'
+        : subscription === 'missing'
+          ? 'bad'
+          : 'off',
+    text: {
+      registered: 'Strava push registered',
+      missing: 'Strava push not registered',
+      unknown: 'Strava push not checked',
+      not_managed: 'Strava push not managed here',
+    }[subscription],
+  };
+}
+
 /** The four tabs' one-line summaries and tones. */
 export function tabStates(
   snapshot: AdminSnapshot,
@@ -355,6 +418,9 @@ export function tabStates(
   const affected = new Set(found.flatMap((item) => item.athleteId ?? [])).size;
   const userCount = `${number(users.length)} ${users.length === 1 ? 'user' : 'users'}`;
   const progress = rematchProgress(snapshot);
+  const late = snapshot.jobs.filter((job) =>
+    jobLate(job, snapshot.observedAt),
+  ).length;
   const checked =
     progress && progress.done < progress.total
       ? `${Math.floor((100 * progress.done) / progress.total)}% of changed areas checked`
@@ -396,12 +462,12 @@ export function tabStates(
         'system',
         snapshot.subscription === 'registered' ? 'ok' : 'off',
       ),
-      text: {
-        registered: 'Strava push registered',
-        missing: 'Strava push not registered',
-        unknown: 'Strava push not checked',
-        not_managed: 'Strava push not managed here',
-      }[snapshot.subscription],
+      text: [
+        pushState(snapshot).text,
+        late > 0 && `${late} ${late === 1 ? 'job' : 'jobs'} late`,
+      ]
+        .filter(Boolean)
+        .join(', '),
     },
   };
 }

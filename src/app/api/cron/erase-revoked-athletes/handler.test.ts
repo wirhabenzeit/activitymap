@@ -107,3 +107,32 @@ void test('erasure cron returns failure when any candidate transaction failed', 
   const body = (await response.json()) as { failed: number };
   assert.equal(body.failed, 1);
 });
+
+void test('erasure cron records a successful run, and only that', async () => {
+  const recorded: string[] = [];
+  const errors: string[] = [];
+  const handler = (failed: number, record: () => Promise<unknown>) =>
+    createErasureCronHandler({
+      externalEffectsEnabled: () => true,
+      externalEffectsDisabledMessage: 'disabled',
+      getCronSecret: () => 'correct',
+      eraseDue: async () => ({ ...SUCCESS, failed }),
+      onSucceeded: record,
+      onError: (message) => errors.push(message),
+    });
+  const record = async () => recorded.push('run');
+
+  assert.equal((await handler(1, record)(request())).status, 500);
+  assert.deepEqual(recorded, []);
+  assert.equal((await handler(0, record)(request())).status, 200);
+  assert.deepEqual(recorded, ['run']);
+
+  // A backend that cannot record it yet does not fail the erasure.
+  const refused = handler(0, async () => {
+    throw new Error('400');
+  });
+  assert.equal((await refused(request())).status, 200);
+  assert.deepEqual(errors, [
+    '[Cron] erase-revoked-athletes success not recorded',
+  ]);
+});

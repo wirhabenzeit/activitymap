@@ -3,6 +3,7 @@ import { v } from 'convex/values';
 import { SYNC_RETENTION_MS as RETENTION_MS } from '../../src/contracts/v1/sync-policy';
 import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
+import { succeeded } from './jobHealth';
 
 const PAGE_SIZE = 256;
 
@@ -39,6 +40,7 @@ export const compactChanges = internalMutation({
       await ctx.scheduler.runAfter(0, internal.maintenance.compactChanges, {
         cutoff,
       });
+    await succeeded(ctx, 'compact-changes');
     return rows.length;
   },
 });
@@ -68,6 +70,7 @@ const WALK_RESTARTS = 16;
 export const resumeRematchWalks = internalMutation({
   args: {},
   handler: async (ctx): Promise<number[]> => {
+    await succeeded(ctx, 'resume-rematch-walks');
     const state = await ctx.db.query('placeCatalogueState').unique();
     if (!state) return [];
     const revisions: number[] = [];
@@ -114,6 +117,7 @@ export const expireProviderEvents = internalMutation({
         internal.maintenance.expireProviderEvents,
         {},
       );
+    await succeeded(ctx, 'expire-provider-events');
     return rows.length;
   },
 });

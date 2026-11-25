@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
+import { succeeded } from './jobHealth';
 
 /** Record a write nonce once. A repeated nonce means a replayed request. */
 export const consumeNonce = internalMutation({
@@ -31,6 +32,7 @@ export const expireNonces = internalMutation({
     for (const row of rows) await ctx.db.delete('bridgeNonces', row._id);
     if (rows.length === PAGE_SIZE)
       await ctx.scheduler.runAfter(0, internal.bridge.expireNonces, {});
+    await succeeded(ctx, 'expire-nonces');
     return rows.length;
   },
 });

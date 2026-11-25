@@ -148,5 +148,13 @@ IDs only. Access requires a Strava sign-in whose athlete ID is listed in
 `ACTIVITYMAP_ADMIN_ATHLETE_IDS`; anyone else gets a 404. The plan and what is
 still to come are in [Admin dashboard](admin-dashboard-plan.md).
 
-The scheduled jobs above are not shown there yet; their runs are on the Convex
-and Cloudflare dashboards.
+Its System tab lists the Convex jobs and the account erasure with their last
+success. Each job records that in the transaction of its work
+(`backend/convex/jobHealth.ts`, which also sets the Convex crons' intervals);
+the erasure route reports it through the auth route once a run has erased
+everything due. A job without success for twice its interval is a problem on
+the Overview. One without a recorded success yet is not: after a deploy it may
+not have been due, and the erasure runs in Production only. The weekly place
+refresh is not listed; Places warns when the live catalogue's source data is
+older than 14 days. Individual runs and their logs stay on the Convex and
+Cloudflare dashboards.

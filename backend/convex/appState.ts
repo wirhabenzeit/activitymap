@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 
 import { internal } from './_generated/api';
 import { type MutationCtx, internalMutation } from './_generated/server';
+import { succeeded } from './jobHealth';
 
 /**
  * Two counters the app keeps for itself, stored in Convex:
@@ -87,6 +88,7 @@ export const expireOldRateLimits = internalMutation({
     await ctx.scheduler.runAfter(0, internal.appState.expireRateLimits, {
       cutoff: Date.now() - 2 * 86_400_000,
     });
+    await succeeded(ctx, 'expire-rate-limits');
   },
 });
 

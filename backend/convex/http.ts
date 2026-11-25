@@ -526,6 +526,10 @@ router.route({
             args,
           );
           break;
+        // A scheduled job of the app did its work (convex/jobHealth.ts).
+        case 'jobSucceeded':
+          result = await ctx.runMutation(internal.jobHealth.record, args);
+          break;
         default:
           return new Response(null, { status: 400, headers });
       }

@@ -7,6 +7,7 @@ import type { AdminSnapshot, AdminUser } from '~/server/admin/contract';
 import {
   ago,
   budgetWindows,
+  every,
   lastSyncAt,
   limitedUntil,
   nextCheck,
@@ -96,6 +97,7 @@ function snapshot(
       publications: [publication()],
     },
     budget: [],
+    jobs: [],
     subscription: 'registered',
     leftovers: 0,
     users,
@@ -273,6 +275,58 @@ void test('a re-match walk without a step for 30 minutes is a problem while it h
     'bad places Re-matching for revision 3 stopped 24 h ago with 1 changed area left',
   ]);
   assert.deepEqual(at({ ...left, completedAt: null, walkedAt: null }), []);
+});
+
+void test('place source data older than 14 days is a problem, when it is known', () => {
+  const at = (dataAsOf: number) =>
+    texts(published(publication({ source: { dataAsOf, regions: 45 } })));
+  assert.deepEqual(at(now - 14 * DAY), []);
+  assert.deepEqual(at(now - 15 * DAY - HOUR), [
+    'warn places Place source data is 15 days old',
+  ]);
+  // Revisions from before the source date was recorded.
+  assert.deepEqual(texts(published(publication({ source: null }))), []);
+  // Only the live revision's source counts.
+  assert.deepEqual(
+    texts(
+      published(
+        publication({
+          revision: 2,
+          source: { dataAsOf: now - 30 * DAY, regions: 45 },
+        }),
+      ),
+    ),
+    [],
+  );
+});
+
+void test('a scheduled job without success for twice its interval is late', () => {
+  const job = (succeededAt: number | null, intervalMs = HOUR) => ({
+    job: 'erase-revoked-athletes',
+    intervalMs,
+    succeededAt,
+  });
+  const at = (...jobs: AdminSnapshot['jobs']) => snapshot([user()], { jobs });
+  assert.deepEqual(texts(at(job(now - 2 * HOUR), job(null, DAY))), []);
+  const late = at(job(now - 3 * HOUR), {
+    ...job(now - 3 * DAY, DAY),
+    job: 'some-new-job',
+  });
+  assert.deepEqual(texts(late), [
+    'bad system Erase revoked accounts last succeeded 3 h ago, runs hourly',
+    'bad system some-new-job last succeeded 3 d ago, runs daily',
+  ]);
+  assert.deepEqual(tabStates(late).system, {
+    tone: 'bad',
+    text: 'Strava push registered, 2 jobs late',
+  });
+  assert.deepEqual([HOUR, 6 * HOUR, DAY, 7 * DAY, 30 * MINUTE].map(every), [
+    'hourly',
+    'every 6 hours',
+    'daily',
+    'every 7 days',
+    'every 30 min',
+  ]);
 });
 
 void test('match totals leave out users not counted and earlier re-matches', () => {

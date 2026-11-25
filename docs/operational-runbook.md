@@ -47,6 +47,12 @@ against the production deployment. Repeating it is harmless.
 A `blocked` job waits for the account's Strava credentials to change, for
 example after a reconnect.
 
+If `/admin` says a scheduled job is late, look at its runs: the Convex jobs in
+the deployment's Convex dashboard (Schedules, Cron jobs), the account erasure in
+the `activitymap-cron` Worker's logs in Cloudflare. A Convex job records its
+success only when its work succeeds, so a failed run shows there with its
+error.
+
 ## Credential revocation
 
 The athlete-deauthorization webhook clears stored Strava tokens immediately,
