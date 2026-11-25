@@ -1464,6 +1464,199 @@ void test('a catalogue change during a run is matched afterwards without another
   );
 });
 
+const unavailable: GatewayFailure = {
+  kind: 'upstream_error',
+  status: 400,
+  retryable: false,
+};
+const outcomes = async (convex: Convex) =>
+  (await state(convex)).jobs.map((job) => [
+    job.status,
+    job.phase,
+    job.error,
+    job.failure,
+  ]);
+async function adoptRenamed(convex: Convex, revision: string, id: string) {
+  const next = await rowset(convex, revision, [{ ...peak, id }]);
+  await next.complete();
+  await convex.action(internal.catalogueWorker.adopt, {});
+  return next;
+}
+
+void test('a match says nothing about a failed or blocked read, which stays on the job', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+
+  for (const [revision, failure, status, error] of [
+    ['8', unavailable, 'failed', 'upstream_error 400'],
+    ['9', { kind: 'credentials_rejected' }, 'blocked', 'credentials_rejected'],
+  ] as const) {
+    provider.fail(failure);
+    await event(convex, '7', 'update');
+    await settle(convex);
+    const ended = [[status, 'source', error, undefined]];
+    assert.deepEqual(await outcomes(convex), ended);
+
+    const reads = provider.reads.length;
+    const next = await adoptRenamed(
+      convex,
+      revision,
+      `${revision.repeat(8)}-2222-4222-8222-222222222222`,
+    );
+    await settle(convex);
+    const { activities } = await state(convex);
+    assert.equal(
+      activities[0]!.projection!.match!.catalogue,
+      next.identity,
+      'matched again',
+    );
+    assert.deepEqual(await outcomes(convex), ended);
+    assert.equal(provider.reads.length, reads);
+  }
+
+  // The next read of the activity decides anew.
+  await event(convex, '7', 'update');
+  await settle(convex);
+  assert.deepEqual(await outcomes(convex), [
+    ['idle', 'source', undefined, undefined],
+  ]);
+});
+
+void test('a read that fails while a match is owed is still failed after the match', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+
+  const next = await rowset(convex, '8', [
+    { ...peak, id: '22222222-2222-4222-8222-222222222222' },
+  ]);
+  await next.complete();
+  provider.fail(unavailable);
+  provider.during = async () => {
+    await convex.action(internal.catalogueWorker.adopt, {});
+    await convex.mutation(internal.catalogue.next, {
+      scope,
+      catalogue: next.identity,
+      writer: 'convex',
+    });
+  };
+  await event(convex, '7', 'update');
+  await settle(convex);
+  const { activities } = await state(convex);
+  assert.equal(activities[0]!.projection!.match!.catalogue, next.identity);
+  assert.deepEqual(await outcomes(convex), [
+    ['failed', 'source', 'upstream_error 400', undefined],
+  ]);
+});
+
+void test('a read given up after its retries while a match is owed is still failed after the match', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+
+  await event(convex, '7', 'update');
+  const job = (await state(convex)).jobs[0]!;
+  await convex.run((ctx) =>
+    ctx.db.patch('ingestionJobs', job._id, { attempt: MAX_ATTEMPTS - 1 }),
+  );
+  const next = await rowset(convex, '8', [
+    { ...peak, id: '22222222-2222-4222-8222-222222222222' },
+  ]);
+  await next.complete();
+  provider.fail({ ...unavailable, status: 503, retryable: true });
+  provider.during = async () => {
+    await convex.action(internal.catalogueWorker.adopt, {});
+    await convex.mutation(internal.catalogue.next, {
+      scope,
+      catalogue: next.identity,
+      writer: 'convex',
+    });
+  };
+  await settle(convex);
+  const after = (await state(convex)).jobs[0]!;
+  assert.equal(
+    (await state(convex)).activities[0]!.projection!.match!.catalogue,
+    next.identity,
+  );
+  assert.deepEqual(
+    [after.status, after.error, after.attempt],
+    ['failed', 'upstream_error 503', MAX_ATTEMPTS],
+  );
+});
+
+void test('an activity that is requested while its match runs drops the earlier failure', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  provider.set(detail(7, 'Past the peak'));
+  provider.record('7', pastThePeak);
+  await ingest(convex, '7');
+  provider.fail(unavailable);
+  await event(convex, '7', 'update');
+  await settle(convex);
+
+  await adoptRenamed(convex, '8', '22222222-2222-4222-8222-222222222222');
+  const job = (await state(convex)).jobs[0]!;
+  await convex.mutation(internal.catalogue.next, {
+    scope,
+    catalogue: (await convex.run((ctx) => ctx.db.query('owners').first()))!
+      .catalogue,
+    writer: 'convex',
+  });
+  const step = await convex.mutation(internal.ingestion.claim, {
+    job: job._id,
+  });
+  assert.equal(step?.phase, 'match');
+  await event(convex, '7', 'update');
+  const { claims, failure } = (await state(convex)).jobs[0]!;
+  assert.equal(failure?.error, 'upstream_error 400');
+  await convex.mutation(internal.ingestion.complete, {
+    job: job._id,
+    claim: claims,
+  });
+  await settle(convex);
+  assert.deepEqual(await outcomes(convex), [
+    ['idle', 'source', undefined, undefined],
+  ]);
+});
+
+void test('an operator can request one known activity again', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  const request = (id: string, userId = actor.userId) =>
+    convex.mutation(internal.ingestion.request, { userId, id });
+  provider.set(detail(7, 'Morning ride'));
+  provider.fail(unavailable);
+  await event(convex, '7');
+  await settle(convex);
+  assert.equal((await state(convex)).jobs[0]!.status, 'failed');
+
+  assert.deepEqual(await request('7'), {
+    status: 'queued',
+    dueAt: Date.now(),
+  });
+  await settle(convex);
+  assert.equal((await state(convex)).jobs[0]!.status, 'idle');
+  assert.equal((await state(convex)).activities.length, 1);
+
+  const reads = provider.reads.length;
+  await assert.rejects(request('8'), /Unknown activity/);
+  await assert.rejects(request('x'), /Invalid external activity/);
+  await assert.rejects(request('7', 'nobody'), /does not ingest/);
+  await settle(convex);
+  assert.equal(provider.reads.length, reads);
+});
+
 void test('an adoption that a newer one overtook moves no library back', async () => {
   const convex = convexTest(schema, modules);
   const owners = 33;

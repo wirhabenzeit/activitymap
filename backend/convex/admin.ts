@@ -2,7 +2,8 @@ import { v } from 'convex/values';
 
 import type { Doc } from './_generated/dataModel';
 import { type QueryCtx, internalQuery } from './_generated/server';
-import { ingests } from './ingestion';
+import { activityFor } from './activityWrites';
+import { ingests, needsRecording } from './ingestion';
 
 /**
  * What the app's operator dashboard (`/admin`) reads, through the signed
@@ -17,6 +18,8 @@ import { ingests } from './ingestion';
 const USER_PAGE = 16;
 /** Jobs read per user and status; a count at the limit means "or more". */
 const JOB_LIMIT = 250;
+/** Activities of failed jobs looked up per user. */
+const FAILED_LOOKUPS = 8;
 const TILE_LIMIT = 1000;
 /** Publications listed, the newest first. */
 const PUBLICATIONS = 5;
@@ -147,6 +150,30 @@ async function access(ctx: QueryCtx, userId: string) {
   };
 }
 
+/** What the given failed jobs' activities still miss. Nothing is under way
+ * for them, so they are counted as failed and not as left to fetch. */
+async function missing(
+  ctx: QueryCtx,
+  owner: Doc<'owners'>,
+  jobs: Doc<'ingestionJobs'>[],
+) {
+  const rows = (
+    await Promise.all(
+      jobs
+        .filter((job) => job.phase !== 'match')
+        .slice(0, FAILED_LOOKUPS)
+        .map((job) => activityFor(ctx, owner._id, job.activity)),
+    )
+  ).filter(
+    (row) => row?.dto && !row.deleted && row.generation === owner.generation,
+  );
+  return {
+    details: rows.filter((row) => row!.dto!.geometry_state !== 'detailed')
+      .length,
+    recordings: rows.filter(needsRecording).length,
+  };
+}
+
 async function userFigures(ctx: QueryCtx, owner: Doc<'owners'>, now: number) {
   const [matches, stats, sweep, event, queued, failed, blocked, accountAccess] =
     await Promise.all([
@@ -173,6 +200,7 @@ async function userFigures(ctx: QueryCtx, owner: Doc<'owners'>, now: number) {
       access(ctx, owner.userId),
     ]);
   const counts = stats?.counts;
+  const gaveUp = await missing(ctx, owner, [...failed, ...blocked]);
   const split = (jobs: Doc<'ingestionJobs'>[]) => {
     const matches = jobs.filter((job) => job.phase === 'match').length;
     return {
@@ -205,10 +233,15 @@ async function userFigures(ctx: QueryCtx, owner: Doc<'owners'>, now: number) {
           activities: counts.total,
           recordings: counts.withData + counts.withoutData,
           photos: counts.photoCount,
-          /** Activities that still miss their details or their recording. */
+          /** Activities that still miss their details or their recording,
+           * apart from those whose job failed or is blocked. */
           toFetch: Math.max(
-            counts.neverFetched + counts.invalidatedDetails,
-            counts.runnable + counts.waiting + counts.blocked,
+            0,
+            counts.neverFetched + counts.invalidatedDetails - gaveUp.details,
+            counts.runnable +
+              counts.waiting +
+              counts.blocked -
+              gaveUp.recordings,
           ),
           rebuilding: stats.rebuildAfter !== undefined,
         }

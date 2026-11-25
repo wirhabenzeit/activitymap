@@ -381,7 +381,9 @@ What keeps this safe:
   and a provider error that a retry cannot change mark the job failed at
   once. Everything else is retried after one minute, doubling up to six
   hours, and the job is marked failed after ten attempts. A failed job
-  starts over with the next request for its activity.
+  starts over with the next request for its activity. A new catalogue or
+  changed places match its recording again in the meantime, after which the
+  job is failed (or blocked) as before.
 
 The worker needs three Convex environment variables, and without them every
 run fails as retryable and writes nothing:
@@ -394,7 +396,9 @@ ACTIVITYMAP_PROVIDER_GATEWAY_SECRET='<64 hex characters>'
 
 The key pair must be one of the app's `ACTIVITYMAP_PROVIDER_GATEWAY_KEYS`.
 `convex run ingestion:status '{"userId":"<userId>"}'` lists an owner's jobs
-that are waiting, blocked or failed.
+that are waiting, blocked or failed, and
+`convex run ingestion:request '{"userId":"<userId>","id":"<activity>"}'`
+requests one activity again.
 
 ### Edit and refresh
 

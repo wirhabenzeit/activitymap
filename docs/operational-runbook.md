@@ -31,8 +31,11 @@ current problems and, on a user's page, how many jobs failed or are blocked and
 why. The jobs themselves (status `failed` or `blocked`, with their `error`) are
 on the Convex dashboard. A
 failed job is retried by the account's next sweep, which requests every
-activity that is still incomplete. To retry sooner, start the sweep: the
-account's owner can use **Check Strava for missing activities** in Settings
+activity that is still incomplete. To retry one activity sooner, run
+`pnpm exec convex run ingestion:request '{"userId":"<userId>","id":"<activity>"}'`
+in `backend/` against the production deployment; `ingestion:status` with the
+same `userId` then shows the job with its error. To retry all, start the sweep:
+the account's owner can use **Check Strava for missing activities** in Settings
 (at most once an hour), or an operator can send the write bridge's `sweepNow`
 operation for the account.
 

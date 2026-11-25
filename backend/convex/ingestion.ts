@@ -61,7 +61,8 @@ import { applyPhotoSet, photosOfActivities } from './photos';
  * `requestMatch` queues a job that starts at the match phase, so the
  * recording is matched again without a provider read. A job that is running
  * at that moment is marked (`rematch`) and queued for the match when its run
- * ends, however it ends.
+ * ends, however it ends. A job that had failed or was blocked is so again
+ * after such a match (`failure`).
  *
  * Every write names the job's claim. A worker whose lease was taken over
  * (it expired and `recover` or a later claim moved on) changes nothing, and
@@ -207,13 +208,25 @@ export async function requestMatch(
   await queueMatch(ctx, job);
 }
 
-/** Queue a job for the match alone. */
-async function queueMatch(ctx: MutationCtx, job: Doc<'ingestionJobs'>) {
+type SourceFailure = NonNullable<Doc<'ingestionJobs'>['failure']>;
+
+/** Queue a job for the match alone. The job returns afterwards to the
+ * failure it was in, or ends in now (`failure`), unless that was the match's
+ * own. */
+async function queueMatch(
+  ctx: MutationCtx,
+  job: Doc<'ingestionJobs'>,
+  failure: SourceFailure | undefined = job.phase !== 'match' &&
+  (job.status === 'failed' || job.status === 'blocked')
+    ? { status: job.status, attempt: job.attempt, error: job.error }
+    : job.failure,
+) {
   const now = Date.now();
   await ctx.db.patch('ingestionJobs', job._id, {
     status: 'queued',
     phase: 'match',
     rematch: true,
+    failure,
     attempt: 0,
     dueAt: now,
     lease: undefined,
@@ -222,7 +235,23 @@ async function queueMatch(ctx: MutationCtx, job: Doc<'ingestionJobs'>) {
   await schedule(ctx, job._id, now);
 }
 
-function needsRecording(row: Doc<'activities'> | null) {
+/** A job with nothing left to run: idle, or back in the failure that a match
+ * interrupted. */
+function atRest(job: Doc<'ingestionJobs'>) {
+  return {
+    status: 'idle' as const,
+    phase: 'source' as const,
+    rematch: undefined,
+    attempt: 0,
+    dueAt: undefined,
+    lease: undefined,
+    error: undefined,
+    ...job.failure,
+    failure: undefined,
+  };
+}
+
+export function needsRecording(row: Doc<'activities'> | null) {
   return (
     !!row?.dto &&
     !row.deleted &&
@@ -399,14 +428,7 @@ async function finish(ctx: MutationCtx, job: Doc<'ingestionJobs'>) {
   }
   // The catalogue changed while the run was under way.
   if (job.rematch) return queueMatch(ctx, job);
-  await ctx.db.patch('ingestionJobs', job._id, {
-    status: 'idle',
-    phase: 'source',
-    attempt: 0,
-    dueAt: undefined,
-    lease: undefined,
-    error: undefined,
-  });
+  await ctx.db.patch('ingestionJobs', job._id, atRest(job));
 }
 
 async function retry(
@@ -417,7 +439,8 @@ async function retry(
   const attempt = job.attempt + 1;
   if (attempt >= MAX_ATTEMPTS) {
     // The owed match needs no provider and is not given up with the rest.
-    if (job.rematch && job.phase !== 'match') return queueMatch(ctx, job);
+    if (job.rematch && job.phase !== 'match')
+      return queueMatch(ctx, job, { status: 'failed', attempt, error: reason });
     await ctx.db.patch('ingestionJobs', job._id, {
       status: 'failed',
       attempt,
@@ -514,15 +537,7 @@ export const claim = internalMutation({
       // A job queued for the match alone has nothing to do (matched
       // meanwhile, or the recording is gone): it never reads the provider.
       if (job.rematch) {
-        await ctx.db.patch('ingestionJobs', job._id, {
-          status: 'idle',
-          phase: 'source',
-          rematch: undefined,
-          attempt: 0,
-          dueAt: undefined,
-          lease: undefined,
-          error: undefined,
-        });
+        await ctx.db.patch('ingestionJobs', job._id, atRest(job));
         return null;
       }
       // Nothing left to record or match (deleted, or done meanwhile): look
@@ -536,6 +551,7 @@ export const claim = internalMutation({
     await ctx.db.patch('ingestionJobs', job._id, {
       phase: 'source',
       rematch: undefined,
+      failure: undefined,
       claims: number,
       lease,
       attempt,
@@ -750,19 +766,22 @@ export const fail = internalMutation({
         return;
       }
       case 'blocked':
-      case 'permanent':
+      case 'permanent': {
+        const status = failure.kind === 'blocked' ? 'blocked' : 'failed';
+        const error = failure.reason.slice(0, 200);
         // The owed match needs no provider: it runs all the same.
         if (job.rematch && job.phase !== 'match') {
-          await queueMatch(ctx, job);
+          await queueMatch(ctx, job, { status, attempt: job.attempt, error });
           return;
         }
         await ctx.db.patch('ingestionJobs', job._id, {
-          status: failure.kind === 'blocked' ? 'blocked' : 'failed',
+          status,
           dueAt: undefined,
           lease: undefined,
-          error: failure.reason.slice(0, 200),
+          error,
         });
         return;
+      }
       case 'retry':
         await retry(ctx, job, failure.reason.slice(0, 200));
     }
@@ -878,7 +897,11 @@ export const apply = internalMutation({
         }),
       ))!;
     const revision = await nextRevision(ctx, owner, job);
-    await ctx.db.patch('ingestionJobs', job._id, { revision });
+    // A failure that a match interrupted is over: the app read the source.
+    await ctx.db.patch('ingestionJobs', job._id, {
+      revision,
+      failure: undefined,
+    });
     const fence = {
       scope: args.scope,
       generation: owner.generation,
@@ -951,7 +974,35 @@ export const status = internalQuery({
       attempt: job.attempt,
       dueAt: job.dueAt ?? null,
       running: !!job.lease && job.lease.expiresAt > Date.now(),
-      error: job.error ?? null,
+      error: job.error ?? job.failure?.error ?? null,
     }));
+  },
+});
+
+/** Ask for one activity again, for an operator:
+ * `convex run ingestion:request '{"userId":"<userId>","id":"<activity>"}'`.
+ * Only an activity that is in the library or has a job, so that a mistyped
+ * ID is never read. `ingestion:status` then says how it went. */
+export const request = internalMutation({
+  args: { userId: v.string(), id: v.string() },
+  handler: async (ctx, { userId, id }) => {
+    const owner = await ownerFor(ctx, userId);
+    if (!ingests(owner)) throw new Error('Convex does not ingest for the user');
+    const activity = idKey(id);
+    const [row, job] = await Promise.all([
+      activityFor(ctx, owner._id, activity),
+      ctx.db
+        .query('ingestionJobs')
+        .withIndex('by_owner_activity', (q) =>
+          q.eq('owner', owner._id).eq('activity', activity),
+        )
+        .unique(),
+    ]);
+    if (!job && !row?.dto) throw new Error('Unknown activity');
+    const requested = (await ctx.db.get(
+      'ingestionJobs',
+      await requestIngestion(ctx, owner._id, activity),
+    ))!;
+    return { status: requested.status, dueAt: requested.dueAt ?? null };
   },
 });
