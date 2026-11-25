@@ -1,0 +1,685 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Admin mockup</title>
+    <style id="standalone-tokens">
+      :root {
+        color-scheme: light;
+        --background: #fff;
+        --foreground: #0a0a0a;
+        --card: #fff;
+        --muted: #f5f5f5;
+        --muted-foreground: #686868;
+        --border: #e3e3e3;
+        --ring: #0a0a0a;
+        --destructive: #d4342c;
+        --warning: #b87503;
+        --success: #16803c;
+        --radius: 8px;
+        --font-sans: ui-sans-serif, system-ui, sans-serif;
+        --font-mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --background: #0a0a0a;
+          --foreground: #fafafa;
+          --card: #0a0a0a;
+          --muted: #262626;
+          --muted-foreground: #a3a3a3;
+          --border: #2e2e2e;
+          --ring: #d4d4d4;
+          --destructive: #f0645c;
+          --warning: #dd9a2b;
+          --success: #3fb568;
+        }
+      }
+      html {
+        background: var(--background);
+      }
+      body {
+        max-width: 52rem;
+        margin: 0 auto;
+        padding: 1.5rem 1rem 3rem;
+        color: var(--foreground);
+        font-family: var(--font-sans);
+      }
+    </style>
+    <style>
+      :root {
+        --bar: #2a78d6;
+        --track: color-mix(in oklab, var(--foreground) 11%, var(--background));
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-size: 14px;
+        line-height: 1.45;
+      }
+      h1,
+      h2,
+      p,
+      ul {
+        margin: 0;
+        padding: 0;
+      }
+      ul {
+        list-style: none;
+      }
+      button {
+        font: inherit;
+        color: inherit;
+        background: none;
+        border: 0;
+        padding: 0;
+        cursor: pointer;
+        text-align: left;
+      }
+      :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+      }
+      .dim {
+        color: var(--muted-foreground);
+      }
+      .small {
+        font-size: 12px;
+      }
+      .mockbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 12px;
+        align-items: center;
+        padding-bottom: 14px;
+        margin-bottom: 20px;
+        border-bottom: 1px dashed var(--border);
+        font-size: 12px;
+        color: var(--muted-foreground);
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        overflow: hidden;
+      }
+      .seg button {
+        padding: 5px 11px;
+        font-size: 12px;
+      }
+      .seg button + button {
+        border-left: 1px solid var(--border);
+      }
+      .seg [aria-pressed='true'] {
+        background: var(--muted);
+        color: var(--foreground);
+        font-weight: 600;
+      }
+      .head {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 16px;
+        align-items: baseline;
+        justify-content: space-between;
+      }
+      h1 {
+        font-size: 24px;
+        line-height: 1.2;
+        font-weight: 600;
+      }
+      .link {
+        text-decoration: underline;
+        text-underline-offset: 3px;
+      }
+      nav {
+        position: relative;
+        display: flex;
+        gap: 22px;
+        margin: 16px 0 26px;
+        border-bottom: 1px solid var(--border);
+        overflow-x: auto;
+      }
+      nav button {
+        padding: 0 0 9px;
+        color: var(--muted-foreground);
+        display: inline-flex;
+        gap: 7px;
+        align-items: center;
+        white-space: nowrap;
+        border-bottom: 2px solid transparent;
+      }
+      nav button[aria-current] {
+        color: var(--foreground);
+        font-weight: 600;
+        border-color: var(--foreground);
+      }
+      nav button:focus-visible {
+        outline-offset: -2px;
+      }
+      .mark {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        flex: none;
+      }
+      .ok {
+        border-radius: 50%;
+        background: var(--success);
+      }
+      .run {
+        border-radius: 50%;
+        border: 2px solid var(--bar);
+      }
+      .warn {
+        background: var(--warning);
+        clip-path: polygon(50% 0, 100% 100%, 0 100%);
+      }
+      .bad {
+        background: var(--destructive);
+        transform: rotate(45deg) scale(0.88);
+      }
+      .state {
+        display: inline-flex;
+        gap: 8px;
+        align-items: center;
+      }
+      .box {
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        background: var(--card);
+        overflow: hidden;
+      }
+      .row {
+        display: flex;
+        width: 100%;
+        justify-content: space-between;
+        gap: 4px 20px;
+        align-items: baseline;
+        padding: 11px 14px;
+      }
+      .row + .row {
+        border-top: 1px solid var(--border);
+      }
+      button.row:hover {
+        background: var(--muted);
+      }
+      .row > :last-child {
+        color: var(--muted-foreground);
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .problem {
+        display: grid;
+        grid-template-columns: 9px 1fr;
+        gap: 11px;
+        align-items: baseline;
+        justify-content: start;
+      }
+      .problem > :last-child {
+        color: var(--foreground);
+        text-align: left;
+      }
+      section + section {
+        margin-top: 28px;
+      }
+      h2 {
+        font-size: 14px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+      .figs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+        gap: 16px;
+      }
+      .figs .v {
+        font-size: 22px;
+        font-weight: 600;
+        line-height: 1.25;
+        font-variant-numeric: tabular-nums;
+      }
+      .bar {
+        height: 8px;
+        border-radius: 4px;
+        background: var(--track);
+        overflow: hidden;
+        margin: 8px 0;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--bar);
+      }
+      .pad {
+        padding: 14px;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-variant-numeric: tabular-nums;
+      }
+      th {
+        text-align: left;
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--muted-foreground);
+        padding: 9px 14px;
+      }
+      td {
+        padding: 11px 14px;
+        border-top: 1px solid var(--border);
+      }
+      tbody tr {
+        cursor: pointer;
+      }
+      tbody tr:hover {
+        background: var(--muted);
+      }
+      .r {
+        text-align: right;
+      }
+      .btns {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 10px;
+      }
+      .btn {
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--background);
+        padding: 5px 11px;
+        font-size: 13px;
+      }
+      @media (max-width: 520px) {
+        .hide {
+          display: none;
+        }
+        th,
+        td {
+          padding-left: 11px;
+          padding-right: 11px;
+        }
+        nav {
+          gap: 13px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="mockbar">
+      <span>Mockup, sample data. Show state:</span>
+      <div class="seg" role="group" aria-label="Mockup state" id="states"></div>
+    </div>
+    <main id="app"></main>
+    <script>
+      const f = (n) => n.toLocaleString('en-US');
+      const mark = (s) => `<span class="mark ${s}" aria-hidden="true"></span>`;
+      const state = (s, t) => `<span class="state">${mark(s)}${t}</span>`;
+      const row = (a, b, to) =>
+        to
+          ? `<button class="row" data-to="${to}"><span>${a}</span><span>${b}</span></button>`
+          : `<div class="row"><span>${a}</span><span>${b}</span></div>`;
+      const section = (title, body) =>
+        `<section>${title ? `<h2>${title}</h2>` : ''}${body}</section>`;
+      const box = (x) => `<div class="box">${x}</div>`;
+      const fig = (v, l) =>
+        `<div><div class="v">${v}</div><div class="small dim">${l}</div></div>`;
+
+      const base = [
+        ['1000001', 3412, 3398, 5210, '6 min ago', 'in 4 d'],
+        ['1000002', 2107, 2105, 1874, '3 h ago', 'in 1 d'],
+        ['1000003', 1296, 1288, 902, '1 d ago', 'in 2 d'],
+        ['1000004', 940, 940, 311, '9 h ago', 'in 5 d'],
+        ['1000005', 611, 611, 128, '2 d ago', 'in 3 d'],
+        ['1000006', 1460, 1448, 640, '40 min ago', 'in 2 d'],
+      ].map(([name, total, rec, photos, sync, next], id) => ({
+        id,
+        name,
+        total,
+        rec,
+        photos,
+        sync,
+        next,
+        account: ['ok', 'Connected'],
+        waiting: 0,
+        failed: 0,
+        matchWaiting: 0,
+        matchFailed: 0,
+        problems: [],
+      }));
+
+      function data(key) {
+        const u = base.map((x) => ({ ...x, problems: [] }));
+        const d = {
+          u,
+          problems: [],
+          walk: 1,
+          walkState: ['ok', 'Done'],
+          rematched: 3076,
+          sub: ['ok', 'Registered'],
+          late: false,
+          quarter: [12, 100],
+          day: [141, 1000],
+        };
+        if (key === 'fine') return d;
+        [163, 52, 31, 18, 4, 0].forEach((n, i) => (u[i].matchWaiting = n));
+        Object.assign(u[5], {
+          rec: 214,
+          photos: 88,
+          waiting: 1246,
+          account: ['run', 'Importing'],
+          next: 'in 22 min',
+        });
+        Object.assign(d, {
+          walk: 0.63,
+          walkState: ['run', 'Running'],
+          rematched: 1640,
+          quarter: [41, 100],
+          day: [702, 1000],
+        });
+        if (key === 'running') return d;
+        Object.assign(d, {
+          walkState: ['bad', 'Stopped 3 h ago'],
+          sub: ['bad', 'Points at another URL'],
+          late: true,
+          quarter: [75, 100],
+          day: [900, 1000],
+          limit: 'until 00:00 UTC',
+        });
+        Object.assign(u[2], {
+          account: ['bad', 'Sync overdue'],
+          sync: '8 d ago',
+          next: '2 d overdue',
+          matchFailed: 2,
+          problems: [
+            ['bad', 'Not synced for 8 days, over the seven-day limit'],
+            ['warn', '2 place matches failed: too many tiles'],
+          ],
+        });
+        Object.assign(u[3], {
+          account: ['warn', 'Must reconnect'],
+          failed: 14,
+          problems: [
+            ['warn', 'Strava rejected the credentials. 14 activities blocked.'],
+          ],
+        });
+        d.problems = [
+          ['bad', 'Re-matching stopped 3 h ago', 'places'],
+          ['bad', 'Athlete 1000003 has not synced for 8 days', 'user/2'],
+          ['bad', 'Strava push subscription points at another URL', 'system'],
+          ['bad', 'Scheduled job late: resume re-match walks', 'system'],
+          ['warn', 'Athlete 1000004 must reconnect to Strava', 'user/3'],
+          ['warn', '2 place matches failed', 'user/2'],
+        ];
+        return d;
+      }
+
+      const labels = {
+        fine: 'All fine',
+        running: 'Work in progress',
+        problems: 'Problems',
+      };
+      let key = 'running',
+        route = 'overview';
+      const worst = (list) =>
+        list.some((x) => x === 'bad')
+          ? 'bad'
+          : list.some((x) => x === 'warn')
+            ? 'warn'
+            : list.some((x) => x === 'run')
+              ? 'run'
+              : 'ok';
+      const total = (d, k) => d.u.reduce((t, x) => t + x[k], 0);
+
+      function status(d) {
+        const waiting = total(d, 'waiting'),
+          failed = total(d, 'failed'),
+          mw = total(d, 'matchWaiting'),
+          mf = total(d, 'matchFailed');
+        return {
+          users: [
+            worst(d.u.map((x) => x.account[0])),
+            `${d.u.length} users` +
+              (d.u.some((x) => x.problems.length)
+                ? `, ${d.u.filter((x) => x.problems.length).length} with problems`
+                : ''),
+          ],
+          activities: [
+            failed ? 'warn' : waiting ? 'run' : 'ok',
+            `${f(total(d, 'total'))} activities` +
+              (waiting ? `, ${f(waiting)} waiting` : '') +
+              (failed ? `, ${failed} blocked` : ''),
+          ],
+          places: [
+            d.walkState[0] === 'bad' ? 'bad' : mf ? 'warn' : mw ? 'run' : 'ok',
+            'Revision 3, ' + (mw ? `${f(mw)} matches waiting` : 'all matched'),
+          ],
+          system: [
+            worst([d.sub[0], d.late ? 'bad' : 'ok']),
+            d.late ? '2 problems' : 'All running',
+          ],
+        };
+      }
+
+      const behind = (d, w, x, words) => {
+        const list = d.u.filter((p) => p[w] || p[x]);
+        return list.length
+          ? section(
+              'Not finished',
+              box(
+                list
+                  .map((p) =>
+                    row(
+                      p.name,
+                      [p[w] && `${f(p[w])} waiting`, p[x] && `${p[x]} ${words}`]
+                        .filter(Boolean)
+                        .join(', '),
+                      `user/${p.id}`,
+                    ),
+                  )
+                  .join(''),
+              ),
+            )
+          : '';
+      };
+
+      const pages = {
+        overview: (d, s) =>
+          section(
+            '',
+            box(
+              d.problems.length
+                ? d.problems
+                    .map(
+                      ([k, t, to]) =>
+                        `<button class="row problem" data-to="${to}">${mark(k)}<span>${t}</span></button>`,
+                    )
+                    .join('')
+                : `<div class="row">${state('ok', '<b>No problems</b>')}<span></span></div>`,
+            ),
+          ) +
+          section(
+            '',
+            box(
+              ['users', 'activities', 'places', 'system']
+                .map((t) =>
+                  row(
+                    state(s[t][0], t[0].toUpperCase() + t.slice(1)),
+                    s[t][1],
+                    t,
+                  ),
+                )
+                .join(''),
+            ),
+          ),
+        users: (d) =>
+          box(
+            `<table><thead><tr><th>Athlete</th><th>State</th><th class="r hide">Activities</th><th class="r">Last sync</th></tr></thead><tbody>${d.u.map((p) => `<tr data-to="user/${p.id}"><td><button data-to="user/${p.id}">${p.name}</button></td><td>${state(...p.account)}</td><td class="r hide">${f(p.total)}</td><td class="r dim">${p.sync}</td></tr>`).join('')}</tbody></table>`,
+          ),
+        activities: (d) =>
+          section(
+            '',
+            `<div class="figs">${fig(f(total(d, 'total')), 'activities')}${fig(f(total(d, 'rec')), 'recordings')}${fig(f(total(d, 'photos')), 'photos')}${fig(f(total(d, 'waiting')), 'waiting')}${fig(f(total(d, 'failed')), 'failed or blocked')}</div>`,
+          ) +
+          behind(d, 'waiting', 'failed', 'blocked') +
+          section(
+            'Strava',
+            box(
+              row('Last event', '6 min ago') +
+                (d.limit
+                  ? row(
+                      state('warn', 'Waiting for Strava’s request limit'),
+                      d.limit,
+                      'system',
+                    )
+                  : ''),
+            ),
+          ),
+        places: (d) =>
+          section(
+            'Live catalogue',
+            `<div class="figs">${fig('Revision 3', 'since 25 Nov')}${fig('461,066', 'places')}${fig('23 Nov', 'source data')}</div>`,
+          ) +
+          section(
+            'Re-matching',
+            box(
+              `<div class="pad">${state(...d.walkState)}<div class="bar"><i style="width:${d.walk * 100}%"></i></div><p class="small dim">${Math.round(d.walk * 100)}% of changed areas checked, ${f(d.rematched)} activities re-matched${total(d, 'matchWaiting') ? `, ${f(total(d, 'matchWaiting'))} waiting` : ''}</p></div>`,
+            ),
+          ) +
+          behind(d, 'matchWaiting', 'matchFailed', 'failed') +
+          section(
+            'Publications',
+            box(
+              row('Revision 3', '25 Nov, 45 regions') +
+                row('Revision 2', '24 Nov, 8 regions') +
+                row('Revision 1', '24 Nov, 8 regions'),
+            ),
+          ),
+        system: (d) =>
+          section(
+            'Strava push subscription',
+            box(
+              `<div class="pad">${state(...d.sub)}<div class="btns"><button class="btn">Check status</button><button class="btn">Register webhook</button></div></div>`,
+            ),
+          ) +
+          section(
+            'Strava request budget',
+            box(
+              [
+                ['This quarter hour', d.quarter],
+                ['Today', d.day],
+              ]
+                .map(
+                  ([l, [a, b]]) =>
+                    `<div class="pad" style="padding-bottom:6px"><div style="display:flex;justify-content:space-between"><span>${l}</span><span class="dim">${f(a)} of ${f(b)}</span></div><div class="bar"><i style="width:${(100 * a) / b}%"></i></div></div>`,
+                )
+                .join(''),
+            ),
+          ) +
+          section(
+            'Scheduled jobs',
+            box(
+              [
+                [
+                  'Resume re-match walks',
+                  d.late ? '31 h ago' : '6 h ago',
+                  d.late,
+                ],
+                ['Compact sync changes', '6 h ago'],
+                ['Expire event receipts', '6 h ago'],
+                ['Expire rate limits', '6 h ago'],
+                ['Expire write nonces', '22 min ago'],
+                ['Erase revoked accounts', '32 min ago'],
+              ]
+                .map(([n, t, l]) =>
+                  row(state(l ? 'bad' : 'ok', n), l ? `late, ${t}` : t),
+                )
+                .join(''),
+            ),
+          ),
+      };
+      function userPage(d, id) {
+        const p = d.u[id];
+        return (
+          `<p style="margin-bottom:18px"><button class="link small dim" data-to="users">Users</button> <span class="dim small">/</span></p><h1 style="font-size:20px;margin-bottom:16px">Athlete ${p.name}</h1>` +
+          (p.problems.length
+            ? section(
+                '',
+                box(
+                  p.problems
+                    .map(
+                      ([k, t]) =>
+                        `<div class="row problem">${mark(k)}<span>${t}</span></div>`,
+                    )
+                    .join(''),
+                ),
+              )
+            : '') +
+          section(
+            'Account',
+            box(
+              row('State', state(...p.account)) +
+                row('Last sync', p.sync) +
+                row('Next full check', p.next),
+            ),
+          ) +
+          section(
+            'Activities',
+            box(
+              row('Activities', f(p.total)) +
+                row('Recordings', f(p.rec)) +
+                row('Photos', f(p.photos)) +
+                row('Waiting', f(p.waiting)) +
+                row('Failed or blocked', f(p.failed)),
+            ),
+          ) +
+          section(
+            'Places',
+            box(
+              row('Matched', f(p.rec - p.matchWaiting - p.matchFailed)) +
+                row('Waiting', f(p.matchWaiting)) +
+                row('Failed', f(p.matchFailed)),
+            ),
+          )
+        );
+      }
+      function render() {
+        const d = data(key),
+          s = status(d);
+        const [page, id] = route.split('/');
+        const active = page === 'user' ? 'users' : page;
+        document.getElementById('states').innerHTML = Object.entries(labels)
+          .map(
+            ([k, l]) =>
+              `<button data-key="${k}" aria-pressed="${k === key}">${l}</button>`,
+          )
+          .join('');
+        document.getElementById('app').innerHTML =
+          `<header class="head"><h1>Admin</h1><span class="small dim">Updated 14:32:07 UTC &nbsp; <button class="link">Back to the map</button></span></header>
+    <nav aria-label="Admin">${Object.keys(pages)
+      .map(
+        (t) =>
+          `<button data-to="${t}"${t === active ? ' aria-current="page"' : ''}>${t[0].toUpperCase() + t.slice(1)}${s[t] && ['bad', 'warn'].includes(s[t][0]) ? mark(s[t][0]) + '<span class="small" style="position:absolute;clip-path:inset(50%)">has problems</span>' : ''}</button>`,
+      )
+      .join('')}</nav>` +
+          (page === 'user' ? userPage(d, Number(id)) : pages[page](d, s));
+      }
+      document.addEventListener('click', (e) => {
+        const t = e.target.closest('[data-key],[data-to]');
+        if (!t) return;
+        if (t.dataset.key) key = t.dataset.key;
+        else route = t.dataset.to;
+        const kind = t.dataset.key ? 'key' : 'to',
+          value = t.dataset[kind];
+        render();
+        [...document.querySelectorAll(`button[data-${kind}]`)]
+          .find((x) => x.dataset[kind] === value)
+          ?.focus({ preventScroll: true });
+      });
+      render();
+    </script>
+  </body>
+</html>

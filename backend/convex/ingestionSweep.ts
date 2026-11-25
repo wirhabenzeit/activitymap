@@ -287,7 +287,11 @@ export const applyPage = internalMutation({
     }
     const next =
       args.items.length === 0
-        ? { phase: 'confirming' as const, after: '' }
+        ? {
+            phase: 'confirming' as const,
+            after: '',
+            listReadAt: Date.now(),
+          }
         : { page: sweep.page + 1 };
     await extend(ctx, sweep, args.claim, next);
     return stepFor(owner, args.claim, { ...sweep, ...next });

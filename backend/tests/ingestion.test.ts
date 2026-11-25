@@ -801,6 +801,7 @@ void test('a sweep finds an activity, a change and a deletion that no event repo
     [sweep!.phase, sweep!.number, sweep!.lease, sweep!.dueAt - Date.now()],
     ['idle', 2, undefined, SWEEP_INTERVAL_MS],
   );
+  assert.equal(sweep!.listReadAt, Date.now());
 
   // Nothing changed: the next sweep reads the list and nothing else.
   await advance(convex, SWEEP_INTERVAL_MS);
@@ -817,6 +818,23 @@ void test('a sweep finds an activity, a change and a deletion that no event repo
     'Renamed',
   );
   assert.equal(sweep!.number, 4);
+});
+
+void test('the list counts as read when a scan reaches its end, not when one starts', async () => {
+  const provider = fakeProvider();
+  const convex = await owner();
+  provider.set(manual(1, 'Ride'));
+  const readAt = (await state(convex)).sweep!.listReadAt;
+  assert.equal(readAt, Date.now());
+
+  provider.fail({ kind: 'upstream_error', status: 503, retryable: true });
+  await advance(convex, SWEEP_INTERVAL_MS);
+  let { sweep } = await state(convex);
+  assert.deepEqual([sweep!.phase, sweep!.listReadAt], ['scanning', readAt]);
+
+  await advance(convex, 60_000);
+  ({ sweep } = await state(convex));
+  assert.equal(sweep!.listReadAt, Date.now());
 });
 
 void test('activities missing from the list are confirmed a bounded number at a time', async () => {

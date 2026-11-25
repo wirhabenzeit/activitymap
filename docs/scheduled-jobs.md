@@ -140,6 +140,13 @@ GitHub's failure notification. Setup, review, failures and rollback are in
 
 ## Admin page
 
-`/admin` manages the Strava push subscription. Access requires a Strava
-sign-in whose athlete ID is listed in `ACTIVITYMAP_ADMIN_ATHLETE_IDS`; anyone
-else gets a 404. Ingestion is observed on the Convex dashboard.
+`/admin` shows what needs attention, the state of each user's library, the
+place catalogue and its re-matching, the Strava request budget and the Strava
+push subscription, which it also registers. It reads the Convex backend through
+the signed admin route (`backend/convex/admin.ts`): counts, states and athlete
+IDs only. Access requires a Strava sign-in whose athlete ID is listed in
+`ACTIVITYMAP_ADMIN_ATHLETE_IDS`; anyone else gets a 404. The plan and what is
+still to come are in [Admin dashboard](admin-dashboard-plan.md).
+
+The scheduled jobs above are not shown there yet; their runs are on the Convex
+and Cloudflare dashboards.

@@ -63,6 +63,7 @@ export default defineSchema({
     receivedAt: v.number(),
   })
     .index('by_owner_event', ['owner', 'event'])
+    .index('by_owner_received', ['owner', 'receivedAt'])
     .index('by_received', ['receivedAt']),
   /** Convex ingestion (convex/ingestion.ts): one job per owner and activity.
    * `requested` counts the times the activity was asked for; a run that
@@ -138,6 +139,9 @@ export default defineSchema({
     lease: v.optional(v.object({ claim: v.number(), expiresAt: v.number() })),
     error: v.optional(v.string()),
     completedAt: v.optional(v.number()),
+    /** When a scan last reached the end of the provider's list. The sweep
+     * itself completes later, once it has asked for what is missing. */
+    listReadAt: v.optional(v.number()),
   }).index('by_owner', ['owner']),
   /** Private share links of an owner Convex writes for (convex/shares.ts).
    * `activities` are activity keys. */

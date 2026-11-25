@@ -49,6 +49,12 @@ const channels = {
     keys: 'ACTIVITYMAP_BRIDGE_WRITER_KEYS',
     domain: 'activitymap-auth-v1',
   },
+  // The operator dashboard's reads. The app's read keys, under a domain of
+  // their own.
+  admin: {
+    keys: 'ACTIVITYMAP_BRIDGE_SIGNING_KEYS',
+    domain: 'activitymap-admin-v1',
+  },
   // The live place catalogue's reads and writes. Keys of their own, so a key
   // that publishes the catalogue can neither read nor write a library, and
   // the app's keys cannot change the catalogue.
@@ -165,6 +171,41 @@ router.route({
           { code: 'sync_rebootstrap_required' },
           { status: 409, headers },
         );
+      return new Response(null, { status: 400, headers });
+    }
+  }),
+});
+
+/**
+ * The operator dashboard's reads (convex/admin.ts): counts and states of
+ * every user's library. Who may see them is decided by the app
+ * (`requireAdmin`) before it asks.
+ */
+router.route({
+  path: '/internal/admin/v1',
+  method: 'POST',
+  handler: httpAction(async (ctx, request) => {
+    try {
+      const body = await readBody(request);
+      if (body === null) return new Response(null, { status: 413, headers });
+      if (!(await allowed(request, body, 'admin')))
+        return new Response(null, { status: 401, headers });
+      const { kind, ...args } = JSON.parse(body).operation ?? {};
+      switch (kind) {
+        case 'overview':
+          return Response.json(
+            await ctx.runQuery(internal.admin.overview, {}),
+            { headers },
+          );
+        case 'users':
+          return Response.json(await ctx.runQuery(internal.admin.users, args), {
+            headers,
+          });
+        default:
+          return new Response(null, { status: 400, headers });
+      }
+    } catch (error) {
+      console.error('Admin read failed', error);
       return new Response(null, { status: 400, headers });
     }
   }),
