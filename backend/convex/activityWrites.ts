@@ -29,6 +29,7 @@ import {
   scopeFields,
 } from './owners';
 import { removeActivityPhotos } from './photos';
+import { applyMatchCount, isMatched } from './placeCounts';
 import { manifestValidator, summaryValidator } from './recordingValidators';
 import { applyStats, contribution } from './stats';
 
@@ -135,6 +136,7 @@ export async function applySourceRecord(
   );
   // Counted before the old recording can be deleted below.
   const countedBefore = await contribution(ctx, owner, prior);
+  const matchedBefore = isMatched(owner, prior);
   const oldRecording =
     prior?.recording && (await ctx.db.get('recordings', prior.recording));
   if (oldRecording && !preserve) {
@@ -168,6 +170,7 @@ export async function applySourceRecord(
       await publishChange(ctx, owner, args.id, 'delete');
     await removeActivityPhotos(ctx, owner._id, key);
     await applyStats(ctx, owner._id, key, countedBefore, null);
+    await applyMatchCount(ctx, owner._id, key, matchedBefore, false);
     return true;
   }
   const {
@@ -213,12 +216,20 @@ export async function applySourceRecord(
   // advances the revision fence; clients have nothing new to sync.
   if (!(preserve && sameValue(prior!.dto, dto)))
     await publishChange(ctx, owner, args.id, 'upsert');
+  const stored = await activityFor(ctx, owner._id, key);
   await applyStats(
     ctx,
     owner._id,
     key,
     countedBefore,
-    await contribution(ctx, owner, await activityFor(ctx, owner._id, key)),
+    await contribution(ctx, owner, stored),
+  );
+  await applyMatchCount(
+    ctx,
+    owner._id,
+    key,
+    matchedBefore,
+    isMatched(owner, stored),
   );
   return true;
 }
@@ -365,6 +376,13 @@ export const publishRecording = internalMutation({
       countedBefore,
       await contribution(ctx, owner, await ctx.db.get('activities', row._id)),
     );
+    await applyMatchCount(
+      ctx,
+      owner._id,
+      row.key,
+      isMatched(owner, row),
+      false,
+    );
     return true;
   },
 });
@@ -419,5 +437,14 @@ export async function publishMatchRecord(
     }),
   });
   await publishChange(ctx, owner, args.id, 'upsert');
+  const replaced = prior?.catalogue === args.catalogue;
+  await applyMatchCount(
+    ctx,
+    owner._id,
+    row.key,
+    replaced,
+    true,
+    replaced && (prior.revision ?? 0) >= 1 ? revision : undefined,
+  );
   return true;
 }

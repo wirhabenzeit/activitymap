@@ -13,6 +13,7 @@ import {
   replacePlaceTiles,
 } from './activityWrites';
 import { ingests, requestMatch } from './ingestion';
+import { publicationFor } from './livePlaces';
 import { writerValidator } from './ownerScope';
 import {
   ownerFor,
@@ -21,6 +22,7 @@ import {
   scopeFields,
   writerOf,
 } from './owners';
+import { recountMatches } from './placeCounts';
 import { latestCatalogue } from './places';
 
 /** How many activities one step of the walk handles, and how long it waits
@@ -62,6 +64,8 @@ export async function selectFor(
   const head = await requireHead(ctx, owner._id);
   await ctx.db.patch('owners', owner._id, { catalogue, matchingVersion });
   await ctx.db.patch('ownerHeads', head._id, { catalogueAfter: '' });
+  // Matches for another catalogue no longer count.
+  await recountMatches(ctx, owner._id);
   await ctx.scheduler.runAfter(0, internal.catalogue.next, {
     scope: {
       userId: owner.userId,
@@ -308,6 +312,7 @@ export const rematchTiles = internalMutation({
     const seen = new Set<string>();
     let budget = WALK_PAGE;
     let requested = 0;
+    let finished = 0;
     let next: typeof cursor;
     for (const change of changes) {
       const rows = await tileActivities(
@@ -350,6 +355,15 @@ export const rematchTiles = internalMutation({
         break;
       }
       await ctx.db.delete('placeTileChanges', change._id);
+      finished++;
+    }
+    if (changes.length > 0) {
+      const publication = await publicationFor(ctx, revision);
+      if (publication)
+        await ctx.db.patch('placePublications', publication._id, {
+          tilesDone: publication.tilesDone + finished,
+          walkedAt: Date.now(),
+        });
     }
     const done = !next && changes.length < TILE_PAGE;
     if (!done)

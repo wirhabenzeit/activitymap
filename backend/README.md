@@ -515,6 +515,18 @@ walk deletes each tile's row once it has finished the tile, so the rows left
 are its unfinished work; a daily job (`maintenance.resumeRematchWalks`)
 starts the walk again for completed revisions that still have rows.
 
+For the operator dashboard (`/admin/places`), `placePublications` keeps one row
+per publication: the source date and number of regions the publisher names, how
+many tiles changed and were finished, and the walk's last step.
+`placeMatchCounts` keeps how many of each owner's activities have a current
+match, and how many were matched again for the latest revision. Owners that
+existed before these counts need one recount. Writes keep the counts consistent
+while it runs:
+
+```sh
+pnpm exec convex run placeCounts:rebuild
+```
+
 `livePlaces.demandTiles` pages through `activityPlaceTiles` in tile order
 and answers each tile with the number of its rows on the page, with no owner
 or activity: the tiles that hold activities, from which the region selection

@@ -11,6 +11,7 @@ import {
   scopeFields,
   writerValidator,
 } from './ownerScope';
+import { startMatchCounts } from './placeCounts';
 import { zeroCounts } from './statsShape';
 
 export { scopeFields } from './ownerScope';
@@ -122,6 +123,7 @@ export const provision = internalMutation({
       await ctx.db.insert('ownerEpochs', { owner: id, epoch: args.epoch });
       // A new owner has no activities yet; writes keep its counts current.
       await ctx.db.insert('ownerStats', { owner: id, counts: zeroCounts() });
+      await startMatchCounts(ctx, id);
       return id;
     }
     if (

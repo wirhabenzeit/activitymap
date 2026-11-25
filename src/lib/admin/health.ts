@@ -25,6 +25,8 @@ const LIST_LIMIT_MS = 7 * DAY;
 const SWEEP_LATE_MS = HOUR;
 /** A large re-match keeps jobs waiting for a while without being stuck. */
 const JOB_LATE_MS = 30 * MINUTE;
+/** A walk step takes seconds and pauses for two. */
+const WALK_LIMIT_MS = 30 * MINUTE;
 const APPLY_LIMIT_MS = 2 * HOUR;
 const ERASURE_LATE_MS = DAY;
 
@@ -70,6 +72,14 @@ export function until(time: number, now: number) {
 
 export const clock = (time: number) =>
   `${new Date(time).toISOString().slice(11, 16)} UTC`;
+
+export const date = (time: number) =>
+  new Date(time).toLocaleDateString('en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+    timeZone: 'UTC',
+  });
 
 export const number = (value: number) => value.toLocaleString('en-US');
 
@@ -180,6 +190,31 @@ export function userProblems(user: AdminUser, now: number): Problem[] {
   return found;
 }
 
+type Publication = NonNullable<
+  AdminSnapshot['catalogue']
+>['publications'][number];
+
+const tilesLeft = ({ tiles, tilesDone }: Publication) =>
+  Math.max(0, tiles - tilesDone);
+
+/** The re-match walks' progress in changed tiles: of the live revision and
+ * of earlier ones not finished. Null when none is recorded. */
+export function rematchProgress({ catalogue }: AdminSnapshot) {
+  const walks = (catalogue?.publications ?? []).filter(
+    (item) =>
+      item.completedAt !== null &&
+      (item.revision === catalogue!.revision || tilesLeft(item) > 0),
+  );
+  if (walks.length === 0) return null;
+  const total = walks.reduce((sum, item) => sum + item.tiles, 0);
+  const left = walks.reduce((sum, item) => sum + tilesLeft(item), 0);
+  return { total, done: total - left };
+}
+
+/** The live publication, unless it is from before they were recorded. */
+export const livePublication = ({ catalogue }: AdminSnapshot) =>
+  catalogue?.publications.find((item) => item.revision === catalogue.revision);
+
 export function problems(snapshot: AdminSnapshot): Problem[] {
   const now = snapshot.observedAt;
   const found = snapshot.users.flatMap((user) => userProblems(user, now));
@@ -190,6 +225,17 @@ export function problems(snapshot: AdminSnapshot): Problem[] {
       tab: 'places',
       text: `Catalogue revision ${pending.revision} begun ${ago(pending.startedAt, now)} and not completed`,
     });
+  for (const item of snapshot.catalogue?.publications ?? []) {
+    const left = tilesLeft(item);
+    if (item.completedAt === null || left === 0) continue;
+    const steppedAt = item.walkedAt ?? item.completedAt;
+    if (now - steppedAt > WALK_LIMIT_MS)
+      found.push({
+        tone: 'bad',
+        tab: 'places',
+        text: `Re-matching for revision ${item.revision} stopped ${ago(steppedAt, now)} with ${number(left)} changed ${left === 1 ? 'area' : 'areas'} left`,
+      });
+  }
   if (snapshot.leftovers > 0)
     found.push({
       tone: 'warn',
@@ -258,7 +304,7 @@ function total(
   };
 }
 
-export function totals({ users }: AdminSnapshot) {
+export function totals({ users, catalogue }: AdminSnapshot) {
   const connected = users.filter((user) => !disconnected(user));
   return {
     activities: total(users, (user) => user.counts?.activities ?? 0),
@@ -269,6 +315,16 @@ export function totals({ users }: AdminSnapshot) {
       connected,
       (user) => user.jobs.failed.activities + user.jobs.blocked.activities,
       (user) => user.jobs.failed.capped || user.jobs.blocked.capped,
+    ),
+    /** Of connected users whose matches have been counted. */
+    matched: total(connected, (user) => user.matches?.matched ?? 0),
+    toMatch: total(connected, (user) =>
+      user.matches ? (user.counts?.recordings ?? 0) : 0,
+    ),
+    rematched: total(users, ({ matches }) =>
+      matches && matches.rematched.revision === catalogue?.revision
+        ? matches.rematched.count
+        : 0,
     ),
     matchesWaiting: total(
       connected,
@@ -298,6 +354,11 @@ export function tabStates(
   const { catalogue, users } = snapshot;
   const affected = new Set(found.flatMap((item) => item.athleteId ?? [])).size;
   const userCount = `${number(users.length)} ${users.length === 1 ? 'user' : 'users'}`;
+  const progress = rematchProgress(snapshot);
+  const checked =
+    progress && progress.done < progress.total
+      ? `${Math.floor((100 * progress.done) / progress.total)}% of changed areas checked`
+      : 'checking changed areas';
   const matching =
     sum.matchesWaiting.count > 0 || (catalogue?.tilesLeft.count ?? 0) > 0;
   return {
@@ -326,7 +387,7 @@ export function tabStates(
             sum.matchesWaiting.count > 0
               ? `${show(sum.matchesWaiting)} matches waiting`
               : matching
-                ? 'checking changed areas'
+                ? checked
                 : 'nothing waiting'
           }`,
     },

@@ -326,6 +326,34 @@ export default defineSchema({
     revision: v.number(),
     tile: v.string(),
   }).index('by_revision_tile', ['revision', 'tile']),
+  /** One row per publication of the live catalogue, from its beginning
+   * (convex/livePlaces.ts), and how far its re-match walk has come. A
+   * replaced pending publication hands its revision and its row on. */
+  placePublications: defineTable({
+    revision: v.number(),
+    snapshotId: v.string(),
+    completedAt: v.optional(v.number()),
+    /** What the publisher says about the artifact: the date of its source
+     * data and the number of its regions. */
+    source: v.optional(v.object({ dataAsOf: v.number(), regions: v.number() })),
+    /** Changed tiles, and those the walk has finished. */
+    tiles: v.number(),
+    tilesDone: v.number(),
+    /** The walk's last step. */
+    walkedAt: v.optional(v.number()),
+  }).index('by_revision', ['revision']),
+  /** Place match counts per owner (convex/placeCounts.ts). `rebuildAfter` is
+   * set while a recount runs: the last activity key it has counted. */
+  placeMatchCounts: defineTable({
+    owner: v.id('owners'),
+    /** Activities with a match for the owner's catalogue. */
+    matched: v.number(),
+    /** Matches of live catalogue revision `revision` that replaced one of an
+     * older revision. */
+    rematched: v.number(),
+    revision: v.number(),
+    rebuildAfter: v.optional(v.string()),
+  }).index('by_owner', ['owner']),
   /** The catalogue tiles each activity's match read, so a catalogue change
    * finds the activities it affects. `activity` is the activity key. */
   activityPlaceTiles: defineTable({

@@ -6,14 +6,17 @@ import {
   atLeast,
   budgetWindows,
   clock,
+  date,
   disconnected,
   lastSyncAt,
   limitedUntil,
+  livePublication,
   nextCheck,
   number,
   problemHref,
   problems,
   reasonText,
+  rematchProgress,
   tabStates,
   totals,
   until,
@@ -157,7 +160,7 @@ export function UserView({ snapshot, user }: Props & { user: AdminUser }) {
   const now = snapshot.observedAt;
   const state = userState(user, now);
   const found = userProblems(user, now);
-  const { counts, jobs, sweep } = user;
+  const { counts, jobs, matches, sweep } = user;
   const waiting = (value: number) => atLeast(value, jobs.queued.capped);
   const given = (value: number | undefined) =>
     value === undefined ? '–' : number(value);
@@ -236,6 +239,7 @@ export function UserView({ snapshot, user }: Props & { user: AdminUser }) {
       </Section>
       <Section title="Place matches">
         <Box>
+          <Row label="Matched" value={given(matches?.matched)} />
           <Row label="Waiting" value={waiting(jobs.queued.matches)} />
           <Row
             label="Failed"
@@ -245,6 +249,7 @@ export function UserView({ snapshot, user }: Props & { user: AdminUser }) {
             )}
           />
           {reasons('matches')}
+          {matches?.rebuilding && <Row label="Matches are being recounted" />}
         </Box>
       </Section>
     </>
@@ -338,14 +343,20 @@ export function PlacesView({ snapshot }: Props) {
         <Row label="No catalogue has been published" />
       </Box>
     );
-  const { tilesLeft } = catalogue;
+  const { tilesLeft, publications } = catalogue;
+  const live = livePublication(snapshot);
+  const progress = rematchProgress(snapshot);
   return (
     <>
       <Section title="Live catalogue">
         <Figures
           items={[
-            [`Revision ${catalogue.revision}`, 'live'],
+            [
+              `Revision ${catalogue.revision}`,
+              live?.completedAt ? `since ${date(live.completedAt)}` : 'live',
+            ],
             [number(catalogue.places), 'places'],
+            [live?.source ? date(live.source.dataAsOf) : '–', 'source data'],
           ]}
         />
       </Section>
@@ -363,18 +374,35 @@ export function PlacesView({ snapshot }: Props) {
       )}
       <Section title="Re-matching">
         <Box>
-          <Row
-            label={
-              <State tone={tilesLeft.count > 0 ? 'run' : 'ok'}>
-                Changed areas
-              </State>
-            }
-            value={
-              tilesLeft.count > 0
-                ? `${atLeast(tilesLeft.count, tilesLeft.capped)} left to check`
-                : 'all checked'
-            }
-          />
+          {progress && progress.total > 0 ? (
+            <Meter
+              label="Changed areas checked"
+              used={progress.done}
+              limit={progress.total}
+            />
+          ) : (
+            <Row
+              label="Changed areas"
+              value={
+                tilesLeft.count > 0
+                  ? `${atLeast(tilesLeft.count, tilesLeft.capped)} left to check`
+                  : 'all checked'
+              }
+            />
+          )}
+          {live && (
+            <Row
+              label={`Activities re-matched for revision ${live.revision}`}
+              value={number(sum.rematched.count)}
+            />
+          )}
+          {sum.toMatch.count > 0 && (
+            <Meter
+              label="Recordings matched"
+              used={sum.matched.count}
+              limit={sum.toMatch.count}
+            />
+          )}
           <Row
             label="Matches waiting"
             value={atLeast(sum.matchesWaiting.count, sum.matchesWaiting.capped)}
@@ -401,6 +429,25 @@ export function PlacesView({ snapshot }: Props) {
           ];
         }}
       />
+      {publications.length > 0 && (
+        <Section title="Publications">
+          <Box>
+            {publications.map(({ revision, completedAt, source }) => (
+              <Row
+                key={revision}
+                label={`Revision ${revision}`}
+                value={[
+                  completedAt === null ? 'being applied' : date(completedAt),
+                  source &&
+                    `${number(source.regions)} ${source.regions === 1 ? 'region' : 'regions'}`,
+                ]
+                  .filter(Boolean)
+                  .join(', ')}
+              />
+            ))}
+          </Box>
+        </Section>
+      )}
     </>
   );
 }

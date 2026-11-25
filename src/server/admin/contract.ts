@@ -18,6 +18,23 @@ export const adminOverviewSchema = z.strictObject({
       places: count,
       pending: z.strictObject({ revision: count, startedAt: time }).nullable(),
       tilesLeft: z.strictObject({ count, capped: z.boolean() }),
+      /** The last few, the newest first. None from a backend before them. */
+      publications: z
+        .array(
+          z.strictObject({
+            revision: count,
+            /** Null while it is being applied. */
+            completedAt: time.nullable(),
+            source: z
+              .strictObject({ dataAsOf: time, regions: count })
+              .nullable(),
+            /** Changed map tiles, and those the re-match walk finished. */
+            tiles: count,
+            tilesDone: count,
+            walkedAt: time.nullable(),
+          }),
+        )
+        .default([]),
     })
     .nullable(),
   budget: z.array(
@@ -56,6 +73,16 @@ export const adminUserSchema = z.strictObject({
       rebuilding: z.boolean(),
     })
     .nullable(),
+  /** Null until counted, and from a backend before these counts. */
+  matches: z
+    .strictObject({
+      matched: count,
+      /** Matches of the catalogue revision that replaced an older one. */
+      rematched: z.strictObject({ revision: count, count }),
+      rebuilding: z.boolean(),
+    })
+    .nullable()
+    .default(null),
   lastEventAt: time.nullable(),
   sweep: z
     .strictObject({

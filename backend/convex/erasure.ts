@@ -139,6 +139,11 @@ export const step = internalMutation({
       .collect())
       await ctx.db.delete('ownerStats', doc._id);
     for (const doc of await ctx.db
+      .query('placeMatchCounts')
+      .withIndex('by_owner', (q) => q.eq('owner', id))
+      .collect())
+      await ctx.db.delete('placeMatchCounts', doc._id);
+    for (const doc of await ctx.db
       .query('ownerHeads')
       .withIndex('by_owner', (q) => q.eq('owner', id))
       .collect())

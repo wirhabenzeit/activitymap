@@ -336,6 +336,10 @@ export async function publishCatalogue({
     count: rows.length,
     setDigest: hashes.reduce(addToSetDigest, EMPTY_SET_DIGEST),
     ...(replacePending === undefined ? {} : { replacePending }),
+    source: {
+      dataAsOf: Date.parse(report.sourceDataAsOf),
+      regions: regions.length,
+    },
   });
   if (!begun.ok) throw new Error(beginRefusal(snapshotId, begun));
 

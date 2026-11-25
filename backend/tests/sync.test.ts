@@ -35,6 +35,7 @@ const modules = {
   './ingestionWorker.ts': () => import('../convex/ingestionWorker'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
+  './placeCounts.ts': () => import('../convex/placeCounts'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
   './sync.ts': () => import('../convex/sync'),
 };

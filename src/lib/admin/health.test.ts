@@ -12,6 +12,7 @@ import {
   nextCheck,
   problemHref,
   problems,
+  rematchProgress,
   tabStates,
   totals,
   until,
@@ -41,6 +42,11 @@ function user(change: Partial<AdminUser> = {}): AdminUser {
       toFetch: 0,
       rebuilding: false,
     },
+    matches: {
+      matched: 10,
+      rematched: { revision: 3, count: 4 },
+      rebuilding: false,
+    },
     lastEventAt: now - HOUR,
     sweep: {
       phase: 'idle',
@@ -60,6 +66,21 @@ function user(change: Partial<AdminUser> = {}): AdminUser {
   };
 }
 
+type Publication = NonNullable<
+  AdminSnapshot['catalogue']
+>['publications'][number];
+function publication(change: Partial<Publication> = {}): Publication {
+  return {
+    revision: 3,
+    completedAt: now - DAY,
+    source: { dataAsOf: now - 2 * DAY, regions: 45 },
+    tiles: 200,
+    tilesDone: 200,
+    walkedAt: now - DAY,
+    ...change,
+  };
+}
+
 function snapshot(
   users: AdminUser[],
   change: Partial<AdminSnapshot> = {},
@@ -72,6 +93,7 @@ function snapshot(
       places: 461_066,
       pending: null,
       tilesLeft: { count: 0, capped: false },
+      publications: [publication()],
     },
     budget: [],
     subscription: 'registered',
@@ -195,6 +217,7 @@ void test('the catalogue and the push subscription have problems of their own', 
       places: 1,
       pending: { revision: 4, startedAt: now - 5 * HOUR },
       tilesLeft: { count: 1000, capped: true },
+      publications: [],
     },
   });
   // Worst first.
@@ -207,6 +230,70 @@ void test('the catalogue and the push subscription have problems of their own', 
   // Not knowing is not a problem.
   for (const subscription of ['unknown', 'not_managed'] as const)
     assert.deepEqual(problems(snapshot([user()], { subscription })), []);
+});
+
+const published = (...publications: Publication[]) =>
+  snapshot([user()], {
+    catalogue: {
+      ...snapshot([]).catalogue!,
+      tilesLeft: { count: 1, capped: false },
+      publications,
+    },
+  });
+
+void test('re-match progress covers the live revision and earlier ones not finished', () => {
+  assert.equal(rematchProgress(published()), null);
+  assert.equal(rematchProgress(snapshot([], { catalogue: null })), null);
+  const value = published(
+    // Being applied: its tiles wait.
+    publication({ revision: 4, completedAt: null, tiles: 50, tilesDone: 0 }),
+    publication({ tilesDone: 199, walkedAt: now - MINUTE }),
+    publication({ revision: 2, tiles: 100, tilesDone: 99, walkedAt: now }),
+    publication({ revision: 1 }),
+  );
+  assert.deepEqual(rematchProgress(value), { total: 300, done: 298 });
+  assert.deepEqual(problems(value), []);
+  // Never 100% before the end.
+  assert.deepEqual(tabStates(value).places, {
+    tone: 'run',
+    text: 'Revision 3, 99% of changed areas checked',
+  });
+});
+
+void test('a re-match walk without a step for 30 minutes is a problem while it has tiles left', () => {
+  const at = (change: Partial<Publication>) =>
+    texts(published(publication(change)));
+  const left = { tilesDone: 150, walkedAt: now - 30 * MINUTE };
+  assert.deepEqual(at(left), []);
+  assert.deepEqual(at({ ...left, walkedAt: now - 40 * MINUTE }), [
+    'bad places Re-matching for revision 3 stopped 40 min ago with 50 changed areas left',
+  ]);
+  // It never made a step.
+  assert.deepEqual(at({ tilesDone: 199, walkedAt: null }), [
+    'bad places Re-matching for revision 3 stopped 24 h ago with 1 changed area left',
+  ]);
+  assert.deepEqual(at({ ...left, completedAt: null, walkedAt: null }), []);
+});
+
+void test('match totals leave out users not counted and earlier re-matches', () => {
+  const sum = totals(
+    snapshot([
+      user(),
+      user({ matches: null }),
+      user({
+        matches: {
+          matched: 7,
+          rematched: { revision: 2, count: 5 },
+          rebuilding: false,
+        },
+      }),
+      user({ active: false }),
+    ]),
+  );
+  assert.deepEqual(
+    [sum.matched.count, sum.toMatch.count, sum.rematched.count],
+    [17, 20, 8],
+  );
 });
 
 void test('work in progress is not a problem', () => {

@@ -20,6 +20,7 @@ export const SHARED_TABLES = [
 export const OWNER_TABLES = [
   'ownerHeads',
   'ownerStats',
+  'placeMatchCounts',
   'ownerEpochs',
   'activities',
   'photos',
@@ -31,7 +32,7 @@ export const OWNER_TABLES = [
 
 /**
  * Tables emptied on Preview: operational state (queues, nonces, budgets,
- * rate limits, the tiles a re-match walk has left), delivered events, and
+ * rate limits, publication records and the tiles a re-match walk has left), delivered events, and
  * share links, whose tokens would grant access to production libraries from
  * Preview.
  */
@@ -43,6 +44,8 @@ export const EMPTIED_TABLES = [
   'providerBudget',
   'bridgeNonces',
   'placeTileChanges',
+  // Its walk progress belongs to the tiles above.
+  'placePublications',
 ];
 
 /** Auth models that identify a person; sessions, verifications and keys are

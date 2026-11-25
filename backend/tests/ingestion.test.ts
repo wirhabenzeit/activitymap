@@ -31,6 +31,7 @@ import {
   EXPLICIT_REQUEST_COOLDOWN_MS,
   SWEEP_INTERVAL_MS,
 } from '../convex/ingestionSweep';
+import { isMatched } from '../convex/placeCounts';
 import schema from '../convex/schema';
 import { stravaDetail as detail, stravaPhoto as photo } from './fixtures';
 
@@ -56,6 +57,7 @@ const modules = {
   './livePlaces.ts': () => import('../convex/livePlaces'),
   './maintenance.ts': () => import('../convex/maintenance'),
   './owners.ts': () => import('../convex/owners'),
+  './placeCounts.ts': () => import('../convex/placeCounts'),
   './places.ts': () => import('../convex/places'),
   './providerEvents.ts': () => import('../convex/providerEvents'),
   './recordingWorker.ts': () => import('../convex/recordingWorker'),
@@ -207,7 +209,33 @@ async function settle(convex: Convex) {
     !jobs.some((job) => job.state.kind === 'failed'),
     'scheduled function failed',
   );
+  await checkMatchCounts(convex);
 }
+
+/** The stored match counts are what the library holds. */
+async function checkMatchCounts(convex: Convex) {
+  await convex.run(async (ctx) => {
+    const activities = await ctx.db.query('activities').collect();
+    for (const counts of await ctx.db.query('placeMatchCounts').collect()) {
+      if (counts.rebuildAfter !== undefined) continue;
+      const owner = await ctx.db.get('owners', counts.owner);
+      // An erasure deletes the counts with the owner, not with each match.
+      if (!owner || owner.revoked) continue;
+      assert.equal(
+        counts.matched,
+        activities.filter(
+          (row) => row.owner === owner._id && isMatched(owner, row),
+        ).length,
+        'match count',
+      );
+    }
+  });
+}
+
+const matchCounts = (convex: Convex) =>
+  convex.run((ctx) => ctx.db.query('placeMatchCounts').first());
+const publicationRows = (convex: Convex) =>
+  convex.run((ctx) => ctx.db.query('placePublications').collect());
 
 async function advance(convex: Convex, ms: number) {
   mock.timers.tick(ms);
@@ -1189,6 +1217,44 @@ void test('a match records the catalogue tiles it read, and they go with the mat
   assert.equal((await placeTiles(convex)).size, 0);
 });
 
+void test('matches are recounted for libraries from before the counts, while writes go on', async () => {
+  const provider = fakeProvider();
+  const { convex, complete } = await matchingOwner();
+  await complete();
+  for (const id of ['7', '8']) {
+    provider.set(detail(Number(id), 'Past the peak'));
+    provider.record(id, pastThePeak);
+  }
+  await ingest(convex, '7', '8');
+  await convex.run(async (ctx) => {
+    const row = (await ctx.db.query('placeMatchCounts').first())!;
+    await ctx.db.delete('placeMatchCounts', row._id);
+  });
+  // Uncounted, not wrong, until the recount.
+  provider.set(detail(9, 'Past the peak'));
+  provider.record('9', pastThePeak);
+  await ingest(convex, '9');
+  assert.equal(await matchCounts(convex), null);
+
+  await convex.mutation(internal.placeCounts.rebuild, {});
+  // Deleted before the recount reaches it.
+  provider.remove('9');
+  await convex.mutation(internal.ingestion.apply, {
+    scope,
+    id: '9',
+    dto: null,
+  });
+  assert.equal((await matchCounts(convex))!.matched, 0);
+  await settle(convex);
+  const { matched, rebuildAfter } = (await matchCounts(convex))!;
+  assert.deepEqual([matched, rebuildAfter], [2, undefined]);
+  // Repeating it changes nothing.
+  await convex.mutation(internal.placeCounts.rebuild, {});
+  await convex.mutation(internal.placeCounts.rebuild, {});
+  await settle(convex);
+  assert.equal((await matchCounts(convex))!.matched, 2);
+});
+
 void test('a match result that started at an older or the same catalogue revision is dropped', async () => {
   const provider = fakeProvider();
   const { convex, complete } = await matchingOwner();
@@ -1326,6 +1392,7 @@ void test('a new catalogue moves every library to it and matches every recording
       [place],
     );
   }
+  assert.equal((await matchCounts(convex))!.matched, 3);
   // Clients are told; the provider is not asked for anything.
   assert((await feed()) > sequence);
   assert.equal(provider.reads.length, reads);
@@ -1643,6 +1710,11 @@ void test('only activities in changed tiles are matched again, and their old mat
   const revision = await second.complete();
   // Until the walk has matched it again, the old match is what clients see.
   assert.deepEqual(await matches(convex), before);
+  const published = (await publicationRows(convex)).at(-1)!;
+  assert.deepEqual(
+    [published.revision, published.tiles, published.tilesDone],
+    [revision, 1, 0],
+  );
 
   await settle(convex);
   await advance(convex, 2_000);
@@ -1666,6 +1738,14 @@ void test('only activities in changed tiles are matched again, and their old mat
     [1, 0],
   );
   assert.equal(provider.reads.length, reads);
+  const counted = (await matchCounts(convex))!;
+  assert.deepEqual(
+    [counted.matched, counted.revision, counted.rematched],
+    [2, revision, 1],
+  );
+  const walked = (await publicationRows(convex)).at(-1)!;
+  assert.equal(walked.tilesDone, 1);
+  assert(walked.walkedAt! >= walked.completedAt!);
   // The walk has consumed the revision's tiles.
   assert.deepEqual(
     await convex.run((ctx) => ctx.db.query('placeTileChanges').collect()),
@@ -1772,11 +1852,13 @@ void test('a match whose catalogue metadata a publication replaced meanwhile is 
   await ingest(convex, '7');
   const { activities } = await state(convex);
   const row = activities[0]!;
-  await convex.run((ctx) =>
-    ctx.db.patch('activities', row._id, {
+  await convex.run(async (ctx) => {
+    await ctx.db.patch('activities', row._id, {
       projection: { ...row.projection!, match: undefined },
-    }),
-  );
+    });
+    const counts = (await ctx.db.query('placeMatchCounts').first())!;
+    await ctx.db.patch('placeMatchCounts', counts._id, { matched: 0 });
+  });
 
   // The worker has its step and reads the recording when the next
   // publication completes and deletes the metadata the step names.
@@ -1924,6 +2006,9 @@ void test('the re-match walk continues within a tile, leaves pending tiles alone
   assert.deepEqual(await left(revision), []);
   const match = (await matches(convex)).get(7)!;
   assert.equal(match.revision, revision);
+  const { tiles, tilesDone } = (await publicationRows(convex)).at(-1)!;
+  assert.deepEqual([tiles, tilesDone], [1, 1]);
+  assert.equal((await matchCounts(convex))!.rematched, 1);
   // Matched once, however many walks asked.
   assert.equal((await state(convex)).jobs[0]!.claims, jobs[0]!.claims + 1);
 
@@ -2060,6 +2145,7 @@ void test('erasing an account fences it at once and removes everything it had he
         'owners',
         'ownerHeads',
         'ownerStats',
+        'placeMatchCounts',
         'ownerEpochs',
         'activities',
         'recordings',
@@ -2119,6 +2205,7 @@ void test('erasing an account fences it at once and removes everything it had he
     owners: 1,
     ownerHeads: 1,
     ownerStats: 1,
+    placeMatchCounts: 1,
     ownerEpochs: 1,
   });
   assert.equal(

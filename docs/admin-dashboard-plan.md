@@ -41,8 +41,8 @@ a changed tile, and the others keep an older revision and are still correct.
   unknown until the walk ends, so the bar follows tiles.
 - **A user's page** shows matched, waiting and failed. Any current match counts
   as matched, whatever its revision.
-- After a matching-recipe change (`adopt`), the bar is matched of all activities
-  with a recording.
+- A second bar shows recordings matched of all recordings. After a
+  matching-recipe change (`adopt`) it starts again from zero.
 
 ### Reading Convex
 
@@ -82,14 +82,14 @@ incomplete activity, at 20 an hour, which takes days for a new user.
 ### New tables
 
 - **`placePublications`**: `beginApply` inserts the row with the snapshot and,
-  from the publisher, the source date and regions (a new optional argument).
-  `recordTiles` counts changed tiles, `completeApply` sets the time and place
-  count, and `rematchTiles` counts tiles handled and records its last step. The
-  last step tells a stopped walk from a slow one. A replaced pending publication
+  from the publisher, the source date and number of regions (a new optional
+  argument). `recordTiles` counts changed tiles, `completeApply` sets the time,
+  and `rematchTiles` counts tiles handled and records its last step. The last
+  step tells a stopped walk from a slow one. A replaced pending publication
   keeps its revision, so it keeps its row and tile count.
 - **`placeMatchCounts`**: `matched` follows every place a match is published or
-  cleared (`publishMatchRecord`, `applySourceRecord`, `publishRecording`,
-  `catalogue.next`), and `selectFor` resets it. `rematched` counts matches that
+  cleared (`publishMatchRecord`, `applySourceRecord`, `publishRecording`), and
+  `selectFor` starts a recount. `rematched` counts matches that
   replaced one from an older live revision, with the revision it counts for.
   Per owner, because a match already writes the owner's head; a global counter
   would make users' matches conflict.
@@ -139,7 +139,7 @@ One pull request each.
    apply, changed tiles left (capped) and matches waiting or failed. Done.
 2. **Place progress**: `placePublications`, `placeMatchCounts`, the publisher
    argument; the progress bar, source date, publications and matched counts, and
-   the problem of a stopped walk.
+   the problem of a stopped walk. Done.
 3. **Job health**: `jobHeartbeats`, the job list on System and the problem of a
    late job. Also the problem of old source data.
 
