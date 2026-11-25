@@ -15,7 +15,9 @@ import {
   tabStates,
   totals,
   until,
+  userByAthlete,
   userState,
+  withoutLeftovers,
 } from './health';
 
 const now = Date.UTC(2026, 10, 25, 14, 32);
@@ -29,6 +31,7 @@ function user(change: Partial<AdminUser> = {}): AdminUser {
     athleteId: '42',
     createdAt: now - 100 * DAY,
     active: true,
+    hasAccount: true,
     revokedAt: null,
     erasureDueAt: null,
     counts: {
@@ -72,6 +75,7 @@ function snapshot(
     },
     budget: [],
     subscription: 'registered',
+    leftovers: 0,
     users,
     ...change,
   };
@@ -279,4 +283,28 @@ void test('what is left of a disconnected user is not counted as work', () => {
   assert.equal(totals(value).toFetch.count, 0);
   assert.equal(totals(value).matchesWaiting.count, 0);
   assert.equal(totals(value).activities.count, 10);
+});
+
+void test('a record that belongs to nobody is not a user, whatever its athlete ID', () => {
+  const leftover = user({ active: false, hasAccount: false, createdAt: 1 });
+  const real = user({ createdAt: 2 });
+  const split = withoutLeftovers([leftover, real]);
+  assert.deepEqual(split, { users: [real], leftovers: 1 });
+  const value = snapshot([], split);
+  assert.equal(tabStates(value).users.text, '1 user');
+  assert.deepEqual(texts(value), [
+    'warn users 1 leftover library record without an account',
+  ]);
+  assert.equal(problemHref(problems(value)[0]!), '/admin/users');
+  // Disconnected users and libraries in use stay.
+  for (const kept of [user({ active: false }), user({ hasAccount: false })])
+    assert.equal(withoutLeftovers([kept]).leftovers, 0);
+});
+
+void test('an athlete ID names the active record when two share it', () => {
+  const old = user({ active: false, createdAt: 1 });
+  const real = user({ createdAt: 2 });
+  assert.equal(userByAthlete([old, real], '42'), real);
+  assert.equal(userByAthlete([old], '42'), old);
+  assert.equal(userByAthlete([old], '43'), undefined);
 });
