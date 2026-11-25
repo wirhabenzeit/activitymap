@@ -7,6 +7,7 @@ import test, { after, before, mock } from 'node:test';
 import { readAdminFigures } from '../../src/server/admin/convex-admin';
 import { internal } from '../convex/_generated/api';
 import schema from '../convex/schema';
+import { previewFixtureActivity } from './fixtures';
 
 /**
  * The operator dashboard's reads, through the app's client and its strict
@@ -235,6 +236,53 @@ void test('a user is counts, states and times, and nothing personal', async () =
       oldestDueAt: now - 600,
     },
   });
+});
+
+void test('what a failed job’s activity still misses is failed, not left to fetch', async () => {
+  const convex = convexTest(schema, modules);
+  const owner = await provision(convex, '42');
+  await convex.run(async (ctx) => {
+    await ctx.db.patch('owners', owner, { writer: 'convex' });
+    const stats = (await ctx.db.query('ownerStats').first())!;
+    await ctx.db.patch('ownerStats', stats._id, {
+      counts: { ...stats.counts, total: 4, invalidatedDetails: 3, runnable: 2 },
+    });
+    // 1 and 2 miss their details and 3 has them; 4 is not in the library.
+    for (const id of ['1', '2', '3']) {
+      const {
+        streams: _streams,
+        placeMatches: _matches,
+        ...dto
+      } = previewFixtureActivity(id, '42', 'Ride', now);
+      await ctx.db.insert('activities', {
+        owner,
+        key: id.padStart(20, '0'),
+        generation: 'test-generation-01',
+        sourceRevision: 1,
+        streamSourceRevision: 1,
+        deleted: false,
+        dto: {
+          ...dto,
+          geometry_state: id === '3' ? 'detailed' : 'refresh_required',
+        },
+      });
+    }
+    for (const [index, fields] of [
+      { status: 'failed' as const, error: 'invalid_response' },
+      { status: 'failed' as const, phase: 'match' as const },
+      { status: 'blocked' as const, error: 'credentials_rejected' },
+      { status: 'failed' as const, error: 'forbidden' },
+    ].entries())
+      await ctx.db.insert('ingestionJobs', {
+        owner,
+        activity: String(index + 1).padStart(20, '0'),
+        ...job,
+        ...fields,
+      });
+  });
+  const { users } = await figures(convex);
+  // Of three without details one has failed; of two without a recording, two.
+  assert.equal(users[0]!.counts!.toFetch, 2);
 });
 
 void test('a revoked library without a sign-in record is told apart from one with', async () => {

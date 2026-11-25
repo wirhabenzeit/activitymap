@@ -106,6 +106,16 @@ export default defineSchema({
      * provider read with it (ingestion.requestMatch). Set while a run holds
      * the job, and on a job queued only for that match. */
     rematch: v.optional(v.boolean()),
+    /** How the job ended before it was queued for a match alone. A match
+     * says nothing about the provider read that failed, so the job goes back
+     * to this when the match is done; the next read of the source drops it. */
+    failure: v.optional(
+      v.object({
+        status: v.union(v.literal('blocked'), v.literal('failed')),
+        attempt: v.number(),
+        error: v.optional(v.string()),
+      }),
+    ),
     /** Why the last run did not finish. */
     error: v.optional(v.string()),
     /** Reconciliation (convex/ingestionSweep.ts): a fingerprint of the last
