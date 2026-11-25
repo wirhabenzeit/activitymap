@@ -490,13 +490,18 @@ void test('a first publication inserts every place after a reviewed dry run', as
     progress: (sent, total) => progress.push([sent, total]),
   });
   assert.deepEqual([published.status, published.revision], ['published', 1]);
-  assert.deepEqual(kinds(backend.take()), [
+  const operations = backend.take();
+  assert.deepEqual(kinds(operations), [
     'liveState',
     'uploadUrl',
     'beginApply',
     'applyBatch',
     'completeApply',
   ]);
+  assert.deepEqual(
+    operations.find(({ kind }) => kind === 'beginApply')!.source,
+    { dataAsOf: Date.parse(a.manifest.source.data_as_of), regions: 1 },
+  );
   assert.deepEqual(progress, [
     [0, rows.length],
     [rows.length, rows.length],

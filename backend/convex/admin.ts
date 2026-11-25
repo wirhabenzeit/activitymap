@@ -18,6 +18,8 @@ const USER_PAGE = 16;
 /** Jobs read per user and status; a count at the limit means "or more". */
 const JOB_LIMIT = 250;
 const TILE_LIMIT = 1000;
+/** Publications listed, the newest first. */
+const PUBLICATIONS = 5;
 
 /** Job errors are partly free text from caught exceptions. Only these leave
  * the backend, the rest as `other`; the text stays with the job. */
@@ -44,7 +46,7 @@ export const overview = internalQuery({
   args: {},
   handler: async (ctx) => {
     const now = Date.now();
-    const [state, budget, event] = await Promise.all([
+    const [state, budget, event, publications] = await Promise.all([
       ctx.db.query('placeCatalogueState').unique(),
       ctx.db.query('providerBudget').take(8),
       ctx.db
@@ -52,6 +54,11 @@ export const overview = internalQuery({
         .withIndex('by_received')
         .order('desc')
         .first(),
+      ctx.db
+        .query('placePublications')
+        .withIndex('by_revision')
+        .order('desc')
+        .take(PUBLICATIONS),
     ]);
     // Tiles of a pending revision wait for its completion.
     const tiles = state
@@ -76,6 +83,15 @@ export const overview = internalQuery({
           : null,
         /** Changed tiles the re-match walk has not finished. */
         tilesLeft: { count: tiles.length, capped: tiles.length === TILE_LIMIT },
+        /** None for publications from before they were recorded. */
+        publications: publications.map((item) => ({
+          revision: item.revision,
+          completedAt: item.completedAt ?? null,
+          source: item.source ?? null,
+          tiles: item.tiles,
+          tilesDone: item.tilesDone,
+          walkedAt: item.walkedAt ?? null,
+        })),
       },
       budget: budget.map(
         ({ key, windowStart, used, ceiling, blockedUntil }) => ({
@@ -132,8 +148,12 @@ async function access(ctx: QueryCtx, userId: string) {
 }
 
 async function userFigures(ctx: QueryCtx, owner: Doc<'owners'>, now: number) {
-  const [stats, sweep, event, queued, failed, blocked, accountAccess] =
+  const [matches, stats, sweep, event, queued, failed, blocked, accountAccess] =
     await Promise.all([
+      ctx.db
+        .query('placeMatchCounts')
+        .withIndex('by_owner', (q) => q.eq('owner', owner._id))
+        .unique(),
       ctx.db
         .query('ownerStats')
         .withIndex('by_owner', (q) => q.eq('owner', owner._id))
@@ -193,6 +213,12 @@ async function userFigures(ctx: QueryCtx, owner: Doc<'owners'>, now: number) {
           rebuilding: stats.rebuildAfter !== undefined,
         }
       : null,
+    /** Null until the matches have been counted once. */
+    matches: matches && {
+      matched: matches.matched,
+      rematched: { revision: matches.revision, count: matches.rematched },
+      rebuilding: matches.rebuildAfter !== undefined,
+    },
     lastEventAt: event?.receivedAt ?? null,
     sweep: sweep && {
       phase: sweep.phase,

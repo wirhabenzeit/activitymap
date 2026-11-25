@@ -124,6 +124,13 @@ void test('a user is counts, states and times, and nothing personal', async () =
       completedAt: now - 10,
       listReadAt: now - 20,
     });
+    const matches = (await ctx.db.query('placeMatchCounts').first())!;
+    await ctx.db.patch('placeMatchCounts', matches._id, {
+      matched: 5,
+      rematched: 3,
+      revision: 2,
+      rebuildAfter: '1',
+    });
     for (const receivedAt of [now - 100, now - 300])
       await ctx.db.insert('providerEvents', {
         owner,
@@ -203,6 +210,11 @@ void test('a user is counts, states and times, and nothing personal', async () =
       toFetch: 4,
       rebuilding: false,
     },
+    matches: {
+      matched: 5,
+      rematched: { revision: 2, count: 3 },
+      rebuilding: true,
+    },
     lastEventAt: now - 100,
     sweep: {
       phase: 'scanning',
@@ -279,6 +291,22 @@ void test('the catalogue, its changed tiles and the request budget', async () =>
       [4, '1,2'],
     ] as const)
       await ctx.db.insert('placeTileChanges', { revision, tile });
+    for (let revision = 1; revision <= 4; revision++)
+      await ctx.db.insert('placePublications', {
+        revision,
+        snapshotId: `snapshot-${revision}`,
+        tiles: 10,
+        tilesDone: revision < 4 ? 9 : 0,
+        ...(revision < 4 && { completedAt: now - 20, walkedAt: now - 10 }),
+        ...(revision > 1 && { source: { dataAsOf: now - 99, regions: 45 } }),
+      });
+    for (let revision = -1; revision < 1; revision++)
+      await ctx.db.insert('placePublications', {
+        revision,
+        snapshotId: 'too old to list',
+        tiles: 0,
+        tilesDone: 0,
+      });
     await ctx.db.insert('providerBudget', {
       key: 'read:15m',
       windowStart: now - 1,
@@ -296,6 +324,14 @@ void test('the catalogue, its changed tiles and the request budget', async () =>
       places: 12,
       pending: { revision: 4, startedAt: now - 7 },
       tilesLeft: { count: 2, capped: false },
+      publications: [4, 3, 2, 1, 0].map((revision) => ({
+        revision,
+        completedAt: revision >= 1 && revision < 4 ? now - 20 : null,
+        source: revision > 1 ? { dataAsOf: now - 99, regions: 45 } : null,
+        tiles: revision >= 1 ? 10 : 0,
+        tilesDone: revision >= 1 && revision < 4 ? 9 : 0,
+        walkedAt: revision >= 1 && revision < 4 ? now - 10 : null,
+      })),
     },
     budget: [
       {
@@ -369,6 +405,33 @@ void test('only the admin signature opens the route', async () => {
   ])
     assert.equal(await send(domain, operation), 401);
   assert.equal(await send('activitymap-admin-v1', { kind: 'unknown' }), 400);
+});
+
+void test('an answer from a backend before place progress is accepted', async () => {
+  const convex = convexTest(schema, modules);
+  await provision(convex, '42');
+  await convex.run(async (ctx) => {
+    await ctx.db.insert('placeCatalogueState', {
+      revision: 1,
+      count: 12,
+      setDigest: '0'.repeat(64),
+    });
+  });
+  type Answer = {
+    catalogue?: { publications?: unknown };
+    page?: { matches?: unknown }[];
+  };
+  const { catalogue, users } = await readAdminFigures((async (
+    url: URL,
+    init: RequestInit,
+  ) => {
+    const answer = (await (await fetcher(convex)(url, init)).json()) as Answer;
+    delete answer.catalogue?.publications;
+    for (const user of answer.page ?? []) delete user.matches;
+    return Response.json(answer);
+  }) as unknown as typeof fetch);
+  assert.deepEqual(catalogue?.publications, []);
+  assert.equal(users[0]!.matches, null);
 });
 
 void test('an answer with a field the app does not know is refused', async () => {

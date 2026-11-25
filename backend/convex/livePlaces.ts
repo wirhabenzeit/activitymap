@@ -53,6 +53,13 @@ function stateRow(ctx: QueryCtx) {
   return ctx.db.query('placeCatalogueState').unique();
 }
 
+export function publicationFor(ctx: QueryCtx, revision: number) {
+  return ctx.db
+    .query('placePublications')
+    .withIndex('by_revision', (q) => q.eq('revision', revision))
+    .unique();
+}
+
 function liveRow(ctx: QueryCtx, key: string) {
   return ctx.db
     .query('livePlaces')
@@ -64,13 +71,20 @@ function checkIdentity(args: {
   snapshotId: string;
   count: number;
   setDigest: string;
+  source?: { dataAsOf: number; regions: number };
 }) {
   if (
     !args.snapshotId ||
     args.snapshotId.length > SNAPSHOT_ID_LIMIT ||
     !Number.isSafeInteger(args.count) ||
     args.count < 0 ||
-    !/^[0-9a-f]{64}$/.test(args.setDigest)
+    !/^[0-9a-f]{64}$/.test(args.setDigest) ||
+    (args.source &&
+      !(
+        Number.isSafeInteger(args.source.dataAsOf) &&
+        Number.isSafeInteger(args.source.regions) &&
+        args.source.regions >= 0
+      ))
   )
     throw new Error('Invalid live catalogue identity');
 }
@@ -197,6 +211,8 @@ export const beginApply = internalMutation({
     count: v.number(),
     setDigest: v.string(),
     replacePending: v.optional(v.string()),
+    /** For the operator's record (`placePublications`) only. */
+    source: v.optional(v.object({ dataAsOf: v.number(), regions: v.number() })),
   },
   handler: async (ctx, args) => {
     checkIdentity(args);
@@ -254,6 +270,22 @@ export const beginApply = internalMutation({
         startedAt: Date.now(),
       },
     });
+    const publication = await publicationFor(ctx, revision);
+    const { snapshotId, source } = args;
+    // The tiles a replaced publication changed carry over, and their count.
+    if (publication)
+      await ctx.db.patch('placePublications', publication._id, {
+        snapshotId,
+        source,
+      });
+    else
+      await ctx.db.insert('placePublications', {
+        revision,
+        snapshotId,
+        source,
+        tiles: 0,
+        tilesDone: 0,
+      });
     return { ok: true as const, revision, resumed: false };
   },
 });
@@ -273,9 +305,17 @@ async function recordTiles(
         .unique(),
     ),
   );
+  let added = 0;
   for (const [index, tile] of [...tiles].entries())
-    if (!seen[index])
+    if (!seen[index]) {
       await ctx.db.insert('placeTileChanges', { revision, tile });
+      added++;
+    }
+  const publication = added > 0 && (await publicationFor(ctx, revision));
+  if (publication)
+    await ctx.db.patch('placePublications', publication._id, {
+      tiles: publication.tiles + added,
+    });
 }
 
 /**
@@ -390,6 +430,11 @@ export const completeApply = internalMutation({
       metadata: pending.metadata,
       pending: undefined,
     });
+    const publication = await publicationFor(ctx, pending.revision);
+    if (publication)
+      await ctx.db.patch('placePublications', publication._id, {
+        completedAt: Date.now(),
+      });
     if (row.metadata && row.metadata !== pending.metadata)
       await ctx.storage.delete(row.metadata);
     await ctx.scheduler.runAfter(0, internal.catalogue.rematchTiles, {

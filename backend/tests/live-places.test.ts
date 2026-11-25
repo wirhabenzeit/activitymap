@@ -31,6 +31,7 @@ const modules = {
   './http.ts': () => import('../convex/http'),
   './livePlaces.ts': () => import('../convex/livePlaces'),
   './maintenance.ts': () => import('../convex/maintenance'),
+  './placeCounts.ts': () => import('../convex/placeCounts'),
   './places.ts': () => import('../convex/places'),
 };
 type Convex = ReturnType<typeof setup>;
@@ -64,7 +65,10 @@ async function begin(
   snapshotId: string,
   rows: PlaceRow[],
   expectCurrent: string | null,
-  extra: { replacePending?: string } = {},
+  extra: {
+    replacePending?: string;
+    source?: { dataAsOf: number; regions: number };
+  } = {},
 ) {
   return convex.mutation(internal.livePlaces.beginApply, {
     expectCurrent,
@@ -338,6 +342,7 @@ void test('expectCurrent races and other artifacts refuse; replacePending abando
   assert.deepEqual(
     await begin(convex, 'snap-1', [a, b, c], 'snap-1', {
       replacePending: 'snap-2',
+      source: { dataAsOf: 5, regions: 2 },
     }),
     { ok: true, revision: 2, resumed: false },
   );
@@ -365,6 +370,34 @@ void test('expectCurrent races and other artifacts refuse; replacePending abando
   assert.deepEqual(
     [state?.revision, state?.snapshotId, state?.count],
     [2, 'snap-1', 3],
+  );
+  // A replaced publication hands its record on, with the tiles it changed.
+  assert.deepEqual(
+    (
+      await convex.run((ctx) => ctx.db.query('placePublications').collect())
+    ).map(({ revision, snapshotId, tiles, completedAt, source }) => ({
+      revision,
+      snapshotId,
+      tiles,
+      completed: completedAt !== undefined,
+      source,
+    })),
+    [
+      {
+        revision: 1,
+        snapshotId: 'snap-1',
+        tiles: 3,
+        completed: true,
+        source: undefined,
+      },
+      {
+        revision: 2,
+        snapshotId: 'snap-1',
+        tiles: 1,
+        completed: true,
+        source: { dataAsOf: 5, regions: 2 },
+      },
+    ],
   );
 });
 

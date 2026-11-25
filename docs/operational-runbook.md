@@ -36,6 +36,11 @@ account's owner can use **Check Strava for missing activities** in Settings
 (at most once an hour), or an operator can send the write bridge's `sweepNow`
 operation for the account.
 
+If `/admin` says that re-matching stopped, the walk over a publication's changed
+tiles ended before it was done. A daily job starts it again. To start it
+sooner, run `pnpm exec convex run maintenance:resumeRematchWalks` in `backend/`
+against the production deployment. Repeating it is harmless.
+
 A `blocked` job waits for the account's Strava credentials to change, for
 example after a reconnect.
 
