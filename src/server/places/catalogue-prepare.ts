@@ -72,6 +72,12 @@ async function implementationHash(files: string[]) {
   );
 }
 
+/** The peaks, passes and huts one region may select, named or not, and
+ * their serialized size: all are held in memory. Spain, the largest region
+ * measured, selects 100,097 sources of 25 MB and peaks at 1.6 GB. */
+const MAX_SELECTED_SOURCES = 500_000;
+const MAX_SELECTED_BYTES = 268_435_456;
+
 /** Entire preparation runs in Node. Only selected sources and hut dependencies
  * are retained across streaming passes; no global node-location index is built.
  * Preparation has no database access and requires a complete current snapshot. */
@@ -110,11 +116,15 @@ export async function prepareCatalogue(input: {
       const key = sourceKey(source);
       if (sources.has(key))
         throw new Error(`Duplicate selected source identity: ${key}`);
-      if (sources.size >= 100_000)
-        throw new Error('Catalogue exceeds the 100000 selected source limit');
+      if (sources.size >= MAX_SELECTED_SOURCES)
+        throw new Error(
+          `Catalogue exceeds the ${MAX_SELECTED_SOURCES} selected source limit`,
+        );
       selectedBytes += Buffer.byteLength(canonicalJson(source));
-      if (selectedBytes > 67_108_864)
-        throw new Error('Selected sources exceed the 64 MiB preparation limit');
+      if (selectedBytes > MAX_SELECTED_BYTES)
+        throw new Error(
+          'Selected sources exceed the 256 MiB preparation limit',
+        );
       sources.set(key, source);
     },
   });
