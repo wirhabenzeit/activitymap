@@ -95,6 +95,22 @@ export function lastSyncAt(user: AdminUser) {
 export const disconnected = (user: AdminUser) =>
   user.revokedAt !== null || !user.active;
 
+/**
+ * Set apart the library records that belong to nobody: inactive and without
+ * a sign-in record. They are no users, and one can share its athlete ID with
+ * a real library (records are keyed by user ID).
+ */
+export function withoutLeftovers(records: readonly AdminUser[]) {
+  const users = records.filter((user) => user.active || user.hasAccount);
+  return { users, leftovers: records.length - users.length };
+}
+
+/** The user an athlete ID names: the active one if two records share it. */
+export function userByAthlete(users: readonly AdminUser[], athleteId: string) {
+  const found = users.filter((user) => user.athleteId === athleteId);
+  return found.find((user) => user.active) ?? found[0];
+}
+
 export const mustReconnect = (user: AdminUser) =>
   !disconnected(user) &&
   (user.jobs.blocked.activities + user.jobs.blocked.matches > 0 ||
@@ -173,6 +189,12 @@ export function problems(snapshot: AdminSnapshot): Problem[] {
       tone: 'warn',
       tab: 'places',
       text: `Catalogue revision ${pending.revision} begun ${ago(pending.startedAt, now)} and not completed`,
+    });
+  if (snapshot.leftovers > 0)
+    found.push({
+      tone: 'warn',
+      tab: 'users',
+      text: `${number(snapshot.leftovers)} leftover library ${snapshot.leftovers === 1 ? 'record' : 'records'} without an account`,
     });
   if (snapshot.subscription === 'missing')
     found.push({

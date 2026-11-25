@@ -42,6 +42,9 @@ export const adminUserSchema = z.strictObject({
   athleteId: z.string().regex(/^[1-9][0-9]{0,19}$/),
   createdAt: time,
   active: z.boolean(),
+  /** Whether a sign-in record belongs to the library. A backend from before
+   * this field does not say; it deploys separately from the app. */
+  hasAccount: z.boolean().default(true),
   revokedAt: time.nullable(),
   erasureDueAt: time.nullable(),
   counts: z
@@ -97,6 +100,9 @@ export type PushSubscription =
   | 'not_managed';
 
 export type AdminSnapshot = AdminOverview & {
+  /** Library records that belong to a user. */
   users: AdminUser[];
+  /** How many do not: see `withoutLeftovers`. */
+  leftovers: number;
   subscription: PushSubscription;
 };

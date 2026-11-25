@@ -57,9 +57,13 @@ const fetcher = (convex: Convex) =>
 
 const figures = (convex: Convex) => readAdminFigures(fetcher(convex));
 
-const provision = (convex: Convex, athleteId: string) =>
+const provision = (
+  convex: Convex,
+  athleteId: string,
+  userId = `user-${athleteId}`,
+) =>
   convex.mutation(internal.owners.provision, {
-    userId: `user-${athleteId}`,
+    userId,
     athleteId,
     epoch: `epoch-${athleteId.padStart(16, '0')}`,
     backend: 'convex',
@@ -189,6 +193,7 @@ void test('a user is counts, states and times, and nothing personal', async () =
   assert.deepEqual(user, {
     athleteId: '42',
     active: true,
+    hasAccount: true,
     revokedAt: now - 50,
     erasureDueAt: now + 50,
     counts: {
@@ -218,6 +223,34 @@ void test('a user is counts, states and times, and nothing personal', async () =
       oldestDueAt: now - 600,
     },
   });
+});
+
+void test('a revoked library without a sign-in record is told apart from one with', async () => {
+  const convex = convexTest(schema, modules);
+  const stale = await provision(convex, '42', 'earlier-user');
+  const real = await provision(convex, '42');
+  await convex.run(async (ctx) => {
+    await ctx.db.patch('owners', stale, { revoked: true, writer: 'convex' });
+    await ctx.db.patch('owners', real, { writer: 'convex' });
+    await ctx.db.insert('authRecords', {
+      model: 'account',
+      key: 'a1',
+      userId: 'user-42',
+      doc: { id: 'a1', providerId: 'strava', userId: 'user-42' },
+    });
+  });
+  const { users } = await figures(convex);
+  assert.deepEqual(
+    users.map(({ athleteId, active, hasAccount }) => ({
+      athleteId,
+      active,
+      hasAccount,
+    })),
+    [
+      { athleteId: '42', active: false, hasAccount: false },
+      { athleteId: '42', active: true, hasAccount: true },
+    ],
+  );
 });
 
 void test('the catalogue, its changed tiles and the request budget', async () => {

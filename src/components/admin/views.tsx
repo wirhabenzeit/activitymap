@@ -26,6 +26,8 @@ import { Box, Figures, Mark, Meter, Row, Section, State } from './parts';
 
 type Props = { snapshot: AdminSnapshot };
 
+/** Athlete IDs need not be unique among library records. */
+const userKey = (user: AdminUser) => `${user.athleteId}-${user.createdAt}`;
 const userHref = (user: AdminUser) => `/admin/users/${user.athleteId}`;
 
 function ProblemRow({
@@ -95,49 +97,59 @@ export function OverviewView({ snapshot }: Props) {
 
 export function UsersView({ snapshot }: Props) {
   const now = snapshot.observedAt;
+  const { leftovers } = snapshot;
   const cell = 'px-3.5 py-2.5 max-sm:px-2.5';
   return (
-    <div className="overflow-x-auto rounded-lg border bg-card">
-      <table className="w-full text-sm tabular-nums">
-        <thead className="text-left text-xs text-muted-foreground">
-          <tr>
-            <th className={`${cell} font-medium`}>Athlete</th>
-            <th className={`${cell} font-medium`}>State</th>
-            <th className={`${cell} text-right font-medium max-sm:hidden`}>
-              Activities
-            </th>
-            <th className={`${cell} text-right font-medium`}>Last sync</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y border-t">
-          {snapshot.users.map((user) => {
-            const state = userState(user, now);
-            return (
-              <tr key={user.athleteId}>
-                <td className={cell}>
-                  <Link
-                    href={userHref(user)}
-                    prefetch={false}
-                    className="underline underline-offset-4"
-                  >
-                    {user.athleteId}
-                  </Link>
-                </td>
-                <td className={cell}>
-                  <State tone={state.tone}>{state.text}</State>
-                </td>
-                <td className={`${cell} text-right max-sm:hidden`}>
-                  {user.counts ? number(user.counts.activities) : '–'}
-                </td>
-                <td className={`${cell} text-right text-muted-foreground`}>
-                  {ago(lastSyncAt(user), now)}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <>
+      <div className="overflow-x-auto rounded-lg border bg-card">
+        <table className="w-full text-sm tabular-nums">
+          <thead className="text-left text-xs text-muted-foreground">
+            <tr>
+              <th className={`${cell} font-medium`}>Athlete</th>
+              <th className={`${cell} font-medium`}>State</th>
+              <th className={`${cell} text-right font-medium max-sm:hidden`}>
+                Activities
+              </th>
+              <th className={`${cell} text-right font-medium`}>Last sync</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y border-t">
+            {snapshot.users.map((user) => {
+              const state = userState(user, now);
+              return (
+                <tr key={userKey(user)}>
+                  <td className={cell}>
+                    <Link
+                      href={userHref(user)}
+                      prefetch={false}
+                      className="underline underline-offset-4"
+                    >
+                      {user.athleteId}
+                    </Link>
+                  </td>
+                  <td className={cell}>
+                    <State tone={state.tone}>{state.text}</State>
+                  </td>
+                  <td className={`${cell} text-right max-sm:hidden`}>
+                    {user.counts ? number(user.counts.activities) : '–'}
+                  </td>
+                  <td className={`${cell} text-right text-muted-foreground`}>
+                    {ago(lastSyncAt(user), now)}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {leftovers > 0 && (
+        <p className="text-sm text-muted-foreground">
+          {number(leftovers)} more library{' '}
+          {leftovers === 1 ? 'record is' : 'records are'} inactive, without an
+          account. Erase with <code>erasure:start</code> on the Convex backend.
+        </p>
+      )}
+    </>
   );
 }
 
@@ -257,7 +269,7 @@ function Unfinished({
       <Box>
         {rows.map(({ user, value }) => (
           <Row
-            key={user.athleteId}
+            key={userKey(user)}
             href={userHref(user)}
             label={user.athleteId}
             value={value}

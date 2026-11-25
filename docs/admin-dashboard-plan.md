@@ -116,6 +116,7 @@ Revisions 1 to 3 predate them; unknown values show as "–".
 | User must reconnect (rejected credentials)                         | Warning |
 | Failed activities or matches                                       | Warning |
 | Catalogue apply pending over 2 h                                   | Warning |
+| Library record that is inactive and has no account                 | Warning |
 | Source data older than 14 days                                     | Warning |
 
 One pure function in `src/lib/admin/`, with a test per rule. A reached request

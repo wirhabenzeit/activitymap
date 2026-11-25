@@ -1,5 +1,6 @@
 import 'server-only';
 
+import { withoutLeftovers } from '~/lib/admin/health';
 import { requireAdmin } from '~/server/auth/admin';
 
 import type { AdminSnapshot } from './contract';
@@ -14,5 +15,5 @@ export async function loadAdminSnapshot(): Promise<AdminSnapshot> {
     readAdminFigures(),
     pushSubscription(),
   ]);
-  return { ...figures, subscription };
+  return { ...figures, ...withoutLeftovers(figures.users), subscription };
 }

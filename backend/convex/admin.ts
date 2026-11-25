@@ -111,8 +111,9 @@ const timeOf = (value: unknown) => {
   return Number.isFinite(time) ? time : null;
 };
 
-/** When Strava access was withdrawn and the erasure is due, from the
- * sign-in record. Nothing else of it is read out. */
+/** Whether anyone can sign in to the library, and when Strava access was
+ * withdrawn and the erasure is due, from the sign-in record. Nothing else of
+ * it is read out. */
 async function access(ctx: QueryCtx, userId: string) {
   const accounts = await ctx.db
     .query('authRecords')
@@ -124,6 +125,7 @@ async function access(ctx: QueryCtx, userId: string) {
     .map((record) => record.doc as Record<string, unknown>)
     .find((doc) => doc.providerId === 'strava');
   return {
+    hasAccount: accounts.length > 0,
     revokedAt: timeOf(account?.revokedAt),
     erasureDueAt: timeOf(account?.scheduledErasureAt),
   };
